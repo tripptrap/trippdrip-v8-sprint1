@@ -59,12 +59,27 @@ model Lead {
   status      String   @default("active")
   disposition String?  // 'sold' | 'not_interested' | 'callback' | etc.
 
+  // Lead Scoring
+  score       Int      @default(0) // 0-100 score based on engagement
+  temperature String   @default("cold") // 'hot' | 'warm' | 'cold'
+  lastEngaged DateTime? @map("last_engaged") // Last time lead responded
+
+  // Follow-up tracking
+  followUpDate DateTime? @map("follow_up_date")
+  followUpNote String?   @map("follow_up_note")
+  snoozedUntil DateTime? @map("snoozed_until")
+
   // AI-generated fields
   aiTags      String[] @map("ai_tags") @default([])
   aiNotes     String?  @map("ai_notes")
 
   // Campaign tracking
   campaignIds String[] @map("campaign_ids") @default([])
+
+  // Engagement metrics
+  responseRate Float    @default(0) @map("response_rate") // % of messages they respond to
+  totalSent    Int      @default(0) @map("total_sent")
+  totalReceived Int     @default(0) @map("total_received")
 
   // Metadata
   source      String?
@@ -76,11 +91,15 @@ model Lead {
   // Relations
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages    Message[]
+  followUps   FollowUp[]
 
   @@index([userId])
   @@index([phone])
   @@index([email])
   @@index([tags])
+  @@index([score])
+  @@index([temperature])
+  @@index([followUpDate])
   @@map("leads")
 }
 
@@ -142,8 +161,12 @@ model Message {
   body        String
 
   // Status
-  status      String   @default("pending") // 'pending' | 'sent' | 'delivered' | 'failed' | 'read'
+  status      String   @default("pending") // 'pending' | 'sent' | 'delivered' | 'failed' | 'read' | 'scheduled'
   error       String?
+
+  // Scheduling
+  scheduledFor DateTime? @map("scheduled_for") // When to send this message
+  sentAt       DateTime? @map("sent_at") // When actually sent
 
   // External IDs
   twilioSid   String?  @map("twilio_sid")
@@ -173,6 +196,7 @@ model Message {
   @@index([channel])
   @@index([direction])
   @@index([status])
+  @@index([scheduledFor])
   @@index([createdAt])
   @@map("messages")
 }
@@ -227,4 +251,39 @@ model ImportHistory {
   @@index([userId])
   @@index([createdAt])
   @@map("import_history")
+}
+
+// Follow-up Model (Smart Follow-up System)
+model FollowUp {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  leadId      String   @map("lead_id")
+
+  type        String   // 'callback' | 'reminder' | 'auto_sequence' | 'manual'
+  status      String   @default("pending") // 'pending' | 'completed' | 'cancelled' | 'snoozed'
+
+  // Scheduling
+  dueDate     DateTime @map("due_date")
+  completedAt DateTime? @map("completed_at")
+
+  // Content
+  note        String?
+  messageBody String?  @map("message_body") // Pre-written message to send
+
+  // Auto-sequence tracking
+  sequenceId  String?  @map("sequence_id") // Groups related follow-ups
+  sequenceStep Int?    @map("sequence_step") // Step number in sequence
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([type])
+  @@map("follow_ups")
 }
