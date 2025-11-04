@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // The access password - change this to whatever you want
-const ACCESS_PASSWORD = 'TrippDrip2025$ecure!Preview';
+const ACCESS_PASSWORD = '90EJYFzWmtIJhz/kWeM+E5tD5mqXAERVrn4EskVL';
 
 export function middleware(request: NextRequest) {
   // Allow access to the auth page and API routes

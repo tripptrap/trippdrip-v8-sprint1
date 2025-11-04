@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ACCESS_PASSWORD = 'TrippDrip2025$ecure!Preview';
+const ACCESS_PASSWORD = '90EJYFzWmtIJhz/kWeM+E5tD5mqXAERVrn4EskVL';
 
 export async function POST(request: NextRequest) {
   try {
