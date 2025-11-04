@@ -5,8 +5,9 @@ import type { NextRequest } from 'next/server';
 const ACCESS_PASSWORD = 'TrippDrip2025$ecure!Preview';
 
 export function middleware(request: NextRequest) {
-  // Check if user is trying to access the auth page
-  if (request.nextUrl.pathname === '/site-access') {
+  // Allow access to the auth page and API routes
+  if (request.nextUrl.pathname === '/site-access' ||
+      request.nextUrl.pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 
