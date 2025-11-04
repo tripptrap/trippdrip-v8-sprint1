@@ -1,0 +1,225 @@
+// Prisma Schema for TrippDrip v8
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model with balances
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+
+  // Balances
+  appBalance    Float     @default(0) @map("app_balance")
+  pointsBalance Float     @default(0) @map("points_balance")
+  twilioBalance Float     @default(0) @map("twilio_balance")
+
+  // Twilio Integration
+  twilioAccountSid String? @map("twilio_account_sid")
+  twilioAuthToken  String? @map("twilio_auth_token")
+  twilioPhoneNumbers String[] @map("twilio_phone_numbers")
+
+  // Email Integration
+  emailProvider    String? @map("email_provider")
+  emailConfig      Json?   @map("email_config")
+
+  // Settings
+  settings      Json?
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  leads         Lead[]
+  campaigns     Campaign[]
+  messages      Message[]
+  transactions  Transaction[]
+
+  @@map("users")
+}
+
+// Lead Model
+model Lead {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+
+  firstName   String?  @map("first_name")
+  lastName    String?  @map("last_name")
+  phone       String?
+  email       String?
+  state       String?
+  tags        String[]
+  status      String   @default("active")
+
+  // AI-generated fields
+  aiTags      String[] @map("ai_tags") @default([])
+  aiNotes     String?  @map("ai_notes")
+
+  // Campaign tracking
+  campaignIds String[] @map("campaign_ids") @default([])
+
+  // Metadata
+  source      String?
+  customFields Json?  @map("custom_fields")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@index([userId])
+  @@index([phone])
+  @@index([email])
+  @@index([tags])
+  @@map("leads")
+}
+
+// Campaign Model
+model Campaign {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+
+  name        String
+  description String?
+
+  // Campaign settings
+  channel     String   // 'sms' | 'email' | 'both'
+  message     String
+
+  // Filters
+  tags        String[]
+  leadIds     String[] @map("lead_ids") @default([])
+
+  // Stats
+  totalLeads  Int      @default(0) @map("total_leads")
+  messagesSent Int     @default(0) @map("messages_sent")
+  messagesDelivered Int @default(0) @map("messages_delivered")
+  messagesFailed Int @default(0) @map("messages_failed")
+
+  // Status
+  status      String   @default("draft") // 'draft' | 'running' | 'completed' | 'failed'
+
+  // Scheduling
+  scheduledAt DateTime? @map("scheduled_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+// Message Model (SMS & Email)
+model Message {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  leadId      String   @map("lead_id")
+
+  // Message details
+  channel     String   // 'sms' | 'email'
+  direction   String   // 'in' | 'out'
+  sender      String   // 'agent' | 'lead' | 'ai'
+
+  // Content
+  subject     String?  // For emails
+  body        String
+
+  // Status
+  status      String   @default("pending") // 'pending' | 'sent' | 'delivered' | 'failed' | 'read'
+  error       String?
+
+  // External IDs
+  twilioSid   String?  @map("twilio_sid")
+  emailId     String?  @map("email_id")
+
+  // Campaign tracking
+  campaignId  String?  @map("campaign_id")
+
+  // AI features
+  aiGenerated Boolean  @default(false) @map("ai_generated")
+
+  // Costs
+  pointsCost  Float    @default(0) @map("points_cost")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([channel])
+  @@index([direction])
+  @@index([status])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// Transaction Model (Points, Payments)
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+
+  type        String   // 'purchase' | 'spend' | 'refund' | 'adjustment'
+  category    String   // 'points' | 'app_balance' | 'twilio_balance'
+  amount      Float
+
+  description String
+  actionType  String?  @map("action_type") // 'sms_sent' | 'ai_response' | etc.
+
+  // Stripe/Payment details
+  stripeSessionId String? @map("stripe_session_id")
+  stripePaymentId String? @map("stripe_payment_id")
+
+  // Balances after transaction
+  balanceAfter Float   @map("balance_after")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+// Import History (for undo feature)
+model ImportHistory {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+
+  fileName    String?  @map("file_name")
+  leadsCount  Int      @map("leads_count")
+
+  // Backup data
+  backupData  Json     @map("backup_data")
+  leadIds     String[] @map("lead_ids")
+
+  undone      Boolean  @default(false)
+  undoneAt    DateTime? @map("undone_at")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("import_history")
+}

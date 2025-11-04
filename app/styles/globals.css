@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark theme with proper contrast */
+html, body {
+  height: 100%;
+  background: #0b0f14;
+  color: #e6e9f0;
+}
+
+/* Ensure text is readable on light backgrounds */
+.card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 1rem;
+  color: #e6e9f0;
+}
+
+/* Light card variant for better contrast */
+.card-light {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1rem;
+  color: #111827; /* Dark text on light background */
+}
+
+/* Text utilities */
+.text-dark { color: #111827; }
+.text-light { color: #e6e9f0; }
+.text-muted { color: #9ca3af; }
+.text-muted-dark { color: #6b7280; }
+
+/* Background utilities */
+.bg-card-light {
+  background: #ffffff;
+  color: #111827;
+}
+
+.bg-card-dark {
+  background: rgba(255,255,255,0.06);
+  color: #e6e9f0;
+}
+
+/* Button improvements */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+/* Dark inputs (default for dark theme) */
+.input-dark {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #e6e9f0 !important;
+}
+
+.input-dark::placeholder {
+  color: rgba(255,255,255,0.4) !important;
+}
+
+/* Light inputs for light backgrounds */
+.input-light {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827 !important;
+}
+
+.input-light::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Table improvements */
+table {
+  color: #e6e9f0;
+}
+
+table thead {
+  background: rgba(255,255,255,0.08);
+}
+
+table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+/* Light table */
+.table-light {
+  color: #111827;
+}
+
+.table-light thead {
+  background: #f9fafb;
+}
+
+.table-light tbody tr:hover {
+  background: #f3f4f6;
+}
+
+/* Toast notifications positioning */
+.toaster-container {
+  z-index: 9999;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Container */
+.container {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}

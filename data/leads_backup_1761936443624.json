@@ -1,0 +1,5 @@
+[
+  { "id": 1, "first_name": "Ava",  "last_name": "Nguyen", "email": "ava@example.com",  "phone": "+18135550101", "state": "FL", "tags": ["Warm","Followup"], "status": "Active" },
+  { "id": 2, "first_name": "Noah", "last_name": "Miller", "email": "noah@example.com", "phone": "+18135550102", "state": "NC", "tags": ["New"],            "status": "New" },
+  { "id": 3, "first_name": "Mia",  "last_name": "Lopez",  "email": "mia@example.com",  "phone": "+18135550103", "state": "TX", "tags": ["Followup"],       "status": "Active" }
+]

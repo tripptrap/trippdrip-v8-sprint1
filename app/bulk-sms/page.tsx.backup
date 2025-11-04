@@ -1,0 +1,552 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { getPointsBalance, canAffordAction, spendPointsForAction } from '@/lib/pointsStore';
+import { loadSettings } from '@/lib/settingsStore';
+import { checkSpamRisk } from '@/lib/spamDetection';
+
+type Lead = {
+  phone: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+};
+
+type SendResult = {
+  phone: string;
+  success: boolean;
+  messageId?: string;
+  error?: string;
+};
+
+export default function BulkSMSPage() {
+  const [step, setStep] = useState<'input' | 'compose' | 'review' | 'sending' | 'results'>('input');
+
+  // Input step
+  const [inputMethod, setInputMethod] = useState<'paste' | 'file'>('paste');
+  const [textInput, setTextInput] = useState('');
+  const [leads, setLeads] = useState<Lead[]>([]);
+
+  // Compose step
+  const [message, setMessage] = useState('');
+  const [fromNumber, setFromNumber] = useState('');
+
+  // System checks
+  const [pointsBalance, setPointsBalance] = useState(0);
+  const [availableNumbers, setAvailableNumbers] = useState<string[]>([]);
+  const [hasAccount, setHasAccount] = useState(false);
+
+  // Results
+  const [sendResults, setSendResults] = useState<SendResult[]>([]);
+  const [sending, setSending] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    loadUserSettings();
+  }, []);
+
+  function loadUserSettings() {
+    const balance = getPointsBalance();
+    setPointsBalance(balance);
+
+    const settings = loadSettings();
+    setHasAccount(!!settings.twilio?.accountSid);
+    setAvailableNumbers(settings.twilio?.phoneNumbers || []);
+    if (settings.twilio?.phoneNumbers?.length) {
+      setFromNumber(settings.twilio.phoneNumbers[0]);
+    }
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      parseLeads(text);
+    };
+    reader.readAsText(file);
+  }
+
+  function parseLeads(text: string) {
+    const lines = text.split('\n').filter(line => line.trim());
+    const parsed: Lead[] = [];
+
+    for (const line of lines) {
+      const parts = line.split(',').map(p => p.trim());
+
+      if (parts.length >= 1) {
+        const phone = parts[0].replace(/\D/g, '');
+        if (phone.length >= 10) {
+          const formattedPhone = phone.length === 10 ? `+1${phone}` : `+${phone}`;
+
+          parsed.push({
+            phone: formattedPhone,
+            firstName: parts[1] || undefined,
+            lastName: parts[2] || undefined,
+            name: parts[1] ? `${parts[1]} ${parts[2] || ''}`.trim() : undefined
+          });
+        }
+      }
+    }
+
+    setLeads(parsed);
+    setStep('compose');
+  }
+
+  function handlePasteLeads() {
+    parseLeads(textInput);
+  }
+
+  async function handleSendBulk() {
+    if (!message.trim()) {
+      alert('Please enter a message');
+      return;
+    }
+
+    if (leads.length === 0) {
+      alert('No leads to send to');
+      return;
+    }
+
+    const spamCheck = checkSpamRisk(message, leads.length);
+    if (spamCheck.blocked) {
+      alert(`Message blocked: ${spamCheck.flags.join(', ')}\n\nRecommendations:\n${spamCheck.recommendations.join('\n')}`);
+      return;
+    }
+
+    if (spamCheck.level === 'high' || spamCheck.level === 'medium') {
+      if (!confirm(`Spam risk detected (${spamCheck.level}): ${spamCheck.flags.join(', ')}\n\nDo you want to continue?`)) {
+        return;
+      }
+    }
+
+    const totalCost = leads.length;
+    if (!canAffordAction('sms_sent', leads.length)) {
+      alert(`Insufficient points. You need ${totalCost} points but have ${pointsBalance}.\n\nPlease purchase more points.`);
+      return;
+    }
+
+    if (!hasAccount) {
+      alert('SMS account not active. Please purchase a point pack to activate your account.');
+      return;
+    }
+
+    if (availableNumbers.length === 0) {
+      alert('No phone numbers configured. Please add a phone number in Settings.');
+      return;
+    }
+
+    if (!confirm(`Send to ${leads.length} recipients?\n\nCost: ${totalCost} points\nYour balance: ${pointsBalance} points`)) {
+      return;
+    }
+
+    setStep('sending');
+    setSending(true);
+    setSendResults([]);
+    setProgress(0);
+
+    const settings = loadSettings();
+    const twilioConfig = settings.twilio;
+
+    const results: SendResult[] = [];
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i];
+
+      let personalizedMessage = message;
+      if (lead.firstName) {
+        personalizedMessage = personalizedMessage.replace(/\{\{first\}\}/gi, lead.firstName);
+      }
+      if (lead.lastName) {
+        personalizedMessage = personalizedMessage.replace(/\{\{last\}\}/gi, lead.lastName);
+      }
+      if (lead.name) {
+        personalizedMessage = personalizedMessage.replace(/\{\{name\}\}/gi, lead.name);
+      }
+
+      try {
+        const response = await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: lead.phone,
+            from: fromNumber,
+            message: personalizedMessage,
+            accountSid: twilioConfig?.accountSid,
+            authToken: twilioConfig?.authToken
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          results.push({
+            phone: lead.phone,
+            success: true,
+            messageId: result.messageId
+          });
+          spendPointsForAction('sms_sent', 1);
+        } else {
+          results.push({
+            phone: lead.phone,
+            success: false,
+            error: result.error || 'Send failed'
+          });
+        }
+      } catch (error) {
+        results.push({
+          phone: lead.phone,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+
+      setProgress(Math.round(((i + 1) / leads.length) * 100));
+      setSendResults([...results]);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    setSending(false);
+    setStep('results');
+    loadUserSettings();
+  }
+
+  function reset() {
+    setStep('input');
+    setLeads([]);
+    setMessage('');
+    setTextInput('');
+    setSendResults([]);
+    setProgress(0);
+    loadUserSettings();
+  }
+
+  const successCount = sendResults.filter(r => r.success).length;
+  const failedCount = sendResults.filter(r => !r.success).length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Bulk SMS</h1>
+        <p className="text-[var(--muted)] mt-1">Send messages to a large number of leads at once</p>
+      </div>
+
+      {/* Status Bar */}
+      <div className="flex items-center gap-4 text-sm">
+        <div className={`px-3 py-1 rounded-full ${step === 'input' ? 'bg-blue-500/20 text-blue-300' : 'bg-white/5 text-[var(--muted)]'}`}>
+          1. Import Leads
+        </div>
+        <div className={`px-3 py-1 rounded-full ${step === 'compose' ? 'bg-blue-500/20 text-blue-300' : 'bg-white/5 text-[var(--muted)]'}`}>
+          2. Compose Message
+        </div>
+        <div className={`px-3 py-1 rounded-full ${step === 'review' || step === 'sending' ? 'bg-blue-500/20 text-blue-300' : 'bg-white/5 text-[var(--muted)]'}`}>
+          3. Review & Send
+        </div>
+        <div className={`px-3 py-1 rounded-full ${step === 'results' ? 'bg-green-500/20 text-green-300' : 'bg-white/5 text-[var(--muted)]'}`}>
+          4. Results
+        </div>
+      </div>
+
+      {/* Account Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card">
+          <div className="text-sm text-[var(--muted)] mb-1">Points Balance</div>
+          <div className="text-2xl font-bold text-white">{pointsBalance.toLocaleString()}</div>
+          <div className="text-xs text-[var(--muted)]">1 point per SMS</div>
+        </div>
+        <div className="card">
+          <div className="text-sm text-[var(--muted)] mb-1">SMS Account</div>
+          <div className={`text-lg font-semibold ${hasAccount ? 'text-green-400' : 'text-red-400'}`}>
+            {hasAccount ? 'Active' : 'Not Active'}
+          </div>
+          {!hasAccount && <a href="/points" className="text-xs text-blue-400 hover:underline">Activate now</a>}
+        </div>
+        <div className="card">
+          <div className="text-sm text-[var(--muted)] mb-1">Phone Numbers</div>
+          <div className="text-2xl font-bold text-white">{availableNumbers.length}</div>
+          {availableNumbers.length === 0 && <a href="/settings" className="text-xs text-blue-400 hover:underline">Add number</a>}
+        </div>
+      </div>
+
+      {/* Step 1: Input */}
+      {step === 'input' && (
+        <div className="card space-y-4">
+          <h2 className="text-xl font-semibold text-white">Import Leads</h2>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setInputMethod('paste')}
+              className={`px-4 py-2 rounded-lg ${inputMethod === 'paste' ? 'bg-blue-500 text-white' : 'bg-white/5 text-[var(--muted)] hover:bg-white/10'}`}
+            >
+              Paste Text
+            </button>
+            <button
+              onClick={() => setInputMethod('file')}
+              className={`px-4 py-2 rounded-lg ${inputMethod === 'file' ? 'bg-blue-500 text-white' : 'bg-white/5 text-[var(--muted)] hover:bg-white/10'}`}
+            >
+              Upload File
+            </button>
+          </div>
+
+          {inputMethod === 'paste' ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-white">
+                Paste phone numbers (one per line, or CSV format: phone,firstName,lastName)
+              </label>
+              <textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="12345678901&#10;12345678902,John,Doe&#10;12345678903,Jane,Smith"
+                className="input-dark w-full h-48 px-3 py-2 rounded-lg font-mono text-sm"
+              />
+              <button
+                onClick={handlePasteLeads}
+                disabled={!textInput.trim()}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                Parse & Continue
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-white">
+                Upload CSV or TXT file
+              </label>
+              <input
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleFileUpload}
+                className="block w-full text-sm text-[var(--muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-500/20 file:text-blue-300 hover:file:bg-blue-500/30"
+              />
+              <p className="text-xs text-[var(--muted)]">
+                Format: phone,firstName,lastName (one per line)
+              </p>
+            </div>
+          )}
+
+          <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+            <h3 className="font-medium text-blue-300 mb-2">Supported Formats</h3>
+            <ul className="text-sm text-blue-200 space-y-1">
+              <li>• Phone numbers only: 12345678901</li>
+              <li>• With name: 12345678901,John,Doe</li>
+              <li>• Any US/international format (will auto-format)</li>
+              <li>• Use {`{{first}}`} and {`{{last}}`} in message for personalization</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Compose */}
+      {step === 'compose' && (
+        <div className="space-y-4">
+          <div className="card">
+            <h2 className="text-xl font-semibold text-white mb-4">Compose Message</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white mb-1">
+                  From Number
+                </label>
+                <select
+                  value={fromNumber}
+                  onChange={(e) => setFromNumber(e.target.value)}
+                  className="input-dark w-full px-3 py-2 rounded-lg"
+                >
+                  {availableNumbers.map(num => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white mb-1">
+                  Message ({message.length}/160 characters)
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Hi {{first}}, this is your message..."
+                  className="input-dark w-full h-32 px-3 py-2 rounded-lg"
+                  maxLength={320}
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Use {`{{first}}`} for first name, {`{{last}}`} for last name
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStep('input')}
+                  className="px-6 py-2 bg-white/5 rounded-lg hover:bg-white/10 text-white"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => setStep('review')}
+                  disabled={!message.trim()}
+                  className="flex-1 bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Review & Send
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="font-semibold text-white mb-2">{leads.length} Recipients</h3>
+            <div className="max-h-48 overflow-y-auto text-sm space-y-1">
+              {leads.slice(0, 10).map((lead, i) => (
+                <div key={i} className="flex justify-between p-2 bg-white/5 rounded">
+                  <span className="text-white">{lead.name || 'Unknown'}</span>
+                  <span className="font-mono text-[var(--muted)]">{lead.phone}</span>
+                </div>
+              ))}
+              {leads.length > 10 && (
+                <div className="text-center text-[var(--muted)] py-2">
+                  ... and {leads.length - 10} more
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Review */}
+      {step === 'review' && (
+        <div className="card space-y-6">
+          <h2 className="text-xl font-semibold text-white">Review & Confirm</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-[var(--muted)]">Recipients</div>
+              <div className="text-2xl font-bold text-white">{leads.length}</div>
+            </div>
+            <div>
+              <div className="text-sm text-[var(--muted)]">Total Cost</div>
+              <div className="text-2xl font-bold text-white">{leads.length} points</div>
+            </div>
+            <div>
+              <div className="text-sm text-[var(--muted)]">From Number</div>
+              <div className="font-mono text-white">{fromNumber}</div>
+            </div>
+            <div>
+              <div className="text-sm text-[var(--muted)]">After Send Balance</div>
+              <div className="text-lg font-semibold text-white">{pointsBalance - leads.length} points</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm text-[var(--muted)] mb-2">Message Preview</div>
+            <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-white">
+              {message}
+            </div>
+            {leads[0]?.firstName && (
+              <div className="mt-2 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <div className="text-xs text-blue-300 mb-1">Example for {leads[0].name}:</div>
+                <div className="text-sm text-blue-200">
+                  {message.replace(/\{\{first\}\}/gi, leads[0].firstName || '').replace(/\{\{last\}\}/gi, leads[0].lastName || '')}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStep('compose')}
+              className="px-6 py-2 bg-white/5 rounded-lg hover:bg-white/10 text-white"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleSendBulk}
+              className="flex-1 bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 font-semibold"
+            >
+              Send to {leads.length} Recipients
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Sending */}
+      {step === 'sending' && (
+        <div className="card text-center space-y-4">
+          <div className="text-2xl font-semibold text-white">Sending Messages...</div>
+          <div className="text-4xl">📱</div>
+          <div className="text-xl text-white">{progress}%</div>
+          <div className="w-full bg-white/10 rounded-full h-4">
+            <div
+              className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="text-sm text-[var(--muted)]">
+            Sent {successCount + failedCount} of {leads.length}
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Results */}
+      {step === 'results' && (
+        <div className="space-y-4">
+          <div className="card">
+            <h2 className="text-xl font-semibold text-white mb-4">Send Complete!</h2>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-green-400">{successCount}</div>
+                <div className="text-sm text-[var(--muted)]">Successful</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-red-400">{failedCount}</div>
+                <div className="text-sm text-[var(--muted)]">Failed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white">{sendResults.length}</div>
+                <div className="text-sm text-[var(--muted)]">Total</div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-semibold text-white">Detailed Results</h3>
+              <div className="max-h-96 overflow-y-auto space-y-1">
+                {sendResults.map((result, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between p-3 rounded-lg ${
+                      result.success ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'
+                    }`}
+                  >
+                    <span className="font-mono text-white">{result.phone}</span>
+                    {result.success ? (
+                      <span className="text-green-400 font-medium">Sent</span>
+                    ) : (
+                      <span className="text-red-400 text-sm">{result.error}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={reset}
+                className="flex-1 bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+              >
+                Send Another Bulk Message
+              </button>
+              <a
+                href="/points"
+                className="px-6 py-2 bg-white/5 rounded-lg hover:bg-white/10 text-white"
+              >
+                Buy More Points
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
