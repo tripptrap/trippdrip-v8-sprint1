@@ -11,6 +11,8 @@ export type PointTransaction = {
   actionType?: ActionType; // Track what action caused this transaction
 };
 
+export type PlanType = 'basic' | 'premium';
+
 export type PointsData = {
   balance: number;
   transactions: PointTransaction[];
@@ -18,6 +20,7 @@ export type PointsData = {
   autoTopUp: boolean;
   autoTopUpThreshold: number;
   autoTopUpAmount: number;
+  planType: PlanType;
 };
 
 // Cost configuration for different actions
@@ -54,20 +57,21 @@ export function savePoints(data: PointsData): void {
 
 export function getDefaultPoints(): PointsData {
   return {
-    balance: 1000, // Starting balance with base plan
+    balance: 1000, // Starting balance with Basic plan
     transactions: [
       {
         id: Date.now().toString(),
         type: 'earn',
         amount: 1000,
-        description: 'Monthly renewal - Base plan',
+        description: 'Monthly renewal - Basic plan',
         timestamp: new Date().toISOString()
       }
     ],
     lastRenewal: new Date().toISOString(),
     autoTopUp: false,
     autoTopUpThreshold: 100,
-    autoTopUpAmount: 500
+    autoTopUpAmount: 500,
+    planType: 'basic'
   };
 }
 
@@ -225,8 +229,52 @@ export function checkMonthlyRenewal(): void {
                       (now.getMonth() - lastRenewal.getMonth());
 
   if (monthsSince >= 1) {
-    addPoints(1000, 'Monthly renewal - Base plan ($30)', 'earn');
+    const renewalAmount = data.planType === 'premium' ? 15000 : 1000;
+    const planName = data.planType === 'premium' ? 'Premium plan ($98.99)' : 'Basic plan ($30)';
+    addPoints(renewalAmount, `Monthly renewal - ${planName}`, 'earn');
     data.lastRenewal = now.toISOString();
     savePoints(data);
   }
+}
+
+// Get current plan type
+export function getCurrentPlan(): PlanType {
+  const data = loadPoints();
+  return data.planType || 'basic';
+}
+
+// Switch plan type
+export function switchPlan(planType: PlanType): PointsData {
+  const data = loadPoints();
+  const oldPlan = data.planType;
+  data.planType = planType;
+
+  // Add a transaction noting the plan change
+  const planName = planType === 'premium' ? 'Premium ($98.99/mo)' : 'Basic ($30/mo)';
+  data.transactions.unshift({
+    id: Date.now().toString(),
+    type: 'earn',
+    amount: 0,
+    description: `Switched to ${planName}`,
+    timestamp: new Date().toISOString()
+  });
+
+  savePoints(data);
+  return data;
+}
+
+// Get plan details
+export function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: number; name: string } {
+  if (planType === 'premium') {
+    return {
+      price: 98.99,
+      monthlyPoints: 15000,
+      name: 'Premium Plan'
+    };
+  }
+  return {
+    price: 30,
+    monthlyPoints: 1000,
+    name: 'Basic Plan'
+  };
 }

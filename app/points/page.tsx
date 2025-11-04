@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadPoints, addPoints, getRecentTransactions, getUsageStats, type PointTransaction } from "@/lib/pointsStore";
+import { loadPoints, addPoints, getRecentTransactions, getUsageStats, getCurrentPlan, switchPlan, getPlanDetails, type PointTransaction, type PlanType } from "@/lib/pointsStore";
 
 type PointPack = {
   name: string;
@@ -15,32 +15,34 @@ const POINT_PACKS: PointPack[] = [
   {
     name: "Starter",
     points: 4000,
-    price: 40,
+    price: 38,
+    discount: "5% off",
   },
   {
     name: "Pro",
     points: 10000,
-    price: 90,
-    discount: "10% off",
+    price: 85,
+    discount: "15% off",
     popular: true,
   },
   {
     name: "Business",
     points: 25000,
-    price: 212.50,
-    discount: "15% off",
+    price: 200,
+    discount: "20% off",
   },
   {
     name: "Enterprise",
     points: 60000,
-    price: 480,
-    discount: "20% off",
+    price: 450,
+    discount: "25% off",
   },
 ];
 
 export default function PointsPage() {
   const [balance, setBalance] = useState(1000);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<PlanType>('basic');
   const [stats, setStats] = useState({
     totalSpent: 0,
     totalEarned: 0,
@@ -130,6 +132,12 @@ export default function PointsPage() {
     setBalance(data.balance);
     setTransactions(getRecentTransactions(20));
     setStats(getUsageStats(7));
+    setCurrentPlan(getCurrentPlan());
+  }
+
+  function handlePlanSwitch(planType: PlanType) {
+    switchPlan(planType);
+    refreshData();
   }
 
   async function handlePurchase(pack: PointPack) {
@@ -189,9 +197,27 @@ export default function PointsPage() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-sm text-white/60 mb-1">Base Plan</div>
-            <div className="text-2xl font-bold">$30/mo</div>
-            <div className="text-xs text-white/60">+1,000 pts monthly</div>
+            <div className="text-sm text-white/60 mb-1">
+              {getPlanDetails(currentPlan).name}
+              {currentPlan === 'basic' && (
+                <button
+                  onClick={() => handlePlanSwitch('premium')}
+                  className="ml-2 text-xs bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-full hover:opacity-80 transition-opacity font-semibold"
+                >
+                  Upgrade to Premium
+                </button>
+              )}
+            </div>
+            <div className="text-2xl font-bold">${getPlanDetails(currentPlan).price}/mo</div>
+            <div className="text-xs text-white/60">+{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts monthly</div>
+            {currentPlan === 'premium' && (
+              <button
+                onClick={() => handlePlanSwitch('basic')}
+                className="mt-2 text-xs text-white/60 hover:text-white transition-colors underline"
+              >
+                Downgrade to Basic
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -327,11 +353,11 @@ export default function PointsPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-white/60">Plan:</span>
-            <span className="font-medium">Base Plan - $30/month</span>
+            <span className="font-medium">{getPlanDetails(currentPlan).name} - ${getPlanDetails(currentPlan).price}/month</span>
           </div>
           <div className="flex justify-between">
             <span className="text-white/60">Includes:</span>
-            <span className="font-medium">1,000 points monthly</span>
+            <span className="font-medium">{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} points monthly</span>
           </div>
           <div className="flex justify-between">
             <span className="text-white/60">Next renewal:</span>

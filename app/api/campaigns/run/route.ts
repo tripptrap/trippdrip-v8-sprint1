@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { calculateSMSCredits } from "@/lib/creditCalculator";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -92,11 +93,13 @@ export async function POST(req: Request) {
     // SMS sending logic
     const sendResults: SendResult[] = [];
     let pointsUsed = 0;
-    const costPerSMS = 1; // 1 point per SMS
+    let totalCreditsUsed = 0;
 
     if (sendSMS && messageTemplate) {
-      // Check if we have enough points
-      const totalCost = targetLeads.length * costPerSMS;
+      // Calculate credits per message based on character count
+      const creditCalc = calculateSMSCredits(messageTemplate, 0);
+      const creditsPerMessage = creditCalc.credits;
+      const totalCost = targetLeads.length * creditsPerMessage;
 
       if (userPoints < totalCost) {
         return NextResponse.json({
@@ -168,13 +171,18 @@ export async function POST(req: Request) {
           const result = await response.json();
 
           if (response.ok) {
+            // Calculate credits for this specific personalized message
+            const personalizedCreditCalc = calculateSMSCredits(personalizedMessage, 0);
+            const messageCredits = personalizedCreditCalc.credits;
+
             sendResults.push({
               leadId: String(lead.id),
               phone: lead.phone,
               success: true,
               messageId: result.sid
             });
-            pointsUsed += costPerSMS;
+            pointsUsed += messageCredits;
+            totalCreditsUsed += messageCredits;
           } else {
             sendResults.push({
               leadId: String(lead.id),
@@ -220,6 +228,7 @@ export async function POST(req: Request) {
       found.lead_count = found.lead_ids.length;
       found.updated_at = new Date().toISOString();
       found.messages_sent = (found.messages_sent || 0) + sendResults.filter(r => r.success).length;
+      found.credits_used = (found.credits_used || 0) + totalCreditsUsed;
       campaignId = String(found.id);
     } else {
       campaignId = `cmp_${Date.now()}`;
@@ -231,7 +240,8 @@ export async function POST(req: Request) {
         tags_applied: addTags,
         lead_ids: ids,
         lead_count: ids.length,
-        messages_sent: sendResults.filter(r => r.success).length
+        messages_sent: sendResults.filter(r => r.success).length,
+        credits_used: totalCreditsUsed
       });
     }
     fs.writeFileSync(campaignsFile, JSON.stringify(campaigns, null, 2), "utf8");
@@ -263,7 +273,8 @@ export async function POST(req: Request) {
         failed: failCount,
         details: sendResults
       },
-      pointsUsed
+      pointsUsed,
+      creditsUsed: totalCreditsUsed
     });
   } catch (e:any) {
     return NextResponse.json({ ok:false, error: e?.message || "Campaign run failed" }, { status:400 });

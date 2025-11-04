@@ -68,6 +68,9 @@ export default function LeadsPage() {
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
 
+  /* Disposition dropdown per lead */
+  const [dispositionMenuOpen, setDispositionMenuOpen] = useState<{ [key: string]: boolean }>({});
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
     for (const l of leads) (Array.isArray(l.tags) ? l.tags : []).forEach(t => set.add(String(t)));
@@ -102,6 +105,83 @@ export default function LeadsPage() {
       const j = await r.json();
       setTagsList(Array.isArray(j?.items) ? j.items : []);
     } catch { setTagsList([]); }
+  }
+
+  async function deleteLead(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/leads/delete?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.ok) {
+        setToast('Lead deleted successfully');
+        setTimeout(()=>setToast(''), 2500);
+        await fetchLeads();
+      } else {
+        setToast(`Error: ${data.error || 'Failed to delete lead'}`);
+        setTimeout(()=>setToast(''), 3500);
+      }
+    } catch (e: any) {
+      setToast(`Error: ${e?.message || 'Failed to delete lead'}`);
+      setTimeout(()=>setToast(''), 3500);
+    }
+  }
+
+  async function deleteSelectedLeads() {
+    if (selectedIds.size === 0) {
+      setToast('No leads selected');
+      setTimeout(()=>setToast(''), 2500);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} lead(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const ids = Array.from(selectedIds).join(',');
+      const res = await fetch(`/api/leads/delete?ids=${ids}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.ok) {
+        setToast(`${data.deletedCount} lead(s) deleted successfully`);
+        setTimeout(()=>setToast(''), 2500);
+        setSelectedIds(new Set());
+        await fetchLeads();
+      } else {
+        setToast(`Error: ${data.error || 'Failed to delete leads'}`);
+        setTimeout(()=>setToast(''), 3500);
+      }
+    } catch (e: any) {
+      setToast(`Error: ${e?.message || 'Failed to delete leads'}`);
+      setTimeout(()=>setToast(''), 3500);
+    }
+  }
+
+  async function updateDisposition(id: string, disposition: string) {
+    try {
+      const res = await fetch('/api/leads/disposition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, disposition })
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        setToast(`Lead disposition updated to: ${disposition}`);
+        setTimeout(()=>setToast(''), 2500);
+        await fetchLeads();
+      } else {
+        setToast(`Error: ${data.error || 'Failed to update disposition'}`);
+        setTimeout(()=>setToast(''), 3500);
+      }
+    } catch (e: any) {
+      setToast(`Error: ${e?.message || 'Failed to update disposition'}`);
+      setTimeout(()=>setToast(''), 3500);
+    }
   }
 
   useEffect(() => { fetchLeads(); fetchCampaigns(); fetchTags(); }, []);
@@ -531,6 +611,14 @@ export default function LeadsPage() {
             >
               Run Campaign
             </button>
+            {selectedIds.size > 0 && (
+              <button
+                className="rounded-md border border-[#5a2424] bg-[#2a0f0f] px-3 py-2 text-sm text-[#ff6b6b] hover:bg-[#3a1515]"
+                onClick={deleteSelectedLeads}
+              >
+                Delete Selected ({selectedIds.size})
+              </button>
+            )}
           </div>
         </div>
 
@@ -568,22 +656,24 @@ export default function LeadsPage() {
                 <th className="border-b border-[#1a2637] px-3 py-2">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
-                {["Name","Email","Phone","State","Tags","Status"].map(h => (
+                {["Name","Email","Phone","State","Tags","Status","Disposition","Actions"].map(h => (
                   <th key={h} className="border-b border-[#1a2637] px-3 py-2">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={7}>Loading…</td></tr>
+                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={9}>Loading…</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={7}>No leads found.</td></tr>
+                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={9}>No leads found.</td></tr>
               )}
               {!loading && filtered.map((l, i) => {
                 const name = [l.first_name, l.last_name].filter(Boolean).join(" ") || "—";
                 const id = String(l.id ?? i);
                 const checked = selectedIds.has(id);
+                const disposition = (l as any).disposition || "—";
+                const isMenuOpen = dispositionMenuOpen[id] || false;
                 return (
                   <tr key={id} className="border-t border-[#1a2637]">
                     <td className="px-3 py-2">
@@ -595,6 +685,38 @@ export default function LeadsPage() {
                     <td className="px-3 py-2">{l.state || "—"}</td>
                     <td className="px-3 py-2">{Array.isArray(l.tags) && l.tags.length ? l.tags.join(", ") : "—"}</td>
                     <td className="px-3 py-2">{l.status || "—"}</td>
+                    <td className="px-3 py-2 relative">
+                      <button
+                        className="text-sm text-[#9fb0c3] hover:text-[#e7eef9] underline"
+                        onClick={() => setDispositionMenuOpen(prev => ({ ...prev, [id]: !prev[id] }))}
+                      >
+                        {disposition === "—" ? "Set" : disposition.replace(/_/g, ' ')}
+                      </button>
+                      {isMenuOpen && (
+                        <div className="absolute left-0 mt-1 w-[160px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                          {['sold', 'not_interested', 'callback', 'qualified', 'nurture'].map(disp => (
+                            <button
+                              key={disp}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                              onClick={() => {
+                                updateDisposition(id, disp);
+                                setDispositionMenuOpen(prev => ({ ...prev, [id]: false }));
+                              }}
+                            >
+                              {disp.replace(/_/g, ' ')}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => deleteLead(id, name)}
+                        className="text-sm text-red-400 hover:text-red-300"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 );
               })}

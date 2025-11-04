@@ -1,0 +1,229 @@
+ABSOLUTE FILE PATHS - TRIPPDRIP V8 CODEBASE
+
+ROOT: /Applications/MAMP/htdocs/trippdrip-v8-sprint1
+
+=== CAMPAIGN MANAGEMENT ===
+Campaign Page Component:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/campaigns/page.tsx
+
+Campaign API Routes:
+  GET /api/campaigns
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/campaigns/route.ts
+  
+  POST /api/campaigns/run (execute campaign, send SMS)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/campaigns/run/route.ts
+
+Campaign LocalStorage Store:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/campaignsStore.ts
+
+=== LEAD MANAGEMENT ===
+Lead Management Page:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/leads/page.tsx
+
+Lead Table Component:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/components/leads/MainTable.tsx
+
+Lead API Routes:
+  GET /api/leads (basic filtering)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/leads/route.ts
+  
+  GET /api/leads/list (with tag aggregation)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/leads/list/route.ts
+  
+  POST /api/leads/import (bulk import)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/leads/import/route.ts
+  
+  POST /api/leads/upsert (create/update single lead)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/leads/upsert/route.ts
+  
+  POST /api/leads/upload-document (AI document parsing)
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/leads/upload-document/route.ts
+
+=== MESSAGING & TEXTS ===
+Texts/Conversations Page:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/texts/page.tsx
+
+Conversation Drawer Component:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/components/ConversationDrawer.tsx
+
+Message/Thread LocalStorage Management:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/localStore.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/storeOps.ts
+
+=== DATABASE SCHEMA ===
+Prisma Schema (defines all models):
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/prisma/schema.prisma
+
+Prisma Client Configuration:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/prisma.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/prisma.config.ts
+
+=== DATA STORAGE (JSON FILES) ===
+Leads Data:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/data/leads.json
+
+Campaigns Data:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/data/campaigns.json
+
+Tags Data:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/data/tags.json
+
+Emails History:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/data/emails.json
+
+Backups:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/data/leads_backup_*.json
+
+=== SUPPORTING LIBRARIES ===
+Campaign Store:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/campaignsStore.ts
+
+Settings Store:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/settingsStore.ts
+
+Points/Billing Store:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/pointsStore.ts
+
+Twilio Integration:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/twilioClient.ts
+
+Spam Detection:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/spamDetection.ts
+
+Database Utilities:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/db.ts
+
+AI Integration:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/lib/useAI.ts
+
+=== OTHER COMPONENTS ===
+Sidebar:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/components/Sidebar.tsx
+
+Topbar:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/components/Topbar.tsx
+
+Filters Bar:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/components/FiltersBar.tsx
+
+=== OTHER API ROUTES ===
+Email Send:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/email/send/route.ts
+
+SMS Send:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/sms/send/route.ts
+
+Tags List:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/tags/route.ts
+
+AI Response Generation:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/ai-response/route.ts
+
+File Ingestion:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/ingest/route.ts
+
+Payments/Stripe:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/payments/complete-purchase/route.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/stripe/create-checkout/route.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/stripe/webhook/route.ts
+
+Twilio Integration:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/twilio/create-account/route.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/twilio/purchase-number/route.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/twilio/release-number/route.ts
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/app/api/twilio/search-numbers/route.ts
+
+=== DOCUMENTATION ===
+Comprehensive Codebase Exploration:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/CODEBASE_EXPLORATION.md
+
+Quick Reference:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/QUICK_REFERENCE.md
+
+Getting Started:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/GETTING_STARTED.md
+
+README:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/README.md
+
+Implementation Plan:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/IMPLEMENTATION_PLAN.md
+
+Twilio Setup:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/TWILIO_SETUP.md
+
+Production Status:
+  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/PRODUCTION_READY_STATUS.md
+
+=== KEY CODE SECTIONS ===
+
+CAMPAIGN EXECUTION (/app/api/campaigns/run/route.ts, lines 46-54):
+  - Message personalization with {{first}}, {{last}}, {{email}}, {{phone}}, {{state}}
+  - Twilio API integration
+  - Points validation and deduction
+  - Spam detection
+  - Send result tracking per lead
+
+LEAD IMPORT (/app/api/leads/import/route.ts, lines 37-108):
+  - CSV column mapping
+  - Deduplication by ID/phone/email
+  - Tag merging
+  - Campaign creation
+  - Automatic backup
+
+MESSAGE STATUS (/lib/storeOps.ts, lines 104-119):
+  - pending: Queued for sending
+  - sent: Sent to Twilio
+  - delivered: Confirmed delivery
+  - read: Lead has read
+  - failed: Send failed
+
+THREAD OPERATIONS (/lib/storeOps.ts):
+  - upsertThread(): Create/get conversation
+  - sendOutbound(): Send message
+  - simulateInbound(): Add lead reply
+  - updateMessageStatus(): Track delivery
+
+MESSAGE COMPOSER (/app/texts/page.tsx, lines 308-389):
+  - Manual text input
+  - AI reply mode (toggle)
+  - Points balance checking
+  - Message sending with status
+
+=== PRISMA SCHEMA MODELS ===
+Location: /Applications/MAMP/htdocs/trippdrip-v8-sprint1/prisma/schema.prisma
+
+Models defined:
+  - User (lines 13-46)
+  - Lead (lines 49-84)
+  - Campaign (lines 87-125)
+  - Message (lines 128-173)
+  - Transaction (lines 176-203)
+  - ImportHistory (lines 206-225)
+
+Key Campaign fields (lines 108-109):
+  status: String @default("draft") // 'draft' | 'running' | 'completed' | 'failed'
+
+Key Lead fields (lines 59):
+  status: String @default("active")
+
+Key Message fields (lines 143):
+  status: String @default("pending") // 'pending' | 'sent' | 'delivered' | 'failed' | 'read'
+
+=== STORAGE LOCATIONS ===
+LocalStorage Key: "trippdrip.store.v1"
+Contents:
+  - leads[]
+  - threads[]
+  - messages[]
+
+Event Name: "trippdrip:store-updated"
+Fired when store changes to notify listeners
+
+JSON Files in /data/:
+  - leads.json (array of lead objects)
+  - campaigns.json (array of campaign objects)
+  - tags.json (array of {tag, count} objects)
+  - emails.json (array of email records)
+  - leads_backup_*.json (timestamped backups)
+

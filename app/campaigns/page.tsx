@@ -12,6 +12,7 @@ type Campaign = {
   lead_ids: string[];
   lead_count: number;
   messages_sent?: number;
+  credits_used?: number;
 };
 
 export default function CampaignsPage() {
@@ -35,6 +36,28 @@ export default function CampaignsPage() {
       console.error('Error loading campaigns:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function deleteCampaign(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete campaign "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/campaigns/delete?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        await loadCampaigns();
+      } else {
+        alert(`Error: ${data.error || 'Failed to delete campaign'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      alert('Failed to delete campaign');
     }
   }
 
@@ -70,7 +93,7 @@ export default function CampaignsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="card">
           <div className="text-sm text-gray-600 mb-1">Total Campaigns</div>
           <div className="text-3xl font-bold">{campaigns.length}</div>
@@ -85,6 +108,12 @@ export default function CampaignsPage() {
           <div className="text-sm text-gray-600 mb-1">Messages Sent</div>
           <div className="text-3xl font-bold">
             {campaigns.reduce((sum, c) => sum + (c.messages_sent || 0), 0).toLocaleString()}
+          </div>
+        </div>
+        <div className="card">
+          <div className="text-sm text-gray-600 mb-1">Credits Used</div>
+          <div className="text-3xl font-bold text-blue-600">
+            {campaigns.reduce((sum, c) => sum + (c.credits_used || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className="card">
@@ -122,8 +151,10 @@ export default function CampaignsPage() {
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Tags Applied</th>
                   <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Leads</th>
                   <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Messages Sent</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Credits Used</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Created</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Last Updated</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -155,11 +186,22 @@ export default function CampaignsPage() {
                     <td className="px-4 py-3 text-center">
                       <div className="font-medium">{campaign.messages_sent || 0}</div>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="font-medium text-blue-600">{campaign.credits_used || 0}</div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {new Date(campaign.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {new Date(campaign.updated_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => deleteCampaign(campaign.id, campaign.name)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}

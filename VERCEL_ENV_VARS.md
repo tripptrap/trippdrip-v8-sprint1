@@ -5,6 +5,11 @@ Settings → Environment Variables
 
 ## Required Variables:
 
+### Site Password Protection (CRITICAL - MUST ADD)
+```
+SITE_PASSWORD=90EJYFzWmtIJhz/kWeM+E5tD5mqXAERVrn4EskVL
+```
+
 ### OpenAI (Already have this)
 ```
 OPENAI_API_KEY=sk-proj-YOUR_OPENAI_API_KEY_HERE

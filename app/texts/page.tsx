@@ -7,6 +7,7 @@ import FiltersBar, { Filters } from "@/components/FiltersBar";
 import { leads as seedLeads, threads as seedThreads, messages as seedMessages, findLead as seedFindLead } from "@/lib/db";
 import { loadStore, saveStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { spendPoints, getPointsBalance } from "@/lib/pointsStore";
+import { calculateSMSCredits, getCharacterWarning } from "@/lib/creditCalculator";
 
 type Msg = { id:number; thread_id:number; direction:'in'|'out'; sender:'lead'|'agent'; body:string; created_at:string };
 type FlowStep = {
@@ -201,16 +202,23 @@ function TextsPageContent(){
                 const L = findLead(t.lead_id, store.leads);
                 const active = t.id === activeThreadId;
                 const flowStepTag = getThreadFlowStep(t.id);
+                const isSold = L.disposition === 'sold' || L.status === 'sold';
+                const isArchived = L.disposition === 'not_interested' || L.status === 'archived';
                 return (
                   <button
                     key={t.id}
-                    className={`w-full text-left px-3 py-2 hover:bg-white/5 ${active ? "bg-white/10" : ""}`}
+                    className={`w-full text-left px-3 py-2 hover:bg-white/5 ${active ? "bg-white/10" : ""} ${isSold ? "bg-green-900/20 border-l-4 border-green-500" : ""} ${isArchived ? "opacity-50" : ""}`}
                     onClick={()=> setActiveThreadId(t.id)}
                     title={t.last_message_snippet}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 truncate">
-                        <div className="truncate font-medium">{L.first_name} {L.last_name}</div>
+                        <div className={`truncate font-medium ${isSold ? "text-green-400" : ""}`}>{L.first_name} {L.last_name}</div>
+                        {isSold && (
+                          <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-green-900/40 text-green-400 border border-green-500/40">
+                            Sold
+                          </span>
+                        )}
                         {flowStepTag && (
                           <span
                             className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
@@ -226,8 +234,8 @@ function TextsPageContent(){
                       </div>
                       {t.unread && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-[var(--accent)]" />}
                     </div>
-                    <div className="text-xs text-[var(--muted)] truncate">{t.last_message_snippet}</div>
-                    <div className="text-[10px] text-[var(--muted)]">
+                    <div className={`text-xs truncate ${isSold ? "text-green-300/70" : "text-[var(--muted)]"}`}>{t.last_message_snippet}</div>
+                    <div className={`text-[10px] ${isSold ? "text-green-400/60" : "text-[var(--muted)]"}`}>
                       Campaign {t.campaign_id ?? "-"} • {new Date(t.updated_at).toLocaleString()}
                     </div>
                   </button>
@@ -296,6 +304,7 @@ function TextsPageContent(){
                 useAI={useAI}
                 onGenerateAI={generateAIResponse}
                 isGenerating={isGeneratingResponse}
+                isSold={activeLead?.disposition === 'sold' || activeLead?.status === 'sold'}
               />
             </div>
           )}
@@ -309,14 +318,21 @@ function Composer({
   onSend,
   useAI,
   onGenerateAI,
-  isGenerating
+  isGenerating,
+  isSold
 }: {
   onSend: (body: string) => void;
   useAI: boolean;
   onGenerateAI: () => void;
   isGenerating: boolean;
+  isSold?: boolean;
 }) {
   const [text, setText] = useState("");
+  const [mediaCount, setMediaCount] = useState(0);
+
+  // Calculate credits in real-time
+  const creditCalc = useMemo(() => calculateSMSCredits(text, mediaCount), [text, mediaCount]);
+  const charWarning = useMemo(() => getCharacterWarning(text.length), [text.length]);
 
   function handleSend() {
     if (useAI && !text.trim()) {
@@ -326,16 +342,40 @@ function Composer({
       // If there's text, send it
       onSend(text.trim());
       setText('');
+      setMediaCount(0);
     }
   }
 
   return (
-    <div className="p-3 border-t border-white/10">
+    <div className={`p-3 border-t ${isSold ? "border-green-500/30 bg-green-900/10" : "border-white/10"}`}>
+      {/* Credit Cost Display */}
+      {text.length > 0 && (
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-3">
+            <span className={`font-medium ${creditCalc.credits > 1 ? "text-yellow-400" : "text-[var(--muted)]"}`}>
+              {creditCalc.credits} credit{creditCalc.credits !== 1 ? 's' : ''}
+            </span>
+            <span className="text-[var(--muted)]">
+              {creditCalc.characterCount} / {charWarning.threshold} chars
+            </span>
+            {creditCalc.segments > 1 && (
+              <span className="text-yellow-400">
+                {creditCalc.segments} segments
+              </span>
+            )}
+          </div>
+          {charWarning.remaining > 0 && charWarning.remaining <= 20 && (
+            <span className="text-orange-400">
+              {charWarning.remaining} chars until +1 credit
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex gap-2">
         {useAI ? (
           <>
             <input
-              className="flex-1 input-dark px-4 py-3 rounded-lg"
+              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-green-500/50 bg-green-900/20 text-green-100 placeholder-green-300/50" : ""}`}
               placeholder="AI will generate a response, or type to override..."
               value={text}
               onChange={e => setText(e.target.value)}
@@ -347,7 +387,7 @@ function Composer({
               }}
             />
             <button
-              className="bg-blue-500 text-white font-medium px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
               onClick={handleSend}
               disabled={isGenerating}
             >
@@ -357,7 +397,7 @@ function Composer({
         ) : (
           <>
             <input
-              className="flex-1 input-dark px-4 py-3 rounded-lg"
+              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-green-500/50 bg-green-900/20 text-green-100 placeholder-green-300/50" : ""}`}
               placeholder="Type a message…"
               value={text}
               onChange={e => setText(e.target.value)}
@@ -370,7 +410,7 @@ function Composer({
               }}
             />
             <button
-              className="bg-blue-500 text-white font-medium px-6 py-3 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 ${isSold ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
               onClick={() => {
                 if (text.trim()) {
                   onSend(text.trim());

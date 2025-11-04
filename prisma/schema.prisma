@@ -57,6 +57,7 @@ model Lead {
   state       String?
   tags        String[]
   status      String   @default("active")
+  disposition String?  // 'sold' | 'not_interested' | 'callback' | etc.
 
   // AI-generated fields
   aiTags      String[] @map("ai_tags") @default([])
@@ -104,6 +105,7 @@ model Campaign {
   messagesSent Int     @default(0) @map("messages_sent")
   messagesDelivered Int @default(0) @map("messages_delivered")
   messagesFailed Int @default(0) @map("messages_failed")
+  creditsUsed Int      @default(0) @map("credits_used") // Total credits spent on this campaign
 
   // Status
   status      String   @default("draft") // 'draft' | 'running' | 'completed' | 'failed'
@@ -155,6 +157,9 @@ model Message {
 
   // Costs
   pointsCost  Float    @default(0) @map("points_cost")
+  creditsCost Int      @default(0) @map("credits_cost") // SMS segment credits
+  segments    Int      @default(0) // Number of SMS segments
+  mediaCount  Int      @default(0) @map("media_count") // Number of photos/attachments
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
