@@ -24,69 +24,147 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        router.push("/");
-        router.refresh();
+        // Force a hard navigation to clear any cached content
+        window.location.href = "/";
       } else {
         setError("Invalid password");
+        setLoading(false);
       }
     } catch (err) {
       setError("An error occurred");
-    } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f14] flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="bg-[#0d121a] border border-[#1a2637] rounded-xl p-8 shadow-xl">
-          <h1 className="text-2xl font-bold text-[#e7eef9] mb-2 text-center">
-            TrippDrip v8
-          </h1>
-          <p className="text-[#9fb0c3] text-sm mb-6 text-center">
-            Enter password to access
-          </p>
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>Access Required</title>
+      </head>
+      <body style={{ margin: 0, padding: 0, background: '#0b0f14', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{ width: '100%', maxWidth: '400px' }}>
+            <div style={{
+              background: '#0d121a',
+              border: '1px solid #1a2637',
+              borderRadius: '12px',
+              padding: '2rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+            }}>
+              <h1 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: '#e7eef9',
+                marginBottom: '0.5rem',
+                textAlign: 'center',
+                margin: '0 0 0.5rem 0'
+              }}>
+                🔒 Access Required
+              </h1>
+              <p style={{
+                color: '#9fb0c3',
+                fontSize: '0.875rem',
+                marginBottom: '1.5rem',
+                textAlign: 'center',
+                margin: '0 0 1.5rem 0'
+              }}>
+                This site is password protected
+              </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-[#9fb0c3] mb-2"
-              >
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder-[#5e7aa0] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter password"
-                required
-                autoFocus
-              />
-            </div>
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label
+                    htmlFor="password"
+                    style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#9fb0c3',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: '#0c1420',
+                      border: '1px solid #223246',
+                      borderRadius: '8px',
+                      color: '#e7eef9',
+                      fontSize: '1rem',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                    placeholder="Enter password"
+                    required
+                    autoFocus
+                    autoComplete="off"
+                  />
+                </div>
 
-            {error && (
-              <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-900/50 rounded-lg py-2">
-                {error}
+                {error && (
+                  <div style={{
+                    color: '#ff6b6b',
+                    fontSize: '0.875rem',
+                    textAlign: 'center',
+                    background: 'rgba(255, 107, 107, 0.1)',
+                    border: '1px solid rgba(255, 107, 107, 0.3)',
+                    borderRadius: '8px',
+                    padding: '0.5rem',
+                    marginBottom: '1rem'
+                  }}>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !password}
+                  style={{
+                    width: '100%',
+                    background: loading || !password ? '#1e3a8a' : '#2563eb',
+                    color: 'white',
+                    fontWeight: '500',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '1rem',
+                    cursor: loading || !password ? 'not-allowed' : 'pointer',
+                    transition: 'background 0.2s',
+                    opacity: loading || !password ? 0.6 : 1
+                  }}
+                >
+                  {loading ? "Checking..." : "Access Site"}
+                </button>
+              </form>
+
+              <div style={{
+                marginTop: '1.5rem',
+                textAlign: 'center',
+                fontSize: '0.75rem',
+                color: '#5e7aa0'
+              }}>
+                Authorized Access Only
               </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !password}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors"
-            >
-              {loading ? "Checking..." : "Access Site"}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-xs text-[#5e7aa0]">
-            Protected Access Only
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </body>
+    </html>
   );
 }
