@@ -57,7 +57,7 @@ function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: num
   if (planType === 'premium') {
     return {
       price: 98.99,
-      monthlyPoints: 15000,
+      monthlyPoints: 10000,
       name: 'Premium Plan'
     };
   }
@@ -183,7 +183,7 @@ export default function PointsPage() {
     const oldPlan = currentPlan;
 
     // Update subscription tier in Supabase
-    const newCredits = planType === 'premium' ? 15000 : 1000;
+    const newCredits = planType === 'premium' ? 10000 : 1000;
     const { error } = await supabase
       .from('users')
       .update({

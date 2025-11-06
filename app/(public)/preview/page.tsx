@@ -136,12 +136,12 @@ export default function PreviewPage() {
           <div className="p-6 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
             <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center mb-4">
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Team Collaboration</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Workflow Management</h3>
             <p className="text-white/60">
-              Work together seamlessly with shared inboxes, assignments, and notes. Keep everyone on the same page.
+              Organize your leads with tags, notes, and custom dispositions. Create powerful workflows that match your process.
             </p>
           </div>
 
@@ -210,7 +210,7 @@ export default function PreviewPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-green-400 text-xl">✓</span>
-                <span className="text-white">Up to {SUBSCRIPTION_FEATURES.starter.teamMembers} team members</span>
+                <span className="text-white">Priority email support</span>
               </div>
             </div>
             <Link
@@ -266,7 +266,7 @@ export default function PreviewPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-green-400 text-xl">✓</span>
-                <span className="text-white">Unlimited team members</span>
+                <span className="text-white">Dedicated account manager</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-green-400 text-xl">✓</span>

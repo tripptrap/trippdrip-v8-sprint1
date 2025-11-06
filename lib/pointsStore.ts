@@ -229,7 +229,7 @@ export function checkMonthlyRenewal(): void {
                       (now.getMonth() - lastRenewal.getMonth());
 
   if (monthsSince >= 1) {
-    const renewalAmount = data.planType === 'premium' ? 15000 : 1000;
+    const renewalAmount = data.planType === 'premium' ? 10000 : 1000;
     const planName = data.planType === 'premium' ? 'Premium plan ($98.99)' : 'Basic plan ($30)';
     addPoints(renewalAmount, `Monthly renewal - ${planName}`, 'earn');
     data.lastRenewal = now.toISOString();
@@ -268,7 +268,7 @@ export function getPlanDetails(planType: PlanType): { price: number; monthlyPoin
   if (planType === 'premium') {
     return {
       price: 98.99,
-      monthlyPoints: 15000,
+      monthlyPoints: 10000,
       name: 'Premium Plan'
     };
   }

@@ -66,10 +66,6 @@ export default function Page() {
   const [areaCode, setAreaCode] = useState('');
   const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
 
-  // Demo test
-  const [addingDemoPoints, setAddingDemoPoints] = useState(false);
-  const [adding3000Points, setAdding3000Points] = useState(false);
-
   // Account deletion
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -336,27 +332,6 @@ export default function Page() {
     setTimeout(() => setSaveMessage(''), 3000);
   };
 
-  const handleDemoTest = async () => {
-    setAddingDemoPoints(true);
-    try {
-      const result = await addPoints(5000, 'Demo Test - Added 5000 points', 'purchase');
-
-      if (result.success) {
-        toast.success(`✅ Demo Test: Added 5000 points! New balance: ${result.balance?.toLocaleString()}`);
-        // Dispatch event to update topbar
-        window.dispatchEvent(new CustomEvent('pointsUpdated', {
-          detail: { balance: result.balance }
-        }));
-      } else {
-        toast.error(`❌ Failed to add points: ${result.error}`);
-      }
-    } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
-    } finally {
-      setAddingDemoPoints(false);
-    }
-  };
-
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE MY ACCOUNT') {
       toast.error('Please type "DELETE MY ACCOUNT" to confirm');
@@ -386,29 +361,6 @@ export default function Page() {
     }
   };
 
-  const handleAdd3000Points = async () => {
-    setAdding3000Points(true);
-    try {
-      // Import spendPoints from pointsSupabase
-      const { spendPoints } = await import('@/lib/pointsSupabase');
-      const result = await spendPoints(3000, 'Demo Test - Used 3000 points');
-
-      if (result.success) {
-        toast.success(`✅ Demo Test: Used 3000 points! New balance: ${result.balance?.toLocaleString()}`);
-        // Dispatch event to update topbar
-        window.dispatchEvent(new CustomEvent('pointsUpdated', {
-          detail: { balance: result.balance }
-        }));
-      } else {
-        toast.error(`❌ Failed to use points: ${result.error}`);
-      }
-    } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
-    } finally {
-      setAdding3000Points(false);
-    }
-  };
-
   if (!settings) return <div>Loading...</div>;
 
   const hasTwilioAccount = !!settings.twilio?.accountSid;
@@ -417,27 +369,11 @@ export default function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <div className="flex items-center gap-3">
-          {saveMessage && (
-            <div className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg border border-green-500/30">
-              {saveMessage}
-            </div>
-          )}
-          <button
-            onClick={handleAdd3000Points}
-            disabled={adding3000Points}
-            className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg font-semibold hover:from-red-700 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
-          >
-            {adding3000Points ? 'Using...' : '🔥 Use 3000 Points'}
-          </button>
-          <button
-            onClick={handleDemoTest}
-            disabled={addingDemoPoints}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
-          >
-            {addingDemoPoints ? 'Adding...' : '🎁 Add 5000 Points'}
-          </button>
-        </div>
+        {saveMessage && (
+          <div className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg border border-green-500/30">
+            {saveMessage}
+          </div>
+        )}
       </div>
 
       {/* Tab Navigation */}
