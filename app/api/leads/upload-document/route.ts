@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { spendPointsForAction } from "@/lib/pointsSupabase";
 import fs from "fs";
 import path from "path";
 
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "No file uploaded" },
         { status: 400 }
+      );
+    }
+
+    // Check and deduct points BEFORE processing (5 points for document upload with AI)
+    const pointsResult = await spendPointsForAction('document_upload', 1);
+
+    if (!pointsResult.success) {
+      return NextResponse.json(
+        { error: pointsResult.error || 'Insufficient points. Document upload with AI processing costs 5 points.' },
+        { status: 402 }
       );
     }
 
@@ -226,7 +237,8 @@ Important:
       message: `Successfully parsed and imported ${normalizedLeads.length} leads`,
       leadsAdded: normalizedLeads.length,
       totalLeads: merged.length,
-      pointsUsed: fileType === 'csv' || fileType === 'txt' ? 3 : 0 // AI parsing costs 3 points
+      pointsUsed: 5,
+      remainingBalance: pointsResult.balance
     });
   } catch (error: any) {
     console.error("Error uploading document:", error);

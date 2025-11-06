@@ -141,3 +141,24 @@ table tbody tr:hover {
   margin: 0 auto;
   padding: 0 1rem;
 }
+
+/* Firework animation */
+@keyframes firework {
+  0% {
+    opacity: 1;
+    transform: scale(0) translate(0, 0);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(4) translate(var(--tx, 20px), var(--ty, -30px));
+  }
+}
+
+.animate-firework {
+  animation: firework 2s ease-out forwards;
+  --tx: calc((var(--random-x, 0.5) - 0.5) * 200px);
+  --ty: calc((var(--random-y, 0.5) - 0.5) * 200px);
+}

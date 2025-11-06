@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Initialize Demo Conversations</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0b0f14;
+      color: #e7eef9;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .success {
+      background: #10b981;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .info {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border: 1px solid #334155;
+    }
+    pre {
+      background: #0d121a;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎭 Initialize Demo Conversations</h1>
+  <p>Click the button below to add demo conversations to your Texts page.</p>
+
+  <div class="info">
+    <strong>This will add:</strong>
+    <ul>
+      <li>3 conversation threads with Sarah, Jennifer, and Michael</li>
+      <li>9 messages across these conversations</li>
+      <li>Demo leads linked to conversations</li>
+    </ul>
+  </div>
+
+  <button onclick="initializeDemoData()">Initialize Demo Conversations</button>
+  <button onclick="clearAllData()">Clear All Conversations</button>
+  <button onclick="viewCurrentData()">View Current Data</button>
+
+  <div id="output"></div>
+
+  <script>
+    function initializeDemoData() {
+      const demoLeads = [
+        {
+          id: "demo_lead_1",
+          first_name: "Sarah",
+          last_name: "Johnson",
+          phone: "+15551234567",
+          email: "sarah.johnson@example.com",
+          state: "CA",
+          tags: ["hot-lead", "interested", "demo"],
+          status: "active",
+          disposition: "qualified"
+        },
+        {
+          id: "demo_lead_2",
+          first_name: "Michael",
+          last_name: "Rodriguez",
+          phone: "+15559876543",
+          email: "m.rodriguez@example.com",
+          state: "TX",
+          tags: ["callback", "demo"],
+          status: "active",
+          disposition: "callback"
+        },
+        {
+          id: "demo_lead_3",
+          first_name: "Jennifer",
+          last_name: "Chen",
+          phone: "+15555551234",
+          email: "jennifer.chen@example.com",
+          state: "NY",
+          tags: ["sold", "demo", "vip"],
+          status: "sold",
+          disposition: "sold"
+        }
+      ];
+
+      const demoThreads = [
+        {
+          id: 1,
+          lead_id: "demo_lead_1",
+          lead_name: "Sarah Johnson",
+          lead_phone: "+15551234567",
+          last_message_snippet: "Great! It's 30% off all products until March 31st. Can I send you the catalog?",
+          last_sender: "agent",
+          unread: false,
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 35 * 60 * 1000).toISOString()
+        },
+        {
+          id: 2,
+          lead_id: "demo_lead_3",
+          lead_name: "Jennifer Chen",
+          lead_phone: "+15555551234",
+          last_message_snippet: "Just placed my order! Thanks so much!",
+          last_sender: "lead",
+          unread: true,
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 3,
+          lead_id: "demo_lead_2",
+          lead_name: "Michael Rodriguez",
+          lead_phone: "+15559876543",
+          last_message_snippet: "Can you call me back tomorrow? I have some questions.",
+          last_sender: "lead",
+          unread: true,
+          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
+        }
+      ];
+
+      const demoMessages = [
+        // Sarah Johnson conversation
+        {
+          id: 1,
+          thread_id: 1,
+          direction: "out",
+          sender: "agent",
+          body: "Hi Sarah! Our Spring Sale is live with 30% off. Interested?",
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 2,
+          thread_id: 1,
+          direction: "in",
+          sender: "lead",
+          body: "Yes! Tell me more about this sale!",
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString()
+        },
+        {
+          id: 3,
+          thread_id: 1,
+          direction: "out",
+          sender: "agent",
+          body: "Great! It's 30% off all products until March 31st. Can I send you the catalog?",
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 35 * 60 * 1000).toISOString()
+        },
+        // Jennifer Chen conversation (SOLD - green styling)
+        {
+          id: 4,
+          thread_id: 2,
+          direction: "out",
+          sender: "agent",
+          body: "Hi Jennifer! Our Spring Sale is live with 30% off. Interested?",
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 5,
+          thread_id: 2,
+          direction: "in",
+          sender: "lead",
+          body: "Absolutely! I've been waiting for this!",
+          created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 6,
+          thread_id: 2,
+          direction: "out",
+          sender: "agent",
+          body: "Perfect! I'll send you the details right now.",
+          created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString()
+        },
+        {
+          id: 7,
+          thread_id: 2,
+          direction: "in",
+          sender: "lead",
+          body: "Just placed my order! Thanks so much!",
+          created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+        },
+        // Michael Rodriguez conversation
+        {
+          id: 8,
+          thread_id: 3,
+          direction: "out",
+          sender: "agent",
+          body: "Hey Michael, just checking in! Any questions about our service?",
+          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 9,
+          thread_id: 3,
+          direction: "in",
+          sender: "lead",
+          body: "Can you call me back tomorrow? I have some questions.",
+          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
+        }
+      ];
+
+      // Get existing store or create new one
+      const existing = localStorage.getItem('trippdrip.store.v1');
+      let store = existing ? JSON.parse(existing) : { leads: [], threads: [], messages: [] };
+
+      // Remove any existing demo data
+      store.leads = (store.leads || []).filter(l => !l.id || !l.id.includes('demo_lead'));
+      store.threads = (store.threads || []).filter(t => ![1, 2, 3].includes(t.id));
+      store.messages = (store.messages || []).filter(m => ![1,2,3,4,5,6,7,8,9].includes(m.id));
+
+      // Add demo data
+      store.leads = [...demoLeads, ...store.leads];
+      store.threads = [...demoThreads, ...store.threads];
+      store.messages = [...demoMessages, ...store.messages];
+
+      // Save to localStorage
+      localStorage.setItem('trippdrip.store.v1', JSON.stringify(store));
+
+      // Dispatch update event
+      window.dispatchEvent(new Event('trippdrip:store-updated'));
+
+      document.getElementById('output').innerHTML = `
+        <div class="success">
+          <h3>✅ Demo data initialized successfully!</h3>
+          <p>Added:</p>
+          <ul>
+            <li>${demoLeads.length} demo leads</li>
+            <li>${demoThreads.length} conversation threads</li>
+            <li>${demoMessages.length} messages</li>
+          </ul>
+          <p><strong>Next step:</strong> Go to <a href="/texts" style="color: #60a5fa;">http://localhost:3000/texts</a> and refresh the page!</p>
+        </div>
+      `;
+    }
+
+    function clearAllData() {
+      if (confirm('Are you sure you want to clear all conversation data?')) {
+        localStorage.removeItem('trippdrip.store.v1');
+        window.dispatchEvent(new Event('trippdrip:store-updated'));
+        document.getElementById('output').innerHTML = `
+          <div class="success">
+            <h3>✅ All conversation data cleared!</h3>
+          </div>
+        `;
+      }
+    }
+
+    function viewCurrentData() {
+      const store = localStorage.getItem('trippdrip.store.v1');
+      if (!store) {
+        document.getElementById('output').innerHTML = `
+          <div class="info">
+            <h3>📋 Current Data</h3>
+            <p>No data found in localStorage.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const data = JSON.parse(store);
+      document.getElementById('output').innerHTML = `
+        <div class="info">
+          <h3>📋 Current Data</h3>
+          <ul>
+            <li>Leads: ${(data.leads || []).length}</li>
+            <li>Threads: ${(data.threads || []).length}</li>
+            <li>Messages: ${(data.messages || []).length}</li>
+          </ul>
+          <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}...</pre>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

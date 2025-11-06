@@ -32,7 +32,7 @@ export default function SignInPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">TrippDrip</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">HyveWyre™</h1>
           <p className="text-white/80">SMS & Email Campaign Management</p>
         </div>
 
@@ -115,7 +115,7 @@ export default function SignInPage() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-white/80 text-sm">
-          <p>&copy; 2025 TrippDrip. All rights reserved.</p>
+          <p>&copy; 2025 HyveWyre™. All rights reserved.</p>
         </div>
       </div>
     </div>

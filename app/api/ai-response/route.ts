@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, leadName, leadInfo, userPoints } = await req.json();
+    const { messages, leadName, leadInfo, userPoints, flowContext } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -32,6 +32,26 @@ export async function POST(req: NextRequest) {
       content: msg.body,
     }));
 
+    // Build flow guidance if available
+    let flowGuidance = "";
+    if (flowContext && flowContext.steps && Array.isArray(flowContext.steps)) {
+      flowGuidance = `\n\nConversation Flow Guidance:
+You should follow this conversation flow as a general guide (not a strict script). Use it as the backbone to structure your conversation naturally:
+
+${flowContext.steps.map((step: any, index: number) => {
+  let stepText = `Step ${index + 1}: ${step.yourMessage || ''}`;
+  if (step.responses && Array.isArray(step.responses)) {
+    stepText += '\n  Expected response types and how to handle them:';
+    step.responses.forEach((resp: any) => {
+      stepText += `\n  - ${resp.label || 'Response'}: ${resp.followUpMessage || ''}`;
+    });
+  }
+  return stepText;
+}).join('\n\n')}
+
+Use this flow as a guide to keep the conversation on track, but adapt naturally to what the lead is saying. Don't force the flow - let it guide you while staying conversational and responsive to their needs.`;
+    }
+
     // Create system prompt with context
     const systemPrompt = `You are a helpful sales representative responding to a lead named ${leadName}.
 
@@ -42,7 +62,7 @@ Lead Information:
 - State: ${leadInfo?.state || "Unknown"}
 
 Your goal is to be friendly, professional, and helpful. Keep responses concise and conversational (1-3 sentences typically).
-Respond naturally to their most recent message based on the conversation history.`;
+Respond naturally to their most recent message based on the conversation history.${flowGuidance}`;
 
     // Call OpenAI API directly using fetch
     const apiKey = process.env.OPENAI_API_KEY;

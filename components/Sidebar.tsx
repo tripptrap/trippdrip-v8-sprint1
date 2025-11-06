@@ -10,8 +10,11 @@ const navItems = [
   { href: "/leads",     label: "Leads" },
   { href: "/bulk-sms",  label: "Bulk SMS" },
   { href: "/texts",     label: "Texts" },
+  { href: "/scheduled", label: "Scheduled" },
+  { href: "/follow-ups", label: "Follow-ups" },
   { href: "/email",     label: "Email" },
   { href: "/campaigns", label: "Campaigns" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/templates", label: "Flows" },
   { href: "/points",    label: "Points" },
   { href: "/tags",      label: "Tags" },
@@ -46,14 +49,21 @@ export default function Sidebar(){
 
   return (
     <aside className="w-64 shrink-0 p-3 border-r border-white/10">
-      <div className="text-lg font-semibold mb-3">TrippDrip</div>
+      <div className="text-lg font-semibold mb-6 flex items-center gap-3 px-2">
+        <img src="/icon.png" alt="HyveWyre™" className="h-12 w-12 rounded-xl" />
+        <span className="text-xl">HyveWyre™</span>
+      </div>
 
       <nav className="space-y-1 mb-4">
         {navItems.map(it => {
           const active = path?.startsWith(it.href);
           return (
             <Link key={it.href} href={it.href}
-              className={`block px-3 py-2 rounded-xl ${active ? "bg-white/10" : "hover:bg-white/5"}`}>
+              className={`block px-3 py-2 rounded-xl transition-all duration-200 ${
+                active
+                  ? "bg-blue-600/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)] border border-blue-500/30"
+                  : "hover:bg-white/5"
+              }`}>
               {it.label}
             </Link>
           );

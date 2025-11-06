@@ -1,24 +1,23 @@
 import { NextResponse } from "next/server";
+import { spendPointsForAction } from "@/lib/pointsSupabase";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const { messages, model, userPoints } = await req.json();
+  const { messages, model } = await req.json();
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
   }
 
-  // Check if user has enough points (1 point for AI chat)
-  const pointCost = 1;
-  const currentPoints = typeof userPoints === 'number' ? userPoints : 0;
+  // Check and deduct points BEFORE making AI request (2 points for AI response)
+  const pointsResult = await spendPointsForAction('ai_response', 1);
 
-  if (currentPoints < pointCost) {
+  if (!pointsResult.success) {
     return NextResponse.json(
       {
-        error: "Insufficient points. You need 1 point for AI chat. Please purchase more points.",
-        pointsNeeded: pointCost,
-        pointsAvailable: currentPoints
+        error: pointsResult.error || "Insufficient points. You need 2 points for AI responses.",
+        pointsNeeded: 2
       },
       { status: 402 }
     );
@@ -50,6 +49,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     reply,
-    pointsUsed: 1  // Return points used so client can deduct
+    pointsUsed: 2,
+    remainingBalance: pointsResult.balance
   });
 }

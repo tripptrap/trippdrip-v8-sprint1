@@ -1,4 +1,4 @@
-# TrippDrip v8 - SMS Lead Management & Campaign System
+# HyveWyre v8 - SMS Lead Management & Campaign System
 
 A comprehensive lead management and SMS campaign platform built with Next.js, featuring AI-powered responses, points-based billing, Twilio integration, and spam protection.
 
@@ -78,7 +78,7 @@ A comprehensive lead management and SMS campaign platform built with Next.js, fe
 
 1. **Clone the repository**
    ```bash
-   cd /Applications/MAMP/htdocs/trippdrip-v8-sprint1
+   cd /Applications/MAMP/htdocs/hyvewyre-v8-sprint1
    ```
 
 2. **Install dependencies**
@@ -350,7 +350,7 @@ Spam scores:
 ### Project Structure
 
 ```
-/trippdrip-v8-sprint1/
+/hyvewyre-v8-sprint1/
 ├── app/                      # Next.js pages and API routes
 │   ├── api/                  # Backend API endpoints
 │   │   ├── ai/              # AI chat endpoint

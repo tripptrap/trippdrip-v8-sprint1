@@ -32,7 +32,7 @@ export default function SignUpPage() {
     // Mock registration - will be replaced with real authentication
     setTimeout(() => {
       if (name && email && password) {
-        toast.success('Account created! Welcome to TrippDrip');
+        toast.success('Account created! Welcome to HyveWyre™');
         router.push('/dashboard');
       } else {
         toast.error('Please fill in all fields');
@@ -46,7 +46,7 @@ export default function SignUpPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">TrippDrip</h1>
+          <h1 className="text-4xl font-bold text-white mb-2">HyveWyre™</h1>
           <p className="text-white/80">Start your campaign journey today</p>
         </div>
 
@@ -175,7 +175,7 @@ export default function SignUpPage() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-white/80 text-sm">
-          <p>&copy; 2025 TrippDrip. All rights reserved.</p>
+          <p>&copy; 2025 HyveWyre™. All rights reserved.</p>
         </div>
       </div>
     </div>

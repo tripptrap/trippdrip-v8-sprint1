@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,40 +17,57 @@ type Lead = {
   [k: string]: any;
 };
 
-function readLeads(): Lead[] {
-  const p = path.join(process.cwd(), "data", "leads.json");
-  try {
-    if (!fs.existsSync(p)) return [];
-    return JSON.parse(fs.readFileSync(p, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-function matchesQuery(l: Lead, q: string) {
-  const hay = [
-    l.first_name, l.last_name, l.email, l.phone, l.state, l.status,
-    ...(Array.isArray(l.tags) ? l.tags : [])
-  ].filter(Boolean).join(" ").toLowerCase();
-  return hay.includes(q.toLowerCase());
-}
-
-function hasAllTags(l: Lead, need: string[]) {
-  const t = new Set((Array.isArray(l.tags) ? l.tags : []).map(String));
-  return need.every(x => t.has(x));
-}
-
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") || "").trim();
   const tags = (url.searchParams.get("tags") || "").split(",").map(s=>s.trim()).filter(Boolean);
   const campaign = (url.searchParams.get("campaign") || "").trim();
 
-  let items = readLeads();
+  try {
+    const supabase = await createClient();
 
-  if (q) items = items.filter(l => matchesQuery(l, q));
-  if (tags.length) items = items.filter(l => hasAllTags(l, tags));
-  if (campaign) items = items.filter(l => l.campaign === campaign);
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
+    }
 
-  return NextResponse.json({ ok: true, items });
+    // Build query
+    let query = supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', user.id);
+
+    // Apply search filter (if provided)
+    if (q) {
+      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,state.ilike.%${q}%,status.ilike.%${q}%`);
+    }
+
+    // Apply campaign filter (if provided)
+    if (campaign) {
+      query = query.eq('campaign', campaign);
+    }
+
+    // Execute query
+    const { data: items, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching leads:', error);
+      return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });
+    }
+
+    // Filter by tags in memory (since Supabase doesn't support array filtering easily in this way)
+    let filteredItems = items || [];
+    if (tags.length > 0) {
+      filteredItems = filteredItems.filter(lead => {
+        const leadTags = Array.isArray(lead.tags) ? lead.tags : [];
+        return tags.every(tag => leadTags.includes(tag));
+      });
+    }
+
+    return NextResponse.json({ ok: true, items: filteredItems });
+  } catch (error: any) {
+    console.error('Error in GET /api/leads:', error);
+    return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });
+  }
 }

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts.json`;
 
     const params = new URLSearchParams();
-    params.append('FriendlyName', friendlyName || 'TrippDrip User Account');
+    params.append('FriendlyName', friendlyName || 'HyveWyre™ User Account');
 
     const response = await fetch(twilioUrl, {
       method: 'POST',

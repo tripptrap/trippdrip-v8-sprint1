@@ -1,10 +1,12 @@
 // API Route: Send SMS via Twilio
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { spendPointsForAction } from '@/lib/pointsSupabase';
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, from, message, accountSid, authToken } = await req.json();
+    const { to, from, message, accountSid, authToken, isBulk } = await req.json();
 
     // Validate inputs
     if (!to || !from || !message) {
@@ -18,6 +20,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Twilio credentials not provided' },
         { status: 400 }
+      );
+    }
+
+    // Check and deduct points BEFORE sending
+    const actionType = isBulk ? 'bulk_message' : 'sms_sent';
+    const pointsResult = await spendPointsForAction(actionType, 1);
+
+    if (!pointsResult.success) {
+      return NextResponse.json(
+        { error: pointsResult.error || 'Insufficient points' },
+        { status: 402 } // Payment Required
       );
     }
 
@@ -57,7 +70,9 @@ export async function POST(req: NextRequest) {
       messageId: result.sid,
       status: result.status,
       to: result.to,
-      from: result.from
+      from: result.from,
+      pointsDeducted: isBulk ? 2 : 1,
+      remainingBalance: pointsResult.balance
     });
 
   } catch (error) {

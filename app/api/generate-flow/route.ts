@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { spendPointsForAction } from "@/lib/pointsSupabase";
 
 export async function POST(req: NextRequest) {
   try {
-    const { flowName, context, userPoints } = await req.json();
+    const { flowName, context } = await req.json();
 
     if (!flowName || !context || !context.whoYouAre || !context.whatOffering || !context.whoTexting) {
       return NextResponse.json(
@@ -11,16 +12,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user has enough points (5 points for flow generation)
-    const pointCost = 5;
-    const currentPoints = typeof userPoints === 'number' ? userPoints : 0;
+    // Check and deduct points BEFORE generating flow (15 points for flow creation)
+    const pointsResult = await spendPointsForAction('flow_creation', 1);
 
-    if (currentPoints < pointCost) {
+    if (!pointsResult.success) {
       return NextResponse.json(
         {
-          error: "Insufficient points. You need 5 points to generate a flow. Please purchase more points.",
-          pointsNeeded: pointCost,
-          pointsAvailable: currentPoints
+          error: pointsResult.error || "Insufficient points. You need 15 points to generate a flow.",
+          pointsNeeded: 15
         },
         { status: 402 }
       );
@@ -132,7 +131,8 @@ Important:
 
       return NextResponse.json({
         ...flowData,
-        pointsUsed: 5  // Return points used so client can deduct
+        pointsUsed: 15,
+        remainingBalance: pointsResult.balance
       });
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);

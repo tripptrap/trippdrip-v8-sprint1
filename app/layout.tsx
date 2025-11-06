@@ -4,13 +4,40 @@ import Topbar from "@/components/Topbar";
 import { Toaster } from "react-hot-toast";
 
 export const metadata = {
-  title: "TrippDrip",
+  title: "HyveWyre™",
   description: "Mass texting + campaign management",
+  icons: {
+    icon: '/icon.png',
+  },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                const points = localStorage.getItem('userPoints');
+                if (points) {
+                  const data = JSON.parse(points);
+                  if (data.planType === 'professional' || data.planType === 'premium') {
+                    document.documentElement.style.setProperty('--accent', '#a855f7');
+                    document.documentElement.style.setProperty('--accent-hover', '#9333ea');
+                  }
+                }
+              } catch (e) {}
+            })();
+          `
+        }} />
+      </head>
       <body>
         <Toaster
           position="top-right"
@@ -35,13 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             },
           }}
         />
-        <div className="min-h-screen flex">
-          <Sidebar />
-          <main className="flex-1 flex flex-col">
-            <Topbar />
-            <div className="container py-6">{children}</div>
-          </main>
-        </div>
+        {children}
       </body>
     </html>
   );

@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
           // Create Twilio subaccount
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts.json`;
           const params = new URLSearchParams();
-          params.append('FriendlyName', `TrippDrip User - ${packName} Purchase`);
+          params.append('FriendlyName', `HyveWyre™ User - ${packName} Purchase`);
 
           const response = await fetch(twilioUrl, {
             method: 'POST',
