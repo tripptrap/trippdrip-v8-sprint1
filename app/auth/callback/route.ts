@@ -19,17 +19,17 @@ export async function GET(request: NextRequest) {
       // Check if user has already selected a plan
       const { data: userData } = await supabase
         .from('users')
-        .select('subscription_tier')
+        .select('subscription_status')
         .eq('id', data.user.id)
         .single()
 
-      // If no plan selected yet (new user) or on free, redirect to onboarding
-      if (!userData || !userData.subscription_tier || userData.subscription_tier === 'free') {
-        return NextResponse.redirect(requestUrl.origin + '/auth/onboarding')
+      // If no plan selected yet (new user) or no subscription, redirect to onboarding
+      if (!userData || !userData.subscription_status || userData.subscription_status === 'none') {
+        return NextResponse.redirect(requestUrl.origin + '/onboarding')
       }
 
       // If plan already selected, go to dashboard
-      return NextResponse.redirect(requestUrl.origin + '/leads')
+      return NextResponse.redirect(requestUrl.origin + '/dashboard')
     }
   }
 

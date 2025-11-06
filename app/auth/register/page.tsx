@@ -77,7 +77,7 @@ export default function RegisterPage() {
               We've sent a verification email to <strong style={{ color: '#e6e9f0' }}>{email}</strong>
             </p>
             <p style={{ color: '#9ca3af' }} className="text-sm">
-              Click the link in the email to verify your account and complete your HyveWyre™ setup.
+              Click the link in the email to verify your account. After verification, you'll be guided through selecting a plan and setting up your account.
             </p>
           </div>
 
