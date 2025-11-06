@@ -222,17 +222,20 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: false, error: deleteError.message }, { status: 500 });
     }
 
-    // Remove tag from all threads
-    const { error: removeError } = await supabase
+    // Remove tag from all threads using the SQL function
+    const { data: threadsWithTag } = await supabase
       .from('threads')
-      .update({
-        conversation_tags: supabase.raw(`array_remove(conversation_tags, '${tag.name}')`),
-      })
+      .select('id')
       .eq('user_id', user.id)
       .contains('conversation_tags', [tag.name]);
 
-    if (removeError) {
-      console.warn('Error removing tag from threads:', removeError);
+    if (threadsWithTag && threadsWithTag.length > 0) {
+      for (const thread of threadsWithTag) {
+        await supabase.rpc('remove_thread_tag', {
+          thread_id_param: thread.id,
+          tag_name: tag.name,
+        });
+      }
     }
 
     return NextResponse.json({
