@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Sort by priority (urgent > high > medium > low)
-    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    const priorityOrder: { [key: string]: number } = { urgent: 0, high: 1, medium: 2, low: 3 };
     suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     return NextResponse.json({ ok: true, suggestions: suggestions.slice(0, 50) }); // Limit to 50 suggestions
