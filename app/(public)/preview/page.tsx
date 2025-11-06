@@ -58,20 +58,20 @@ export default function PreviewPage() {
             Automate personalized conversations, nurture leads with AI, and close more deals with intelligent SMS and email campaigns.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Link
-              href="/auth/register"
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20"
-            >
-              Start Free Trial
-            </Link>
             <button
               onClick={() => {
                 document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-all border border-white/10"
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20"
             >
               View Pricing
             </button>
+            <Link
+              href="/auth/register"
+              className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-all border border-white/10"
+            >
+              Create Account
+            </Link>
           </div>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function PreviewPage() {
             href="/auth/register"
             className="inline-block px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20"
           >
-            Start Your Free Trial
+            Get Started Now
           </Link>
         </div>
       </div>
