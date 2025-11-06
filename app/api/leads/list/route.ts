@@ -59,7 +59,7 @@ export async function GET(req: Request) {
     const filtered = leads.filter(l => {
       const matchesTags =
         selectedTags.length === 0 ||
-        (Array.isArray(l.tags) && l.tags.some(t => selectedTags.includes(t)));
+        (Array.isArray(l.tags) && l.tags.some((t: string) => selectedTags.includes(t)));
 
       if (!matchesTags) return false;
       if (!search) return true;
