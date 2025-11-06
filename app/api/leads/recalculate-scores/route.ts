@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { calculateLeadScore } from '@/lib/leadScoring';
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Allow longer execution for bulk operations
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
