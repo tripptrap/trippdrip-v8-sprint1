@@ -6,9 +6,6 @@ import { Toaster } from "react-hot-toast";
 export const metadata = {
   title: "HyveWyre™",
   description: "Mass texting + campaign management",
-  icons: {
-    icon: '/icon.png',
-  },
 };
 
 export const viewport = {
@@ -25,14 +22,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           __html: `
             (function() {
               try {
+                // Set dynamic favicon based on user plan
                 const points = localStorage.getItem('userPoints');
+                let faviconPath = '/logo-premium.png'; // Default for login/public pages
+
                 if (points) {
                   const data = JSON.parse(points);
+
+                  // Update favicon based on plan
                   if (data.planType === 'professional' || data.planType === 'premium') {
+                    faviconPath = '/logo-premium.png';
                     document.documentElement.style.setProperty('--accent', '#a855f7');
                     document.documentElement.style.setProperty('--accent-hover', '#9333ea');
+                  } else {
+                    faviconPath = '/logo-basic.png';
                   }
                 }
+
+                // Update favicon dynamically
+                const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+                link.type = 'image/png';
+                link.rel = 'icon';
+                link.href = faviconPath;
+                document.getElementsByTagName('head')[0].appendChild(link);
               } catch (e) {}
             })();
           `

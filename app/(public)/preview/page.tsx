@@ -22,9 +22,7 @@ export default function PreviewPage() {
         {/* Navigation */}
         <nav className="relative z-10 flex items-center justify-between p-6 max-w-7xl mx-auto">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">T</span>
-            </div>
+            <img src="/logo-premium.png" alt="HyveWyre" className="w-10 h-10 rounded-2xl" />
             <span className="text-2xl font-bold text-white">HyveWyre™</span>
           </div>
           <div className="flex items-center gap-4">

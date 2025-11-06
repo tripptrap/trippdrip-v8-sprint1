@@ -65,7 +65,7 @@ export default function LoginPage() {
       }}>
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img src="/icon.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl" />
+            <img src="/logo-premium.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl" />
           </div>
           <h1 className="text-3xl font-bold mb-2" style={{ color: '#e6e9f0' }}>HyveWyre™</h1>
           <p style={{ color: '#9ca3af' }}>Sign in to your account</p>

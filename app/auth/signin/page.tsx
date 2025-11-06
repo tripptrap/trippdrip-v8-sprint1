@@ -32,6 +32,9 @@ export default function SignInPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <img src="/logo-premium.png" alt="HyveWyre" className="h-20 w-20 rounded-2xl" />
+          </div>
           <h1 className="text-4xl font-bold text-white mb-2">HyveWyre™</h1>
           <p className="text-white/80">SMS & Email Campaign Management</p>
         </div>

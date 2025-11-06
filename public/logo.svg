@@ -2,43 +2,40 @@
   <!-- Dark background -->
   <rect width="512" height="512" fill="#0f1419"/>
 
-  <!-- Honeycomb structure - pyramid of hexagons -->
-  <g id="honeycomb" transform="translate(256, 180)">
-    <!-- Top hexagon -->
-    <path d="M 0,-60 L 35,-40 L 35,0 L 0,20 L -35,0 L -35,-40 Z"
-          stroke="#4a5f7a" stroke-width="8" fill="none" stroke-linejoin="miter"/>
+  <!-- Define gradients for metallic look -->
+  <defs>
+    <linearGradient id="hexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9ca3af;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6b7280;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4b5563;stop-opacity:1" />
+    </linearGradient>
+  </defs>
 
-    <!-- Second row - 2 hexagons -->
-    <path d="M -60,-20 L -25,0 L -25,40 L -60,60 L -95,40 L -95,0 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
-    <path d="M 60,-20 L 95,0 L 95,40 L 60,60 L 25,40 L 25,0 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
+  <!-- Honeycomb structure - 1, 2, 3, 2 pattern with overlapping hexagons -->
+  <g id="honeycomb" transform="translate(256, 220)">
 
-    <!-- Third row - 3 hexagons -->
-    <path d="M -120,20 L -85,40 L -85,80 L -120,100 L -155,80 L -155,40 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
-    <path d="M 0,20 L 35,40 L 35,80 L 0,100 L -35,80 L -35,40 Z"
-          stroke="#4a5f7a" stroke-width="7" fill="none" stroke-linejoin="miter"/>
-    <path d="M 120,20 L 155,40 L 155,80 L 120,100 L 85,80 L 85,40 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
+    <!-- Row 1: 1 hexagon at top -->
+    <path d="M 0,-80 L 30,-60 L 30,-20 L 0,0 L -30,-20 L -30,-60 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
 
-    <!-- Fourth row - 4 hexagons -->
-    <path d="M -180,60 L -145,80 L -145,120 L -180,140 L -215,120 L -215,80 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
-    <path d="M -60,60 L -25,80 L -25,120 L -60,140 L -95,120 L -95,80 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
-    <path d="M 60,60 L 95,80 L 95,120 L 60,140 L 25,120 L 25,80 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
-    <path d="M 180,60 L 215,80 L 215,120 L 180,140 L 145,120 L 145,80 Z"
-          stroke="#3b4a5c" stroke-width="6" fill="none" stroke-linejoin="miter"/>
+    <!-- Row 2: 2 hexagons (overlapping with row 1 and each other) -->
+    <path d="M -40,-40 L -10,-20 L -10,20 L -40,40 L -70,20 L -70,-20 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+    <path d="M 40,-40 L 70,-20 L 70,20 L 40,40 L 10,20 L 10,-20 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+
+    <!-- Row 3: 3 hexagons (overlapping with each other to form connected wave) -->
+    <path d="M -80,0 L -50,20 L -50,60 L -80,80 L -110,60 L -110,20 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+    <path d="M 0,0 L 30,20 L 30,60 L 0,80 L -30,60 L -30,20 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+    <path d="M 80,0 L 110,20 L 110,60 L 80,80 L 50,60 L 50,20 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+
+    <!-- Row 4: 2 hexagons at bottom (overlapping with row 3 and each other) -->
+    <path d="M -40,40 L -10,60 L -10,100 L -40,120 L -70,100 L -70,60 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
+    <path d="M 40,40 L 70,60 L 70,100 L 40,120 L 10,100 L 10,60 Z"
+          stroke="url(#hexGradient)" stroke-width="12" fill="none" stroke-linejoin="round"/>
   </g>
-
-  <!-- HyveWyre text with better styling -->
-  <text x="256" y="450"
-        font-family="Arial, Helvetica, sans-serif"
-        font-size="64"
-        font-weight="700"
-        fill="#4a5f7a"
-        text-anchor="middle"
-        letter-spacing="6">HYVEWYRE</text>
 </svg>

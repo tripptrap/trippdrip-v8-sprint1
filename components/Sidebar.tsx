@@ -26,6 +26,7 @@ function findLead(id:number, leads:any[]){ return (leads||[]).find((l:any)=> l.i
 export default function Sidebar(){
   const path = usePathname();
   const [store, setStore] = useState<any>({ leads:[], threads:[] });
+  const [userPlan, setUserPlan] = useState<string>('basic');
 
   useEffect(()=>{
     const sync = () => { const s = loadStore(); if (s) setStore(s); };
@@ -41,16 +42,34 @@ export default function Sidebar(){
     };
   }, []);
 
+  // Detect user plan type
+  useEffect(() => {
+    try {
+      const points = localStorage.getItem('userPoints');
+      if (points) {
+        const data = JSON.parse(points);
+        setUserPlan(data.planType || 'basic');
+      }
+    } catch (e) {
+      console.error('Error loading user plan:', e);
+    }
+  }, []);
+
   const showTextList = path?.startsWith("/texts");
   const smsThreads = useMemo(()=> (store.threads || []).filter((t:any)=> t.channel === "sms"), [store]);
   const recent = useMemo(()=> {
     return [...smsThreads].sort((a:any,b:any)=> new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()).slice(0, 10);
   }, [smsThreads]);
 
+  // Determine which logo to show
+  const logoSrc = userPlan === 'premium' || userPlan === 'professional'
+    ? '/logo-premium.png'
+    : '/logo-basic.png';
+
   return (
     <aside className="w-64 shrink-0 p-3 border-r border-white/10">
       <div className="text-lg font-semibold mb-6 flex items-center gap-3 px-2">
-        <img src="/icon.png" alt="HyveWyre™" className="h-12 w-12 rounded-xl" />
+        <img src={logoSrc} alt="HyveWyre™" className="h-12 w-12 rounded-2xl" />
         <span className="text-xl">HyveWyre™</span>
       </div>
 
