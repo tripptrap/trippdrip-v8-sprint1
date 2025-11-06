@@ -200,11 +200,11 @@ export default function FollowUpsPage() {
 
   function getPriorityColor(priority: string) {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800 border-red-300';
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'medium': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'low': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'urgent': return 'bg-red-900/30 text-red-300 border-red-700';
+      case 'high': return 'bg-orange-900/30 text-orange-300 border-orange-700';
+      case 'medium': return 'bg-blue-900/30 text-blue-300 border-blue-700';
+      case 'low': return 'bg-gray-800/50 text-gray-400 border-gray-700';
+      default: return 'bg-gray-800/50 text-gray-400 border-gray-700';
     }
   }
 
@@ -221,8 +221,8 @@ export default function FollowUpsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Follow-ups & Reminders</h1>
-          <p className="text-gray-600 mt-1">Manage your lead follow-up schedule</p>
+          <h1 className="text-2xl font-semibold text-[#e7eef9]">Follow-ups & Reminders</h1>
+          <p className="text-[#9fb0c3] mt-1">Manage your lead follow-up schedule</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -244,41 +244,41 @@ export default function FollowUpsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Pending</div>
-          <div className="text-3xl font-bold text-blue-600">{pendingCount}</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Pending</div>
+          <div className="text-3xl font-bold text-blue-400">{pendingCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Overdue</div>
-          <div className="text-3xl font-bold text-red-600">{overdueCount}</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Overdue</div>
+          <div className="text-3xl font-bold text-red-400">{overdueCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Completed</div>
-          <div className="text-3xl font-bold text-green-600">{completedCount}</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Completed</div>
+          <div className="text-3xl font-bold text-green-400">{completedCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Total</div>
-          <div className="text-3xl font-bold">{followUps.length}</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Total</div>
+          <div className="text-3xl font-bold text-[#e7eef9]">{followUps.length}</div>
         </div>
       </div>
 
       {/* Filter Tabs */}
       <div className="card">
-        <div className="flex gap-2 border-b pb-2">
+        <div className="flex gap-2 border-b border-[#223246] pb-2">
           <button
             onClick={() => setStatusFilter('pending')}
-            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             Pending ({pendingCount})
           </button>
           <button
             onClick={() => setStatusFilter('completed')}
-            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             Completed ({completedCount})
           </button>
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             All ({followUps.length})
           </button>
@@ -288,17 +288,17 @@ export default function FollowUpsPage() {
       {/* Follow-ups List */}
       <div className="card p-0">
         {loading ? (
-          <div className="p-8 text-center text-gray-600">Loading follow-ups...</div>
+          <div className="p-8 text-center text-[#9fb0c3]">Loading follow-ups...</div>
         ) : filteredFollowUps.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-gray-600 mb-4">
+            <div className="text-[#9fb0c3] mb-4">
               No follow-ups yet. Create one or use Smart Suggestions to get started.
             </div>
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-[#223246]">
             {filteredFollowUps.map((followUp) => (
-              <div key={followUp.id} className="p-4 hover:bg-gray-50">
+              <div key={followUp.id} className="p-4 hover:bg-[#0c1420]/50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -306,29 +306,29 @@ export default function FollowUpsPage() {
                         {followUp.priority.toUpperCase()}
                       </span>
                       {isOverdue(followUp.due_date) && followUp.status === 'pending' && (
-                        <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-red-900/30 text-red-300 border border-red-700">
                           OVERDUE
                         </span>
                       )}
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        followUp.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        followUp.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
-                        'bg-yellow-100 text-yellow-800'
+                        followUp.status === 'completed' ? 'bg-green-900/30 text-green-300 border border-green-700' :
+                        followUp.status === 'cancelled' ? 'bg-gray-800/50 text-gray-400 border border-gray-700' :
+                        'bg-yellow-900/30 text-yellow-300 border border-yellow-700'
                       }`}>
                         {followUp.status.toUpperCase()}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-lg mb-1">{followUp.title}</h3>
+                    <h3 className="font-semibold text-lg mb-1 text-[#e7eef9]">{followUp.title}</h3>
                     {followUp.leads && (
-                      <div className="text-sm text-gray-600 mb-1">
+                      <div className="text-sm text-[#9fb0c3] mb-1">
                         Lead: {followUp.leads.first_name} {followUp.leads.last_name} • {followUp.leads.phone}
                         {followUp.leads.disposition && ` • ${followUp.leads.disposition}`}
                       </div>
                     )}
                     {followUp.notes && (
-                      <p className="text-sm text-gray-600 mb-2">{followUp.notes}</p>
+                      <p className="text-sm text-[#9fb0c3] mb-2">{followUp.notes}</p>
                     )}
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[#5a6b7f]">
                       Due: {format(new Date(followUp.due_date), 'MMM d, yyyy h:mm a')}
                     </div>
                   </div>
@@ -337,14 +337,14 @@ export default function FollowUpsPage() {
                       <>
                         <button
                           onClick={() => updateFollowUp(followUp.id, { status: 'completed' })}
-                          className="px-3 py-1 text-sm bg-green-50 text-green-600 rounded hover:bg-green-100"
+                          className="px-3 py-1 text-sm bg-green-900/30 text-green-300 rounded hover:bg-green-900/50 border border-green-700"
                         >
                           Complete
                         </button>
                         {followUp.leads && (
                           <Link
                             href={`/texts?leadId=${followUp.lead_id}`}
-                            className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-blue-700"
                           >
                             Message
                           </Link>
@@ -353,7 +353,7 @@ export default function FollowUpsPage() {
                     )}
                     <button
                       onClick={() => deleteFollowUp(followUp.id)}
-                      className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                      className="px-3 py-1 text-sm bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 border border-red-700"
                     >
                       Delete
                     </button>
@@ -445,9 +445,9 @@ export default function FollowUpsPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-50 border-blue-200">
-        <h3 className="font-semibold mb-2">Smart Follow-up System</h3>
-        <ul className="text-sm text-gray-700 space-y-1">
+      <div className="card bg-blue-900/20 border-blue-700/50">
+        <h3 className="font-semibold mb-2 text-[#e7eef9]">Smart Follow-up System</h3>
+        <ul className="text-sm text-[#9fb0c3] space-y-1">
           <li>• Click "Smart Suggestions" to see AI-powered follow-up recommendations</li>
           <li>• Suggestions are based on lead engagement, response times, and disposition</li>
           <li>• Urgent priorities are for hot leads that need immediate attention</li>

@@ -52,7 +52,7 @@ export default function EmailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Email</h1>
-          <p className="text-gray-600 mt-1">View sent emails and configure email settings</p>
+          <p className="text-[#9fb0c3] mt-1">View sent emails and configure email settings</p>
         </div>
         <Link
           href="/settings?tab=email"
@@ -76,15 +76,15 @@ export default function EmailPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Total Emails</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Total Emails</div>
           <div className="text-3xl font-bold">{emails.length}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Sent Successfully</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Sent Successfully</div>
           <div className="text-3xl font-bold text-green-600">{sentCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Failed</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Failed</div>
           <div className="text-3xl font-bold text-red-600">{failedCount}</div>
         </div>
       </div>
@@ -92,17 +92,17 @@ export default function EmailPage() {
       {/* Emails List */}
       <div className="card p-0">
         {loading ? (
-          <div className="p-8 text-center text-gray-600">Loading emails...</div>
+          <div className="p-8 text-center text-[#9fb0c3]">Loading emails...</div>
         ) : filteredEmails.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-gray-600 mb-4">
+            <div className="text-[#9fb0c3] mb-4">
               {searchQuery ? 'No emails found matching your search.' : 'No emails sent yet.'}
             </div>
             {!searchQuery && (
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-[#5a6b7f]">
                 Emails are automatically sent to new leads when you import them.
                 <br />
-                <Link href="/leads" className="text-blue-600 hover:underline">
+                <Link href="/leads" className="text-blue-400 hover:underline">
                   Import Leads
                 </Link>
                 {' '}to start sending welcome emails.
@@ -112,18 +112,18 @@ export default function EmailPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[#0c1420]/30 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Recipient</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Subject</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Sent At</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-700">Actions</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Recipient</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Subject</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Sent At</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredEmails.map((email) => (
-                  <tr key={email.id} className="hover:bg-gray-50">
+                  <tr key={email.id} className="hover:bg-[#0c1420]/50">
                     <td className="px-4 py-3">
                       {email.status === 'sent' ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -141,13 +141,13 @@ export default function EmailPage() {
                     <td className="px-4 py-3">
                       <div className="max-w-xs truncate">{email.subject}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-[#9fb0c3]">
                       {new Date(email.sent_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => setSelectedEmail(email)}
-                        className="text-blue-600 hover:underline text-sm"
+                        className="text-blue-400 hover:underline text-sm"
                       >
                         View
                       </button>
@@ -224,7 +224,7 @@ export default function EmailPage() {
               )}
             </div>
 
-            <div className="p-6 border-t bg-gray-50">
+            <div className="p-6 border-t bg-[#0c1420]/30">
               <button
                 onClick={() => setSelectedEmail(null)}
                 className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
@@ -237,12 +237,12 @@ export default function EmailPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-50 border-blue-200">
+      <div className="card bg-blue-900/20 border-blue-700/50">
         <h3 className="font-semibold mb-2">About Email</h3>
-        <ul className="text-sm text-gray-700 space-y-1">
+        <ul className="text-sm text-[#9fb0c3] space-y-1">
           <li>• Welcome emails are automatically sent to new leads with email addresses</li>
           <li>• Each email costs 0.5 points from your balance</li>
-          <li>• Configure your email provider in <Link href="/settings?tab=email" className="text-blue-600 hover:underline">Settings → Email</Link></li>
+          <li>• Configure your email provider in <Link href="/settings?tab=email" className="text-blue-400 hover:underline">Settings → Email</Link></li>
           <li>• Supports SMTP (Gmail, Office 365, etc.) and SendGrid</li>
           <li>• Track all sent emails and their delivery status here</li>
         </ul>

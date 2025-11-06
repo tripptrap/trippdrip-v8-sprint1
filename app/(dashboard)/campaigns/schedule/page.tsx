@@ -418,7 +418,7 @@ export default function ScheduleCampaignPage() {
                 case 'scheduled': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
                 case 'running': return 'text-green-400 bg-green-500/10 border-green-500/20';
                 case 'paused': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-                case 'completed': return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+                case 'completed': return 'text-[#5a6b7f] bg-gray-500/10 border-gray-500/20';
                 case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
                 default: return 'text-white/60 bg-white/5 border-white/10';
               }

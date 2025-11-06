@@ -151,7 +151,7 @@ export default function TagsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Tags</h1>
-          <p className="text-gray-600 mt-1">Organize and filter your leads by tags</p>
+          <p className="text-[#9fb0c3] mt-1">Organize and filter your leads by tags</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -183,15 +183,15 @@ export default function TagsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Total Tags</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Total Tags</div>
           <div className="text-3xl font-bold">{tags.length}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Total Tagged Leads</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Total Tagged Leads</div>
           <div className="text-3xl font-bold">{totalLeads.toLocaleString()}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-600 mb-1">Average per Tag</div>
+          <div className="text-sm text-[#9fb0c3] mb-1">Average per Tag</div>
           <div className="text-3xl font-bold">
             {tags.length > 0 ? Math.round(totalLeads / tags.length) : 0}
           </div>
@@ -201,16 +201,16 @@ export default function TagsPage() {
       {/* Tags Grid */}
       <div className="card p-0">
         {loading ? (
-          <div className="p-8 text-center text-gray-600">Loading tags...</div>
+          <div className="p-8 text-center text-[#9fb0c3]">Loading tags...</div>
         ) : filteredTags.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-gray-600 mb-4">
+            <div className="text-[#9fb0c3] mb-4">
               {searchQuery ? 'No tags found matching your search.' : 'No tags yet.'}
             </div>
             {!searchQuery && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="text-blue-600 hover:underline"
+                className="text-blue-400 hover:underline"
               >
                 Create your first tag
               </button>
@@ -245,13 +245,13 @@ export default function TagsPage() {
                         style={{ width: `${percentage}%`, backgroundColor: tag.color }}
                       />
                     </div>
-                    <div className="text-sm text-gray-600 mb-3">
+                    <div className="text-sm text-[#9fb0c3] mb-3">
                       {percentage.toFixed(1)}% of all tagged leads
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => openEditModal(tag)}
-                        className="flex-1 text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                        className="flex-1 text-sm px-3 py-1 bg-blue-900/20 text-blue-400 rounded hover:bg-blue-900/30"
                       >
                         Edit
                       </button>
@@ -263,7 +263,7 @@ export default function TagsPage() {
                       </button>
                       <Link
                         href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                        className="flex-1 text-sm px-3 py-1 bg-gray-50 text-gray-600 rounded hover:bg-gray-100 text-center"
+                        className="flex-1 text-sm px-3 py-1 bg-[#0c1420]/30 text-[#9fb0c3] rounded hover:bg-[#0c1420]/50 text-center"
                       >
                         View
                       </Link>
@@ -357,9 +357,9 @@ export default function TagsPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-50 border-blue-200">
+      <div className="card bg-blue-900/20 border-blue-700/50">
         <h3 className="font-semibold mb-2">Working with Tags</h3>
-        <ul className="text-sm text-gray-700 space-y-1">
+        <ul className="text-sm text-[#9fb0c3] space-y-1">
           <li>• Create custom tags with color coding for easy organization</li>
           <li>• Click any tag to see all leads with that tag</li>
           <li>• Tags help you organize and segment your leads effectively</li>
