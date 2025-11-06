@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 
 // Create Supabase admin client for webhook (bypasses RLS)
 // Only create if keys are available
@@ -34,7 +35,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const stripe = require('stripe')(stripeSecretKey);
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2024-12-18.acacia',
+    });
 
     // Verify webhook signature
     let event;

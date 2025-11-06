@@ -1,9 +1,8 @@
-// API Route: Create Stripe Checkout Session with Demo Mode Support
+// API Route: Create Stripe Checkout Session
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-
-const DEMO_MODE = process.env.STRIPE_DEMO_MODE === 'true' || process.env.NODE_ENV === 'development';
+import Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,59 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // DEMO MODE: Skip Stripe and directly update credits
-    if (DEMO_MODE) {
-      console.log('[DEMO MODE] Simulating payment for:', packName, points, 'credits');
-
-      // Update user credits directly in Supabase
-      const { data: userData } = await supabase
-        .from('users')
-        .select('credits, monthly_credits')
-        .eq('id', user.id)
-        .single();
-
-      const currentCredits = userData?.credits || 0;
-      const newCredits = currentCredits + points;
-
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          credits: newCredits,
-          monthly_credits: points,
-          plan_type: planType || 'basic',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (updateError) {
-        console.error('Error updating credits in demo mode:', updateError);
-        return NextResponse.json({ error: 'Failed to update credits' }, { status: 500 });
-      }
-
-      // Create a demo payment record
-      await supabase.from('payments').insert({
-        user_id: user.id,
-        amount: Math.round(price * 100),
-        currency: 'usd',
-        status: 'demo_completed',
-        plan_type: planType || 'basic',
-        credits_purchased: points,
-        payment_method: 'demo',
-        pack_name: packName,
-        created_at: new Date().toISOString()
-      });
-
-      return NextResponse.json({
-        ok: true,
-        demo: true,
-        message: 'Demo payment completed successfully',
-        credits: newCredits,
-        points,
-        packName
-      });
-    }
-
-    // REAL MODE: Create Stripe checkout session
+    // Check for Stripe API key
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
     if (!stripeSecretKey) {
@@ -90,8 +37,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Import Stripe dynamically
-    const stripe = require('stripe')(stripeSecretKey);
+    // Initialize Stripe
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2024-12-18.acacia',
+    });
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
@@ -104,7 +53,8 @@ export async function POST(req: NextRequest) {
             currency: 'usd',
             product_data: {
               name: `${packName} - ${points.toLocaleString()} Credits`,
-              description: `${points.toLocaleString()} credits for your HyveWyre account`
+              description: `${points.toLocaleString()} credits for your HyveWyre account`,
+              images: [`${baseUrl}/logo.png`]
             },
             unit_amount: Math.round(price * 100) // Convert to cents
           },
@@ -112,9 +62,10 @@ export async function POST(req: NextRequest) {
         }
       ],
       mode: 'payment',
-      success_url: `${baseUrl}/points?success=true&points=${points}&packName=${encodeURIComponent(packName)}`,
+      success_url: `${baseUrl}/points?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/points?canceled=true`,
       client_reference_id: user.id,
+      customer_email: user.email,
       metadata: {
         user_id: user.id,
         points: points.toString(),
