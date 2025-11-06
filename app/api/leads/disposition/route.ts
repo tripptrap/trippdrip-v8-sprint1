@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,45 +23,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Read leads file
-    if (!fs.existsSync(LEADS_FILE)) {
-      return NextResponse.json({ ok: false, error: 'Leads file not found' }, { status: 404 });
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    const leadsData = JSON.parse(fs.readFileSync(LEADS_FILE, 'utf-8'));
-    const leads = leadsData.items || [];
-
-    // Find and update lead
-    const leadIndex = leads.findIndex((l: any) => String(l.id) === String(id));
-
-    if (leadIndex === -1) {
-      return NextResponse.json({ ok: false, error: 'Lead not found' }, { status: 404 });
-    }
-
-    // Update disposition and status based on disposition type
-    leads[leadIndex].disposition = disposition;
-
-    // Auto-update status based on disposition
+    // Determine status based on disposition
+    let status;
     if (disposition === 'not_interested') {
-      leads[leadIndex].status = 'archived';
+      status = 'archived';
     } else if (disposition === 'sold') {
-      leads[leadIndex].status = 'sold';
-    } else if (leads[leadIndex].status === 'archived' || leads[leadIndex].status === 'sold') {
-      // If moving away from archived/sold, set back to active
-      leads[leadIndex].status = 'active';
+      status = 'sold';
     }
 
-    // Save updated leads
-    fs.writeFileSync(
-      LEADS_FILE,
-      JSON.stringify({ items: leads }, null, 2),
-      'utf-8'
-    );
+    // Update lead (only if it belongs to current user)
+    const updateData: any = { disposition };
+    if (status) {
+      updateData.status = status;
+    }
+
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating lead disposition:', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    if (!lead) {
+      return NextResponse.json({ ok: false, error: 'Lead not found or access denied' }, { status: 404 });
+    }
 
     return NextResponse.json({
       ok: true,
       message: 'Lead disposition updated successfully',
-      lead: leads[leadIndex]
+      lead
     });
   } catch (error: any) {
     console.error('Error updating lead disposition:', error);
