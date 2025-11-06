@@ -7,7 +7,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419] relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundSize: '40px 40px'
+        }} />
+      </div>
       {/* Mobile menu button */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -39,7 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar />
       </div>
 
-      <main className="flex-1 flex flex-col w-full md:w-auto">
+      <main className="flex-1 flex flex-col w-full md:w-auto relative z-10">
         <Topbar />
         <div className="container py-6 px-4 md:px-6">{children}</div>
       </main>
