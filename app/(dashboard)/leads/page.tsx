@@ -472,7 +472,7 @@ export default function LeadsPage() {
   }, [raw]);
 
   const initialMap = useMemo<MapType>(() => {
-    const m: MapType = { first_name:"", last_name:"", phone:"", email:"", state:"", tags:"", status:"" };
+    const m: MapType = { first_name:"", last_name:"", phone:"", email:"", state:"", zip_code:"", tags:"", status:"" };
     const cols = detectedColumns.map(c => [c, c.toLowerCase()] as const);
     for (const [orig, low] of cols) {
       if (low.includes("first")) m.first_name ||= orig;
@@ -480,6 +480,7 @@ export default function LeadsPage() {
       else if (/phone|cell|mobile|tel/.test(low)) m.phone ||= orig;
       else if (low.includes("mail")) m.email ||= orig;
       else if (low === "state" || low.includes("state")) m.state ||= orig;
+      else if (low.includes("zip") || low.includes("postal")) m.zip_code ||= orig;
       else if (low.includes("tag") || low.includes("label")) m.tags ||= orig;
       else if (low === "status") m.status ||= orig;
       else if (low === "name" || low.includes("full name")) { if (!m.first_name) m.first_name = orig; }
