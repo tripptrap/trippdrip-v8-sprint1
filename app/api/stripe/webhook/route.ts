@@ -1,6 +1,13 @@
-// API Route: Stripe Webhook Handler
+// API Route: Stripe Webhook Handler with Supabase Integration
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Create Supabase admin client for webhook (bypasses RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,23 +51,63 @@ export async function POST(req: NextRequest) {
         const session = event.data.object;
 
         // Extract metadata
+        const userId = session.client_reference_id || session.metadata?.user_id;
         const points = parseInt(session.metadata?.points || '0');
         const packName = session.metadata?.packName || 'Unknown';
+        const planType = session.metadata?.planType || 'basic';
 
         console.log('Payment successful!', {
+          userId,
           points,
           packName,
+          planType,
           customerId: session.customer,
           paymentIntent: session.payment_intent
         });
 
-        // In a real app, you would:
-        // 1. Identify the user (using customer ID or session metadata)
-        // 2. Add points to their account in your database
-        // 3. Send confirmation email
+        if (userId && points > 0) {
+          // Get current user credits
+          const { data: userData } = await supabaseAdmin
+            .from('users')
+            .select('credits, monthly_credits')
+            .eq('id', userId)
+            .single();
 
-        // For now, we'll just log it
-        // The client-side will handle adding points based on the success URL
+          const currentCredits = userData?.credits || 0;
+          const newCredits = currentCredits + points;
+
+          // Update user credits in Supabase
+          const { error: updateError } = await supabaseAdmin
+            .from('users')
+            .update({
+              credits: newCredits,
+              monthly_credits: points,
+              plan_type: planType,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+          if (updateError) {
+            console.error('Error updating user credits:', updateError);
+          } else {
+            console.log(`Updated user ${userId} credits to ${newCredits}`);
+          }
+
+          // Create payment record
+          await supabaseAdmin.from('payments').insert({
+            user_id: userId,
+            amount: session.amount_total,
+            currency: session.currency,
+            status: 'completed',
+            plan_type: planType,
+            credits_purchased: points,
+            payment_method: 'card',
+            pack_name: packName,
+            stripe_session_id: session.id,
+            stripe_payment_intent: session.payment_intent,
+            created_at: new Date().toISOString()
+          });
+        }
 
         break;
 
@@ -69,7 +116,21 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'payment_intent.payment_failed':
-        console.log('PaymentIntent failed:', event.data.object.id);
+        const failedIntent = event.data.object;
+        console.log('PaymentIntent failed:', failedIntent.id);
+
+        // Record failed payment
+        if (failedIntent.metadata?.user_id) {
+          await supabaseAdmin.from('payments').insert({
+            user_id: failedIntent.metadata.user_id,
+            amount: failedIntent.amount,
+            currency: failedIntent.currency,
+            status: 'failed',
+            payment_method: 'card',
+            stripe_payment_intent: failedIntent.id,
+            created_at: new Date().toISOString()
+          });
+        }
         break;
 
       default:
