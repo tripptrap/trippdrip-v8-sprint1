@@ -23,6 +23,16 @@ export async function GET(req: Request) {
   const tags = (url.searchParams.get("tags") || "").split(",").map(s=>s.trim()).filter(Boolean);
   const campaign = (url.searchParams.get("campaign") || "").trim();
 
+  // Advanced filters
+  const status = url.searchParams.get("status");
+  const disposition = url.searchParams.get("disposition");
+  const temperature = url.searchParams.get("temperature");
+  const source = url.searchParams.get("source");
+  const dateFrom = url.searchParams.get("dateFrom");
+  const dateTo = url.searchParams.get("dateTo");
+  const sortBy = url.searchParams.get("sortBy") || "created_at";
+  const sortOrder = url.searchParams.get("sortOrder") || "desc";
+
   try {
     const supabase = await createClient();
 
@@ -38,18 +48,50 @@ export async function GET(req: Request) {
       .select('*')
       .eq('user_id', user.id);
 
-    // Apply search filter (if provided)
+    // Apply search filter (searches across multiple fields)
     if (q) {
-      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,state.ilike.%${q}%,status.ilike.%${q}%`);
+      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,company.ilike.%${q}%`);
     }
 
-    // Apply campaign filter (if provided)
+    // Apply status filter
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    // Apply disposition filter
+    if (disposition) {
+      query = query.eq('disposition', disposition);
+    }
+
+    // Apply temperature filter
+    if (temperature) {
+      query = query.eq('temperature', temperature);
+    }
+
+    // Apply source filter
+    if (source) {
+      query = query.eq('source', source);
+    }
+
+    // Apply campaign filter
     if (campaign) {
       query = query.eq('campaign', campaign);
     }
 
+    // Apply date range filters
+    if (dateFrom) {
+      query = query.gte('created_at', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('created_at', dateTo);
+    }
+
+    // Apply sorting
+    const ascending = sortOrder === 'asc';
+    query = query.order(sortBy, { ascending });
+
     // Execute query
-    const { data: items, error } = await query.order('created_at', { ascending: false });
+    const { data: items, error } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);
