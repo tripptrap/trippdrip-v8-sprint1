@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60; // Max execution time in seconds
+
 /**
  * CRON JOB ENDPOINT - Process Scheduled Messages & Campaigns
  *
@@ -13,9 +17,11 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 export async function GET(req: NextRequest) {
-  // Security: Verify cron secret
+  // Security: Verify cron secret (optional in development)
   const cronSecret = req.headers.get('x-cron-secret');
-  if (cronSecret !== process.env.CRON_SECRET) {
+  const expectedSecret = process.env.CRON_SECRET;
+
+  if (expectedSecret && cronSecret !== expectedSecret) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
