@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@/lib/supabase/server";
 import { Parser } from "json2csv";
+
+export const dynamic = "force-dynamic";
 
 interface Lead {
   id?: string;
@@ -9,18 +10,29 @@ interface Lead {
   last_name?: string;
   phone?: string;
   email?: string;
-  state?: string;
+  company?: string;
+  source?: string;
   tags?: string[];
   status?: string;
   disposition?: string;
   score?: number;
   temperature?: string;
+  notes?: string;
   created_at?: string;
+  last_contacted?: string;
   [key: string]: any;
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { leadIds, format } = body;
 
@@ -31,19 +43,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const dataDir = path.join(process.cwd(), "data");
-    const leadsPath = path.join(dataDir, "leads.json");
+    // Fetch leads from Supabase
+    const { data: selectedLeads, error } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('id', leadIds);
 
-    // Read leads
-    const leadsData = await fs.readFile(leadsPath, "utf-8");
-    const allLeads: Lead[] = JSON.parse(leadsData);
+    if (error) {
+      console.error('Error fetching leads:', error);
+      return NextResponse.json(
+        { ok: false, error: "Failed to fetch leads" },
+        { status: 500 }
+      );
+    }
 
-    // Filter selected leads
-    const selectedLeads = allLeads.filter(lead =>
-      leadIds.includes(String(lead.id))
-    );
-
-    if (selectedLeads.length === 0) {
+    if (!selectedLeads || selectedLeads.length === 0) {
       return NextResponse.json(
         { ok: false, error: "No leads found" },
         { status: 404 }
@@ -64,19 +79,24 @@ export async function POST(req: NextRequest) {
         'last_name',
         'phone',
         'email',
-        'state',
+        'company',
+        'source',
         'tags',
         'status',
         'disposition',
         'score',
         'temperature',
+        'notes',
         'created_at',
+        'last_contacted',
       ];
 
       // Transform data for CSV
       const dataForCSV = selectedLeads.map(lead => ({
         ...lead,
-        tags: Array.isArray(lead.tags) ? lead.tags.join(', ') : '',
+        tags: Array.isArray(lead.tags) ? lead.tags.join(';') : '',
+        created_at: lead.created_at ? new Date(lead.created_at).toISOString() : '',
+        last_contacted: lead.last_contacted ? new Date(lead.last_contacted).toISOString() : '',
       }));
 
       const parser = new Parser({ fields });
