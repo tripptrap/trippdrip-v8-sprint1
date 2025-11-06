@@ -4,10 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase admin client for webhook (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Only create if keys are available
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,6 +69,11 @@ export async function POST(req: NextRequest) {
         });
 
         if (userId && points > 0) {
+          if (!supabaseAdmin) {
+            console.error('Supabase admin client not configured. Missing SUPABASE_SERVICE_ROLE_KEY.');
+            return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+          }
+
           // Get current user credits
           const { data: userData } = await supabaseAdmin
             .from('users')
@@ -120,7 +128,7 @@ export async function POST(req: NextRequest) {
         console.log('PaymentIntent failed:', failedIntent.id);
 
         // Record failed payment
-        if (failedIntent.metadata?.user_id) {
+        if (failedIntent.metadata?.user_id && supabaseAdmin) {
           await supabaseAdmin.from('payments').insert({
             user_id: failedIntent.metadata.user_id,
             amount: failedIntent.amount,
