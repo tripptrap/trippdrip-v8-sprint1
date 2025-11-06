@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@/lib/supabase/server";
 import { loadSettings, isEmailConfigured } from "@/lib/settingsStore";
 import nodemailer from 'nodemailer';
 
 export const runtime = "nodejs";
-const DATA_DIR = path.join(process.cwd(), "data");
-const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 
 type Lead = {
   first_name?: string;
@@ -18,39 +15,79 @@ type Lead = {
   status?: string;
 };
 
-const fp = (l: Lead) =>
-  `${(l.first_name || "").toLowerCase()}|${(l.last_name || "").toLowerCase()}|${(l.phone || "").replace(/\D/g, "")}`;
-
 export async function POST(req: Request) {
   try {
     const lead = (await req.json()) as Lead;
     if (!lead) return NextResponse.json({ ok: false, error: "No lead" }, { status: 400 });
 
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    const supabase = await createClient();
 
-    let list: Lead[] = [];
-    try {
-      const raw = await fs.readFile(LEADS_FILE, "utf8");
-      list = JSON.parse(raw);
-    } catch {}
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
 
-    const key = fp(lead);
+    // Check if lead exists by matching first_name, last_name, and phone
+    const { data: existingLeads } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('first_name', lead.first_name || '')
+      .eq('last_name', lead.last_name || '')
+      .eq('phone', lead.phone || '');
+
     let updated = false;
+    let leadData: any = null;
 
-    const next = list.map((l) => {
-      if (fp(l) === key) {
-        updated = true;
-        return {
-          ...l,
+    if (existingLeads && existingLeads.length > 0) {
+      // Update existing lead
+      const existing = existingLeads[0];
+
+      // Merge tags
+      const mergedTags = Array.from(new Set([
+        ...(existing.tags || []),
+        ...(lead.tags || [])
+      ])).filter(Boolean);
+
+      const { data, error } = await supabase
+        .from('leads')
+        .update({
           ...lead,
-          tags: Array.from(new Set([...(l.tags || []), ...(lead.tags || [])])).filter(Boolean),
-        };
-      }
-      return l;
-    });
+          tags: mergedTags,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
 
-    if (!updated) {
-      next.push(lead);
+      if (error) {
+        console.error('Error updating lead:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+
+      updated = true;
+      leadData = data;
+    } else {
+      // Insert new lead
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          ...lead,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error inserting lead:', error);
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+
+      leadData = data;
 
       // Send welcome email to new lead if email is configured and lead has an email
       if (lead.email && isEmailConfigured()) {
@@ -98,25 +135,16 @@ export async function POST(req: Request) {
               replyTo: emailConfig.replyTo || emailConfig.fromEmail,
             });
 
-            // Save sent email record
-            const emailsFile = path.join(DATA_DIR, "emails.json");
-            let emails = [];
-            try {
-              const emailData = await fs.readFile(emailsFile, "utf8");
-              emails = JSON.parse(emailData);
-            } catch {}
-
-            emails.push({
-              id: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            // Save sent email record to Supabase
+            await supabase.from('emails').insert({
+              user_id: user.id,
               to: lead.email,
               subject: `Welcome to ${emailConfig.fromName}!`,
               body: `Hi ${leadName},\n\nThank you for your interest! We're excited to have you.\n\nWe'll be in touch soon.\n\nBest regards,\n${emailConfig.fromName}`,
               sent_at: new Date().toISOString(),
               status: 'sent',
-              lead_id: undefined,
+              lead_id: leadData.id,
             });
-
-            await fs.writeFile(emailsFile, JSON.stringify(emails, null, 2), "utf8");
           }
         } catch (emailError) {
           // Log but don't fail the lead creation if email fails
@@ -125,12 +153,20 @@ export async function POST(req: Request) {
       }
     }
 
-    await fs.writeFile(LEADS_FILE, JSON.stringify(next, null, 2), "utf8");
+    // Get total count
+    const { count } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
 
-    return NextResponse.json({ ok: true, action: updated ? "updated" : "inserted", total: next.length });
+    return NextResponse.json({
+      ok: true,
+      action: updated ? "updated" : "inserted",
+      total: count || 0,
+      lead: leadData
+    });
   } catch (e: any) {
+    console.error('Error in upsert:', e);
     return NextResponse.json({ ok: false, error: e?.message || "Upsert failed" }, { status: 500 });
   }
 }
-
-
