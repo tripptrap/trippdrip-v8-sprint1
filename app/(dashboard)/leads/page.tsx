@@ -9,6 +9,7 @@ type Lead = {
   phone?: string;
   email?: string;
   state?: string;
+  zip_code?: string;
   tags?: string[];
   status?: string;
   score?: number;
@@ -39,7 +40,7 @@ type Campaign = {
   lead_count?: number;
 };
 
-const CANON_FIELDS = ["first_name","last_name","phone","email","state","tags","status"] as const;
+const CANON_FIELDS = ["first_name","last_name","phone","email","state","zip_code","tags","status"] as const;
 type Canon = typeof CANON_FIELDS[number];
 type MapType = Record<Canon, string | "">;
 
@@ -643,12 +644,36 @@ export default function LeadsPage() {
   const [runCampaignId, setRunCampaignId] = useState<string>(""); // must pick from saved
   const [runTags, setRunTags] = useState("");
   const [runScope, setRunScope] = useState<"selected"|"filtered">("selected");
+  const [runZipCodes, setRunZipCodes] = useState(""); // comma-separated zip codes to filter by
   const [running, setRunning] = useState(false);
 
   async function runCampaign() {
-    const ids = runScope === "selected"
+    let ids = runScope === "selected"
       ? Array.from(selectedIds)
       : filtered.map(l => String(l.id ?? ""));
+
+    // Filter by zip codes if provided
+    if (runZipCodes.trim()) {
+      const zipCodesArray = runZipCodes.split(',').map(z => z.trim()).filter(Boolean);
+      if (zipCodesArray.length > 0) {
+        const leadsToRun = runScope === "selected"
+          ? leads.filter(l => ids.includes(String(l.id ?? "")))
+          : filtered;
+
+        const filteredByZip = leadsToRun.filter(l =>
+          l.zip_code && zipCodesArray.includes(l.zip_code)
+        );
+
+        ids = filteredByZip.map(l => String(l.id ?? ""));
+
+        if (ids.length === 0) {
+          setToast(`No leads found with zip codes: ${runZipCodes}`);
+          setTimeout(()=>setToast(""), 3500);
+          return;
+        }
+      }
+    }
+
     if (!ids.length) {
       setToast("select leads first or switch to filtered");
       setTimeout(()=>setToast(""), 2500);
@@ -682,6 +707,7 @@ export default function LeadsPage() {
         setRunOpen(false);
         setRunCampaignId("");
         setRunTags("");
+        setRunZipCodes("");
         setSelectedIds(new Set());
         setToast("campaign started");
         setTimeout(()=>setToast(""), 2500);
@@ -1182,12 +1208,13 @@ export default function LeadsPage() {
                             <td className="border-b border-[#1a2a40] px-3 py-2">{r.phone||""}</td>
                             <td className="border-b border-[#1a2a40] px-3 py-2">{r.email||""}</td>
                             <td className="border-b border-[#1a2a40] px-3 py-2">{r.state||""}</td>
+                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.zip_code||""}</td>
                             <td className="border-b border-[#1a2a40] px-3 py-2">{Array.isArray(r.tags)? r.tags.join(", "):""}</td>
                             <td className="border-b border-[#1a2a40] px-3 py-2">{r.status||""}</td>
                           </tr>
                         ))}
                         {!mappedPreview.length && (
-                          <tr><td colSpan={7} className="px-3 py-4 text-[#9fb0c3]">No rows detected.</td></tr>
+                          <tr><td colSpan={8} className="px-3 py-4 text-[#9fb0c3]">No rows detected.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1236,6 +1263,12 @@ export default function LeadsPage() {
                   value={runTags}
                   onChange={(e)=>setRunTags(e.target.value)}
                   placeholder="Tags to apply (comma-separated)"
+                  className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                />
+                <input
+                  value={runZipCodes}
+                  onChange={(e)=>setRunZipCodes(e.target.value)}
+                  placeholder="Filter by ZIP codes (comma-separated, optional)"
                   className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
                 />
                 <div className="flex items-center gap-4">
