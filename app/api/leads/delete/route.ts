@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LEADS_FILE = path.join(DATA_DIR, 'leads.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -15,36 +11,33 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Lead ID(s) required' }, { status: 400 });
     }
 
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
     // Parse IDs
-    const idsToDelete = ids ? ids.split(',') : [id];
+    const idsToDelete = ids ? ids.split(',').map(id => parseInt(id)) : [parseInt(id!)];
 
-    // Read leads file
-    if (!fs.existsSync(LEADS_FILE)) {
-      return NextResponse.json({ ok: false, error: 'Leads file not found' }, { status: 404 });
+    // Delete leads (only those belonging to the current user)
+    const { error, count } = await supabase
+      .from('leads')
+      .delete({ count: 'exact' })
+      .in('id', idsToDelete)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error deleting lead(s):', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
-
-    const leadsData = JSON.parse(fs.readFileSync(LEADS_FILE, 'utf-8'));
-    const leads = leadsData.items || [];
-
-    // Filter out leads to delete
-    const filteredLeads = leads.filter((l: any) => !idsToDelete.includes(String(l.id)));
-    const deletedCount = leads.length - filteredLeads.length;
-
-    if (deletedCount === 0) {
-      return NextResponse.json({ ok: false, error: 'No leads found to delete' }, { status: 404 });
-    }
-
-    // Save updated leads
-    fs.writeFileSync(
-      LEADS_FILE,
-      JSON.stringify({ items: filteredLeads }, null, 2),
-      'utf-8'
-    );
 
     return NextResponse.json({
       ok: true,
-      message: `${deletedCount} lead(s) deleted successfully`,
-      deletedCount
+      message: `${count || 0} lead(s) deleted successfully`,
+      deletedCount: count || 0
     });
   } catch (error: any) {
     console.error('Error deleting lead(s):', error);
