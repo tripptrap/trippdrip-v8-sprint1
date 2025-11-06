@@ -42,17 +42,30 @@ export default function Sidebar(){
     };
   }, []);
 
-  // Detect user plan type
+  // Detect user plan type and listen for changes
   useEffect(() => {
-    try {
-      const points = localStorage.getItem('userPoints');
-      if (points) {
-        const data = JSON.parse(points);
-        setUserPlan(data.planType || 'basic');
+    const updatePlan = () => {
+      try {
+        const points = localStorage.getItem('userPoints');
+        if (points) {
+          const data = JSON.parse(points);
+          setUserPlan(data.planType || 'basic');
+        }
+      } catch (e) {
+        console.error('Error loading user plan:', e);
       }
-    } catch (e) {
-      console.error('Error loading user plan:', e);
-    }
+    };
+
+    updatePlan();
+
+    // Listen for storage changes (plan upgrades)
+    window.addEventListener('storage', updatePlan);
+    window.addEventListener(STORE_UPDATED_EVENT, updatePlan);
+
+    return () => {
+      window.removeEventListener('storage', updatePlan);
+      window.removeEventListener(STORE_UPDATED_EVENT, updatePlan);
+    };
   }, []);
 
   const showTextList = path?.startsWith("/texts");

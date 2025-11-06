@@ -198,6 +198,18 @@ export default function PointsPage() {
       return;
     }
 
+    // Update localStorage to trigger logo/favicon updates
+    try {
+      const pointsData = JSON.parse(localStorage.getItem('userPoints') || '{}');
+      pointsData.planType = planType === 'premium' ? 'premium' : 'basic';
+      localStorage.setItem('userPoints', JSON.stringify(pointsData));
+
+      // Dispatch storage event for components listening to plan changes
+      window.dispatchEvent(new Event('storage'));
+    } catch (e) {
+      console.error('Error updating localStorage:', e);
+    }
+
     // Refresh data
     await refreshData();
 
