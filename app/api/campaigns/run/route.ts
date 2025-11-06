@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { createClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 
 export const dynamic = "force-dynamic";
@@ -26,23 +25,6 @@ type SendResult = {
   error?: string;
 };
 
-function ensureDir(p: string) {
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-}
-
-function readJsonSafe<T>(p: string, fallback: T): T {
-  try {
-    if (!fs.existsSync(p)) return fallback;
-    return JSON.parse(fs.readFileSync(p, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function uniq<T>(arr: T[]) {
-  return Array.from(new Set(arr));
-}
-
 // Personalize message with lead data
 function personalizeMessage(template: string, lead: Lead): string {
   let message = template;
@@ -58,7 +40,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const leadIds: string[] = Array.isArray(body?.leadIds) ? body.leadIds.map(String) : [];
-    const addTags: string[] = Array.isArray(body?.addTags) ? body.addTags.map((t:any)=>String(t).trim()).filter(Boolean) : [];
+    const addTags: string[] = Array.isArray(body?.addTags) ? body.addTags.map((t: any) => String(t).trim()).filter(Boolean) : [];
     const campaignName: string = body?.campaignName ? String(body.campaignName).trim() : "";
     const messageTemplate: string = body?.message || "";
     const sendSMS: boolean = body?.sendSMS === true;
@@ -70,25 +52,33 @@ export async function POST(req: Request) {
     const checkSpam: boolean = body?.checkSpam !== false;
 
     if (!campaignName) {
-      return NextResponse.json({ ok:false, error:"campaignName required" }, { status:400 });
+      return NextResponse.json({ ok: false, error: "campaignName required" }, { status: 400 });
     }
     if (!leadIds.length) {
-      return NextResponse.json({ ok:false, error:"leadIds required" }, { status:400 });
+      return NextResponse.json({ ok: false, error: "leadIds required" }, { status: 400 });
     }
 
-    const dataDir = path.join(process.cwd(), "data");
-    ensureDir(dataDir);
+    const supabase = await createClient();
 
-    const leadsFile = path.join(dataDir, "leads.json");
-    const campaignsFile = path.join(dataDir, "campaigns.json");
-    const tagsFile = path.join(dataDir, "tags.json");
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
 
-    const leads: Lead[] = readJsonSafe<Lead[]>(leadsFile, []);
-    const idset = new Set(leadIds.map(String));
-    let updatedCount = 0;
+    // Get leads from Supabase
+    const { data: leads, error: leadsError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('id', leadIds);
 
-    // Get leads to message
-    const targetLeads = leads.filter(l => idset.has(String(l.id ?? "")));
+    if (leadsError) {
+      console.error('Error fetching leads:', leadsError);
+      return NextResponse.json({ ok: false, error: leadsError.message }, { status: 500 });
+    }
+
+    const targetLeads = leads || [];
 
     // SMS sending logic
     const sendResults: SendResult[] = [];
@@ -183,6 +173,56 @@ export async function POST(req: Request) {
             });
             pointsUsed += messageCredits;
             totalCreditsUsed += messageCredits;
+
+            // Create or update thread
+            const { data: existingThread } = await supabase
+              .from('threads')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('lead_id', lead.id)
+              .single();
+
+            if (existingThread) {
+              // Update existing thread
+              await supabase
+                .from('threads')
+                .update({
+                  messages_from_user: (existingThread.messages_from_user || 0) + 1,
+                  last_message_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingThread.id);
+            } else {
+              // Create new thread
+              const { data: newThread } = await supabase
+                .from('threads')
+                .insert({
+                  user_id: user.id,
+                  lead_id: lead.id,
+                  messages_from_user: 1,
+                  messages_from_lead: 0,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  last_message_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+              // Save message to database
+              if (newThread) {
+                await supabase
+                  .from('messages')
+                  .insert({
+                    user_id: user.id,
+                    thread_id: newThread.id,
+                    lead_id: lead.id,
+                    direction: 'outbound',
+                    content: personalizedMessage,
+                    status: 'sent',
+                    created_at: new Date().toISOString()
+                  });
+              }
+            }
           } else {
             sendResults.push({
               leadId: String(lead.id),
@@ -206,58 +246,68 @@ export async function POST(req: Request) {
     }
 
     // Tag leads (always happens)
-    for (const l of leads) {
-      const id = String(l.id ?? "");
-      if (idset.has(id)) {
-        const current = Array.isArray(l.tags) ? l.tags : (l.tags ? String(l.tags).split(",").map((s:string)=>s.trim()) : []);
-        l.tags = uniq([...(current||[]), ...addTags]);
-        updatedCount++;
-      }
+    for (const lead of targetLeads) {
+      const currentTags = Array.isArray(lead.tags) ? lead.tags : [];
+      const mergedTags = Array.from(new Set([...currentTags, ...addTags]));
+
+      await supabase
+        .from('leads')
+        .update({
+          tags: mergedTags,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', lead.id)
+        .eq('user_id', user.id);
     }
 
-    fs.writeFileSync(leadsFile, JSON.stringify(leads, null, 2), "utf8");
+    // Create or update campaign
+    const { data: existingCampaigns } = await supabase
+      .from('campaigns')
+      .select('*')
+      .eq('user_id', user.id)
+      .ilike('name', campaignName);
 
-    // Update campaigns
-    let campaigns = readJsonSafe<any[]>(campaignsFile, []);
-    const ids = leadIds.map(String);
-    const found = campaigns.find(c => String(c.name).toLowerCase() === campaignName.toLowerCase());
     let campaignId: string;
-    if (found) {
-      found.tags_applied = uniq([...(found.tags_applied || []), ...addTags]);
-      found.lead_ids = uniq([...(found.lead_ids || []), ...ids]);
-      found.lead_count = found.lead_ids.length;
-      found.updated_at = new Date().toISOString();
-      found.messages_sent = (found.messages_sent || 0) + sendResults.filter(r => r.success).length;
-      found.credits_used = (found.credits_used || 0) + totalCreditsUsed;
+
+    if (existingCampaigns && existingCampaigns.length > 0) {
+      // Update existing campaign
+      const found = existingCampaigns[0];
+      const currentLeadIds = Array.isArray(found.lead_ids) ? found.lead_ids : [];
+      const currentTags = Array.isArray(found.tags_applied) ? found.tags_applied : [];
+
+      await supabase
+        .from('campaigns')
+        .update({
+          tags_applied: Array.from(new Set([...currentTags, ...addTags])),
+          lead_ids: Array.from(new Set([...currentLeadIds, ...leadIds])),
+          lead_count: Array.from(new Set([...currentLeadIds, ...leadIds])).length,
+          messages_sent: (found.messages_sent || 0) + sendResults.filter(r => r.success).length,
+          credits_used: (found.credits_used || 0) + totalCreditsUsed,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', found.id);
+
       campaignId = String(found.id);
     } else {
-      campaignId = `cmp_${Date.now()}`;
-      campaigns.push({
-        id: campaignId,
-        name: campaignName,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        tags_applied: addTags,
-        lead_ids: ids,
-        lead_count: ids.length,
-        messages_sent: sendResults.filter(r => r.success).length,
-        credits_used: totalCreditsUsed
-      });
-    }
-    fs.writeFileSync(campaignsFile, JSON.stringify(campaigns, null, 2), "utf8");
+      // Create new campaign
+      const { data: newCampaign } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          name: campaignName,
+          tags_applied: addTags,
+          lead_ids: leadIds,
+          lead_count: leadIds.length,
+          messages_sent: sendResults.filter(r => r.success).length,
+          credits_used: totalCreditsUsed,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    // Update tags
-    const tagCounts: Record<string, number> = {};
-    for (const l of leads) {
-      const t = Array.isArray(l.tags) ? l.tags : [];
-      for (const tag of t) {
-        const k = String(tag).trim();
-        if (!k) continue;
-        tagCounts[k] = (tagCounts[k] || 0) + 1;
-      }
+      campaignId = newCampaign ? String(newCampaign.id) : '';
     }
-    const tagsArr = Object.entries(tagCounts).map(([tag, count]) => ({ tag, count })).sort((a,b)=>b.count-a.count);
-    fs.writeFileSync(tagsFile, JSON.stringify(tagsArr, null, 2), "utf8");
 
     const successCount = sendResults.filter(r => r.success).length;
     const failCount = sendResults.filter(r => !r.success).length;
@@ -265,7 +315,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       campaignId,
-      updated: updatedCount,
+      updated: targetLeads.length,
       smsSent: sendSMS,
       sendResults: {
         total: sendResults.length,
@@ -276,7 +326,8 @@ export async function POST(req: Request) {
       pointsUsed,
       creditsUsed: totalCreditsUsed
     });
-  } catch (e:any) {
-    return NextResponse.json({ ok:false, error: e?.message || "Campaign run failed" }, { status:400 });
+  } catch (e: any) {
+    console.error('Error in campaign run:', e);
+    return NextResponse.json({ ok: false, error: e?.message || "Campaign run failed" }, { status: 500 });
   }
 }

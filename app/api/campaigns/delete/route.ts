@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const CAMPAIGNS_FILE = path.join(DATA_DIR, 'campaigns.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -14,29 +10,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Campaign ID is required' }, { status: 400 });
     }
 
-    // Read campaigns file
-    if (!fs.existsSync(CAMPAIGNS_FILE)) {
-      return NextResponse.json({ ok: false, error: 'Campaigns file not found' }, { status: 404 });
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    const campaignsData = JSON.parse(fs.readFileSync(CAMPAIGNS_FILE, 'utf-8'));
-    const campaigns = campaignsData.items || [];
+    // Delete campaign (only if it belongs to current user)
+    const { error, count } = await supabase
+      .from('campaigns')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+      .eq('user_id', user.id);
 
-    // Find and remove campaign
-    const campaignIndex = campaigns.findIndex((c: any) => c.id === id);
-
-    if (campaignIndex === -1) {
-      return NextResponse.json({ ok: false, error: 'Campaign not found' }, { status: 404 });
+    if (error) {
+      console.error('Error deleting campaign:', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    campaigns.splice(campaignIndex, 1);
-
-    // Save updated campaigns
-    fs.writeFileSync(
-      CAMPAIGNS_FILE,
-      JSON.stringify({ items: campaigns }, null, 2),
-      'utf-8'
-    );
+    if (count === 0) {
+      return NextResponse.json({ ok: false, error: 'Campaign not found or access denied' }, { status: 404 });
+    }
 
     return NextResponse.json({ ok: true, message: 'Campaign deleted successfully' });
   } catch (error: any) {

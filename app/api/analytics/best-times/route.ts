@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-import { format, getDay } from "date-fns";
+import { createClient } from "@/lib/supabase/server";
+import { getDay } from "date-fns";
 
 interface Message {
   id: string;
@@ -11,9 +10,29 @@ interface Message {
 
 export async function GET(req: NextRequest) {
   try {
-    const dataDir = path.join(process.cwd(), "data");
-    const messagesData = await fs.readFile(path.join(dataDir, "messages.json"), "utf-8");
-    const messages: Message[] = JSON.parse(messagesData);
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Fetch messages for current user
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('id, direction, created_at')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error("Error fetching messages:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch best times" },
+        { status: 500 }
+      );
+    }
+
+    const messagesData = messages || [];
 
     // Initialize heatmap structure
     const heatmap: { [hour: string]: { [day: string]: number } } = {};
@@ -28,7 +47,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Count received messages by hour and day (only count lead responses)
-    messages
+    messagesData
       .filter(msg => msg.direction === 'in' && msg.created_at)
       .forEach(msg => {
         const date = new Date(msg.created_at!);

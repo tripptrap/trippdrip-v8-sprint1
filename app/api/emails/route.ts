@@ -1,27 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const EMAILS_FILE = path.join(process.cwd(), 'data', 'emails.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    if (!fs.existsSync(EMAILS_FILE)) {
-      return NextResponse.json({ ok: true, items: [] });
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
     }
 
-    const data = fs.readFileSync(EMAILS_FILE, 'utf-8');
-    const emails = JSON.parse(data);
+    // Fetch emails for current user
+    const { data: emails, error } = await supabase
+      .from('emails')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('sent_at', { ascending: false });
 
-    // Sort by sent_at descending (newest first)
-    emails.sort((a: any, b: any) =>
-      new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
-    );
+    if (error) {
+      console.error('Error fetching emails:', error);
+      return NextResponse.json(
+        { ok: false, items: [], error: error.message },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ ok: true, items: emails });
+    return NextResponse.json({ ok: true, items: emails || [] });
   } catch (error: any) {
+    console.error('Error in GET /api/emails:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to load emails' },
+      { ok: false, items: [], error: error.message || 'Failed to load emails' },
       { status: 500 }
     );
   }

@@ -1,34 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@/lib/supabase/server";
 
-// GET: Fetch all scheduled messages
+// GET: Fetch all scheduled messages for the current user
 export async function GET(req: NextRequest) {
   try {
-    const dataDir = path.join(process.cwd(), "data");
-    const messagesPath = path.join(dataDir, "messages.json");
+    const supabase = await createClient();
 
-    let messages: any[] = [];
-    try {
-      const messagesData = await fs.readFile(messagesPath, "utf-8");
-      messages = JSON.parse(messagesData);
-    } catch {
-      return NextResponse.json({ ok: true, items: [] });
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Filter only scheduled messages
-    const scheduledMessages = messages.filter(msg => msg.status === 'scheduled');
+    // Fetch scheduled messages from Supabase
+    const { data: messages, error } = await supabase
+      .from('scheduled_messages')
+      .select(`
+        *,
+        leads:lead_id (
+          id,
+          first_name,
+          last_name,
+          phone,
+          email
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .order('scheduled_for', { ascending: true });
 
-    // Sort by scheduled_for (soonest first)
-    scheduledMessages.sort((a, b) =>
-      new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime()
-    );
+    if (error) {
+      console.error('Error fetching scheduled messages:', error);
+      return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true, items: scheduledMessages });
+    return NextResponse.json({ ok: true, items: messages || [] });
   } catch (error) {
     console.error("Error fetching scheduled messages:", error);
     return NextResponse.json(
-      { ok: false, error: "Failed to fetch scheduled messages" },
+      { ok: false, items: [], error: "Failed to fetch scheduled messages" },
       { status: 500 }
     );
   }
@@ -47,43 +57,54 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const dataDir = path.join(process.cwd(), "data");
-    const messagesPath = path.join(dataDir, "messages.json");
+    const supabase = await createClient();
 
-    let messages: any[] = [];
-    try {
-      const messagesData = await fs.readFile(messagesPath, "utf-8");
-      messages = JSON.parse(messagesData);
-    } catch {
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Get the message to check status and ownership
+    const { data: message, error: fetchError } = await supabase
+      .from('scheduled_messages')
+      .select('*')
+      .eq('id', messageId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !message) {
       return NextResponse.json(
-        { ok: false, error: "No messages found" },
+        { ok: false, error: "Message not found or access denied" },
         { status: 404 }
       );
     }
 
-    // Find the message
-    const messageIndex = messages.findIndex(m => m.id === messageId);
-    if (messageIndex === -1) {
+    // Check if it's scheduled (can only cancel pending messages)
+    if (message.status !== 'pending') {
       return NextResponse.json(
-        { ok: false, error: "Message not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check if it's scheduled
-    if (messages[messageIndex].status !== 'scheduled') {
-      return NextResponse.json(
-        { ok: false, error: "Can only cancel scheduled messages" },
+        { ok: false, error: "Can only cancel pending messages" },
         { status: 400 }
       );
     }
 
     // Update status to cancelled
-    messages[messageIndex].status = 'cancelled';
-    messages[messageIndex].updated_at = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from('scheduled_messages')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', messageId)
+      .eq('user_id', user.id);
 
-    // Save
-    await fs.writeFile(messagesPath, JSON.stringify(messages, null, 2), "utf-8");
+    if (updateError) {
+      console.error('Error cancelling message:', updateError);
+      return NextResponse.json(
+        { ok: false, error: updateError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
