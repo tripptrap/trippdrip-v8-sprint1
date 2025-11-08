@@ -630,12 +630,12 @@ export default function FlowsPage() {
           <h1 className="text-2xl font-semibold text-white">Conversation Flows</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Create AI-powered conversation flows for your campaigns</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={() => setShowNewFlowDialog(true)}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600"
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
-            ✨ New AI Flow
+            + AI Flow
           </button>
           <button
             onClick={() => {
@@ -652,9 +652,9 @@ export default function FlowsPage() {
               saveFlows(updatedFlows);
               setSelectedFlow(newFlow);
             }}
-            className="bg-green-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-600"
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
-            ✏️ New Manual Flow
+            + Manual Flow
           </button>
         </div>
       </div>
@@ -935,15 +935,15 @@ export default function FlowsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={startTestFlow}
-                      className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
-                      🧪 Test Flow
+                      Test
                     </button>
                     <button
                       onClick={addStep}
-                      className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
-                      ✨ Add AI Step
+                      + AI Step
                     </button>
                     <button
                       onClick={() => {
@@ -956,9 +956,9 @@ export default function FlowsPage() {
                         setEditingStepIndex(-1);
                         setShowManualStepDialog(true);
                       }}
-                      className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
-                      ✏️ Add Manual Step
+                      + Manual Step
                     </button>
                   </div>
                 </div>
