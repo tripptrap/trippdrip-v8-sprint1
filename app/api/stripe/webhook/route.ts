@@ -35,9 +35,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
-    });
+    const stripe = new Stripe(stripeSecretKey);
 
     // Verify webhook signature
     let event;

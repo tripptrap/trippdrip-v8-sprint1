@@ -60,9 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Initialize Stripe
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
-    });
+    const stripe = new Stripe(stripeSecretKey);
 
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').trim();
 
