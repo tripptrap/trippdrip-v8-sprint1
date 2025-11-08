@@ -256,10 +256,10 @@ export function switchPlan(planType: PlanType): PointsData {
   const planName = planType === 'premium' ? 'Premium ($98.99/mo)' : 'Basic ($30/mo)';
   data.transactions.unshift({
     id: Date.now().toString(),
-    type: 'earn',
-    amount: 0,
+    action_type: 'earn',
+    points_amount: 0,
     description: `Switched to ${planName}`,
-    timestamp: new Date().toISOString()
+    created_at: new Date().toISOString()
   });
 
   savePoints(data);
