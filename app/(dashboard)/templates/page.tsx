@@ -90,6 +90,14 @@ export default function FlowsPage() {
   const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
   const [pendingDrips, setPendingDrips] = useState<Array<{message: string, scheduledFor: Date}>>([]);
   const [collectedInfo, setCollectedInfo] = useState<Record<string, string>>({});
+  const [showManualStepDialog, setShowManualStepDialog] = useState(false);
+  const [manualStep, setManualStep] = useState<FlowStep>({
+    id: '',
+    yourMessage: '',
+    responses: [],
+    dripSequence: []
+  });
+  const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -352,6 +360,44 @@ export default function FlowsPage() {
     }
   }
 
+  function saveManualStep() {
+    if (!selectedFlow || !manualStep.yourMessage.trim()) {
+      alert("Please enter a message for this step");
+      return;
+    }
+
+    let updatedSteps: FlowStep[];
+
+    if (editingStepIndex >= 0) {
+      // Editing existing step
+      updatedSteps = [...selectedFlow.steps];
+      updatedSteps[editingStepIndex] = manualStep;
+    } else {
+      // Adding new step at end
+      updatedSteps = [...selectedFlow.steps, manualStep];
+    }
+
+    const coloredSteps = assignStepColors(updatedSteps);
+
+    const updatedFlow = {
+      ...selectedFlow,
+      steps: coloredSteps,
+      updatedAt: new Date().toISOString()
+    };
+
+    setSelectedFlow(updatedFlow);
+
+    const updatedFlows = flows.map(f =>
+      f.id === selectedFlow.id ? updatedFlow : f
+    );
+    setFlows(updatedFlows);
+    saveFlows(updatedFlows);
+
+    setShowManualStepDialog(false);
+    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
+    setEditingStepIndex(-1);
+  }
+
   function deleteStep(stepId: string) {
     if (!selectedFlow) return;
     if (selectedFlow.steps.length <= 1) {
@@ -584,12 +630,33 @@ export default function FlowsPage() {
           <h1 className="text-2xl font-semibold text-white">Conversation Flows</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Create AI-powered conversation flows for your campaigns</p>
         </div>
-        <button
-          onClick={() => setShowNewFlowDialog(true)}
-          className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600"
-        >
-          + New Flow
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowNewFlowDialog(true)}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600"
+          >
+            ✨ New AI Flow
+          </button>
+          <button
+            onClick={() => {
+              const flowId = `flow-${Date.now()}`;
+              const newFlow: ConversationFlow = {
+                id: flowId,
+                name: "Untitled Flow",
+                steps: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+              const updatedFlows = [...flows, newFlow];
+              setFlows(updatedFlows);
+              saveFlows(updatedFlows);
+              setSelectedFlow(newFlow);
+            }}
+            className="bg-green-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-600"
+          >
+            ✏️ New Manual Flow
+          </button>
+        </div>
       </div>
 
       {showStepDialog && (
@@ -874,9 +941,24 @@ export default function FlowsPage() {
                     </button>
                     <button
                       onClick={addStep}
-                      className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                      className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm text-white font-medium"
                     >
-                      + Add Step at End
+                      ✨ Add AI Step
+                    </button>
+                    <button
+                      onClick={() => {
+                        setManualStep({
+                          id: `step-${Date.now()}`,
+                          yourMessage: '',
+                          responses: [],
+                          dripSequence: []
+                        });
+                        setEditingStepIndex(-1);
+                        setShowManualStepDialog(true);
+                      }}
+                      className="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                    >
+                      ✏️ Add Manual Step
                     </button>
                   </div>
                 </div>
@@ -1174,6 +1256,59 @@ export default function FlowsPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Step Editor Dialog */}
+      {showManualStepDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="card max-w-2xl w-full my-8">
+            <div className="space-y-4">
+              <div>
+                <div className="text-lg font-semibold text-white">
+                  {editingStepIndex >= 0 ? 'Edit Manual Step' : 'Add Manual Step'}
+                </div>
+                <div className="text-sm text-[var(--muted)] mt-1">
+                  Create a custom message step for your flow
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white mb-2 block">Your Message *</label>
+                <textarea
+                  placeholder="Enter the message you want to send..."
+                  value={manualStep.yourMessage}
+                  onChange={e => setManualStep({...manualStep, yourMessage: e.target.value})}
+                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  This message will be sent to the client at this step
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={saveManualStep}
+                  className="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50"
+                  disabled={!manualStep.yourMessage.trim()}
+                >
+                  {editingStepIndex >= 0 ? 'Update Step' : 'Add Step'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowManualStepDialog(false);
+                    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
+                    setEditingStepIndex(-1);
+                  }}
+                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
