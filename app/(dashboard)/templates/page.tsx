@@ -715,14 +715,28 @@ export default function FlowsPage() {
       )}
 
       {showNewFlowDialog && (
-        <div className="card">
-          <div className="space-y-4">
-            <div>
-              <div className="text-lg font-semibold text-white">Create New Flow with AI</div>
-              <div className="text-sm text-[var(--muted)] mt-1">
-                Tell us about your outreach so AI can generate a customized conversation flow
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-white">Create New Flow with AI</div>
+                  <div className="text-sm text-[var(--muted)] mt-1">
+                    Tell us about your outreach so AI can generate a customized conversation flow
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowNewFlowDialog(false);
+                    setNewFlowName("");
+                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", qualifyingQuestions: "", clientGoals: "" });
+                  }}
+                  className="text-white/60 hover:text-white text-2xl leading-none"
+                  disabled={isGenerating}
+                >
+                  ×
+                </button>
               </div>
-            </div>
 
             <div>
               <label className="text-sm font-medium text-white mb-2 block">Flow Name *</label>
@@ -816,6 +830,7 @@ export default function FlowsPage() {
               </button>
             </div>
           </div>
+        </div>
         </div>
       )}
 
@@ -1323,13 +1338,25 @@ export default function FlowsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="card max-w-2xl w-full my-8">
             <div className="space-y-4">
-              <div>
-                <div className="text-lg font-semibold text-white">
-                  {editingStepIndex >= 0 ? 'Edit Manual Step' : 'Add Manual Step'}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-white">
+                    {editingStepIndex >= 0 ? 'Edit Manual Step' : 'Add Manual Step'}
+                  </div>
+                  <div className="text-sm text-[var(--muted)] mt-1">
+                    Create a custom message step for your flow
+                  </div>
                 </div>
-                <div className="text-sm text-[var(--muted)] mt-1">
-                  Create a custom message step for your flow
-                </div>
+                <button
+                  onClick={() => {
+                    setShowManualStepDialog(false);
+                    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
+                    setEditingStepIndex(-1);
+                  }}
+                  className="text-white/60 hover:text-white text-2xl leading-none"
+                >
+                  ×
+                </button>
               </div>
 
               <div>
