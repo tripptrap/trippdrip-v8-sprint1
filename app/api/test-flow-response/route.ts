@@ -37,14 +37,19 @@ YOUR AVAILABLE RESPONSES:
 ${currentStep.responses.map((r: any, i: number) => `${i}. ${r.label}: "${r.followUpMessage}"`).join('\n')}
 
 YOUR TASK:
-Analyze the client's response and determine:
-1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, etc.)
-2. Does one of your available responses address this? If yes, pick that one.
-3. If NONE of the available responses fit well, you can generate a custom response instead.
+Analyze the client's response and determine the best way to respond:
 
-Think about the natural flow of conversation - if they say "yes" to looking for coverage, use the response that continues helping them.
-If they say they need more info, use that response. If they're not interested, use that one.
-If they ask something unexpected that none of your responses cover, generate a helpful custom response.
+1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, etc.)
+2. Does one of your available responses DIRECTLY and APPROPRIATELY address what they said?
+   - If YES and it makes conversational sense, use that response
+   - If NO or if it would sound awkward/off-topic, generate a custom response instead
+
+IMPORTANT: Only use a preset response if it ACTUALLY addresses what the client said.
+- If they ask "who are you?" and you have a "Need more info" response, DON'T use it - generate a custom intro instead
+- If they say "yes" to your question, use the "Yes/Interested" response to continue
+- If they ask a specific question none of your responses cover, generate a helpful custom answer
+
+Think like a real person having a conversation, not a script reader.
 
 Return ONLY valid JSON (no markdown):
 {
