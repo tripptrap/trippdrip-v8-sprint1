@@ -140,8 +140,8 @@ export async function POST(req: NextRequest) {
           // Create points transaction record
           await supabaseAdmin.from('points_transactions').insert({
             user_id: userId,
-            amount: monthlyCredits,
-            type: 'subscription',
+            points_amount: monthlyCredits,
+            action_type: 'subscription',
             description: `${planType === 'premium' ? 'Premium' : 'Basic'} subscription - monthly credits`,
             created_at: new Date().toISOString()
           });
@@ -154,8 +154,8 @@ export async function POST(req: NextRequest) {
           // This prevents race conditions where both webhooks update credits
           const { data: insertData, error: insertError } = await supabaseAdmin.from('points_transactions').insert({
             user_id: userId,
-            amount: points,
-            type: 'purchase',
+            points_amount: points,
+            action_type: 'purchase',
             description: `${packName} purchased`,
             stripe_session_id: sessionId,
             created_at: new Date().toISOString()
