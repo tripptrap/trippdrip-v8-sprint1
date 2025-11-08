@@ -4,11 +4,15 @@ export type ActionType = 'sms_sent' | 'ai_response' | 'email_sent' | 'ai_chat' |
 
 export type PointTransaction = {
   id: string;
-  type: 'earn' | 'spend' | 'purchase';
-  amount: number;
+  action_type: 'earn' | 'spend' | 'purchase' | 'subscription';
+  points_amount: number;
   description: string;
-  timestamp: string;
-  actionType?: ActionType; // Track what action caused this transaction
+  created_at: string;
+  user_id?: string;
+  stripe_session_id?: string;
+  lead_id?: string;
+  message_id?: string;
+  campaign_id?: string;
 };
 
 export type PlanType = 'basic' | 'premium';
