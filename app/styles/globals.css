@@ -2,26 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme with gradient background */
+/* Brighter theme with gradient background */
 html, body {
   height: 100%;
-  background: #0f1419;
-  color: #e6e9f0;
+  background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%);
+  color: #f7fafc;
 }
 
 /* Card styles matching preview page */
 .card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.20);
   border-radius: 12px;
   padding: 1.5rem;
-  color: #e6e9f0;
+  color: #f7fafc;
   transition: all 0.2s ease;
 }
 
 .card:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.25);
 }
 
 /* Light card variant for better contrast */
