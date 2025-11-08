@@ -67,11 +67,14 @@ CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE
 - Use what you already know to have a natural conversation
 
 EXTRACT KEY INFORMATION from the client's responses:
-- Look for: number of people, coverage type, budget, timeline, current coverage, age, location, etc.
+- Look for: number of people, coverage type, budget, timeline, current coverage, ages, gender, location, zip code, etc.
 - Example: "im looking for coverage for myself" → Extract: Number of people = 1
 - Example: "i dont have any" (about coverage) → Extract: Current coverage = None
 - Example: "my wife and 2 kids" → Extract: Number of people = 4 (including client)
-- Return extracted info in the "extractedInfo" field
+- Example: "35m, 34f, 12f, 6m" → Extract: Ages and genders = "35 (Male), 34 (Female), 12 (Female), 6 (Male)", Number of people = 4
+- Example: "32776" or "zip is 32776" → Extract: Zip code = 32776
+- Parse gender notation: "m" = Male, "f" = Female
+- Return extracted info in the "extractedInfo" field with clear, readable formatting
 
 When generating custom responses:
 - FIRST: Acknowledge what they said (show you heard them)
