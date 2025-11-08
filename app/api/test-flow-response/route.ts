@@ -22,34 +22,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the AI prompt to determine the best response
-    const prompt = `You are simulating a sales conversation flow. Based on the user's message, determine the best response.
+    const prompt = `You are simulating a sales conversation flow. The agent just asked a question, and you need to determine how to respond based on the user's answer.
 
 Current Step Information:
-- Agent's Message: "${currentStep.yourMessage}"
-- Available Response Options:
-${currentStep.responses.map((r: any, i: number) => `  ${i + 1}. ${r.label}: "${r.followUpMessage}"`).join('\n')}
+- Agent's Question: "${currentStep.yourMessage}"
+- Available Response Categories (these are the different ways the user might respond):
+${currentStep.responses.map((r: any, i: number) => `  ${i + 1}. ${r.label}`).join('\n')}
 
 Conversation History:
 ${conversationHistory || 'This is the start of the conversation'}
 
-User's Latest Message:
+User's Answer:
 "${userMessage}"
 
-Your Task:
-1. Analyze if the user's message indicates they're moving forward positively (in which case, move to the next step)
-2. OR determine which response option best matches their message (objection, question, not interested, etc.)
-3. Return the appropriate follow-up message
+IMPORTANT RULES:
+1. ALWAYS match the user's message to one of the ${currentStep.responses.length} response categories above
+2. The user is answering the agent's question "${currentStep.yourMessage}"
+3. DO NOT advance to the next step - just pick which response category best matches
+4. Return the index (0-based) of the matching category
 
 Return ONLY valid JSON (no markdown):
 {
-  "matchedResponseIndex": <number or null if moving forward>,
-  "agentResponse": "<the exact response text to send>",
-  "shouldAdvanceToNextStep": <true or false>,
-  "reasoning": "<brief explanation of why this response was chosen>"
+  "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}>,
+  "reasoning": "<brief explanation>"
 }
 
-If the user is moving forward positively (like "yes", "I'm interested", "sure", "sounds good"), set shouldAdvanceToNextStep to true and use the next step's yourMessage as the agentResponse.
-Otherwise, match their message to the most appropriate response option.`;
+Example:
+If agent asks "Are you currently looking for coverage?" and user says "yes I am", match to the response category that handles positive/interested responses.
+If user says "no" or "maybe later", match to the not interested or need more info category.`;
 
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -99,46 +99,46 @@ Otherwise, match their message to the most appropriate response option.`;
       // Determine the next step index
       const currentStepIndex = allSteps.findIndex((s: any) => s.id === currentStep.id);
       let nextStepIndex = currentStepIndex;
+      let agentResponse = "";
+      let shouldMoveToNextStep = false;
 
-      if (aiDecision.shouldAdvanceToNextStep) {
-        // Move to next step in sequence
-        nextStepIndex = currentStepIndex + 1;
+      // Get the matched response
+      const matchedResponse = currentStep.responses[aiDecision.matchedResponseIndex];
 
-        // If there's a next step, use its message
-        if (nextStepIndex < allSteps.length) {
-          aiDecision.agentResponse = allSteps[nextStepIndex].yourMessage;
-        } else {
-          // End of flow
-          aiDecision.agentResponse = "Thank you! We've reached the end of this conversation flow.";
-          nextStepIndex = currentStepIndex; // Stay on current step
+      if (!matchedResponse) {
+        return NextResponse.json({
+          error: "Invalid response index"
+        }, { status: 400 });
+      }
+
+      // Use the matched response's follow-up message
+      agentResponse = matchedResponse.followUpMessage;
+
+      // Check if this response has a nextStepId to follow
+      if (matchedResponse.nextStepId) {
+        const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
+        if (targetStepIndex >= 0) {
+          nextStepIndex = targetStepIndex;
+          shouldMoveToNextStep = true;
+          // After showing the followUpMessage, move to the target step's message
+          agentResponse += `\n\n${allSteps[targetStepIndex].yourMessage}`;
         }
-      } else if (aiDecision.matchedResponseIndex !== null && aiDecision.matchedResponseIndex !== undefined) {
-        // Use the matched response's follow-up message
-        const matchedResponse = currentStep.responses[aiDecision.matchedResponseIndex];
-        if (matchedResponse) {
-          aiDecision.agentResponse = matchedResponse.followUpMessage;
+      } else {
+        // No nextStepId means we stay on current step and just show the followUp
+        nextStepIndex = currentStepIndex;
+      }
 
-          // Check if this response has a nextStepId to follow
-          if (matchedResponse.nextStepId) {
-            const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
-            if (targetStepIndex >= 0) {
-              nextStepIndex = targetStepIndex;
-            }
-          }
-
-          // Check if action is 'end'
-          if (matchedResponse.action === 'end') {
-            aiDecision.agentResponse += "\n\nThank you for your time. Have a great day!";
-          }
-        }
+      // Check if action is 'end'
+      if (matchedResponse.action === 'end') {
+        agentResponse += "\n\nThank you for your time. Have a great day!";
       }
 
       return NextResponse.json({
-        agentResponse: aiDecision.agentResponse,
+        agentResponse: agentResponse,
         nextStepIndex: nextStepIndex,
         reasoning: aiDecision.reasoning,
         matchedResponseIndex: aiDecision.matchedResponseIndex,
-        shouldAdvanceToNextStep: aiDecision.shouldAdvanceToNextStep
+        shouldAdvanceToNextStep: shouldMoveToNextStep
       });
 
     } catch (parseError) {
