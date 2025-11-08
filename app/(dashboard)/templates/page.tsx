@@ -75,6 +75,25 @@ export default function FlowsPage() {
     setFlows(loadFlows());
   }, []);
 
+  function assignStepColors(steps: FlowStep[]): FlowStep[] {
+    // Color progression: Blue -> Purple -> Orange -> Green (last step)
+    const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange
+    const greenColor = '#10B981'; // Green for last step
+
+    return steps.map((step, index) => {
+      const isLastStep = index === steps.length - 1;
+      const color = isLastStep ? greenColor : colors[index % colors.length];
+
+      return {
+        ...step,
+        tag: {
+          label: step.id || `Step ${index + 1}`,
+          color: color
+        }
+      };
+    });
+  }
+
   async function createNewFlow() {
     if (!newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting || !flowContext.qualifyingQuestions) {
       alert("Please fill in all required fields");
@@ -96,10 +115,13 @@ export default function FlowsPage() {
       const data = await response.json();
 
       if (data.steps) {
+        // Assign automatic colors to steps (last step = green)
+        const stepsWithColors = assignStepColors(data.steps);
+
         const newFlow: ConversationFlow = {
           id: Date.now().toString(),
           name: newFlowName.trim(),
-          steps: data.steps,
+          steps: stepsWithColors,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
