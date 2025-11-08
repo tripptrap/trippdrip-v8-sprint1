@@ -89,6 +89,7 @@ export default function FlowsPage() {
   const [simulatedTime, setSimulatedTime] = useState(new Date());
   const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
   const [pendingDrips, setPendingDrips] = useState<Array<{message: string, scheduledFor: Date}>>([]);
+  const [collectedInfo, setCollectedInfo] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -473,6 +474,7 @@ export default function FlowsPage() {
     setSimulatedTime(new Date());
     setLastMessageTime(null);
     setPendingDrips([]);
+    setCollectedInfo({});
   }
 
   // Advance simulated time and trigger any pending drips
@@ -529,7 +531,8 @@ export default function FlowsPage() {
           userMessage,
           currentStep,
           allSteps: selectedFlow.steps,
-          conversationHistory
+          conversationHistory,
+          collectedInfo
         })
       });
 
@@ -537,6 +540,11 @@ export default function FlowsPage() {
 
       if (data.agentResponse) {
         setTestMessages(prev => [...prev, { role: 'agent', text: data.agentResponse, timestamp: formatTimestamp(now) }]);
+
+        // Update collected info if AI extracted new information
+        if (data.extractedInfo && Object.keys(data.extractedInfo).length > 0) {
+          setCollectedInfo(prev => ({ ...prev, ...data.extractedInfo }));
+        }
 
         // Check if this is a custom response with custom drips
         if (data.isCustomResponse && data.customDrips && data.customDrips.length > 0) {
@@ -1145,6 +1153,20 @@ export default function FlowsPage() {
                     {pendingDrips.map((drip, idx) => (
                       <div key={idx} className="text-xs text-orange-100/70">
                         • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collected Client Information */}
+              {Object.keys(collectedInfo).length > 0 && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-blue-200 mb-2">📋 Collected Client Information</div>
+                  <div className="space-y-1">
+                    {Object.entries(collectedInfo).map(([key, value]) => (
+                      <div key={key} className="text-xs text-blue-100/70">
+                        <span className="font-medium text-blue-200">{key}:</span> {value}
                       </div>
                     ))}
                   </div>

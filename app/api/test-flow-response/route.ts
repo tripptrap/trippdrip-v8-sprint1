@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {} } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -22,10 +22,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the AI prompt to determine the best response
+    const collectedInfoText = Object.keys(collectedInfo).length > 0
+      ? `\n\nINFORMATION ALREADY COLLECTED:\n${Object.entries(collectedInfo).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+      : '';
+
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
@@ -56,6 +60,19 @@ CRITICAL RULE: ALWAYS ACKNOWLEDGE what the client just said before moving forwar
 - Bad: Client asks "who are you?" → You respond "Sure! What would you like to know?"
 - Good: Client asks "who are you?" → You respond "I'm [name] helping you find health insurance. Are you currently looking for coverage?"
 
+CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE
+- If "Information Already Collected" shows you already know something, DON'T ask for it again
+- Example: If you know "Number of people: 1" (or client said "myself"), DON'T ask "How many people need coverage?"
+- Example: If you know "Current coverage: None", DON'T ask "What's your current coverage?"
+- Use what you already know to have a natural conversation
+
+EXTRACT KEY INFORMATION from the client's responses:
+- Look for: number of people, coverage type, budget, timeline, current coverage, age, location, etc.
+- Example: "im looking for coverage for myself" → Extract: Number of people = 1
+- Example: "i dont have any" (about coverage) → Extract: Current coverage = None
+- Example: "my wife and 2 kids" → Extract: Number of people = 4 (including client)
+- Return extracted info in the "extractedInfo" field
+
 When generating custom responses:
 - FIRST: Acknowledge what they said (show you heard them)
 - THEN: Respond appropriately to their specific situation
@@ -78,6 +95,9 @@ Return ONLY valid JSON (no markdown):
       "delayHours": 27
     }
   ],
+  "extractedInfo": {
+    "key": "value"
+  },
   "reasoning": "<1-2 sentences explaining your choice>"
 }
 
@@ -179,7 +199,8 @@ The drips should be contextual to your custom response and help re-engage if the
         matchedResponseIndex: aiDecision.matchedResponseIndex,
         shouldAdvanceToNextStep: shouldMoveToNextStep,
         isCustomResponse: aiDecision.matchedResponseIndex === null,
-        customDrips: aiDecision.customDrips || []
+        customDrips: aiDecision.customDrips || [],
+        extractedInfo: aiDecision.extractedInfo || {}
       });
 
     } catch (parseError) {
