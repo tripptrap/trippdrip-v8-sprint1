@@ -4,6 +4,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
+// Stripe Price IDs
+const STRIPE_PRICES = {
+  subscriptions: {
+    basic: 'price_1SQtYHFyk0lZUopFNa0lT81K',
+    premium: 'price_1SQtaUFyk0lZUopFRJnuLftL'
+  },
+  pointPacks: {
+    basic: {
+      starter: 'price_1SQtbMFyk0lZUopFleqbdgVZ',
+      pro: 'price_1SQtbuFyk0lZUopFbBFafou0',
+      business: 'price_1SQtciFyk0lZUopFP2ATsGyR',
+      enterprise: 'price_1SQtdJFyk0lZUopFuSaGfzU3'
+    },
+    premium: {
+      starter: 'price_1SQtduFyk0lZUopFApnLorDd',
+      pro: 'price_1SQteQFyk0lZUopF63RURC72',
+      business: 'price_1SQteyFyk0lZUopFH9S2ebtD',
+      enterprise: 'price_1SQtfRFyk0lZUopFlv2sFszH'
+    }
+  }
+};
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -14,18 +36,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { points, price, packName, planType } = await req.json();
+    const { points, price, packName, planType, subscriptionType } = await req.json();
 
-    // Validate inputs
-    if (!points || !price || !packName) {
+    // Validate inputs for point packs
+    if (!subscriptionType && (!points || !price || !packName)) {
       return NextResponse.json(
-        { error: 'Missing required fields: points, price, packName' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
     // Check for Stripe API key
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
 
     if (!stripeSecretKey) {
       return NextResponse.json(
@@ -42,35 +64,64 @@ export async function POST(req: NextRequest) {
       apiVersion: '2024-12-18.acacia',
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').trim();
 
-    // Create checkout session
+    // Determine which Price ID to use
+    let priceId: string | null = null;
+    let mode: 'subscription' | 'payment' = 'payment';
+    let successUrl = `${baseUrl}/points?success=true&session_id={CHECKOUT_SESSION_ID}`;
+
+    if (subscriptionType) {
+      // Handle subscription checkout
+      mode = 'subscription';
+      successUrl = `${baseUrl}/leads?success=true&session_id={CHECKOUT_SESSION_ID}`;
+      priceId = subscriptionType === 'premium'
+        ? STRIPE_PRICES.subscriptions.premium
+        : STRIPE_PRICES.subscriptions.basic;
+    } else {
+      // Handle point pack checkout
+      const userPlan = planType === 'premium' ? 'premium' : 'basic';
+      const packType = packName.toLowerCase();
+
+      if (packType.includes('starter')) {
+        priceId = STRIPE_PRICES.pointPacks[userPlan].starter;
+      } else if (packType.includes('pro')) {
+        priceId = STRIPE_PRICES.pointPacks[userPlan].pro;
+      } else if (packType.includes('business')) {
+        priceId = STRIPE_PRICES.pointPacks[userPlan].business;
+      } else if (packType.includes('enterprise')) {
+        priceId = STRIPE_PRICES.pointPacks[userPlan].enterprise;
+      }
+
+      successUrl = `${baseUrl}/points?success=true&points=${points}&packName=${encodeURIComponent(packName)}`;
+    }
+
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'Invalid pack or subscription type' },
+        { status: 400 }
+      );
+    }
+
+    // Create checkout session with actual Price ID
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `${packName} - ${points.toLocaleString()} Credits`,
-              description: `${points.toLocaleString()} credits for your HyveWyre account`,
-              images: [`${baseUrl}/logo.png`]
-            },
-            unit_amount: Math.round(price * 100) // Convert to cents
-          },
+          price: priceId,
           quantity: 1
         }
       ],
-      mode: 'payment',
-      success_url: `${baseUrl}/points?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      mode,
+      success_url: successUrl,
       cancel_url: `${baseUrl}/points?canceled=true`,
       client_reference_id: user.id,
       customer_email: user.email,
       metadata: {
         user_id: user.id,
-        points: points.toString(),
-        packName,
-        planType: planType || 'basic'
+        points: points?.toString() || '0',
+        packName: packName || subscriptionType,
+        planType: planType || subscriptionType || 'basic'
       }
     });
 
