@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { spendPointsForAction } from "@/lib/pointsSupabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { flowName, context } = await req.json();
 
     if (!flowName || !context || !context.whoYouAre || !context.whatOffering || !context.whoTexting) {
@@ -13,18 +20,52 @@ export async function POST(req: NextRequest) {
     }
 
     // Check and deduct points BEFORE generating flow (15 points for flow creation)
-    const pointsResult = await spendPointsForAction('flow_creation', 1);
+    const FLOW_CREATION_COST = 15;
 
-    if (!pointsResult.success) {
-      return NextResponse.json(
-        {
-          error: pointsResult.error || "Insufficient points. You need 15 points to generate a flow.",
-          pointsNeeded: 15
-        },
-        { status: 402 }
-      );
+    // Get current balance
+    const { data: userData, error: fetchError } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', user.id)
+      .single();
+
+    if (fetchError || !userData) {
+      return NextResponse.json({ error: 'Failed to fetch user data' }, { status: 500 });
     }
 
+    const currentBalance = userData.credits || 0;
+
+    if (currentBalance < FLOW_CREATION_COST) {
+      return NextResponse.json({
+        error: `Insufficient points. You need ${FLOW_CREATION_COST} points to generate a flow.`,
+        pointsNeeded: FLOW_CREATION_COST
+      }, { status: 402 });
+    }
+
+    // Deduct points
+    const newBalance = currentBalance - FLOW_CREATION_COST;
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ credits: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating balance:', updateError);
+      return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 });
+    }
+
+    // Record transaction
+    await supabase
+      .from('points_transactions')
+      .insert({
+        user_id: user.id,
+        action_type: 'spend',
+        points_amount: -FLOW_CREATION_COST,
+        description: 'Flow creation',
+        created_at: new Date().toISOString()
+      });
+
+    // Generate the flow with OpenAI
     const prompt = `You are an expert at creating effective text message conversation flows for sales and lead generation.
 
 Context:
@@ -131,8 +172,8 @@ Important:
 
       return NextResponse.json({
         ...flowData,
-        pointsUsed: 15,
-        remainingBalance: pointsResult.balance
+        pointsUsed: FLOW_CREATION_COST,
+        remainingBalance: newBalance
       });
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
