@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
 
     if (!stripeSecretKey || !webhookSecret) {
       return NextResponse.json(
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2025-10-29.clover',
     });
 
     // Verify webhook signature
@@ -61,23 +61,112 @@ export async function POST(req: NextRequest) {
         const points = parseInt(session.metadata?.points || '0');
         const packName = session.metadata?.packName || 'Unknown';
         const planType = session.metadata?.planType || 'basic';
+        const sessionId = session.id;
 
         console.log('Payment successful!', {
           userId,
+          sessionId,
+          mode: session.mode,
           points,
           packName,
           planType,
           customerId: session.customer,
+          subscriptionId: session.subscription,
           paymentIntent: session.payment_intent
         });
 
-        if (userId && points > 0) {
-          if (!supabaseAdmin) {
-            console.error('Supabase admin client not configured. Missing SUPABASE_SERVICE_ROLE_KEY.');
-            return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+        if (!supabaseAdmin) {
+          console.error('Supabase admin client not configured. Missing SUPABASE_SERVICE_ROLE_KEY.');
+          return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+        }
+
+        if (!userId) {
+          console.error('No user ID found in session metadata');
+          return NextResponse.json({ error: 'No user ID' }, { status: 400 });
+        }
+
+        // Check if this is a subscription or one-time payment
+        if (session.mode === 'subscription') {
+          // Handle subscription creation
+          const monthlyCredits = planType === 'premium' ? 10000 : 3000;
+
+          // Check if user row exists
+          const { data: existingUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('id', userId)
+            .single();
+
+          if (!existingUser) {
+            // Create new user row
+            const { error: insertError } = await supabaseAdmin
+              .from('users')
+              .insert({
+                id: userId,
+                email: session.customer_email,
+                subscription_tier: planType,
+                monthly_credits: monthlyCredits,
+                credits: monthlyCredits,
+                account_status: 'active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (insertError) {
+              console.error('Error creating user:', insertError);
+            } else {
+              console.log(`Created user ${userId} with ${planType} subscription and ${monthlyCredits} credits`);
+            }
+          } else {
+            // Update existing user
+            const { error: updateError } = await supabaseAdmin
+              .from('users')
+              .update({
+                subscription_tier: planType,
+                monthly_credits: monthlyCredits,
+                credits: monthlyCredits,
+                account_status: 'active',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', userId);
+
+            if (updateError) {
+              console.error('Error updating user subscription:', updateError);
+            } else {
+              console.log(`Updated user ${userId} to ${planType} subscription with ${monthlyCredits} credits`);
+            }
           }
 
-          // Get current user credits
+          // Create points transaction record
+          await supabaseAdmin.from('points_transactions').insert({
+            user_id: userId,
+            amount: monthlyCredits,
+            type: 'subscription',
+            description: `${planType === 'premium' ? 'Premium' : 'Basic'} subscription - monthly credits`,
+            created_at: new Date().toISOString()
+          });
+
+        } else if (points > 0) {
+          // Handle one-time point pack purchase
+
+          // CRITICAL: Create transaction record FIRST (with unique constraint)
+          // This prevents race conditions where both webhooks update credits
+          const { error: insertError } = await supabaseAdmin.from('points_transactions').insert({
+            user_id: userId,
+            amount: points,
+            type: 'purchase',
+            description: `${packName} purchased`,
+            stripe_session_id: sessionId,
+            created_at: new Date().toISOString()
+          });
+
+          if (insertError) {
+            // Duplicate key error means another webhook already processed this
+            console.log(`⚠️ Transaction already exists for session ${sessionId}, skipping credit update`);
+            return NextResponse.json({ received: true, duplicate: true });
+          }
+
+          // Only update credits if transaction was successfully created
           const { data: userData } = await supabaseAdmin
             .from('users')
             .select('credits, monthly_credits')
@@ -87,13 +176,11 @@ export async function POST(req: NextRequest) {
           const currentCredits = userData?.credits || 0;
           const newCredits = currentCredits + points;
 
-          // Update user credits in Supabase
+          // Update user credits
           const { error: updateError } = await supabaseAdmin
             .from('users')
             .update({
               credits: newCredits,
-              monthly_credits: points,
-              plan_type: planType,
               updated_at: new Date().toISOString()
             })
             .eq('id', userId);
@@ -101,23 +188,8 @@ export async function POST(req: NextRequest) {
           if (updateError) {
             console.error('Error updating user credits:', updateError);
           } else {
-            console.log(`Updated user ${userId} credits to ${newCredits}`);
+            console.log(`✅ Updated user ${userId} credits from ${currentCredits} to ${newCredits}`);
           }
-
-          // Create payment record
-          await supabaseAdmin.from('payments').insert({
-            user_id: userId,
-            amount: session.amount_total,
-            currency: session.currency,
-            status: 'completed',
-            plan_type: planType,
-            credits_purchased: points,
-            payment_method: 'card',
-            pack_name: packName,
-            stripe_session_id: session.id,
-            stripe_payment_intent: session.payment_intent,
-            created_at: new Date().toISOString()
-          });
         }
 
         break;
