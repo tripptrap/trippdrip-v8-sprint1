@@ -101,24 +101,56 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
       "responses": [
         {
           "label": "Short label for response type 1",
-          "followUpMessage": "Your follow-up if they give this type of response"
+          "followUpMessage": "Your follow-up if they give this type of response",
+          "nextStepId": "step-2a",
+          "action": "continue"
         },
         {
           "label": "Short label for response type 2",
-          "followUpMessage": "Your follow-up if they give this type of response"
+          "followUpMessage": "Your follow-up if they give this type of response",
+          "nextStepId": "step-2b",
+          "action": "continue"
         },
         {
           "label": "Short label for response type 3",
-          "followUpMessage": "Your follow-up if they give this type of response"
+          "followUpMessage": "Your follow-up if they give this type of response",
+          "nextStepId": "step-2c",
+          "action": "continue"
         },
         {
           "label": "Short label for response type 4",
-          "followUpMessage": "Your follow-up if they give this type of response"
+          "followUpMessage": "Your follow-up if they give this type of response",
+          "nextStepId": null,
+          "action": "end"
         }
       ]
+    },
+    {
+      "id": "step-2a",
+      "yourMessage": "Follow-up for positive response path",
+      "responses": [...]
+    },
+    {
+      "id": "step-2b",
+      "yourMessage": "Follow-up for neutral response path",
+      "responses": [...]
+    },
+    {
+      "id": "step-2c",
+      "yourMessage": "Follow-up for objection handling path",
+      "responses": [...]
     }
   ]
 }
+
+IMPORTANT BRANCHING RULES:
+- Each response should have a "nextStepId" that points to which step comes next
+- Use "action": "continue" to proceed to another step, or "action": "end" to end the conversation
+- Create different paths (branches) for different types of responses
+- Interested responses should lead to qualification steps
+- Objections should lead to objection-handling steps
+- Not interested should lead to soft close or end
+- Use step IDs like "step-2a", "step-2b" to indicate branches from step 2
 
 Important:
 - Keep messages concise (1-3 sentences max)
