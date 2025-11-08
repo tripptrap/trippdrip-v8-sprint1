@@ -274,7 +274,22 @@ export default function FlowsPage() {
 
   function insertStepAfter(afterIndex: number) {
     setInsertAfterIndex(afterIndex);
-    setShowStepDialog(true);
+
+    // Check if this is a manual flow (not AI generated)
+    if (selectedFlow && selectedFlow.isAIGenerated === false) {
+      // Show manual step dialog for manual flows
+      setManualStep({
+        id: `step-${Date.now()}`,
+        yourMessage: '',
+        responses: [],
+        dripSequence: []
+      });
+      setEditingStepIndex(-1);
+      setShowManualStepDialog(true);
+    } else {
+      // Show AI step dialog for AI-generated flows
+      setShowStepDialog(true);
+    }
   }
 
   function renumberSteps(steps: FlowStep[]): FlowStep[] {
@@ -379,6 +394,10 @@ export default function FlowsPage() {
       // Editing existing step
       updatedSteps = [...selectedFlow.steps];
       updatedSteps[editingStepIndex] = manualStep;
+    } else if (insertAfterIndex >= 0) {
+      // Inserting step after a specific position
+      updatedSteps = [...selectedFlow.steps];
+      updatedSteps.splice(insertAfterIndex + 1, 0, manualStep);
     } else {
       // Adding new step at end
       updatedSteps = [...selectedFlow.steps, manualStep];
@@ -403,6 +422,7 @@ export default function FlowsPage() {
     setShowManualStepDialog(false);
     setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
     setEditingStepIndex(-1);
+    setInsertAfterIndex(-1);
   }
 
   function deleteStep(stepId: string) {
@@ -1001,27 +1021,6 @@ export default function FlowsPage() {
                     >
                       Test
                     </button>
-                    <button
-                      onClick={addStep}
-                      className="bg-blue-600 hover:bg-blue-700 border border-blue-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
-                    >
-                      + AI Step
-                    </button>
-                    <button
-                      onClick={() => {
-                        setManualStep({
-                          id: `step-${Date.now()}`,
-                          yourMessage: '',
-                          responses: [],
-                          dripSequence: []
-                        });
-                        setEditingStepIndex(-1);
-                        setShowManualStepDialog(true);
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 border border-purple-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
-                    >
-                      + Manual Step
-                    </button>
                   </div>
                 </div>
 
@@ -1144,20 +1143,18 @@ export default function FlowsPage() {
                   </div>
                 </div>
 
-                    {/* Insert Step Button */}
-                    {stepIndex < selectedFlow.steps.length - 1 && (
-                      <div className="flex justify-center my-2">
-                        <button
-                          onClick={() => insertStepAfter(stepIndex)}
-                          className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 text-green-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          Insert Step Here
-                        </button>
-                      </div>
-                    )}
+                    {/* Insert Step Button - show after each step */}
+                    <div className="flex justify-center my-2">
+                      <button
+                        onClick={() => insertStepAfter(stepIndex)}
+                        className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 text-green-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Insert Step Here
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1506,6 +1503,7 @@ export default function FlowsPage() {
                     setShowManualStepDialog(false);
                     setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
                     setEditingStepIndex(-1);
+                    setInsertAfterIndex(-1);
                   }}
                   className="text-white/60 hover:text-white text-2xl leading-none"
                 >
@@ -1541,6 +1539,7 @@ export default function FlowsPage() {
                     setShowManualStepDialog(false);
                     setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
                     setEditingStepIndex(-1);
+                    setInsertAfterIndex(-1);
                   }}
                   className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
                 >
