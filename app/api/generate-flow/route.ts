@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check and deduct points BEFORE generating flow (15 points for flow creation)
-    const pointsResult = await spendPointsForAction('flow_creation', 1);
+    // Check and deduct points BEFORE generating flow (5 points for flow generation)
+    const pointsResult = await spendPointsForAction('flow_generation', 1);
 
     if (!pointsResult.success) {
       return NextResponse.json(
