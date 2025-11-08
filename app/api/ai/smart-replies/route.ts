@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateSmartReplies } from '@/lib/ai/openai';
+import { spendPoints } from '@/lib/pointsSupabase';
 
 export const dynamic = "force-dynamic";
 
 /**
  * AI Smart Replies - Generate contextual reply suggestions
  * POST /api/ai/smart-replies
+ * Cost: 2 points per request
  */
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +17,16 @@ export async function POST(req: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Check and deduct points before generating AI response
+    const pointsResult = await spendPoints(2, 'AI Smart Reply Suggestions', 'ai_response');
+    if (!pointsResult.success) {
+      return NextResponse.json({
+        ok: false,
+        error: pointsResult.error || 'Insufficient points',
+        insufficientPoints: true
+      }, { status: 402 });
     }
 
     const { leadId, threadId } = await req.json();
