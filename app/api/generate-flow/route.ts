@@ -77,25 +77,34 @@ Context:
 - Flow name: ${flowName}
 - Qualifying questions: ${context.qualifyingQuestions}
 
-Create a PYRAMID-SHAPED conversation flow that starts narrow and expands as you qualify leads:
+Create a LINEAR conversation flow showing the OPTIMAL PATH where the client moves forward with the sale:
 
-PYRAMID STRUCTURE (total 8-12 steps):
-- Level 1 (Top): 1 step - Initial introduction
-- Level 2: 2-3 steps - Interest-based branches (interested, maybe, not interested)
-- Level 3: 4-5 steps - Qualification branches (budget, timeline, specific needs)
-- Level 4 (Bottom): 3-4 steps - Final outcomes (close, follow-up, nurture, end)
+FLOW STRUCTURE (8-12 steps total):
+- The main flow should assume the client is INTERESTED and progressing toward the sale
+- Each step moves the client closer to closing (intro → interest → qualification → commitment → close)
+- The "yourMessage" field should be the NEXT message in the optimal sales path
+- Response options are there to handle ALTERNATE scenarios (objections, questions, pushback)
+
+CRITICAL STRUCTURE:
+1. Step 1: Initial outreach
+2. Step 2: Assume they responded positively - ask first qualifying question
+3. Step 3: Assume positive answer - ask next qualifying question
+4. Step 4-6: Continue qualifying (budget, timeline, needs)
+5. Step 7-8: Overcome final objections, set appointment
+6. Final steps: Book meeting, confirm details, close
 
 Each step should have:
 1. A SHORT message from the sender (1-2 sentences max - keep it concise like real texting)
-2. 2-4 possible response categories (not always 4 - vary it to create pyramid shape)
-3. For each response, a brief follow-up message
+   - This message assumes the client said YES to the previous step
+   - It moves the conversation forward toward the close
+2. 2-4 possible response categories for when they DON'T follow the optimal path
+3. For each alternate response, a brief follow-up message to handle it
 
-IMPORTANT: Make steps progressively smaller and more targeted as you go deeper:
-- Early steps = broader questions, more options
-- Later steps = specific, focused questions with fewer options
-- Create natural narrowing from general interest → specific qualification → final action
+THINK OF IT LIKE THIS:
+- "yourMessage" = What you send when they're moving forward (the happy path)
+- "responses" = What you say when they object, ask questions, or push back
 
-Make messages ultra-concise and conversational. Think: "Hey, interested in life insurance?" not paragraphs.
+Make messages ultra-concise and conversational. Think: "Great! What's your budget?" not paragraphs.
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
@@ -148,21 +157,27 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
   ]
 }
 
-IMPORTANT BRANCHING RULES:
-- Each response should have a "nextStepId" that points to which step comes next
-- Use "action": "continue" to proceed to another step, or "action": "end" to end the conversation
-- Create different paths (branches) for different types of responses
-- Interested responses should lead to qualification steps
-- Objections should lead to objection-handling steps
-- Not interested should lead to soft close or end
-- Use step IDs like "step-2a", "step-2b" to indicate branches from step 2
+IMPORTANT FLOW RULES:
+- The main flow (step-1 → step-2 → step-3 → etc.) is the OPTIMAL PATH assuming positive responses
+- "yourMessage" at each step assumes they said YES to move forward
+- Each response option handles DEVIATIONS from the optimal path:
+  - "Objection" responses can loop back to try again or move to objection handling
+  - "Question" responses can provide info then return to main flow
+  - "Not interested" responses lead to soft close or end
+  - "Interested/Yes" responses can be included but should continue the main sequence
+
+RESPONSE STRUCTURE:
+- Use "nextStepId": "step-X" to point to the next step in sequence
+- Use "action": "continue" to proceed, or "action": "end" to end conversation
+- Most responses should eventually reconnect to the main flow or close
+- Example: If at step-3 they object, response might go to step-3-objection, then back to step-4
 
 Important:
 - Keep messages concise (1-3 sentences max)
 - Use natural, conversational language
-- Response labels should be 2-4 words max (e.g., "Interested", "Not interested", "Need more info", "Price question")
-- Make sure each response category is distinct and covers common lead responses
-- Include at least one "not interested" or negative response option`;
+- Response labels should be 2-4 words max (e.g., "Price question", "Not interested", "Need more info")
+- The main step sequence (step-1, step-2, step-3...) should flow naturally from intro to close
+- Responses handle the "what ifs" - what if they object, question, or hesitate`;
 
     // Use direct fetch to bypass any SDK caching
     const apiKey = process.env.OPENAI_API_KEY;
