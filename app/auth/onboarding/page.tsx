@@ -28,57 +28,36 @@ export default function OnboardingPage() {
         return
       }
 
-      // First check if user row exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single()
+      // Create Stripe checkout session for subscription
+      const response = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriptionType: selectedPlan
+        })
+      })
 
-      let updateError
+      const result = await response.json()
 
-      if (!existingUser) {
-        // User row doesn't exist, insert it
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            id: user.id,
-            email: user.email,
-            subscription_tier: selectedPlan,
-            monthly_credits: selectedPlan === 'premium' ? 10000 : 3000,
-            credits: selectedPlan === 'premium' ? 10000 : 3000,
-            monthly_points_limit: selectedPlan === 'premium' ? 10000 : 3000,
-            account_status: 'active'
-          })
-        updateError = error
-      } else {
-        // User row exists, update it
-        const { error } = await supabase
-          .from('users')
-          .update({
-            subscription_tier: selectedPlan,
-            monthly_credits: selectedPlan === 'premium' ? 10000 : 3000,
-            credits: selectedPlan === 'premium' ? 10000 : 3000,
-            monthly_points_limit: selectedPlan === 'premium' ? 10000 : 3000,
-            account_status: 'active'
-          })
-          .eq('id', user.id)
-        updateError = error
-      }
-
-      if (updateError) {
-        console.error('Error saving plan:', updateError)
-        toast.error(`Failed to save plan: ${updateError.message}`)
+      if (result.setup) {
+        toast.error('Payment system not configured. Please contact support.')
+        setLoading(false)
         return
       }
 
-      toast.success(`Welcome to HyveWyre™ ${selectedPlan === 'premium' ? 'Premium' : 'Basic'}!`)
-      router.push('/leads')
-      router.refresh()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create checkout session')
+      }
+
+      // Redirect to Stripe Checkout
+      if (result.url) {
+        window.location.href = result.url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
     } catch (error: any) {
       console.error('Error:', error)
       toast.error(error.message || 'An error occurred')
-    } finally {
       setLoading(false)
     }
   }
@@ -280,11 +259,11 @@ export default function OnboardingPage() {
               color: 'white',
             }}
           >
-            {loading ? 'Setting up your account...' : `Continue with ${selectedPlan === 'premium' ? 'Premium' : selectedPlan === 'basic' ? 'Basic' : 'Selected Plan'}`}
+            {loading ? 'Redirecting to checkout...' : `Continue to Payment - ${selectedPlan === 'premium' ? '$98' : selectedPlan === 'basic' ? '$30' : ''}/mo`}
           </button>
 
           <p className="mt-4 text-sm" style={{ color: '#9ca3af' }}>
-            You can upgrade or downgrade your plan anytime in Settings
+            Secure payment via Stripe • Cancel anytime • Upgrade or downgrade later
           </p>
         </div>
       </div>

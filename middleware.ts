@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
     '/auth/reset-password',
     '/auth/onboarding',
     '/api/auth',
+    '/api/stripe/webhook',
     '/preview',
     '/privacy',
     '/terms',

@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from "react";
 
+type DripMessage = {
+  message: string;
+  delayHours: number; // Hours to wait before sending this drip message
+};
+
 type ResponseOption = {
   label: string; // e.g., "Interested", "Not Interested", "More Info", "Pricing"
   followUpMessage: string;
+  nextStepId?: string; // ID of the next step to go to
+  action?: 'continue' | 'end';
 };
 
 type FlowStep = {
   id: string;
   yourMessage: string;
   responses: ResponseOption[];
+  dripSequence?: DripMessage[]; // Follow-up messages if no response
   tag?: {
     label: string;
     color: string;
@@ -74,10 +82,13 @@ export default function FlowsPage() {
   const [stepPurpose, setStepPurpose] = useState("");
   const [insertAfterIndex, setInsertAfterIndex] = useState<number>(-1);
   const [showTestFlow, setShowTestFlow] = useState(false);
-  const [testMessages, setTestMessages] = useState<Array<{role: 'agent' | 'user', text: string}>>([]);
+  const [testMessages, setTestMessages] = useState<Array<{role: 'agent' | 'user' | 'system', text: string, timestamp?: string}>>([]);
   const [testInput, setTestInput] = useState("");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isTestingAI, setIsTestingAI] = useState(false);
+  const [simulatedTime, setSimulatedTime] = useState(new Date());
+  const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
+  const [pendingDrips, setPendingDrips] = useState<Array<{message: string, scheduledFor: Date}>>([]);
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -377,16 +388,79 @@ export default function FlowsPage() {
     });
   }
 
+  // Helper function to check if a time is within business hours (9 AM - 6 PM)
+  function isBusinessHours(date: Date): boolean {
+    const hours = date.getHours();
+    const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+
+    // Not on weekends
+    if (day === 0 || day === 6) return false;
+
+    // Between 9 AM and 6 PM
+    return hours >= 9 && hours < 18;
+  }
+
+  // Helper function to get next business hour time
+  function getNextBusinessHour(from: Date): Date {
+    const next = new Date(from);
+
+    // If already in business hours, return as is
+    if (isBusinessHours(next)) return next;
+
+    // If before 9 AM, set to 9 AM same day
+    if (next.getHours() < 9) {
+      next.setHours(9, 0, 0, 0);
+      if (isBusinessHours(next)) return next;
+    }
+
+    // If after 6 PM or weekend, move to next business day at 9 AM
+    do {
+      next.setDate(next.getDate() + 1);
+      next.setHours(9, 0, 0, 0);
+    } while (!isBusinessHours(next));
+
+    return next;
+  }
+
+  // Format timestamp for display
+  function formatTimestamp(date: Date): string {
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
   function startTestFlow() {
     if (!selectedFlow || !selectedFlow.steps || selectedFlow.steps.length === 0) {
       alert("No steps in flow to test");
       return;
     }
 
+    const now = new Date();
     setShowTestFlow(true);
     setCurrentStepIndex(0);
+    setSimulatedTime(now);
+    setLastMessageTime(now);
+
+    // Initialize drip sequence for first step
+    const firstStep = selectedFlow.steps[0];
+    const initialDrips: Array<{message: string, scheduledFor: Date}> = [];
+
+    if (firstStep.dripSequence && firstStep.dripSequence.length > 0) {
+      firstStep.dripSequence.forEach(drip => {
+        const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
+        const businessHourTime = getNextBusinessHour(scheduledTime);
+        initialDrips.push({
+          message: drip.message,
+          scheduledFor: businessHourTime
+        });
+      });
+    }
+
+    setPendingDrips(initialDrips);
     setTestMessages([
-      { role: 'agent', text: selectedFlow.steps[0].yourMessage }
+      { role: 'agent', text: firstStep.yourMessage, timestamp: formatTimestamp(now) }
     ]);
     setTestInput("");
   }
@@ -396,15 +470,47 @@ export default function FlowsPage() {
     setTestMessages([]);
     setCurrentStepIndex(0);
     setTestInput("");
+    setSimulatedTime(new Date());
+    setLastMessageTime(null);
+    setPendingDrips([]);
+  }
+
+  // Advance simulated time and trigger any pending drips
+  function advanceTime(hours: number) {
+    const newTime = new Date(simulatedTime.getTime() + hours * 60 * 60 * 1000);
+    setSimulatedTime(newTime);
+
+    // Check if any drips should be sent
+    const dripsToSend = pendingDrips.filter(drip => drip.scheduledFor <= newTime);
+    const remainingDrips = pendingDrips.filter(drip => drip.scheduledFor > newTime);
+
+    if (dripsToSend.length > 0) {
+      const newMessages = dripsToSend.map(drip => ({
+        role: 'agent' as const,
+        text: drip.message,
+        timestamp: formatTimestamp(drip.scheduledFor)
+      }));
+
+      setTestMessages(prev => [...prev, ...newMessages]);
+      setLastMessageTime(newTime);
+    }
+
+    setPendingDrips(remainingDrips);
   }
 
   async function sendTestMessage() {
     if (!testInput.trim() || !selectedFlow) return;
 
     const userMessage = testInput.trim();
-    setTestMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    const now = simulatedTime;
+
+    // User responded, so clear any pending drip messages
+    setPendingDrips([]);
+
+    setTestMessages(prev => [...prev, { role: 'user', text: userMessage, timestamp: formatTimestamp(now) }]);
     setTestInput("");
     setIsTestingAI(true);
+    setLastMessageTime(now);
 
     try {
       // Get current step
@@ -412,7 +518,7 @@ export default function FlowsPage() {
 
       // Get conversation history for context
       const conversationHistory = testMessages.map(m =>
-        `${m.role === 'agent' ? 'Agent' : 'User'}: ${m.text}`
+        `${m.role === 'agent' ? 'Agent' : (m.role === 'user' ? 'User' : 'System')}: ${m.text}`
       ).join('\n');
 
       // Send to AI to classify response and get next message
@@ -430,18 +536,35 @@ export default function FlowsPage() {
       const data = await response.json();
 
       if (data.agentResponse) {
-        setTestMessages(prev => [...prev, { role: 'agent', text: data.agentResponse }]);
+        setTestMessages(prev => [...prev, { role: 'agent', text: data.agentResponse, timestamp: formatTimestamp(now) }]);
 
         // Update current step if AI determined we should move to next step
         if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
           setCurrentStepIndex(data.nextStepIndex);
+
+          // Set up drip sequence for new step
+          const newStep = selectedFlow.steps[data.nextStepIndex];
+          if (newStep.dripSequence && newStep.dripSequence.length > 0) {
+            const newDrips: Array<{message: string, scheduledFor: Date}> = [];
+
+            newStep.dripSequence.forEach(drip => {
+              const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
+              const businessHourTime = getNextBusinessHour(scheduledTime);
+              newDrips.push({
+                message: drip.message,
+                scheduledFor: businessHourTime
+              });
+            });
+
+            setPendingDrips(newDrips);
+          }
         }
       } else {
-        setTestMessages(prev => [...prev, { role: 'agent', text: "I'm not sure how to respond to that. Let me try another approach..." }]);
+        setTestMessages(prev => [...prev, { role: 'agent', text: "I'm not sure how to respond to that. Let me try another approach...", timestamp: formatTimestamp(now) }]);
       }
     } catch (error) {
       console.error("Error testing flow:", error);
-      setTestMessages(prev => [...prev, { role: 'agent', text: "Error processing your response. Please try again." }]);
+      setTestMessages(prev => [...prev, { role: 'agent', text: "Error processing your response. Please try again.", timestamp: formatTimestamp(now) }]);
     } finally {
       setIsTestingAI(false);
     }
@@ -922,11 +1045,14 @@ export default function FlowsPage() {
                     className={`max-w-[75%] px-4 py-3 rounded-lg ${
                       message.role === 'user'
                         ? 'bg-blue-500 text-white'
+                        : message.role === 'system'
+                        ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-100'
                         : 'bg-green-500/20 border border-green-500/50 text-green-100'
                     }`}
                   >
-                    <div className="text-xs font-semibold mb-1 opacity-70">
-                      {message.role === 'user' ? 'You (Client)' : 'Agent'}
+                    <div className="text-xs font-semibold mb-1 opacity-70 flex items-center justify-between">
+                      <span>{message.role === 'user' ? 'You (Client)' : message.role === 'system' ? 'System' : 'Agent'}</span>
+                      {message.timestamp && <span className="ml-2 font-normal opacity-50">{message.timestamp}</span>}
                     </div>
                     <div className="text-sm whitespace-pre-wrap">{message.text}</div>
                   </div>
@@ -966,9 +1092,51 @@ export default function FlowsPage() {
               </button>
             </div>
 
-            {/* Current Step Indicator */}
-            {selectedFlow && selectedFlow.steps[currentStepIndex] && (
-              <div className="mt-3 pt-3 border-t border-white/10">
+            {/* Time Controls & Drip Visualization */}
+            <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+              {/* Time Display and Controls */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-[var(--muted)]">
+                  <span className="mr-3">⏰ Current Time: <span className="text-white font-semibold">{simulatedTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span></span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => advanceTime(3)}
+                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                  >
+                    +3 hours
+                  </button>
+                  <button
+                    onClick={() => advanceTime(24)}
+                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                  >
+                    +1 day
+                  </button>
+                  <button
+                    onClick={() => advanceTime(48)}
+                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                  >
+                    +2 days
+                  </button>
+                </div>
+              </div>
+
+              {/* Pending Drips Display */}
+              {pendingDrips.length > 0 && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-orange-200 mb-2">📬 Scheduled Follow-ups ({pendingDrips.length})</div>
+                  <div className="space-y-1">
+                    {pendingDrips.map((drip, idx) => (
+                      <div key={idx} className="text-xs text-orange-100/70">
+                        • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Current Step Indicator */}
+              {selectedFlow && selectedFlow.steps[currentStepIndex] && (
                 <div className="text-xs text-[var(--muted)]">
                   Current Step: <span className="text-white font-semibold">Step {currentStepIndex + 1}</span>
                   {selectedFlow.steps[currentStepIndex].tag && (
@@ -984,8 +1152,8 @@ export default function FlowsPage() {
                     </span>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

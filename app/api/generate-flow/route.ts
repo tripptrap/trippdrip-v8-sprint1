@@ -79,6 +79,13 @@ Context:
 
 Create a LINEAR conversation flow showing the OPTIMAL PATH where the client moves forward with the sale:
 
+**CRITICAL: DRIP SEQUENCES**
+Each step MUST include a "dripSequence" array with 2-3 follow-up messages if the client doesn't respond:
+- First drip: 3-4 hours later
+- Second drip: 24 hours after first drip
+- Third drip (optional): 48 hours after second drip
+These follow-ups will only be sent during business hours (9 AM - 6 PM, weekdays).
+
 FLOW STRUCTURE (8-12 steps total):
 - The main flow should assume the client is INTERESTED and progressing toward the sale
 - Each step moves the client closer to closing (intro → interest → qualification → commitment → close)
@@ -112,6 +119,20 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
     {
       "id": "step-1",
       "yourMessage": "The initial message text here",
+      "dripSequence": [
+        {
+          "message": "First follow-up if no response after 3-4 hours",
+          "delayHours": 3
+        },
+        {
+          "message": "Second follow-up if still no response after 24 more hours",
+          "delayHours": 27
+        },
+        {
+          "message": "Final follow-up after 48 more hours",
+          "delayHours": 75
+        }
+      ],
       "responses": [
         {
           "label": "Short label for response type 1",
@@ -142,16 +163,19 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
     {
       "id": "step-2a",
       "yourMessage": "Follow-up for positive response path",
+      "dripSequence": [...],
       "responses": [...]
     },
     {
       "id": "step-2b",
       "yourMessage": "Follow-up for neutral response path",
+      "dripSequence": [...],
       "responses": [...]
     },
     {
       "id": "step-2c",
       "yourMessage": "Follow-up for objection handling path",
+      "dripSequence": [...],
       "responses": [...]
     }
   ]

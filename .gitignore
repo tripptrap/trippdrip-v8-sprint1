@@ -11,3 +11,4 @@ out
 
 # mac
 .DS_Store
+.vercel

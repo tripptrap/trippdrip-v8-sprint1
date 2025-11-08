@@ -1,13 +1,48 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
 
   if (code) {
-    const supabase = await createClient()
+    const response = NextResponse.next()
+    const cookieStore = await cookies()
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            cookieStore.set({ name, value, ...options })
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+              httpOnly: false,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+            })
+          },
+          remove(name: string, options: any) {
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+              maxAge: 0,
+            })
+          },
+        },
+      }
+    )
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
@@ -15,21 +50,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(requestUrl.origin + '/auth/login')
     }
 
-    if (data.user) {
+    if (data.user && data.session) {
+      // Session is now established
       // Check if user has already selected a plan
       const { data: userData } = await supabase
         .from('users')
-        .select('subscription_status')
+        .select('subscription_tier')
         .eq('id', data.user.id)
         .single()
 
-      // If no plan selected yet (new user) or no subscription, redirect to onboarding
-      if (!userData || !userData.subscription_status || userData.subscription_status === 'none') {
-        return NextResponse.redirect(requestUrl.origin + '/onboarding')
-      }
+      // Create response with proper redirect
+      const redirectUrl = (!userData || !userData.subscription_tier)
+        ? requestUrl.origin + '/auth/onboarding'
+        : requestUrl.origin + '/leads'
 
-      // If plan already selected, go to dashboard
-      return NextResponse.redirect(requestUrl.origin + '/dashboard')
+      const redirectResponse = NextResponse.redirect(redirectUrl)
+
+      // Copy cookies from response to redirectResponse
+      response.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie)
+      })
+
+      return redirectResponse
     }
   }
 

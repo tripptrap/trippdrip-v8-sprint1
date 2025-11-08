@@ -33,6 +33,9 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
+      // Production domain for email verification
+      const baseUrl = 'https://www.hyvewyre.com';
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -40,11 +43,18 @@ export default function RegisterPage() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          // Production domain for email verification
+          emailRedirectTo: `${baseUrl}/auth/callback`,
         },
       })
 
       if (error) {
+        // If user already exists, show success message anyway
+        // Supabase will send a new verification email
+        if (error.message?.includes('already registered')) {
+          setShowSuccess(true)
+          return
+        }
         toast.error(error.message)
         return
       }
@@ -61,48 +71,53 @@ export default function RegisterPage() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#0b0f14' }}>
-        <div className="max-w-md w-full rounded-2xl shadow-xl p-8 text-center" style={{
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.08)'
-        }}>
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
+
+        <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 text-center relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
           <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-blue-600 bg-opacity-20 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold mb-2" style={{ color: '#e6e9f0' }}>Check your email!</h2>
-            <p style={{ color: '#9ca3af' }} className="mb-4">
-              We've sent a verification email to <strong style={{ color: '#e6e9f0' }}>{email}</strong>
+            <h2 className="text-2xl font-bold mb-2 text-white">Check your email!</h2>
+            <p className="text-white/60 mb-4">
+              We've sent a verification email to <strong className="text-white">{email}</strong>
             </p>
-            <p style={{ color: '#9ca3af' }} className="text-sm">
+            <p className="text-white/60 text-sm">
               Click the link in the email to verify your account. After verification, you'll be guided through selecting a plan and setting up your account.
             </p>
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-start text-left p-3 rounded-lg" style={{ background: 'rgba(59,130,246,0.1)' }}>
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start text-left p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div className="text-sm" style={{ color: '#9ca3af' }}>
+              <div className="text-sm text-white/60">
                 Check your spam folder if you don't see the email in a few minutes.
               </div>
             </div>
 
-            <div className="flex items-start text-left p-3 rounded-lg" style={{ background: 'rgba(59,130,246,0.1)' }}>
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start text-left p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div className="text-sm" style={{ color: '#9ca3af' }}>
+              <div className="text-sm text-white/60">
                 After verification, you'll choose your plan and get started!
               </div>
             </div>
           </div>
 
           <div className="mt-6">
-            <Link href="/auth/login" className="text-blue-500 hover:text-blue-400 font-semibold">
+            <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
               Back to login
             </Link>
           </div>
@@ -112,22 +127,27 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{ background: '#0b0f14' }}>
-      <div className="max-w-md w-full rounded-2xl shadow-xl p-8" style={{
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.08)'
-      }}>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundSize: '40px 40px'
+        }} />
+      </div>
+
+      <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img src="/icon.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl" />
+            <img src="/logo-premium.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl shadow-lg" />
           </div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: '#e6e9f0' }}>HyveWyre™</h1>
-          <p style={{ color: '#9ca3af' }}>Create your account</p>
+          <h1 className="text-3xl font-bold mb-2 text-white">HyveWyre™</h1>
+          <p className="text-white/60">Create your account</p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-6">
+        <form onSubmit={handleRegister} className="space-y-5">
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium mb-2" style={{ color: '#e6e9f0' }}>
+            <label htmlFor="fullName" className="block text-sm font-medium mb-2 text-white">
               Full Name
             </label>
             <input
@@ -136,18 +156,13 @@ export default function RegisterPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#e6e9f0'
-              }}
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="John Doe"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2" style={{ color: '#e6e9f0' }}>
+            <label htmlFor="email" className="block text-sm font-medium mb-2 text-white">
               Email Address
             </label>
             <input
@@ -156,18 +171,13 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#e6e9f0'
-              }}
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2" style={{ color: '#e6e9f0' }}>
+            <label htmlFor="password" className="block text-sm font-medium mb-2 text-white">
               Password
             </label>
             <input
@@ -177,18 +187,13 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#e6e9f0'
-              }}
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="At least 8 characters"
             />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2" style={{ color: '#e6e9f0' }}>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2 text-white">
               Confirm Password
             </label>
             <input
@@ -198,12 +203,7 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#e6e9f0'
-              }}
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               placeholder="Confirm your password"
             />
           </div>
@@ -211,19 +211,25 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p style={{ color: '#9ca3af' }}>
+          <p className="text-white/60">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-blue-500 hover:text-blue-400 font-semibold">
+            <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
               Sign in
             </Link>
           </p>
+        </div>
+
+        <div className="mt-4 text-center">
+          <Link href="/preview" className="text-sm text-white/40 hover:text-white/60 transition-colors">
+            ← Back to home
+          </Link>
         </div>
       </div>
     </div>
