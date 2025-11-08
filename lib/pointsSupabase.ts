@@ -99,10 +99,9 @@ export async function spendPoints(
     .from('points_transactions')
     .insert({
       user_id: user.id,
-      type: 'spend',
-      amount: -amount,
+      action_type: 'spend',
+      points_amount: -amount,
       description,
-      action_type: actionType,
       created_at: new Date().toISOString()
     });
 
@@ -163,8 +162,8 @@ export async function addPoints(
     .from('points_transactions')
     .insert({
       user_id: user.id,
-      type,
-      amount,
+      action_type: type,
+      points_amount: amount,
       description,
       created_at: new Date().toISOString()
     });

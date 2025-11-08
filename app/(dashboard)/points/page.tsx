@@ -63,7 +63,7 @@ function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: num
   }
   return {
     price: 30,
-    monthlyPoints: 1000,
+    monthlyPoints: 3000,
     name: 'Basic Plan'
   };
 }
@@ -92,7 +92,10 @@ export default function PointsPage() {
     const packName = urlParams.get('packName');
 
     if (success === 'true' && points) {
-      handlePurchaseComplete(parseInt(points), packName || 'Point Pack');
+      // Points are added by the webhook, just show confirmation
+      alert(`Payment successful! ${parseInt(points).toLocaleString()} points will be added to your account shortly.`);
+      window.history.replaceState({}, '', '/points');
+      refreshData(); // Refresh to show updated balance
     } else if (canceled === 'true') {
       alert('Payment canceled. No charges were made.');
       window.history.replaceState({}, '', '/points');
@@ -182,15 +185,31 @@ export default function PointsPage() {
 
     const oldPlan = currentPlan;
 
+    // Confirm downgrade if going from premium to basic
+    if (oldPlan === 'premium' && planType === 'basic') {
+      const confirmed = confirm(
+        'Are you sure you want to downgrade to Basic plan? You will lose Premium discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.'
+      );
+      if (!confirmed) return;
+    }
+
     // Update subscription tier in Supabase
-    const newCredits = planType === 'premium' ? 10000 : 1000;
+    const newMonthlyCredits = planType === 'premium' ? 10000 : 3000;
+
+    // Only reset credits if upgrading - preserve existing balance when downgrading
+    const updateData: any = {
+      subscription_tier: planType,
+      monthly_credits: newMonthlyCredits
+    };
+
+    // If upgrading to premium, grant the new monthly credits immediately
+    if (planType === 'premium' && oldPlan === 'basic') {
+      updateData.credits = newMonthlyCredits;
+    }
+
     const { error } = await supabase
       .from('users')
-      .update({
-        subscription_tier: planType,
-        monthly_credits: newCredits,
-        credits: newCredits
-      })
+      .update(updateData)
       .eq('id', user.id);
 
     if (error) {
@@ -224,6 +243,14 @@ export default function PointsPage() {
 
   async function handlePurchase(pack: PointPack) {
     const price = currentPlan === 'premium' ? pack.premiumPrice : pack.basePrice;
+    console.log('Purchase initiated:', {
+      currentPlan,
+      pack: pack.name,
+      basePrice: pack.basePrice,
+      premiumPrice: pack.premiumPrice,
+      selectedPrice: price
+    });
+
     try {
       // Try to create Stripe checkout session
       const response = await fetch('/api/stripe/create-checkout', {
@@ -232,7 +259,8 @@ export default function PointsPage() {
         body: JSON.stringify({
           points: pack.points,
           price: price,
-          packName: pack.name
+          packName: pack.name,
+          planType: currentPlan
         })
       });
 
@@ -427,13 +455,13 @@ export default function PointsPage() {
                   transactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-white/5">
                       <td className="px-4 py-3 text-sm">
-                        {new Date(tx.timestamp).toLocaleDateString()}
+                        {new Date(tx.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-sm">{tx.description}</td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${
-                        tx.type === 'spend' ? 'text-red-400' : 'text-green-400'
+                        tx.action_type === 'spend' ? 'text-red-400' : 'text-green-400'
                       }`}>
-                        {tx.type === 'spend' ? '-' : '+'}{Math.abs(tx.amount).toLocaleString()}
+                        {tx.action_type === 'spend' ? '-' : '+'}{Math.abs(tx.points_amount).toLocaleString()}
                       </td>
                     </tr>
                   ))
