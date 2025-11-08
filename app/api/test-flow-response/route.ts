@@ -22,34 +22,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the AI prompt to determine the best response
-    const prompt = `You are simulating a sales conversation flow. The agent just asked a question, and you need to determine how to respond based on the user's answer.
+    const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
-Current Step Information:
-- Agent's Question: "${currentStep.yourMessage}"
-- Available Response Categories (these are the different ways the user might respond):
-${currentStep.responses.map((r: any, i: number) => `  ${i + 1}. ${r.label}`).join('\n')}
-
-Conversation History:
+CONVERSATION CONTEXT:
 ${conversationHistory || 'This is the start of the conversation'}
 
-User's Answer:
+YOUR LAST MESSAGE:
+"${currentStep.yourMessage}"
+
+CLIENT'S RESPONSE:
 "${userMessage}"
 
-IMPORTANT RULES:
-1. ALWAYS match the user's message to one of the ${currentStep.responses.length} response categories above
-2. The user is answering the agent's question "${currentStep.yourMessage}"
-3. DO NOT advance to the next step - just pick which response category best matches
-4. Return the index (0-based) of the matching category
+YOUR AVAILABLE RESPONSES:
+${currentStep.responses.map((r: any, i: number) => `${i}. ${r.label}: "${r.followUpMessage}"`).join('\n')}
+
+YOUR TASK:
+Analyze the client's response and determine:
+1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, etc.)
+2. Which of your available responses best addresses what they said?
+3. Pick the response index that makes the most sense conversationally
+
+Think about the natural flow of conversation - if they say "yes" to looking for coverage, use the response that continues helping them.
+If they say they need more info, use that response. If they're not interested, use that one.
 
 Return ONLY valid JSON (no markdown):
 {
   "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}>,
-  "reasoning": "<brief explanation>"
-}
-
-Example:
-If agent asks "Are you currently looking for coverage?" and user says "yes I am", match to the response category that handles positive/interested responses.
-If user says "no" or "maybe later", match to the not interested or need more info category.`;
+  "reasoning": "<1-2 sentences explaining why this response makes sense>"
+}`;
 
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -62,10 +62,10 @@ If user says "no" or "maybe later", match to the not interested or need more inf
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are an expert at analyzing conversation flows and matching user responses to appropriate follow-ups. Return only valid JSON, no markdown." },
+          { role: "system", content: "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.3,
+        temperature: 0.7,
         max_tokens: 500,
       }),
     });
