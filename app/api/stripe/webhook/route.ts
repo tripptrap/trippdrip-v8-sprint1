@@ -148,10 +148,11 @@ export async function POST(req: NextRequest) {
 
         } else if (points > 0) {
           // Handle one-time point pack purchase
+          console.log(`💰 Processing point pack purchase: ${points} points for user ${userId}, session ${sessionId}`);
 
           // CRITICAL: Create transaction record FIRST (with unique constraint)
           // This prevents race conditions where both webhooks update credits
-          const { error: insertError } = await supabaseAdmin.from('points_transactions').insert({
+          const { data: insertData, error: insertError } = await supabaseAdmin.from('points_transactions').insert({
             user_id: userId,
             amount: points,
             type: 'purchase',
@@ -162,9 +163,12 @@ export async function POST(req: NextRequest) {
 
           if (insertError) {
             // Duplicate key error means another webhook already processed this
-            console.log(`⚠️ Transaction already exists for session ${sessionId}, skipping credit update`);
+            console.error(`⚠️ Transaction insert failed for session ${sessionId}:`, insertError);
             return NextResponse.json({ received: true, duplicate: true });
           }
+
+          console.log(`✅ Transaction record created successfully for session ${sessionId}`);
+
 
           // Only update credits if transaction was successfully created
           const { data: userData } = await supabaseAdmin
