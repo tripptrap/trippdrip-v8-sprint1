@@ -77,20 +77,25 @@ Context:
 - Flow name: ${flowName}
 - Qualifying questions: ${context.qualifyingQuestions}
 
-Create a COMPREHENSIVE, professional conversation flow with 5-8 steps that covers the FULL sales journey from initial contact to close. Each step should have:
-1. A message from the sender (keep it concise, friendly, and natural - like a real text)
-2. Four possible response categories that a lead might give
-3. For each response category, a follow-up message
+Create a PYRAMID-SHAPED conversation flow that starts narrow and expands as you qualify leads:
 
-The flow should progress through these stages:
-- Step 1: Initial introduction and value proposition
-- Step 2: Gauge interest and identify pain points
-- Step 3-4: Ask qualifying questions (budget, timeline, needs)
-- Step 5-6: Handle objections and provide social proof
-- Step 7: Push for appointment/next step
-- Step 8: Final close or follow-up scheduling
+PYRAMID STRUCTURE (total 8-12 steps):
+- Level 1 (Top): 1 step - Initial introduction
+- Level 2: 2-3 steps - Interest-based branches (interested, maybe, not interested)
+- Level 3: 4-5 steps - Qualification branches (budget, timeline, specific needs)
+- Level 4 (Bottom): 3-4 steps - Final outcomes (close, follow-up, nurture, end)
 
-Make the conversation natural and casual (like real texting), avoid being too salesy or formal. The goal is to qualify leads and move them forward through the entire sales process.
+Each step should have:
+1. A SHORT message from the sender (1-2 sentences max - keep it concise like real texting)
+2. 2-4 possible response categories (not always 4 - vary it to create pyramid shape)
+3. For each response, a brief follow-up message
+
+IMPORTANT: Make steps progressively smaller and more targeted as you go deeper:
+- Early steps = broader questions, more options
+- Later steps = specific, focused questions with fewer options
+- Create natural narrowing from general interest → specific qualification → final action
+
+Make messages ultra-concise and conversational. Think: "Hey, interested in life insurance?" not paragraphs.
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
