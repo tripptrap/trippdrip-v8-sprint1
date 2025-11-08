@@ -75,13 +75,22 @@ Context:
 - What they're offering: ${context.whatOffering}
 - Who they're texting: ${context.whoTexting}
 - Flow name: ${flowName}
+- Qualifying questions: ${context.qualifyingQuestions}
 
-Create a professional, effective conversation flow with 2-3 steps. Each step should have:
+Create a COMPREHENSIVE, professional conversation flow with 5-8 steps that covers the FULL sales journey from initial contact to close. Each step should have:
 1. A message from the sender (keep it concise, friendly, and natural - like a real text)
 2. Four possible response categories that a lead might give
 3. For each response category, a follow-up message
 
-Make the conversation natural and casual (like real texting), avoid being too salesy or formal. The goal is to qualify leads and move them forward.
+The flow should progress through these stages:
+- Step 1: Initial introduction and value proposition
+- Step 2: Gauge interest and identify pain points
+- Step 3-4: Ask qualifying questions (budget, timeline, needs)
+- Step 5-6: Handle objections and provide social proof
+- Step 7: Push for appointment/next step
+- Step 8: Final close or follow-up scheduling
+
+Make the conversation natural and casual (like real texting), avoid being too salesy or formal. The goal is to qualify leads and move them forward through the entire sales process.
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
@@ -134,7 +143,7 @@ Important:
           { role: "user", content: prompt }
         ],
         temperature: 0.8,
-        max_tokens: 2000,
+        max_tokens: 4000,
       }),
     });
 
