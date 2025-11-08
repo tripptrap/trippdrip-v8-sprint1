@@ -150,22 +150,22 @@ The drips should be contextual to your custom response and help re-engage if the
           }, { status: 400 });
         }
 
-        // Check if this response has a nextStepId to follow
+        // Always use the followUpMessage for the matched response
+        agentResponse = matchedResponse.followUpMessage;
+
+        // Check if this response has a nextStepId to follow for FUTURE messages
         if (matchedResponse.nextStepId) {
           const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
           if (targetStepIndex >= 0) {
+            // We'll advance to this step, but keep showing the followUp message now
             nextStepIndex = targetStepIndex;
             shouldMoveToNextStep = true;
-            // If moving to next step, use that step's message (not the followUp)
-            agentResponse = allSteps[targetStepIndex].yourMessage;
           } else {
-            // Invalid nextStepId, use followUp instead
-            agentResponse = matchedResponse.followUpMessage;
+            // Invalid nextStepId, stay on current step
             nextStepIndex = currentStepIndex;
           }
         } else {
-          // No nextStepId means we stay on current step and just show the followUp
-          agentResponse = matchedResponse.followUpMessage;
+          // No nextStepId means we stay on current step
           nextStepIndex = currentStepIndex;
         }
 
