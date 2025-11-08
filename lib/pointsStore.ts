@@ -195,16 +195,16 @@ export function getUsageStats(days: number = 7): {
   cutoff.setDate(cutoff.getDate() - days);
 
   const recentTransactions = data.transactions.filter(t =>
-    new Date(t.timestamp) > cutoff
+    new Date(t.created_at) > cutoff
   );
 
   const totalSpent = recentTransactions
-    .filter(t => t.type === 'spend')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .filter(t => t.action_type === 'spend')
+    .reduce((sum, t) => sum + Math.abs(t.points_amount), 0);
 
   const totalEarned = recentTransactions
-    .filter(t => t.type === 'earn' || t.type === 'purchase')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t.action_type === 'earn' || t.action_type === 'purchase')
+    .reduce((sum, t) => sum + t.points_amount, 0);
 
   const avgDailySpend = totalSpent / days;
   const daysRemaining = avgDailySpend > 0 ? Math.floor(data.balance / avgDailySpend) : 999;
