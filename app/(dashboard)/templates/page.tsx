@@ -252,11 +252,13 @@ export default function FlowsPage() {
       const greenColor = '#10B981'; // Green for last step
       const isLastStep = index === steps.length - 1;
       const color = isLastStep ? greenColor : colors[index % colors.length];
+      const newStepId = `step-${index + 1}`;
 
       return {
         ...step,
+        id: newStepId,
         tag: {
-          label: step.id || `step-${index + 1}`,
+          label: newStepId,
           color: color
         }
       };
@@ -340,9 +342,12 @@ export default function FlowsPage() {
       return;
     }
 
+    const filteredSteps = selectedFlow.steps.filter(s => s.id !== stepId);
+    const renumberedSteps = renumberSteps(filteredSteps);
+
     const updatedFlow = {
       ...selectedFlow,
-      steps: selectedFlow.steps.filter(s => s.id !== stepId),
+      steps: renumberedSteps,
       updatedAt: new Date().toISOString()
     };
 
