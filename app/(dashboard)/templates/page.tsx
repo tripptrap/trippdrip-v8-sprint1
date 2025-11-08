@@ -31,6 +31,7 @@ type ConversationFlow = {
   steps: FlowStep[];
   createdAt: string;
   updatedAt: string;
+  isAIGenerated?: boolean; // Track if flow was created with AI
 };
 
 function loadFlows(): ConversationFlow[] {
@@ -98,6 +99,8 @@ export default function FlowsPage() {
     dripSequence: []
   });
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
+  const [editingFlowName, setEditingFlowName] = useState(false);
+  const [tempFlowName, setTempFlowName] = useState("");
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -633,7 +636,7 @@ export default function FlowsPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowNewFlowDialog(true)}
-            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 border border-blue-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + AI Flow
           </button>
@@ -645,14 +648,15 @@ export default function FlowsPage() {
                 name: "Untitled Flow",
                 steps: [],
                 createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                isAIGenerated: false
               };
               const updatedFlows = [...flows, newFlow];
               setFlows(updatedFlows);
               saveFlows(updatedFlows);
               setSelectedFlow(newFlow);
             }}
-            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-purple-600 hover:bg-purple-700 border border-purple-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + Manual Flow
           </button>
@@ -830,11 +834,64 @@ export default function FlowsPage() {
               {flows.map(flow => (
                 <div
                   key={flow.id}
-                  className={`p-3 cursor-pointer hover:bg-white/5 ${selectedFlow?.id === flow.id ? 'bg-white/10' : ''}`}
+                  className={`p-3 cursor-pointer hover:bg-white/5 ${
+                    selectedFlow?.id === flow.id ? 'bg-white/10' : ''
+                  } ${
+                    flow.isAIGenerated !== false
+                      ? 'border-l-2 border-blue-500/50'
+                      : 'border-l-2 border-purple-500/50'
+                  }`}
                   onClick={() => setSelectedFlow(flow)}
                 >
-                  <div className="font-medium text-sm text-white">{flow.name}</div>
-                  <div className="text-xs text-[var(--muted)]">{flow.steps.length} steps</div>
+                  {editingFlowName && selectedFlow?.id === flow.id ? (
+                    <input
+                      type="text"
+                      value={tempFlowName}
+                      onChange={(e) => setTempFlowName(e.target.value)}
+                      onBlur={() => {
+                        if (tempFlowName.trim()) {
+                          const updatedFlow = { ...flow, name: tempFlowName.trim(), updatedAt: new Date().toISOString() };
+                          const updatedFlows = flows.map(f => f.id === flow.id ? updatedFlow : f);
+                          setFlows(updatedFlows);
+                          saveFlows(updatedFlows);
+                          setSelectedFlow(updatedFlow);
+                        }
+                        setEditingFlowName(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        } else if (e.key === 'Escape') {
+                          setTempFlowName(flow.name);
+                          setEditingFlowName(false);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-medium text-sm text-white bg-white/10 border border-white/20 rounded px-2 py-1 w-full focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <div
+                      className="font-medium text-sm text-white flex items-center justify-between group"
+                      onClick={(e) => {
+                        if (selectedFlow?.id === flow.id) {
+                          e.stopPropagation();
+                          setTempFlowName(flow.name);
+                          setEditingFlowName(true);
+                        }
+                      }}
+                    >
+                      <span>{flow.name}</span>
+                      {selectedFlow?.id === flow.id && (
+                        <span className="text-xs text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                          click to edit
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="text-xs text-[var(--muted)] mt-1">
+                    {flow.steps.length} steps • {flow.isAIGenerated !== false ? 'AI' : 'Manual'}
+                  </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteFlow(flow.id); }}
                     className="text-red-400 text-xs hover:text-red-300 mt-1"
@@ -935,13 +992,13 @@ export default function FlowsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={startTestFlow}
-                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
+                      className="bg-green-600 hover:bg-green-700 border border-green-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
                       Test
                     </button>
                     <button
                       onClick={addStep}
-                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
+                      className="bg-blue-600 hover:bg-blue-700 border border-blue-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
                       + AI Step
                     </button>
@@ -956,7 +1013,7 @@ export default function FlowsPage() {
                         setEditingStepIndex(-1);
                         setShowManualStepDialog(true);
                       }}
-                      className="bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
+                      className="bg-purple-600 hover:bg-purple-700 border border-purple-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
                     >
                       + Manual Step
                     </button>
