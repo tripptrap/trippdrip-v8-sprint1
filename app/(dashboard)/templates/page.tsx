@@ -538,8 +538,24 @@ export default function FlowsPage() {
       if (data.agentResponse) {
         setTestMessages(prev => [...prev, { role: 'agent', text: data.agentResponse, timestamp: formatTimestamp(now) }]);
 
+        // Check if this is a custom response with custom drips
+        if (data.isCustomResponse && data.customDrips && data.customDrips.length > 0) {
+          // Set up custom drip sequence
+          const newDrips: Array<{message: string, scheduledFor: Date}> = [];
+
+          data.customDrips.forEach((drip: any) => {
+            const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
+            const businessHourTime = getNextBusinessHour(scheduledTime);
+            newDrips.push({
+              message: drip.message,
+              scheduledFor: businessHourTime
+            });
+          });
+
+          setPendingDrips(newDrips);
+        }
         // Update current step if AI determined we should move to next step
-        if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
+        else if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
           setCurrentStepIndex(data.nextStepIndex);
 
           // Set up drip sequence for new step

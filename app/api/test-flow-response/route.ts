@@ -68,8 +68,21 @@ Return ONLY valid JSON (no markdown):
 {
   "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}, OR null if generating custom>,
   "customResponse": "<your custom response text, only if matchedResponseIndex is null>",
+  "customDrips": [
+    {
+      "message": "First follow-up if no response after 3-4 hours",
+      "delayHours": 3
+    },
+    {
+      "message": "Second follow-up if still no response",
+      "delayHours": 27
+    }
+  ],
   "reasoning": "<1-2 sentences explaining your choice>"
-}`;
+}
+
+IMPORTANT: If generating a customResponse, you MUST also provide customDrips array with 2-3 follow-up messages.
+The drips should be contextual to your custom response and help re-engage if the client doesn't reply.`;
 
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -165,7 +178,8 @@ Return ONLY valid JSON (no markdown):
         reasoning: aiDecision.reasoning,
         matchedResponseIndex: aiDecision.matchedResponseIndex,
         shouldAdvanceToNextStep: shouldMoveToNextStep,
-        isCustomResponse: aiDecision.matchedResponseIndex === null
+        isCustomResponse: aiDecision.matchedResponseIndex === null,
+        customDrips: aiDecision.customDrips || []
       });
 
     } catch (parseError) {
