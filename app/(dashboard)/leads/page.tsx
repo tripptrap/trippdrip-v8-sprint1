@@ -751,7 +751,7 @@ export default function LeadsPage() {
   return (
     <div className="min-h-screen bg-[#0b0f14] text-[#e7eef9]">
       <div className="sticky top-0 z-20 border-b border-[#152133] bg-[#0d121a] px-5 py-3">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between">
+        <div className="mx-auto flex items-center justify-between">
           <div className="font-semibold text-[#9fb0c3]">Welcome back 👋</div>
           <div className="text-xs text-[#9fb0c3]">v8 Sprint 1</div>
         </div>
@@ -763,7 +763,7 @@ export default function LeadsPage() {
         </div>
       )}
 
-      <div className="mx-auto max-w-[1200px] p-4 space-y-4">
+      <div className="p-4 space-y-4 w-full overflow-x-auto">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="m-0 text-xl font-semibold">Leads</h2>
           <div className="flex gap-2 relative">
