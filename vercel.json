@@ -1,3 +1,14 @@
 {
-  "crons": []
+  "crons": [],
+  "headers": [
+    {
+      "source": "/api/stripe/webhook",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    }
+  ]
 }
