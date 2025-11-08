@@ -237,6 +237,42 @@ export default function FlowsPage() {
     saveFlows(updatedFlows);
   }
 
+  function insertStepAfter(afterIndex: number) {
+    if (!selectedFlow) return;
+
+    const newStep: FlowStep = {
+      id: "step-" + Date.now(),
+      yourMessage: "Your next message here...",
+      responses: [
+        { label: "Response 1", followUpMessage: "Your reply to Response 1..." },
+        { label: "Response 2", followUpMessage: "Your reply to Response 2..." },
+        { label: "Response 3", followUpMessage: "Your reply to Response 3..." },
+        { label: "Response 4", followUpMessage: "Your reply to Response 4..." }
+      ],
+      tag: {
+        label: `Step ${afterIndex + 2}`,
+        color: "#3B82F6" // Blue default
+      }
+    };
+
+    const newSteps = [...selectedFlow.steps];
+    newSteps.splice(afterIndex + 1, 0, newStep);
+
+    const updatedFlow = {
+      ...selectedFlow,
+      steps: newSteps,
+      updatedAt: new Date().toISOString()
+    };
+
+    setSelectedFlow(updatedFlow);
+
+    const updatedFlows = flows.map(f =>
+      f.id === selectedFlow.id ? updatedFlow : f
+    );
+    setFlows(updatedFlows);
+    saveFlows(updatedFlows);
+  }
+
   function deleteStep(stepId: string) {
     if (!selectedFlow) return;
     if (selectedFlow.steps.length <= 1) {
@@ -432,24 +468,44 @@ export default function FlowsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
-                  <div className="text-sm text-[var(--muted)]">
-                    Define your messages and the 4 possible response categories
+            <div className="grid grid-cols-12 gap-4">
+              {/* Left sidebar: Rebuttal/Alternate Steps */}
+              <div className="col-span-12 lg:col-span-4 space-y-3">
+                <div className="text-sm font-semibold text-amber-400 mb-2">
+                  📋 Rebuttal & Alternate Paths
+                </div>
+                <div className="text-xs text-[var(--muted)] mb-4">
+                  Response handling for objections, questions, and alternate scenarios
+                </div>
+                {/* Rebuttal steps will be populated here - for now showing placeholder */}
+                <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10">
+                  <div className="text-xs text-amber-300">
+                    Click "Client Response Options" on any step to view and edit rebuttal paths
                   </div>
                 </div>
-                <button
-                  onClick={addStep}
-                  className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm text-white font-medium"
-                >
-                  + Add Step
-                </button>
               </div>
 
-              {selectedFlow.steps.map((step, stepIndex) => (
-                <div key={step.id} className="border border-white/10 rounded-xl p-4 bg-white/5">
+              {/* Right: Main Flow Steps */}
+              <div className="col-span-12 lg:col-span-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
+                    <div className="text-sm text-[var(--muted)]">
+                      Main flow - optimal path to close
+                    </div>
+                  </div>
+                  <button
+                    onClick={addStep}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm text-white font-medium"
+                  >
+                    + Add Step at End
+                  </button>
+                </div>
+
+                {selectedFlow.steps.map((step, stepIndex) => (
+                  <div key={step.id}>
+                    {/* Main Step Card */}
+                <div className="border border-white/10 rounded-xl p-4 bg-white/5">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-bold text-white/60">STEP {stepIndex + 1}</div>
@@ -564,7 +620,24 @@ export default function FlowsPage() {
                     )}
                   </div>
                 </div>
-              ))}
+
+                    {/* Insert Step Button */}
+                    {stepIndex < selectedFlow.steps.length - 1 && (
+                      <div className="flex justify-center my-2">
+                        <button
+                          onClick={() => insertStepAfter(stepIndex)}
+                          className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 text-green-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Insert Step Here
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
