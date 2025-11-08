@@ -101,6 +101,7 @@ export default function FlowsPage() {
   const [showManualFlowDialog, setShowManualFlowDialog] = useState(false);
   const [manualFlowName, setManualFlowName] = useState("");
   const [manualFlowMessage, setManualFlowMessage] = useState("");
+  const [manualFlowSteps, setManualFlowSteps] = useState<string[]>([]);
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
@@ -1359,41 +1360,96 @@ export default function FlowsPage() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">First Message *</label>
+                <label className="text-sm font-medium text-white mb-2 block">
+                  {manualFlowSteps.length === 0 ? 'First Message *' : 'Next Message *'}
+                </label>
                 <textarea
-                  placeholder="Enter your first message to the client..."
+                  placeholder="Enter message to the client..."
                   value={manualFlowMessage}
                   onChange={e => setManualFlowMessage(e.target.value)}
                   className="input-dark w-full px-4 py-3 rounded-lg resize-none"
                   rows={4}
                 />
                 <p className="text-xs text-[var(--muted)] mt-1">
-                  This will be the first message sent in your flow
+                  {manualFlowSteps.length === 0
+                    ? 'This will be the first message sent in your flow'
+                    : `This will be step ${manualFlowSteps.length + 1} in your flow`
+                  }
                 </p>
               </div>
+
+              {manualFlowSteps.length > 0 && (
+                <div className="border border-white/20 rounded-lg p-3">
+                  <div className="text-sm font-medium text-white mb-2">Steps Added ({manualFlowSteps.length})</div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {manualFlowSteps.map((step, index) => (
+                      <div key={index} className="flex items-start gap-2 text-sm bg-white/5 p-2 rounded">
+                        <span className="text-white/60 font-medium">{index + 1}.</span>
+                        <span className="text-white/80 flex-1 line-clamp-2">{step}</span>
+                        <button
+                          onClick={() => {
+                            const updatedSteps = manualFlowSteps.filter((_, i) => i !== index);
+                            setManualFlowSteps(updatedSteps);
+                          }}
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => {
-                    if (!manualFlowName.trim() || !manualFlowMessage.trim()) {
-                      alert("Please enter both a flow name and message");
+                    if (!manualFlowMessage.trim()) {
+                      alert("Please enter a message");
+                      return;
+                    }
+
+                    // Add step to the list
+                    setManualFlowSteps([...manualFlowSteps, manualFlowMessage]);
+                    setManualFlowMessage("");
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                  disabled={!manualFlowMessage.trim()}
+                >
+                  + Add Another Step
+                </button>
+                <button
+                  onClick={() => {
+                    if (!manualFlowName.trim()) {
+                      alert("Please enter a flow name");
+                      return;
+                    }
+
+                    if (manualFlowSteps.length === 0 && !manualFlowMessage.trim()) {
+                      alert("Please add at least one step");
                       return;
                     }
 
                     const flowId = `flow-${Date.now()}`;
-                    const stepId = `step-${Date.now()}`;
 
-                    const firstStep: FlowStep = {
-                      id: stepId,
-                      yourMessage: manualFlowMessage,
+                    // Collect all steps (existing steps + current message if any)
+                    const allStepMessages = [...manualFlowSteps];
+                    if (manualFlowMessage.trim()) {
+                      allStepMessages.push(manualFlowMessage);
+                    }
+
+                    // Create FlowStep objects
+                    const steps: FlowStep[] = allStepMessages.map((msg, index) => ({
+                      id: `step-${Date.now()}-${index}`,
+                      yourMessage: msg,
                       responses: [],
                       dripSequence: []
-                    };
+                    }));
 
                     const newFlow: ConversationFlow = {
                       id: flowId,
                       name: manualFlowName,
-                      steps: [firstStep],
+                      steps: steps,
                       createdAt: new Date().toISOString(),
                       updatedAt: new Date().toISOString(),
                       isAIGenerated: false
@@ -1407,9 +1463,10 @@ export default function FlowsPage() {
                     setShowManualFlowDialog(false);
                     setManualFlowName("");
                     setManualFlowMessage("");
+                    setManualFlowSteps([]);
                   }}
                   className="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50"
-                  disabled={!manualFlowName.trim() || !manualFlowMessage.trim()}
+                  disabled={!manualFlowName.trim() || (manualFlowSteps.length === 0 && !manualFlowMessage.trim())}
                 >
                   Create Flow
                 </button>
@@ -1418,6 +1475,7 @@ export default function FlowsPage() {
                     setShowManualFlowDialog(false);
                     setManualFlowName("");
                     setManualFlowMessage("");
+                    setManualFlowSteps([]);
                   }}
                   className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
                 >
