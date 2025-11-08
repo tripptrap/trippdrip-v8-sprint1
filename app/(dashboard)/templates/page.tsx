@@ -69,6 +69,7 @@ export default function FlowsPage() {
     clientGoals: ""
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -234,6 +235,18 @@ export default function FlowsPage() {
     );
     setFlows(updatedFlows);
     saveFlows(updatedFlows);
+  }
+
+  function toggleStepExpansion(stepId: string) {
+    setExpandedSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepId)) {
+        newSet.delete(stepId);
+      } else {
+        newSet.add(stepId);
+      }
+      return newSet;
+    });
   }
 
   return (
@@ -485,32 +498,48 @@ export default function FlowsPage() {
                     />
                   </div>
 
-                  {/* 4 Response Options */}
+                  {/* 4 Response Options - Collapsible */}
                   <div>
-                    <div className="text-sm font-medium mb-3 text-blue-400">Client Response Options:</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {step.responses.map((response, responseIndex) => (
-                        <div key={responseIndex} className="border border-blue-500/30 rounded-lg p-3 bg-blue-500/10">
-                          <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
+                    <button
+                      onClick={() => toggleStepExpansion(step.id)}
+                      className="w-full flex items-center justify-between text-sm font-medium mb-3 text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      <span>Client Response Options ({step.responses.length})</span>
+                      <svg
+                        className={`w-5 h-5 transition-transform ${expandedSteps.has(step.id) ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
 
-                          <input
-                            type="text"
-                            value={response.label}
-                            onChange={e => updateResponse(step.id, responseIndex, { label: e.target.value })}
-                            className="input-dark w-full px-3 py-2 rounded-lg text-sm mb-2"
-                            placeholder="Label (e.g., 'Interested')"
-                          />
+                    {expandedSteps.has(step.id) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {step.responses.map((response, responseIndex) => (
+                          <div key={responseIndex} className="border border-blue-500/30 rounded-lg p-3 bg-blue-500/10">
+                            <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
 
-                          <div className="text-xs text-[var(--muted)] mb-1">Your reply if they say this:</div>
-                          <textarea
-                            value={response.followUpMessage}
-                            onChange={e => updateResponse(step.id, responseIndex, { followUpMessage: e.target.value })}
-                            className="input-dark w-full px-3 py-2 rounded-lg text-sm min-h-[70px]"
-                            placeholder="Your follow-up message..."
-                          />
-                        </div>
-                      ))}
-                    </div>
+                            <input
+                              type="text"
+                              value={response.label}
+                              onChange={e => updateResponse(step.id, responseIndex, { label: e.target.value })}
+                              className="input-dark w-full px-3 py-2 rounded-lg text-sm mb-2"
+                              placeholder="Label (e.g., 'Interested')"
+                            />
+
+                            <div className="text-xs text-[var(--muted)] mb-1">Your reply if they say this:</div>
+                            <textarea
+                              value={response.followUpMessage}
+                              onChange={e => updateResponse(step.id, responseIndex, { followUpMessage: e.target.value })}
+                              className="input-dark w-full px-3 py-2 rounded-lg text-sm min-h-[70px]"
+                              placeholder="Your follow-up message..."
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
