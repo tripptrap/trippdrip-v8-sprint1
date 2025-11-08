@@ -65,10 +65,10 @@ export function getDefaultPoints(): PointsData {
     transactions: [
       {
         id: Date.now().toString(),
-        type: 'earn',
-        amount: 1000,
+        action_type: 'earn',
+        points_amount: 1000,
         description: 'Monthly renewal - Basic plan',
-        timestamp: new Date().toISOString()
+        created_at: new Date().toISOString()
       }
     ],
     lastRenewal: new Date().toISOString(),
@@ -85,10 +85,10 @@ export function addPoints(amount: number, description: string, type: 'earn' | 'p
   data.balance += amount;
   data.transactions.unshift({
     id: Date.now().toString(),
-    type,
-    amount,
+    action_type: type,
+    points_amount: amount,
     description,
-    timestamp: new Date().toISOString()
+    created_at: new Date().toISOString()
   });
 
   savePoints(data);
@@ -105,11 +105,10 @@ export function spendPoints(amount: number, description: string, actionType?: Ac
   data.balance -= amount;
   data.transactions.unshift({
     id: Date.now().toString(),
-    type: 'spend',
-    amount: -amount,
+    action_type: 'spend',
+    points_amount: -amount,
     description,
-    timestamp: new Date().toISOString(),
-    actionType
+    created_at: new Date().toISOString()
   });
 
   savePoints(data);
