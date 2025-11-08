@@ -648,7 +648,7 @@ export default function PointsPage() {
 
       {/* Celebration Popup */}
       {showCelebration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 md:left-64 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative bg-gradient-to-br from-purple-600 to-pink-600 p-8 rounded-2xl shadow-2xl max-w-md text-center">
             {/* Fireworks Animation */}
             <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">

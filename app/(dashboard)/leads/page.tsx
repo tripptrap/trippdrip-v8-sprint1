@@ -1109,7 +1109,7 @@ export default function LeadsPage() {
 
       {/* Upload modal */}
       {open && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
           <div className="w-full max-w-5xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Upload Leads</div>
@@ -1242,7 +1242,7 @@ export default function LeadsPage() {
 
       {/* Run Campaign modal — campaign must be chosen from saved list */}
       {runOpen && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
           <div className="w-full max-w-xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Run Campaign</div>
@@ -1300,7 +1300,7 @@ export default function LeadsPage() {
 
       {/* Bulk Action Modals */}
       {bulkActionModal === 'status' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Update Status</div>
@@ -1338,7 +1338,7 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'disposition' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Update Disposition</div>
@@ -1378,7 +1378,7 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'addTags' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Add Tags</div>
@@ -1413,7 +1413,7 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'removeTags' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Remove Tags</div>
@@ -1448,7 +1448,7 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'createFollowUps' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[500px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Create Follow-ups</div>
@@ -1521,7 +1521,7 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'delete' && (
-        <div className="fixed inset-0 z-40 flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[300px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#ff6b6b]">Delete Leads</div>

@@ -367,7 +367,7 @@ export default function FollowUpsPage() {
 
       {/* Suggestions Panel */}
       {showSuggestionsPanel && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
           <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6 border-b border-[#1a2637]">
               <div className="flex items-center justify-between">
@@ -427,7 +427,7 @@ export default function FollowUpsPage() {
 
       {/* Create/Edit Modal - Simplified for now */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
           <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg p-6 max-w-md w-full">
             <h2 className="text-xl font-semibold mb-4 text-[#e7eef9]">Create Follow-up</h2>
             <p className="text-sm text-[#9fb0c3] mb-4">
