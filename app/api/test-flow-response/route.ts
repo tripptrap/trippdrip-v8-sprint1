@@ -138,10 +138,7 @@ Return ONLY valid JSON (no markdown):
           nextStepIndex = currentStepIndex;
         }
 
-        // Check if action is 'end'
-        if (matchedResponse.action === 'end') {
-          agentResponse += "\n\nThank you for your time. Have a great day!";
-        }
+        // Note: We don't force-end conversations anymore. The AI can handle all responses naturally.
       }
 
       return NextResponse.json({
