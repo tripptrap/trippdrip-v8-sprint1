@@ -70,6 +70,9 @@ export default function FlowsPage() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [showStepDialog, setShowStepDialog] = useState(false);
+  const [stepPurpose, setStepPurpose] = useState("");
+  const [insertAfterIndex, setInsertAfterIndex] = useState<number>(-1);
 
   useEffect(() => {
     setFlows(loadFlows());
@@ -238,39 +241,96 @@ export default function FlowsPage() {
   }
 
   function insertStepAfter(afterIndex: number) {
-    if (!selectedFlow) return;
+    setInsertAfterIndex(afterIndex);
+    setShowStepDialog(true);
+  }
 
-    const newStep: FlowStep = {
-      id: "step-" + Date.now(),
-      yourMessage: "Your next message here...",
-      responses: [
-        { label: "Response 1", followUpMessage: "Your reply to Response 1..." },
-        { label: "Response 2", followUpMessage: "Your reply to Response 2..." },
-        { label: "Response 3", followUpMessage: "Your reply to Response 3..." },
-        { label: "Response 4", followUpMessage: "Your reply to Response 4..." }
-      ],
-      tag: {
-        label: `Step ${afterIndex + 2}`,
-        color: "#3B82F6" // Blue default
+  function renumberSteps(steps: FlowStep[]): FlowStep[] {
+    return steps.map((step, index) => {
+      // Determine color based on position
+      const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange
+      const greenColor = '#10B981'; // Green for last step
+      const isLastStep = index === steps.length - 1;
+      const color = isLastStep ? greenColor : colors[index % colors.length];
+
+      return {
+        ...step,
+        tag: {
+          label: step.id || `step-${index + 1}`,
+          color: color
+        }
+      };
+    });
+  }
+
+  async function generateAndInsertStep() {
+    if (!selectedFlow || !stepPurpose.trim()) {
+      alert("Please describe what this step is for");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const previousStep = insertAfterIndex >= 0 ? selectedFlow.steps[insertAfterIndex] : null;
+      const nextStep = insertAfterIndex < selectedFlow.steps.length - 1 ? selectedFlow.steps[insertAfterIndex + 1] : null;
+
+      const response = await fetch("/api/generate-step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepPurpose: stepPurpose.trim(),
+          flowContext: flowContext,
+          previousStep,
+          nextStep
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.yourMessage) {
+        const newStep: FlowStep = {
+          id: "step-" + Date.now(),
+          yourMessage: data.yourMessage,
+          responses: data.responses || [],
+          tag: {
+            label: `step-${insertAfterIndex + 2}`,
+            color: "#3B82F6"
+          }
+        };
+
+        const newSteps = [...selectedFlow.steps];
+        newSteps.splice(insertAfterIndex + 1, 0, newStep);
+
+        // Renumber all steps with correct colors
+        const renumberedSteps = renumberSteps(newSteps);
+
+        const updatedFlow = {
+          ...selectedFlow,
+          steps: renumberedSteps,
+          updatedAt: new Date().toISOString()
+        };
+
+        setSelectedFlow(updatedFlow);
+
+        const updatedFlows = flows.map(f =>
+          f.id === selectedFlow.id ? updatedFlow : f
+        );
+        setFlows(updatedFlows);
+        saveFlows(updatedFlows);
+
+        setStepPurpose("");
+        setShowStepDialog(false);
+        setInsertAfterIndex(-1);
+      } else {
+        alert(data.error || "Failed to generate step. Please try again.");
       }
-    };
-
-    const newSteps = [...selectedFlow.steps];
-    newSteps.splice(afterIndex + 1, 0, newStep);
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: newSteps,
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows);
+    } catch (error) {
+      console.error("Error generating step:", error);
+      alert("Error generating step. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   function deleteStep(stepId: string) {
@@ -321,6 +381,57 @@ export default function FlowsPage() {
           + New Flow
         </button>
       </div>
+
+      {showStepDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card max-w-lg w-full mx-4">
+            <div className="space-y-4">
+              <div>
+                <div className="text-lg font-semibold text-white">Generate New Step with AI</div>
+                <div className="text-sm text-[var(--muted)] mt-1">
+                  Describe what this step should accomplish (1 point)
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white mb-2 block">Step Purpose *</label>
+                <textarea
+                  placeholder="e.g., 'Ask about their budget range', 'Handle price objection', 'Qualify timeline'"
+                  value={stepPurpose}
+                  onChange={e => setStepPurpose(e.target.value)}
+                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Be specific about what this step should ask or accomplish
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={generateAndInsertStep}
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isGenerating || !stepPurpose.trim()}
+                >
+                  {isGenerating ? "Generating Step..." : "Generate Step (1 pt)"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowStepDialog(false);
+                    setStepPurpose("");
+                    setInsertAfterIndex(-1);
+                  }}
+                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                  disabled={isGenerating}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNewFlowDialog && (
         <div className="card">
