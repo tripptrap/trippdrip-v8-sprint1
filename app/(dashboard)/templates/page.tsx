@@ -546,9 +546,8 @@ export default function FlowsPage() {
           setCollectedInfo(prev => ({ ...prev, ...data.extractedInfo }));
         }
 
-        // Check if this is a custom response with custom drips
-        if (data.isCustomResponse && data.customDrips && data.customDrips.length > 0) {
-          // Set up custom drip sequence
+        // ALWAYS set up drips if AI provided them (for both custom and preset responses)
+        if (data.customDrips && data.customDrips.length > 0) {
           const newDrips: Array<{message: string, scheduledFor: Date}> = [];
 
           data.customDrips.forEach((drip: any) => {
@@ -562,26 +561,10 @@ export default function FlowsPage() {
 
           setPendingDrips(newDrips);
         }
+
         // Update current step if AI determined we should move to next step
-        else if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
+        if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
           setCurrentStepIndex(data.nextStepIndex);
-
-          // Set up drip sequence for new step
-          const newStep = selectedFlow.steps[data.nextStepIndex];
-          if (newStep.dripSequence && newStep.dripSequence.length > 0) {
-            const newDrips: Array<{message: string, scheduledFor: Date}> = [];
-
-            newStep.dripSequence.forEach(drip => {
-              const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
-              const businessHourTime = getNextBusinessHour(scheduledTime);
-              newDrips.push({
-                message: drip.message,
-                scheduledFor: businessHourTime
-              });
-            });
-
-            setPendingDrips(newDrips);
-          }
         }
       } else {
         setTestMessages(prev => [...prev, { role: 'agent', text: "I'm not sure how to respond to that. Let me try another approach...", timestamp: formatTimestamp(now) }]);

@@ -71,9 +71,10 @@ EXTRACT KEY INFORMATION from the client's responses:
 - Example: "im looking for coverage for myself" → Extract: Number of people = 1
 - Example: "i dont have any" (about coverage) → Extract: Current coverage = None
 - Example: "my wife and 2 kids" → Extract: Number of people = 4 (including client)
-- Example: "35m, 34f, 12f, 6m" → Extract: Ages and genders = "35 (Male), 34 (Female), 12 (Female), 6 (Male)", Number of people = 4
-- Example: "32776" or "zip is 32776" → Extract: Zip code = 32776
+- Example: "35m, 34f, 12f, 6m" → Extract: "Ages and genders": "35 (Male), 34 (Female), 12 (Female), 6 (Male)", "Number of people": "4"
+- Example: "32776" or "zip is 32776" → Extract: "Zip code": "32776"
 - Parse gender notation: "m" = Male, "f" = Female
+- IMPORTANT: All values in extractedInfo MUST be strings, never objects or arrays
 - Return extracted info in the "extractedInfo" field with clear, readable formatting
 
 When generating custom responses:
@@ -99,13 +100,15 @@ Return ONLY valid JSON (no markdown):
     }
   ],
   "extractedInfo": {
-    "key": "value"
+    "key": "value as string only"
   },
   "reasoning": "<1-2 sentences explaining your choice>"
 }
 
-IMPORTANT: If generating a customResponse, you MUST also provide customDrips array with 2-3 follow-up messages.
-The drips should be contextual to your custom response and help re-engage if the client doesn't reply.`;
+CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-up messages.
+- Whether you use a preset response OR generate a custom one, ALWAYS include drips
+- The drips should be contextual to what was just said and help re-engage if the client doesn't reply
+- Make drips natural and conversational, not pushy`;
 
     const apiKey = process.env.OPENAI_API_KEY;
 
