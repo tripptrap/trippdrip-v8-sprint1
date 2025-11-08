@@ -674,7 +674,7 @@ export default function FlowsPage() {
       </div>
 
       {showStepDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
           <div className="card max-w-lg w-full mx-4">
             <div className="space-y-4">
               <div>
@@ -725,8 +725,8 @@ export default function FlowsPage() {
       )}
 
       {showNewFlowDialog && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl ml-0 md:ml-0">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -1165,7 +1165,7 @@ export default function FlowsPage() {
 
       {/* Test Flow Chat Modal */}
       {showTestFlow && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
           <div className="card max-w-2xl w-full max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
               <div>
@@ -1322,7 +1322,7 @@ export default function FlowsPage() {
 
       {/* Manual Flow Creation Dialog */}
       {showManualFlowDialog && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4">
           <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
@@ -1486,7 +1486,7 @@ export default function FlowsPage() {
 
       {/* Manual Step Editor Dialog */}
       {showManualStepDialog && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
           <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-2xl w-full my-8 shadow-2xl">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
