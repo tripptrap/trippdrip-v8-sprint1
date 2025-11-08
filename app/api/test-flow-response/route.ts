@@ -39,16 +39,18 @@ ${currentStep.responses.map((r: any, i: number) => `${i}. ${r.label}: "${r.follo
 YOUR TASK:
 Analyze the client's response and determine:
 1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, etc.)
-2. Which of your available responses best addresses what they said?
-3. Pick the response index that makes the most sense conversationally
+2. Does one of your available responses address this? If yes, pick that one.
+3. If NONE of the available responses fit well, you can generate a custom response instead.
 
 Think about the natural flow of conversation - if they say "yes" to looking for coverage, use the response that continues helping them.
 If they say they need more info, use that response. If they're not interested, use that one.
+If they ask something unexpected that none of your responses cover, generate a helpful custom response.
 
 Return ONLY valid JSON (no markdown):
 {
-  "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}>,
-  "reasoning": "<1-2 sentences explaining why this response makes sense>"
+  "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}, OR null if generating custom>,
+  "customResponse": "<your custom response text, only if matchedResponseIndex is null>",
+  "reasoning": "<1-2 sentences explaining your choice>"
 }`;
 
     const apiKey = process.env.OPENAI_API_KEY;
@@ -66,7 +68,7 @@ Return ONLY valid JSON (no markdown):
           { role: "user", content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: 800,
       }),
     });
 
@@ -102,37 +104,44 @@ Return ONLY valid JSON (no markdown):
       let agentResponse = "";
       let shouldMoveToNextStep = false;
 
-      // Get the matched response
-      const matchedResponse = currentStep.responses[aiDecision.matchedResponseIndex];
+      // Check if AI generated a custom response
+      if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
+        // Use AI's custom response, stay on current step
+        agentResponse = aiDecision.customResponse;
+        nextStepIndex = currentStepIndex;
+      } else {
+        // Get the matched response
+        const matchedResponse = currentStep.responses[aiDecision.matchedResponseIndex];
 
-      if (!matchedResponse) {
-        return NextResponse.json({
-          error: "Invalid response index"
-        }, { status: 400 });
-      }
+        if (!matchedResponse) {
+          return NextResponse.json({
+            error: "Invalid response index"
+          }, { status: 400 });
+        }
 
-      // Check if this response has a nextStepId to follow
-      if (matchedResponse.nextStepId) {
-        const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
-        if (targetStepIndex >= 0) {
-          nextStepIndex = targetStepIndex;
-          shouldMoveToNextStep = true;
-          // If moving to next step, use that step's message (not the followUp)
-          agentResponse = allSteps[targetStepIndex].yourMessage;
+        // Check if this response has a nextStepId to follow
+        if (matchedResponse.nextStepId) {
+          const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
+          if (targetStepIndex >= 0) {
+            nextStepIndex = targetStepIndex;
+            shouldMoveToNextStep = true;
+            // If moving to next step, use that step's message (not the followUp)
+            agentResponse = allSteps[targetStepIndex].yourMessage;
+          } else {
+            // Invalid nextStepId, use followUp instead
+            agentResponse = matchedResponse.followUpMessage;
+            nextStepIndex = currentStepIndex;
+          }
         } else {
-          // Invalid nextStepId, use followUp instead
+          // No nextStepId means we stay on current step and just show the followUp
           agentResponse = matchedResponse.followUpMessage;
           nextStepIndex = currentStepIndex;
         }
-      } else {
-        // No nextStepId means we stay on current step and just show the followUp
-        agentResponse = matchedResponse.followUpMessage;
-        nextStepIndex = currentStepIndex;
-      }
 
-      // Check if action is 'end'
-      if (matchedResponse.action === 'end') {
-        agentResponse += "\n\nThank you for your time. Have a great day!";
+        // Check if action is 'end'
+        if (matchedResponse.action === 'end') {
+          agentResponse += "\n\nThank you for your time. Have a great day!";
+        }
       }
 
       return NextResponse.json({
@@ -140,7 +149,8 @@ Return ONLY valid JSON (no markdown):
         nextStepIndex: nextStepIndex,
         reasoning: aiDecision.reasoning,
         matchedResponseIndex: aiDecision.matchedResponseIndex,
-        shouldAdvanceToNextStep: shouldMoveToNextStep
+        shouldAdvanceToNextStep: shouldMoveToNextStep,
+        isCustomResponse: aiDecision.matchedResponseIndex === null
       });
 
     } catch (parseError) {
