@@ -111,20 +111,22 @@ Return ONLY valid JSON (no markdown):
         }, { status: 400 });
       }
 
-      // Use the matched response's follow-up message
-      agentResponse = matchedResponse.followUpMessage;
-
       // Check if this response has a nextStepId to follow
       if (matchedResponse.nextStepId) {
         const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
         if (targetStepIndex >= 0) {
           nextStepIndex = targetStepIndex;
           shouldMoveToNextStep = true;
-          // After showing the followUpMessage, move to the target step's message
-          agentResponse += `\n\n${allSteps[targetStepIndex].yourMessage}`;
+          // If moving to next step, use that step's message (not the followUp)
+          agentResponse = allSteps[targetStepIndex].yourMessage;
+        } else {
+          // Invalid nextStepId, use followUp instead
+          agentResponse = matchedResponse.followUpMessage;
+          nextStepIndex = currentStepIndex;
         }
       } else {
         // No nextStepId means we stay on current step and just show the followUp
+        agentResponse = matchedResponse.followUpMessage;
         nextStepIndex = currentStepIndex;
       }
 
