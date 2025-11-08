@@ -938,7 +938,77 @@ export default function FlowsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-12 gap-4">
+              {/* Left sidebar: Rebuttal/Alternate Steps - Only show for AI flows */}
+              {selectedFlow.isAIGenerated !== false && (
+                <div className="col-span-12 lg:col-span-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+                  <div className="sticky top-0 bg-[#0a0a0a] pb-3 z-10 pt-2">
+                    <div className="text-sm font-semibold text-amber-400 mb-2">
+                      📋 Rebuttal & Alternate Paths
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      How objections/questions flow back to main path
+                    </div>
+                  </div>
+
+                  {/* Display response flow navigation */}
+                  {selectedFlow.steps.map((step, stepIndex) => (
+                    <div key={step.id} className="space-y-2">
+                      {step.responses && step.responses.length > 0 && (
+                        <>
+                          <div className="text-xs font-semibold text-amber-300 mt-4 mb-2">
+                            Step {stepIndex + 1} Rebuttals
+                          </div>
+                          {step.responses.map((response, responseIndex) => {
+                            const nextStepId = (response as any).nextStepId;
+                            const action = (response as any).action;
+                            const nextStepIndex = nextStepId
+                              ? selectedFlow.steps.findIndex(s => s.id === nextStepId)
+                              : -1;
+
+                            return (
+                              <div
+                                key={responseIndex}
+                                className="border border-amber-500/30 rounded-lg p-2.5 bg-amber-500/10"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="text-xs font-bold text-amber-400 flex-1">
+                                    {response.label || `Response ${responseIndex + 1}`}
+                                  </div>
+                                  {action === 'end' ? (
+                                    <div className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 whitespace-nowrap">
+                                      ⚠️ Ends
+                                    </div>
+                                  ) : nextStepIndex >= 0 ? (
+                                    <div className="text-[10px] px-2 py-0.5 rounded bg-green-500/20 text-green-400 whitespace-nowrap">
+                                      → Step {nextStepIndex + 1}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 whitespace-nowrap">
+                                      ↻ Loop
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  ))}
+
+                  {selectedFlow.steps.every(s => !s.responses || s.responses.length === 0) && (
+                    <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10">
+                      <div className="text-xs text-amber-300">
+                        No response options yet. Expand "Client Response Options" to add rebuttal paths.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Right: Main Flow Steps */}
+              <div className={selectedFlow.isAIGenerated !== false ? "col-span-12 lg:col-span-8 space-y-4" : "col-span-12 space-y-4"}>
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
@@ -1089,6 +1159,7 @@ export default function FlowsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
             </div>
           )}
         </div>
