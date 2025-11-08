@@ -586,19 +586,51 @@ export default function FlowsPage() {
           ) : (
             <div className="grid grid-cols-12 gap-4">
               {/* Left sidebar: Rebuttal/Alternate Steps */}
-              <div className="col-span-12 lg:col-span-4 space-y-3">
-                <div className="text-sm font-semibold text-amber-400 mb-2">
-                  📋 Rebuttal & Alternate Paths
-                </div>
-                <div className="text-xs text-[var(--muted)] mb-4">
-                  Response handling for objections, questions, and alternate scenarios
-                </div>
-                {/* Rebuttal steps will be populated here - for now showing placeholder */}
-                <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10">
-                  <div className="text-xs text-amber-300">
-                    Click "Client Response Options" on any step to view and edit rebuttal paths
+              <div className="col-span-12 lg:col-span-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div className="sticky top-0 bg-[var(--background)] pb-3 z-10">
+                  <div className="text-sm font-semibold text-amber-400 mb-2">
+                    📋 Rebuttal & Alternate Paths
+                  </div>
+                  <div className="text-xs text-[var(--muted)]">
+                    Response handling for objections, questions, and alternate scenarios
                   </div>
                 </div>
+
+                {/* Display all response options from all steps */}
+                {selectedFlow.steps.map((step, stepIndex) => (
+                  <div key={step.id} className="space-y-2">
+                    {step.responses && step.responses.length > 0 && (
+                      <>
+                        <div className="text-xs font-semibold text-amber-300 mt-4">
+                          From Step {stepIndex + 1}: {step.tag?.label}
+                        </div>
+                        {step.responses.map((response, responseIndex) => (
+                          <div
+                            key={responseIndex}
+                            className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="text-xs font-bold text-amber-400">
+                                {response.label || `Response ${responseIndex + 1}`}
+                              </div>
+                            </div>
+                            <div className="text-xs text-amber-200/80">
+                              {response.followUpMessage || 'No follow-up message'}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                {selectedFlow.steps.every(s => !s.responses || s.responses.length === 0) && (
+                  <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10">
+                    <div className="text-xs text-amber-300">
+                      No response options yet. Expand "Client Response Options" to add rebuttal paths.
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right: Main Flow Steps */}
