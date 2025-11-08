@@ -98,6 +98,9 @@ export default function FlowsPage() {
     responses: [],
     dripSequence: []
   });
+  const [showManualFlowDialog, setShowManualFlowDialog] = useState(false);
+  const [manualFlowName, setManualFlowName] = useState("");
+  const [manualFlowMessage, setManualFlowMessage] = useState("");
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
@@ -641,21 +644,7 @@ export default function FlowsPage() {
             + AI Flow
           </button>
           <button
-            onClick={() => {
-              const flowId = `flow-${Date.now()}`;
-              const newFlow: ConversationFlow = {
-                id: flowId,
-                name: "Untitled Flow",
-                steps: [],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                isAIGenerated: false
-              };
-              const updatedFlows = [...flows, newFlow];
-              setFlows(updatedFlows);
-              saveFlows(updatedFlows);
-              setSelectedFlow(newFlow);
-            }}
+            onClick={() => setShowManualFlowDialog(true)}
             className="bg-purple-600 hover:bg-purple-700 border border-purple-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + Manual Flow
@@ -715,8 +704,8 @@ export default function FlowsPage() {
       )}
 
       {showNewFlowDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -1333,10 +1322,117 @@ export default function FlowsPage() {
         </div>
       )}
 
+      {/* Manual Flow Creation Dialog */}
+      {showManualFlowDialog && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-white">Create New Manual Flow</div>
+                  <div className="text-sm text-[var(--muted)] mt-1">
+                    Create a flow with your first message step
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowManualFlowDialog(false);
+                    setManualFlowName("");
+                    setManualFlowMessage("");
+                  }}
+                  className="text-white/60 hover:text-white text-2xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white mb-2 block">Flow Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 'Welcome Sequence', 'Follow-up Flow'"
+                  value={manualFlowName}
+                  onChange={e => setManualFlowName(e.target.value)}
+                  className="input-dark w-full px-4 py-3 rounded-lg"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white mb-2 block">First Message *</label>
+                <textarea
+                  placeholder="Enter your first message to the client..."
+                  value={manualFlowMessage}
+                  onChange={e => setManualFlowMessage(e.target.value)}
+                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
+                  rows={4}
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  This will be the first message sent in your flow
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    if (!manualFlowName.trim() || !manualFlowMessage.trim()) {
+                      alert("Please enter both a flow name and message");
+                      return;
+                    }
+
+                    const flowId = `flow-${Date.now()}`;
+                    const stepId = `step-${Date.now()}`;
+
+                    const firstStep: FlowStep = {
+                      id: stepId,
+                      yourMessage: manualFlowMessage,
+                      responses: [],
+                      dripSequence: []
+                    };
+
+                    const newFlow: ConversationFlow = {
+                      id: flowId,
+                      name: manualFlowName,
+                      steps: [firstStep],
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      isAIGenerated: false
+                    };
+
+                    const updatedFlows = [...flows, newFlow];
+                    setFlows(updatedFlows);
+                    saveFlows(updatedFlows);
+                    setSelectedFlow(newFlow);
+
+                    setShowManualFlowDialog(false);
+                    setManualFlowName("");
+                    setManualFlowMessage("");
+                  }}
+                  className="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50"
+                  disabled={!manualFlowName.trim() || !manualFlowMessage.trim()}
+                >
+                  Create Flow
+                </button>
+                <button
+                  onClick={() => {
+                    setShowManualFlowDialog(false);
+                    setManualFlowName("");
+                    setManualFlowMessage("");
+                  }}
+                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Manual Step Editor Dialog */}
       {showManualStepDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="card max-w-2xl w-full my-8">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-[#1a1f2e] border-2 border-white/30 rounded-xl p-6 max-w-2xl w-full my-8 shadow-2xl">
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
