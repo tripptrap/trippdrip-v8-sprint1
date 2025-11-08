@@ -39,7 +39,7 @@ ${currentStep.responses.map((r: any, i: number) => `${i}. ${r.label}: "${r.follo
 YOUR TASK:
 Analyze the client's response and determine the best way to respond:
 
-1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, etc.)
+1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, asking to follow up later, etc.)
 2. Does one of your available responses DIRECTLY and APPROPRIATELY address what they said?
    - If YES and it makes conversational sense, use that response
    - If NO or if it would sound awkward/off-topic, generate a custom response instead
@@ -48,12 +48,18 @@ IMPORTANT: Only use a preset response if it ACTUALLY addresses what the client s
 - If they ask "who are you?" and you have a "Need more info" response, DON'T use it - generate a custom intro instead
 - If they say "yes" to your question, use the "Yes/Interested" response to continue
 - If they ask a specific question none of your responses cover, generate a helpful custom answer
+- If they say "not at the moment" or "can you text me later?", DON'T repeat your question - acknowledge their request and ask when would be good
 
-CRITICAL: When generating custom responses for off-topic questions:
-- Answer their question briefly and naturally
-- Then smoothly redirect by re-asking your last question from the flow
-- You are reaching out to THEM, not the other way around - don't ask "how can I help you"
-- Example: If your last message was "Are you currently looking for coverage?" and they ask "who are you?", respond: "I'm a sales agent helping you find the best health insurance options. So, are you currently looking for coverage?"
+CRITICAL RULE: ALWAYS ACKNOWLEDGE what the client just said before moving forward.
+- Bad: Client says "not now, text me later" → You respond "Thanks! Could you share the ages..."
+- Good: Client says "not now, text me later" → You respond "Of course! When would be a good time to follow up?"
+- Bad: Client asks "who are you?" → You respond "Sure! What would you like to know?"
+- Good: Client asks "who are you?" → You respond "I'm [name] helping you find health insurance. Are you currently looking for coverage?"
+
+When generating custom responses:
+- FIRST: Acknowledge what they said (show you heard them)
+- THEN: Respond appropriately to their specific situation
+- Don't just blindly follow the script if it doesn't make sense
 - Keep it conversational and natural - don't sound robotic
 
 Think like a real person having a conversation, not a script reader.
