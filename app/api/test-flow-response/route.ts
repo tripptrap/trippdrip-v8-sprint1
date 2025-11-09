@@ -25,8 +25,7 @@ export async function POST(req: NextRequest) {
     const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
     const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
 
-    // If flow requires call, check calendar availability (regardless of whether all questions are answered)
-    let availableTimesText = '';
+    // If flow requires call, check calendar availability
     let calendarSlots: any[] = [];
     if (requiresCall) {
       try {
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
           headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
           body: JSON.stringify({
             action: 'check-availability',
-            dateRequested: collectedInfo.timeline || collectedInfo.when || 'today'
+            dateRequested: 'today'
           })
         });
 
@@ -43,40 +42,11 @@ export async function POST(req: NextRequest) {
 
         if (calendarData.hasCalendar && calendarData.availableSlots) {
           calendarSlots = calendarData.availableSlots;
-          const timesList = calendarSlots.map(s => {
-            const timeMatch = s.formatted.match(/at (.+)$/);
-            return timeMatch ? timeMatch[1] : s.formatted;
-          }).join(', ');
-
-          availableTimesText = `\n\n🚨🚨🚨 STOP AND READ THIS FIRST 🚨🚨🚨
-
-YOUR AVAILABLE TIMES TODAY ARE: ${timesList}
-
-CRITICAL RULE - YOU MUST FOLLOW THIS:
-When discussing scheduling, you MUST include these specific times in your next message.
-
-WRONG EXAMPLES (DO NOT USE):
-❌ "When are you available for a call?"
-❌ "Would you like to schedule a call?"
-❌ "Let me check my calendar"
-❌ "What time works for you?"
-
-CORRECT EXAMPLE (YOU MUST USE THIS FORMAT):
-✅ "I have availability today at ${timesList}. Which time works best for you?"
-
-PASTE THIS EXACT TEXT IN YOUR RESPONSE: "I have availability today at ${timesList}. Which time works best for you?"
-
-DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
+          console.log('📅 Calendar slots fetched:', calendarSlots.length);
         }
       } catch (error) {
         console.error('Calendar check error:', error);
       }
-    }
-
-    // Log calendar data for debugging
-    if (requiresCall && calendarSlots.length > 0) {
-      console.log('🗓️ Calendar slots available:', calendarSlots.length);
-      console.log('🗓️ Calendar instruction text:', availableTimesText.substring(0, 200));
     }
 
     // Check if user is selecting a time slot
@@ -193,7 +163,7 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${availableTimesText}${appointmentBookedText}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${appointmentBookedText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
@@ -354,29 +324,17 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
       // Check if AI generated a custom response
       if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
-        // Use AI's custom response, stay on current step
         agentResponse = aiDecision.customResponse;
 
-        // CRITICAL FIX: If we have real calendar slots and the response mentions scheduling/times,
-        // force-replace with actual available times
-        if (requiresCall && calendarSlots.length > 0) {
+        // SIMPLE FIX: If we have calendar slots and ANY mention of time/scheduling, show real times
+        if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
           const timesList = calendarSlots.map(s => {
             const timeMatch = s.formatted.match(/at (.+)$/);
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
 
-          // If the response contains scheduling language, ensure it has real times
-          if (agentResponse.match(/time|schedule|availability|available|when|call|chat|meet/i)) {
-            // Check if it has fake times or no specific times
-            const hasFakeTimes = agentResponse.match(/3pm|5pm|8pm|example/i);
-            const hasNoSpecificTimes = !agentResponse.match(/\d{1,2}:\d{2}\s*[AP]M|\d{1,2}\s*[AP]M/i);
-
-            if (hasFakeTimes || hasNoSpecificTimes) {
-              console.log('⚠️ AI response has scheduling language but wrong/missing times. Force-replacing with real calendar times.');
-              // Replace the scheduling part with real times
-              agentResponse = `Thank you! Let's discuss the best plans for you. I have availability at: ${timesList}. Which time works best for you?`;
-            }
-          }
+          console.log(`📅 All questions answered. Forcing calendar times: ${timesList}`);
+          agentResponse = `Thank you! I have availability at: ${timesList}. Which time works best for you?`;
         }
 
         nextStepIndex = currentStepIndex;
@@ -393,6 +351,17 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         // Always use the followUpMessage for the matched response
         agentResponse = matchedResponse.followUpMessage;
 
+        // SIMPLE FIX: If all questions answered and we have calendar, show times
+        if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
+          const timesList = calendarSlots.map(s => {
+            const timeMatch = s.formatted.match(/at (.+)$/);
+            return timeMatch ? timeMatch[1] : s.formatted;
+          }).join(', ');
+
+          console.log(`📅 All questions answered (matched response). Forcing calendar times: ${timesList}`);
+          agentResponse = `Thank you! I have availability at: ${timesList}. Which time works best for you?`;
+        }
+
         // Check if this response has a nextStepId to follow for FUTURE messages
         if (matchedResponse.nextStepId) {
           const targetStepIndex = allSteps.findIndex((s: any) => s.id === matchedResponse.nextStepId);
@@ -408,8 +377,6 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           // No nextStepId means we stay on current step
           nextStepIndex = currentStepIndex;
         }
-
-        // Note: We don't force-end conversations anymore. The AI can handle all responses naturally.
       }
 
       return NextResponse.json({
