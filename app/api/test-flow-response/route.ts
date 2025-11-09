@@ -26,8 +26,10 @@ export async function POST(req: NextRequest) {
     const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
 
     console.log('🔍 DEBUG - Required questions:', requiredQuestions.length);
+    console.log('🔍 DEBUG - Required field names:', requiredQuestions.map((q: any) => q.fieldName));
     console.log('🔍 DEBUG - Missing questions:', missingQuestions.map((q: any) => q.fieldName));
     console.log('🔍 DEBUG - All questions answered?', allQuestionsAnswered);
+    console.log('🔍 DEBUG - Collected info keys:', Object.keys(collectedInfo));
     console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
 
     // If flow requires call, check calendar availability
@@ -457,6 +459,12 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           // No nextStepId means we stay on current step
           nextStepIndex = currentStepIndex;
         }
+      }
+
+      // Log extracted info for debugging
+      if (aiDecision.extractedInfo && Object.keys(aiDecision.extractedInfo).length > 0) {
+        console.log('📝 AI extracted info field names:', Object.keys(aiDecision.extractedInfo));
+        console.log('📝 AI extracted info:', JSON.stringify(aiDecision.extractedInfo));
       }
 
       return NextResponse.json({
