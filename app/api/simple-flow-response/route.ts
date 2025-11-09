@@ -14,13 +14,49 @@ export async function POST(req: NextRequest) {
 
     const { userMessage, requiredQuestions, collectedInfo, requiresCall } = await req.json();
 
-    // Find the next unanswered question
-    const nextQuestion = requiredQuestions.find((q: any) => !collectedInfo[q.fieldName]);
+    console.log('📋 Simple flow - requiredQuestions:', requiredQuestions);
+    console.log('📋 Simple flow - collectedInfo:', collectedInfo);
+    console.log('📋 Simple flow - userMessage:', userMessage);
 
-    if (nextQuestion) {
-      // Still have questions to ask - just ask the next one
+    // If user sent a message, try to match it to the current question we're waiting for
+    if (userMessage && requiredQuestions && requiredQuestions.length > 0) {
+      // Find the first unanswered question
+      const unansweredQuestion = requiredQuestions.find((q: any) => !collectedInfo[q.fieldName]);
+
+      if (unansweredQuestion) {
+        // User is answering this question - save the answer
+        const updatedInfo = {
+          ...collectedInfo,
+          [unansweredQuestion.fieldName]: userMessage
+        };
+
+        console.log('💾 Saved answer for', unansweredQuestion.fieldName, ':', userMessage);
+
+        // Check if there are more questions after this one
+        const nextQuestion = requiredQuestions.find((q: any) => !updatedInfo[q.fieldName]);
+
+        if (nextQuestion) {
+          // Ask the next question
+          return NextResponse.json({
+            agentResponse: nextQuestion.question,
+            extractedInfo: updatedInfo,
+            collectedInfo: updatedInfo,
+            done: false
+          });
+        } else {
+          // All questions answered, move to calendar
+          console.log('✅ All questions answered, checking calendar...');
+          // Continue to calendar logic below
+          Object.assign(collectedInfo, updatedInfo);
+        }
+      }
+    }
+
+    // If this is the first message (no user message yet), ask the first question
+    if (!userMessage && requiredQuestions && requiredQuestions.length > 0) {
+      const firstQuestion = requiredQuestions[0];
       return NextResponse.json({
-        agentResponse: nextQuestion.question,
+        agentResponse: firstQuestion.question,
         collectedInfo,
         done: false
       });
@@ -52,8 +88,8 @@ export async function POST(req: NextRequest) {
 
           return NextResponse.json({
             agentResponse: `Great! I have availability at: ${timesList}. Which time works best for you?`,
-            collectedInfo,
-            calendarSlots: slotsToShow,
+            extractedInfo: collectedInfo,
+            availableSlots: slotsToShow,
             done: false,
             awaitingTimeSelection: true
           });
@@ -61,7 +97,7 @@ export async function POST(req: NextRequest) {
           // No calendar slots available
           return NextResponse.json({
             agentResponse: `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`,
-            collectedInfo,
+            extractedInfo: collectedInfo,
             done: false
           });
         }
@@ -69,7 +105,7 @@ export async function POST(req: NextRequest) {
         console.error('Calendar error:', error);
         return NextResponse.json({
           agentResponse: `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`,
-          collectedInfo,
+          extractedInfo: collectedInfo,
           done: false
         });
       }
@@ -78,7 +114,7 @@ export async function POST(req: NextRequest) {
     // No call required, we're done
     return NextResponse.json({
       agentResponse: "Thank you! I have all the information I need. Someone will be in touch shortly.",
-      collectedInfo,
+      extractedInfo: collectedInfo,
       done: true
     });
 
