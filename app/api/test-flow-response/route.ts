@@ -38,20 +38,18 @@ export async function POST(req: NextRequest) {
     let calendarSlots: any[] = [];
     if (requiresCall) {
       try {
-        const calendarResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
-          body: JSON.stringify({
-            action: 'check-availability',
-            dateRequested: 'today'
-          })
+        const calendarResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/get-slots`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
         });
 
         const calendarData = await calendarResponse.json();
 
-        if (calendarData.hasCalendar && calendarData.availableSlots) {
-          calendarSlots = calendarData.availableSlots;
+        if (calendarData.slots && calendarData.slots.length > 0) {
+          calendarSlots = calendarData.slots;
           console.log('📅 Calendar slots fetched:', calendarSlots.length);
+        } else {
+          console.log('📅 No calendar slots available');
         }
       } catch (error) {
         console.error('Calendar check error:', error);
@@ -123,26 +121,24 @@ export async function POST(req: NextRequest) {
       if (selectedSlot) {
         try {
           // Book the appointment
-          const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
+          const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/book-slot`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              action: 'book-appointment',
-              slotStart: selectedSlot.start,
-              slotEnd: selectedSlot.end,
-              clientName: collectedInfo.name || collectedInfo.fullName || 'Client',
-              clientEmail: collectedInfo.email || '',
-              summary: `Call with ${collectedInfo.name || collectedInfo.fullName || 'Client'}`,
-              description: `Scheduled call from conversation flow.\n\nCollected Information:\n${Object.entries(collectedInfo).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+              start: selectedSlot.start,
+              end: selectedSlot.end,
+              name: collectedInfo.name || collectedInfo.fullName || 'Client',
+              email: collectedInfo.email || '',
+              phone: collectedInfo.phone || ''
             })
           });
 
           const bookingData = await bookingResponse.json();
 
-          if (bookingData.success) {
+          if (bookingData.ok) {
             appointmentBooked = true;
             bookedAppointmentInfo = {
-              time: bookingData.formattedTime,
+              time: selectedSlot.formatted || selectedSlot.display,
               eventId: bookingData.eventId
             };
           }
