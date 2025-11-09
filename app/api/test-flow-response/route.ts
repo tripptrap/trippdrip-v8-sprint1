@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false, availableSlots = [] } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -82,8 +82,10 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
     // Check if user is selecting a time slot
     let appointmentBooked = false;
     let bookedAppointmentInfo: any = null;
-    if (requiresCall && availableSlots.length > 0 && userMessage) {
+    if (requiresCall && calendarSlots.length > 0 && userMessage) {
       let selectedSlot = null;
+
+      console.log(`🔍 Checking if "${userMessage}" is selecting a time from ${calendarSlots.length} available slots`);
 
       // Try to detect if user is selecting a time by:
       // 1. Time format (e.g., "1pm", "2:00", "3 PM", "10:00 AM")
@@ -103,19 +105,25 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
           hour24 = 0;
         }
 
-        // Find the slot that matches this time
-        selectedSlot = availableSlots.find((slot: any) => {
+        console.log(`🕐 Looking for ${hour24}:00 (from "${userMessage}")`);
+
+        // Find the slot that matches this time from the CURRENT calendar slots
+        selectedSlot = calendarSlots.find((slot: any) => {
           const slotDate = new Date(slot.start);
-          return slotDate.getHours() === hour24;
+          const slotHour = slotDate.getHours();
+          console.log(`  - Checking slot at ${slotHour}:00`);
+          return slotHour === hour24;
         });
 
         if (selectedSlot) {
           console.log(`✅ Matched time "${userMessage}" to slot at ${hour24}:00`);
+        } else {
+          console.log(`❌ No slot found for ${hour24}:00 in available slots`);
         }
       }
 
-      // If no time match, try index/number matching
-      if (!selectedSlot) {
+      // If no time match, try index/number matching (but be careful not to match times like "1:00 PM")
+      if (!selectedSlot && !timeMatch) {
         const slotMatch = userMessage.match(/\b([1-5])\b|first|second|third|fourth|fifth/i);
         if (slotMatch) {
           let slotIndex = -1;
@@ -126,8 +134,9 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
             slotIndex = wordMap[slotMatch[0].toLowerCase()];
           }
 
-          if (slotIndex >= 0 && slotIndex < availableSlots.length) {
-            selectedSlot = availableSlots[slotIndex];
+          if (slotIndex >= 0 && slotIndex < calendarSlots.length) {
+            selectedSlot = calendarSlots[slotIndex];
+            console.log(`✅ Matched index ${slotIndex + 1} to slot`);
           }
         }
       }
