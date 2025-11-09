@@ -332,7 +332,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         agentResponse = aiDecision.customResponse;
         console.log('🤖 AI custom response:', agentResponse);
 
-        // ONLY show calendar times if ALL required questions have been answered
+        // If calendar is enabled and all questions answered, check if response contains time mentions
         console.log('🔍 Checking override conditions:', {
           requiresCall,
           calendarSlotsLength: calendarSlots.length,
@@ -349,6 +349,20 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
           console.log(`✅ OVERRIDE TRIGGERED! Showing ${slotsToShow.length} available times: ${timesList}`);
           agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+        } else if (requiresCall && calendarSlots.length > 0) {
+          // Even if not all questions answered, if the response mentions times, replace them
+          const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
+          if (hasFakeTimes) {
+            console.log('⚠️ Detected fake times in response, replacing with real calendar slots');
+            const slotsToShow = calendarSlots.slice(0, 3);
+            const timesList = slotsToShow.map(s => {
+              const timeMatch = s.formatted.match(/at (.+)$/);
+              return timeMatch ? timeMatch[1] : s.formatted;
+            }).join(', ');
+            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+          } else {
+            console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
+          }
         } else {
           console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
         }
@@ -368,7 +382,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         agentResponse = matchedResponse.followUpMessage;
         console.log('🎯 Matched response:', agentResponse);
 
-        // ONLY show calendar times if ALL required questions have been answered
+        // If calendar is enabled, check if response contains time mentions
         console.log('🔍 Checking override conditions (matched path):', {
           requiresCall,
           calendarSlotsLength: calendarSlots.length,
@@ -385,6 +399,20 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
           console.log(`✅ OVERRIDE TRIGGERED (matched path)! Showing ${slotsToShow.length} available times: ${timesList}`);
           agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+        } else if (requiresCall && calendarSlots.length > 0) {
+          // Even if not all questions answered, if the response mentions times, replace them
+          const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
+          if (hasFakeTimes) {
+            console.log('⚠️ Detected fake times in matched response, replacing with real calendar slots');
+            const slotsToShow = calendarSlots.slice(0, 3);
+            const timesList = slotsToShow.map(s => {
+              const timeMatch = s.formatted.match(/at (.+)$/);
+              return timeMatch ? timeMatch[1] : s.formatted;
+            }).join(', ');
+            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+          } else {
+            console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
+          }
         } else {
           console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
         }
