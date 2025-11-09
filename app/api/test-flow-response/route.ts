@@ -43,8 +43,30 @@ export async function POST(req: NextRequest) {
 
         if (calendarData.hasCalendar && calendarData.availableSlots) {
           calendarSlots = calendarData.availableSlots;
-          const slots = calendarSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
-          availableTimesText = `\n\n🔴🔴🔴 CRITICAL: YOU HAVE REAL AVAILABLE CALENDAR TIMES 🔴🔴🔴\nYour calendar shows these ACTUAL available times for TODAY:\n${slots}\n\n⚠️ MANDATORY INSTRUCTION ⚠️\nWhenever you mention scheduling a call or ask about availability, you MUST include these specific times in your message.\n\nDO NOT say: "When are you free to talk?"\nDO NOT say: "Would you like to schedule a call?"\nDO NOT say: "Let me check my calendar for you."\n\nINSTEAD, you MUST say something like:\n"I have availability today at: ${calendarSlots.map(s => s.formatted.split(' at ')[1]).join(', ')}. Which time works best for you?"\n\nOR if they ask when you're free:\n"I'm free today at: ${calendarSlots.map(s => s.formatted.split(' at ')[1]).join(', ')}. Would any of those work?"\n\nCopy the exact times from above and show them to the client. This is non-negotiable.`;
+          const timesList = calendarSlots.map(s => {
+            const timeMatch = s.formatted.match(/at (.+)$/);
+            return timeMatch ? timeMatch[1] : s.formatted;
+          }).join(', ');
+
+          availableTimesText = `\n\n🚨🚨🚨 STOP AND READ THIS FIRST 🚨🚨🚨
+
+YOUR AVAILABLE TIMES TODAY ARE: ${timesList}
+
+CRITICAL RULE - YOU MUST FOLLOW THIS:
+When discussing scheduling, you MUST include these specific times in your next message.
+
+WRONG EXAMPLES (DO NOT USE):
+❌ "When are you available for a call?"
+❌ "Would you like to schedule a call?"
+❌ "Let me check my calendar"
+❌ "What time works for you?"
+
+CORRECT EXAMPLE (YOU MUST USE THIS FORMAT):
+✅ "I have availability today at ${timesList}. Which time works best for you?"
+
+PASTE THIS EXACT TEXT IN YOUR RESPONSE: "I have availability today at ${timesList}. Which time works best for you?"
+
+DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
         }
       } catch (error) {
         console.error('Calendar check error:', error);
