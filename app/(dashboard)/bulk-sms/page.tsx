@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { loadPoints, spendPoints } from '@/lib/pointsStore';
+import { spendPoints } from '@/lib/pointsStore';
+import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 
 type ConversationFlow = {
@@ -53,17 +54,28 @@ export default function BulkSMSPage() {
   useEffect(() => {
     loadInitialData();
 
-    const handleUpdate = () => {
-      const data = loadPoints();
-      setPoints(data.balance);
+    const handleUpdate = (e: any) => {
+      setPoints(e.detail.balance);
     };
     window.addEventListener('pointsUpdated', handleUpdate);
     return () => window.removeEventListener('pointsUpdated', handleUpdate);
   }, []);
 
   async function loadInitialData() {
-    const data = loadPoints();
-    setPoints(data.balance);
+    // Load points from Supabase
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('credits')
+        .eq('id', user.id)
+        .single();
+
+      if (userData) {
+        setPoints(userData.credits || 0);
+      }
+    }
 
     // Load all leads to get unique tags and campaigns
     try {
@@ -89,12 +101,12 @@ export default function BulkSMSPage() {
       console.error('Error loading leads:', error);
     }
 
-    // Load flows from localStorage
+    // Load flows from API
     try {
-      const flowsData = localStorage.getItem('conversationFlows');
-      if (flowsData) {
-        const flows = JSON.parse(flowsData);
-        setAvailableFlows(flows);
+      const response = await fetch('/api/flows');
+      const data = await response.json();
+      if (data.ok && data.items) {
+        setAvailableFlows(data.items);
       }
     } catch (error) {
       console.error('Error loading flows:', error);

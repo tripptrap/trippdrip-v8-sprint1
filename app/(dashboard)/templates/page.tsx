@@ -34,35 +34,80 @@ type ConversationFlow = {
   isAIGenerated?: boolean; // Track if flow was created with AI
 };
 
-function loadFlows(): ConversationFlow[] {
+async function loadFlows(): Promise<ConversationFlow[]> {
   if (typeof window === "undefined") return [];
-  const data = localStorage.getItem("conversationFlows");
-  if (!data) return [];
 
   try {
-    const flows = JSON.parse(data);
-    // Migrate old format to new format if needed
-    return flows.map((flow: any) => {
-      if (!flow.steps) {
-        // Old format - convert to new format
-        return {
-          id: flow.id,
-          name: flow.name,
-          steps: [],
-          createdAt: flow.createdAt || new Date().toISOString(),
-          updatedAt: flow.updatedAt || new Date().toISOString()
-        };
-      }
-      return flow;
-    });
+    const response = await fetch('/api/flows');
+    const data = await response.json();
+
+    if (data.ok && data.items) {
+      // Map database format to app format
+      return data.items.map((flow: any) => ({
+        id: flow.id,
+        name: flow.name,
+        steps: flow.steps || [],
+        createdAt: flow.created_at,
+        updatedAt: flow.updated_at,
+        isAIGenerated: flow.is_ai_generated
+      }));
+    }
+
+    return [];
   } catch (e) {
     console.error("Error loading flows:", e);
     return [];
   }
 }
 
+async function saveFlowToServer(flow: ConversationFlow): Promise<boolean> {
+  try {
+    // Check if flow exists by looking for matching flow_config.id
+    const checkResponse = await fetch('/api/flows');
+    const checkData = await checkResponse.json();
+    const existingFlow = checkData.ok && checkData.items && checkData.items.find((f: any) =>
+      f.id === flow.id || f.flow_config?.id === flow.id
+    );
+
+    const method = existingFlow ? 'PUT' : 'POST';
+    const response = await fetch('/api/flows', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: existingFlow?.id || flow.id,  // Use database ID for updates
+        name: flow.name,
+        steps: flow.steps,
+        isAIGenerated: flow.isAIGenerated,
+        description: ''
+      })
+    });
+
+    const data = await response.json();
+    return data.ok;
+  } catch (e) {
+    console.error("Error saving flow:", e);
+    return false;
+  }
+}
+
+async function deleteFlowFromServer(flowId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/flows?id=${flowId}`, {
+      method: 'DELETE'
+    });
+    const data = await response.json();
+    return data.ok;
+  } catch (e) {
+    console.error("Error deleting flow:", e);
+    return false;
+  }
+}
+
 function saveFlows(flows: ConversationFlow[]) {
-  localStorage.setItem("conversationFlows", JSON.stringify(flows));
+  // Save all flows to server async
+  flows.forEach(flow => {
+    saveFlowToServer(flow).catch(e => console.error("Error saving flow:", e));
+  });
 }
 
 export default function FlowsPage() {
@@ -107,7 +152,10 @@ export default function FlowsPage() {
   const [tempFlowName, setTempFlowName] = useState("");
 
   useEffect(() => {
-    setFlows(loadFlows());
+    loadFlows().then(setFlows).catch(e => {
+      console.error("Error loading flows:", e);
+      setFlows([]);
+    });
   }, []);
 
   function assignStepColors(steps: FlowStep[]): FlowStep[] {
