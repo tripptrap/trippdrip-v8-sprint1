@@ -102,7 +102,7 @@ export default function CalendarPage() {
       isOpen: false,
       title: '',
       message: '',
-      type: 'alert',
+      type: 'info',
     });
   };
 
