@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       : '';
 
     const requiresCallText = requiresCall
-      ? '\n\nCALL REQUIREMENT:\nThis flow requires scheduling a phone call or Zoom meeting with the client. After collecting all required information, create a step to propose scheduling the call.'
+      ? '\n\nCALL REQUIREMENT:\nThis flow requires scheduling a phone call or Zoom meeting with the client.\n\nIMPORTANT SCHEDULING INSTRUCTIONS:\n- After collecting all required information, proactively offer 3 specific times TODAY\n- Example: "Let\'s discuss the best plans for you. Are you free today at either 3pm, 5pm, or 8pm?"\n- DO NOT just ask "Would you like to schedule a call?" - always offer specific times\n- If they say they\'re not free today, set up drip messages asking about availability for subsequent days\n- Keep offering 3 time options each time you follow up'
       : '';
 
     // Generate the flow with OpenAI
