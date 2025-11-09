@@ -230,6 +230,15 @@ CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
 - Example: Use "Interested" or "Yes" response to move forward in the flow
 
 EXTRACT KEY INFORMATION from the client's responses:
+${requiredQuestions.length > 0 ? `
+CRITICAL: When extracting information for required questions, you MUST use EXACTLY these field names:
+${requiredQuestions.map((q: any) => `- For "${q.question}" use field name: "${q.fieldName}"`).join('\n')}
+
+DO NOT make up your own field names! Use the EXACT field names listed above.
+For example:
+- If the field name is "income", use "income" NOT "householdIncome"
+- If the field name is "householdMembers", use "householdMembers" exactly
+` : ''}
 - Look for: number of people, coverage type, budget, timeline, current coverage, ages, gender, location, zip code, etc.
 - Example: "im looking for coverage for myself" → Extract: Number of people = 1
 - Example: "i dont have any" (about coverage) → Extract: Current coverage = None
