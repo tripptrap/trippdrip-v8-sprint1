@@ -237,7 +237,7 @@ export default function FlowsPage() {
   const [flowToDelete, setFlowToDelete] = useState<ConversationFlow | null>(null);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
-  const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(false);
+  const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(true);
   const [createdAppointments, setCreatedAppointments] = useState<Array<{title: string, date: string, time: string, eventId?: string, htmlLink?: string}>>([]);
   const [modal, setModal] = useState<{
     isOpen: boolean;
