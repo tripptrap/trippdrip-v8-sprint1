@@ -39,6 +39,7 @@ type ConversationFlow = {
   createdAt: string;
   updatedAt: string;
   isAIGenerated?: boolean; // Track if flow was created with AI
+  is_ai_generated?: boolean; // Database field name (snake_case)
 };
 
 async function loadFlows(): Promise<ConversationFlow[]> {
