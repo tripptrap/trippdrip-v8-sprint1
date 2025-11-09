@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         if (calendarData.hasCalendar && calendarData.availableSlots) {
           calendarSlots = calendarData.availableSlots;
           const slots = calendarSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
-          availableTimesText = `\n\nAVAILABLE CALENDAR TIMES:\nHere are my available times:\n${slots}\n\nOffer these times to the client and ask which works best for them.`;
+          availableTimesText = `\n\n🔴 CRITICAL: AVAILABLE CALENDAR TIMES 🔴\nYou have real calendar availability to offer! Here are the actual available times:\n${slots}\n\nYou MUST include these exact times in your response. Copy them exactly as shown.\nDO NOT just ask "would you like to schedule a call" - actually SHOW them these specific times and ask which one works best.\n\nExample response: "Perfect! I have these times available:\n${slots}\nWhich time works best for you?"`;
         }
       } catch (error) {
         console.error('Calendar check error:', error);
