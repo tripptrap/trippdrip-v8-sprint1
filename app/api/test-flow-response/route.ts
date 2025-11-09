@@ -73,6 +73,12 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
       }
     }
 
+    // Log calendar data for debugging
+    if (requiresCall && calendarSlots.length > 0) {
+      console.log('🗓️ Calendar slots available:', calendarSlots.length);
+      console.log('🗓️ Calendar instruction text:', availableTimesText.substring(0, 200));
+    }
+
     // Check if user is selecting a time slot
     let appointmentBooked = false;
     let bookedAppointmentInfo: any = null;
@@ -250,6 +256,30 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
     const apiKey = process.env.OPENAI_API_KEY;
 
+    // Build system message with calendar instructions at the top for highest priority
+    let systemMessage = "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown.";
+
+    if (requiresCall && calendarSlots.length > 0) {
+      const timesList = calendarSlots.map(s => {
+        const timeMatch = s.formatted.match(/at (.+)$/);
+        return timeMatch ? timeMatch[1] : s.formatted;
+      }).join(', ');
+
+      systemMessage = `🚨🚨🚨 CRITICAL CALENDAR INSTRUCTION - READ FIRST 🚨🚨🚨
+
+YOUR AVAILABLE TIMES TODAY ARE: ${timesList}
+
+MANDATORY RULE - YOU MUST FOLLOW THIS EXACTLY:
+When it's time to schedule (after collecting required info OR when discussing scheduling), you MUST include these specific times.
+
+YOU MUST PASTE THIS EXACT TEXT IN YOUR RESPONSE:
+"I have availability today at ${timesList}. Which time works best for you?"
+
+DO NOT ask "When are you available?" or "What time works for you?" - YOU must offer YOUR specific available times.
+
+` + systemMessage;
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -259,10 +289,10 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown." },
+          { role: "system", content: systemMessage },
           { role: "user", content: prompt }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 800,
       }),
     });
