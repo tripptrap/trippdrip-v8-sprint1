@@ -975,12 +975,10 @@ export default function Page() {
         isOpen={modalState.isOpen}
         onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
         title={modalState.title}
+        message={modalState.message}
         type={modalState.type}
         onConfirm={modalState.onConfirm}
-        onCancel={modalState.onCancel}
-      >
-        <p className="text-white/80">{modalState.message}</p>
-      </CustomModal>
+      />
     </div>
   );
 }
