@@ -121,14 +121,30 @@ Each step should have:
 1. A SHORT message from the sender (1-2 sentences max - keep it concise like real texting)
    - This message assumes the client said YES to the previous step
    - It moves the conversation forward toward the close
+   - MUST be a complete thought that asks a question or makes a statement
 2. 2-4 possible response categories for when they DON'T follow the optimal path
-3. For each alternate response, a brief follow-up message to handle it
+3. For each alternate response, a COMPLETE follow-up message that:
+   - Directly addresses their response
+   - ALWAYS includes the next question or action
+   - NEVER just acknowledges without moving forward
+   - Example: "Great! Let's get started. What's your household income?" NOT just "Great! Let's get started."
 
 THINK OF IT LIKE THIS:
 - "yourMessage" = What you send when they're moving forward (the happy path)
-- "responses" = What you say when they object, ask questions, or push back
+- "responses.followUpMessage" = What you say when they respond differently
+  - CRITICAL: EVERY followUpMessage must END with a question or call to action
+  - BAD: "Great! Let's get started with a few quick questions."
+  - GOOD: "Great! Let's get started. What's your household income?"
+  - BAD: "I understand."
+  - GOOD: "I understand. To help you best, what's your current coverage situation?"
 
 Make messages ultra-concise and conversational. Think: "Great! What's your budget?" not paragraphs.
+
+**CRITICAL RULE: NO DEAD ENDS**
+Every message (yourMessage AND followUpMessage) must either:
+1. Ask a specific question, OR
+2. Make a clear call to action (schedule a call, move forward, etc.)
+NEVER send a message that just acknowledges without progressing the conversation.
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
