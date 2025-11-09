@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false, availableSlots = [] } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
 
     // If flow requires call and all questions answered, check calendar availability
     let availableTimesText = '';
+    let calendarSlots: any[] = [];
     if (requiresCall && allQuestionsAnswered) {
       try {
         const calendarResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
@@ -41,11 +42,62 @@ export async function POST(req: NextRequest) {
         const calendarData = await calendarResponse.json();
 
         if (calendarData.hasCalendar && calendarData.availableSlots) {
-          const slots = calendarData.availableSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
+          calendarSlots = calendarData.availableSlots;
+          const slots = calendarSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
           availableTimesText = `\n\nAVAILABLE CALENDAR TIMES:\nHere are my available times:\n${slots}\n\nOffer these times to the client and ask which works best for them.`;
         }
       } catch (error) {
         console.error('Calendar check error:', error);
+      }
+    }
+
+    // Check if user is selecting a time slot
+    let appointmentBooked = false;
+    let bookedAppointmentInfo: any = null;
+    if (requiresCall && availableSlots.length > 0 && userMessage) {
+      // Try to detect if user is selecting a time (e.g., "1", "option 2", "the first one", etc.)
+      const slotMatch = userMessage.match(/\b([1-5])\b|first|second|third|fourth|fifth/i);
+      if (slotMatch) {
+        let slotIndex = -1;
+        if (slotMatch[1]) {
+          slotIndex = parseInt(slotMatch[1]) - 1;
+        } else {
+          const wordMap: any = { 'first': 0, 'second': 1, 'third': 2, 'fourth': 3, 'fifth': 4 };
+          slotIndex = wordMap[slotMatch[0].toLowerCase()];
+        }
+
+        if (slotIndex >= 0 && slotIndex < availableSlots.length) {
+          const selectedSlot = availableSlots[slotIndex];
+
+          try {
+            // Book the appointment
+            const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+              body: JSON.stringify({
+                action: 'book-appointment',
+                slotStart: selectedSlot.start,
+                slotEnd: selectedSlot.end,
+                clientName: collectedInfo.name || collectedInfo.fullName || 'Client',
+                clientEmail: collectedInfo.email || '',
+                summary: `Call with ${collectedInfo.name || collectedInfo.fullName || 'Client'}`,
+                description: `Scheduled call from conversation flow.\n\nCollected Information:\n${Object.entries(collectedInfo).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+              })
+            });
+
+            const bookingData = await bookingResponse.json();
+
+            if (bookingData.success) {
+              appointmentBooked = true;
+              bookedAppointmentInfo = {
+                time: bookingData.formattedTime,
+                eventId: bookingData.eventId
+              };
+            }
+          } catch (error) {
+            console.error('Appointment booking error:', error);
+          }
+        }
       }
     }
 
@@ -62,10 +114,14 @@ export async function POST(req: NextRequest) {
         }`
       : '';
 
+    const appointmentBookedText = appointmentBooked
+      ? `\n\nAPPOINTMENT SUCCESSFULLY BOOKED!\nThe client selected a time and the appointment has been booked for: ${bookedAppointmentInfo.time}\nYou MUST confirm this booking in your response and thank them for scheduling.`
+      : '';
+
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${availableTimesText}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${availableTimesText}${appointmentBookedText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
@@ -266,7 +322,10 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         shouldAdvanceToNextStep: shouldMoveToNextStep,
         isCustomResponse: aiDecision.matchedResponseIndex === null,
         customDrips: aiDecision.customDrips || [],
-        extractedInfo: aiDecision.extractedInfo || {}
+        extractedInfo: aiDecision.extractedInfo || {},
+        availableSlots: calendarSlots,
+        appointmentBooked: appointmentBooked,
+        appointmentInfo: bookedAppointmentInfo
       });
 
     } catch (parseError) {

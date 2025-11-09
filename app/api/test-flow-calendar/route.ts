@@ -109,6 +109,63 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (action === 'book-appointment') {
+      const { slotStart, slotEnd, clientName, clientEmail, summary, description } = await req.json();
+
+      if (!slotStart || !slotEnd) {
+        return NextResponse.json({ error: 'Missing time slot information' }, { status: 400 });
+      }
+
+      const calendar = google.calendar({ version: 'v3', auth });
+
+      // Create the calendar event
+      const event = {
+        summary: summary || 'Call with Client',
+        description: description || 'Scheduled call from conversation flow',
+        start: {
+          dateTime: slotStart,
+          timeZone: 'America/New_York',
+        },
+        end: {
+          dateTime: slotEnd,
+          timeZone: 'America/New_York',
+        },
+        attendees: clientEmail ? [{ email: clientEmail, displayName: clientName }] : [],
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 },
+            { method: 'popup', minutes: 30 },
+          ],
+        },
+      };
+
+      const createResponse = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: event,
+        sendUpdates: clientEmail ? 'all' : 'none',
+      });
+
+      // Save to database
+      await supabase.from('calendar_events').insert({
+        user_id: user.id,
+        google_event_id: createResponse.data.id,
+        summary: event.summary,
+        description: event.description,
+        start_time: slotStart,
+        end_time: slotEnd,
+        attendee_email: clientEmail,
+        attendee_name: clientName,
+      });
+
+      return NextResponse.json({
+        success: true,
+        eventId: createResponse.data.id,
+        htmlLink: createResponse.data.htmlLink,
+        formattedTime: formatTimeSlot(new Date(slotStart))
+      });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: any) {

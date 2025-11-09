@@ -218,6 +218,7 @@ export default function FlowsPage() {
   const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
   const [pendingDrips, setPendingDrips] = useState<Array<{message: string, scheduledFor: Date}>>([]);
   const [collectedInfo, setCollectedInfo] = useState<Record<string, string>>({});
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   const [showManualStepDialog, setShowManualStepDialog] = useState(false);
   const [manualStep, setManualStep] = useState<FlowStep>({
     id: '',
@@ -753,7 +754,8 @@ export default function FlowsPage() {
           conversationHistory,
           collectedInfo,
           requiredQuestions: selectedFlow.requiredQuestions || [],
-          requiresCall: selectedFlow.requiresCall || false
+          requiresCall: selectedFlow.requiresCall || false,
+          availableSlots: availableSlots
         })
       });
 
@@ -765,6 +767,20 @@ export default function FlowsPage() {
         // Update collected info if AI extracted new information
         if (data.extractedInfo && Object.keys(data.extractedInfo).length > 0) {
           setCollectedInfo(prev => ({ ...prev, ...data.extractedInfo }));
+        }
+
+        // Store available slots if returned
+        if (data.availableSlots && data.availableSlots.length > 0) {
+          setAvailableSlots(data.availableSlots);
+        }
+
+        // Show appointment confirmation if booked
+        if (data.appointmentBooked && data.appointmentInfo) {
+          setTestMessages(prev => [...prev, {
+            role: 'system',
+            text: `✅ Appointment booked for ${data.appointmentInfo.time}`,
+            timestamp: formatTimestamp(now)
+          }]);
         }
 
         // Create real calendar appointment if enabled and AI mentions booking/scheduling
