@@ -12,7 +12,7 @@ const navItems = [
   { href: "/texts",     label: "Texts" },
   { href: "/scheduled", label: "Scheduled" },
   { href: "/follow-ups", label: "Follow-ups" },
-  { href: "/email",     label: "Email" },
+  { href: "/email",     label: "Calendar" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/analytics", label: "Analytics" },
   { href: "/templates", label: "Flows" },

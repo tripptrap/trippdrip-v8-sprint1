@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Load email configuration
-    const settings = loadSettings();
+    const settings = await loadSettings();
     if (!settings.email || settings.email.provider === 'none') {
       return NextResponse.json(
         { error: 'Email not configured. Please configure email settings first.' },

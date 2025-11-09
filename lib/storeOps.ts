@@ -5,26 +5,26 @@ export type MessageStatus = "pending" | "sent" | "delivered" | "read" | "failed"
 
 function nowISO(){ return new Date().toISOString(); }
 
-export function ensureStoreShape(){
-  const s = loadStore() || { leads:[], threads:[], messages:[] };
+export async function ensureStoreShape(){
+  const s = await loadStore() || { leads:[], threads:[], messages:[] };
   s.leads     ||= [];
   s.threads   ||= [];
   s.messages  ||= [];
-  saveStore(s);
+  await saveStore(s);
   return s;
 }
 
-export function mergeLeadTags(lead_id:number, tags:string[]){
-  const s = ensureStoreShape();
+export async function mergeLeadTags(lead_id:number, tags:string[]){
+  const s = await ensureStoreShape();
   const L = s.leads.find((x:any)=> x.id===lead_id);
   if(!L) return;
   const set = new Set([...(L.tags||[]), ...(tags||[])].map(String));
   L.tags = Array.from(set);
-  saveStore(s);
+  await saveStore(s);
 }
 
-export function upsertThread(lead_id:number, channel:"sms"|"email", campaign_id?:number){
-  const s = ensureStoreShape();
+export async function upsertThread(lead_id:number, channel:"sms"|"email", campaign_id?:number){
+  const s = await ensureStoreShape();
   let th = s.threads.find((t:any)=> t.lead_id===lead_id && t.channel===channel && (campaign_id ? t.campaign_id===campaign_id : true));
   if(!th){
     th = {
@@ -37,14 +37,14 @@ export function upsertThread(lead_id:number, channel:"sms"|"email", campaign_id?
       updated_at: nowISO()
     };
     s.threads.unshift(th);
-    saveStore(s);
+    await saveStore(s);
   }
   return th;
 }
 
-export function sendOutbound(lead_id:number, channel:"sms"|"email", body:string, campaign_id?:number, status?: MessageStatus){
-  const s = ensureStoreShape();
-  const th = upsertThread(lead_id, channel, campaign_id)!;
+export async function sendOutbound(lead_id:number, channel:"sms"|"email", body:string, campaign_id?:number, status?: MessageStatus){
+  const s = await ensureStoreShape();
+  const th = await upsertThread(lead_id, channel, campaign_id)!;
   const msg = {
     id: Date.now(),
     thread_id: th.id,
@@ -61,25 +61,25 @@ export function sendOutbound(lead_id:number, channel:"sms"|"email", body:string,
   t.last_sender = "agent";
   t.unread = false;
   t.updated_at = msg.created_at;
-  saveStore(s);
+  await saveStore(s);
   return th.id;
 }
 
 // Update message status (for delivery confirmations)
-export function updateMessageStatus(messageId: number, status: MessageStatus, twilioMessageId?: string){
-  const s = ensureStoreShape();
+export async function updateMessageStatus(messageId: number, status: MessageStatus, twilioMessageId?: string){
+  const s = await ensureStoreShape();
   const msg = s.messages.find((m: any) => m.id === messageId);
   if (msg) {
     msg.status = status;
     if (twilioMessageId) {
       msg.messageId = twilioMessageId;
     }
-    saveStore(s);
+    await saveStore(s);
   }
 }
 
-export function simulateInbound(thread_id:number, body:string){
-  const s = ensureStoreShape();
+export async function simulateInbound(thread_id:number, body:string){
+  const s = await ensureStoreShape();
   const msg = {
     id: Date.now(),
     thread_id,
@@ -97,7 +97,7 @@ export function simulateInbound(thread_id:number, body:string){
     t.unread = true;
     t.updated_at = msg.created_at;
   }
-  saveStore(s);
+  await saveStore(s);
 }
 
 // Get message status icon/color

@@ -15,7 +15,7 @@ export async function sendSMS(
   message: string,
   fromNumber?: string
 ): Promise<SMSResult> {
-  const settings = loadSettings();
+  const settings = await loadSettings();
 
   if (settings.smsProvider !== 'twilio' || !settings.twilio) {
     return {

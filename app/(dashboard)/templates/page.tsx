@@ -258,6 +258,13 @@ export default function FlowsPage() {
     });
   }, []);
 
+  // Automatically enable calendar appointments when flow requires a call
+  useEffect(() => {
+    if (requiresCall) {
+      setEnableCalendarAppointments(true);
+    }
+  }, [requiresCall]);
+
   function assignStepColors(steps: FlowStep[]): FlowStep[] {
     // Color progression: Blue -> Purple -> Orange -> Green (last step)
     const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange

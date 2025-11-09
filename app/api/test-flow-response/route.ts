@@ -25,17 +25,17 @@ export async function POST(req: NextRequest) {
     const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
     const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
 
-    // If flow requires call and all questions answered, check calendar availability
+    // If flow requires call, check calendar availability (regardless of whether all questions are answered)
     let availableTimesText = '';
     let calendarSlots: any[] = [];
-    if (requiresCall && allQuestionsAnswered) {
+    if (requiresCall) {
       try {
         const calendarResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
           body: JSON.stringify({
             action: 'check-availability',
-            dateRequested: collectedInfo.timeline || collectedInfo.when || 'next week'
+            dateRequested: collectedInfo.timeline || collectedInfo.when || 'today'
           })
         });
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         if (calendarData.hasCalendar && calendarData.availableSlots) {
           calendarSlots = calendarData.availableSlots;
           const slots = calendarSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
-          availableTimesText = `\n\n🔴 CRITICAL: AVAILABLE CALENDAR TIMES 🔴\nYou have real calendar availability to offer! Here are the actual available times:\n${slots}\n\nYou MUST include these exact times in your response. Copy them exactly as shown.\nDO NOT just ask "would you like to schedule a call" - actually SHOW them these specific times and ask which one works best.\n\nExample response: "Perfect! I have these times available:\n${slots}\nWhich time works best for you?"`;
+          availableTimesText = `\n\n🔴🔴🔴 CRITICAL: YOU HAVE REAL AVAILABLE CALENDAR TIMES 🔴🔴🔴\nYour calendar shows these ACTUAL available times for TODAY:\n${slots}\n\n⚠️ MANDATORY INSTRUCTION ⚠️\nWhenever you mention scheduling a call or ask about availability, you MUST include these specific times in your message.\n\nDO NOT say: "When are you free to talk?"\nDO NOT say: "Would you like to schedule a call?"\nDO NOT say: "Let me check my calendar for you."\n\nINSTEAD, you MUST say something like:\n"I have availability today at: ${calendarSlots.map(s => s.formatted.split(' at ')[1]).join(', ')}. Which time works best for you?"\n\nOR if they ask when you're free:\n"I'm free today at: ${calendarSlots.map(s => s.formatted.split(' at ')[1]).join(', ')}. Would any of those work?"\n\nCopy the exact times from above and show them to the client. This is non-negotiable.`;
         }
       } catch (error) {
         console.error('Calendar check error:', error);

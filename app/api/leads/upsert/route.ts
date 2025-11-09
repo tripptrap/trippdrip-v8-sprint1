@@ -90,9 +90,9 @@ export async function POST(req: Request) {
       leadData = data;
 
       // Send welcome email to new lead if email is configured and lead has an email
-      if (lead.email && isEmailConfigured()) {
+      if (lead.email && await isEmailConfigured()) {
         try {
-          const settings = loadSettings();
+          const settings = await loadSettings();
           const emailConfig = settings.email!;
 
           let transporter;
