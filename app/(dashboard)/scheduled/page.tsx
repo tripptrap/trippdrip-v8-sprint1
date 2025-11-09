@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import CustomModal from "@/components/CustomModal";
 
 interface ScheduledMessage {
   id: string;
@@ -23,10 +24,24 @@ interface ScheduledMessage {
   };
 }
 
+type ModalState = {
+  isOpen: boolean;
+  type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+};
+
 export default function ScheduledMessagesPage() {
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     fetchScheduledMessages();
@@ -51,30 +66,34 @@ export default function ScheduledMessagesPage() {
   }
 
   async function cancelMessage(messageId: string) {
-    if (!confirm('Are you sure you want to cancel this scheduled message?')) {
-      return;
-    }
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Cancel Message',
+      message: 'Are you sure you want to cancel this scheduled message?',
+      onConfirm: async () => {
+        setCancelling(messageId);
+        try {
+          const response = await fetch(`/api/messages/schedule?id=${messageId}`, {
+            method: 'DELETE',
+          });
+          const data = await response.json();
 
-    setCancelling(messageId);
-    try {
-      const response = await fetch(`/api/messages/schedule?id=${messageId}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-
-      if (data.ok) {
-        toast.success('Message cancelled successfully');
-        // Remove from list
-        setScheduledMessages(prev => prev.filter(msg => msg.id !== messageId));
-      } else {
-        toast.error(data.error || 'Failed to cancel message');
+          if (data.ok) {
+            toast.success('Message cancelled successfully');
+            // Remove from list
+            setScheduledMessages(prev => prev.filter(msg => msg.id !== messageId));
+          } else {
+            toast.error(data.error || 'Failed to cancel message');
+          }
+        } catch (error) {
+          console.error('Error cancelling message:', error);
+          toast.error('Failed to cancel message');
+        } finally {
+          setCancelling(null);
+        }
       }
-    } catch (error) {
-      console.error('Error cancelling message:', error);
-      toast.error('Failed to cancel message');
-    } finally {
-      setCancelling(null);
-    }
+    });
   }
 
   function getStatusColor(status: string) {
@@ -124,6 +143,17 @@ export default function ScheduledMessagesPage() {
 
   return (
     <div className="space-y-4">
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        cancelText="Cancel"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Scheduled Messages</h1>

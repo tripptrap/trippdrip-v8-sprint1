@@ -20,6 +20,7 @@ import PrivacyPolicyPage from '../../(public)/privacy/page';
 import TermsOfServicePage from '../../(public)/terms/page';
 import CompliancePage from '../../(public)/compliance/page';
 import RefundPolicyPage from '../../(public)/refund/page';
+import CustomModal from '@/components/CustomModal';
 
 type AvailableNumber = {
   phoneNumber: string;
@@ -31,7 +32,7 @@ type AvailableNumber = {
 
 export default function Page() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [activeTab, setActiveTab] = useState<'sms' | 'email' | 'spam' | 'autorefill' | 'numbers' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'account'>('sms');
+  const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'account'>('sms');
   const [saveMessage, setSaveMessage] = useState('');
 
   // Twilio account creation
@@ -71,22 +72,63 @@ export default function Page() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // Modal state
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'alert'
+  });
+
+  // Helper functions for modals
+  const showAlert = (message: string, title: string = 'Alert') => {
+    setModalState({
+      isOpen: true,
+      title,
+      message,
+      type: 'alert',
+      onConfirm: () => setModalState(prev => ({ ...prev, isOpen: false }))
+    });
+  };
+
+  const showConfirm = (message: string, onConfirm: () => void, title: string = 'Confirm') => {
+    setModalState({
+      isOpen: true,
+      title,
+      message,
+      type: 'confirm',
+      onConfirm: () => {
+        setModalState(prev => ({ ...prev, isOpen: false }));
+        onConfirm();
+      },
+      onCancel: () => setModalState(prev => ({ ...prev, isOpen: false }))
+    });
+  };
+
   useEffect(() => {
-    const data = loadSettings();
-    setSettings(data);
+    async function loadData() {
+      const data = await loadSettings();
+      setSettings(data);
 
-    setSpamEnabled(data.spamProtection.enabled);
-    setBlockOnHighRisk(data.spamProtection.blockOnHighRisk);
-    setMaxHourly(data.spamProtection.maxHourlyMessages);
-    setMaxDaily(data.spamProtection.maxDailyMessages);
+      setSpamEnabled(data.spamProtection.enabled);
+      setBlockOnHighRisk(data.spamProtection.blockOnHighRisk);
+      setMaxHourly(data.spamProtection.maxHourlyMessages);
+      setMaxDaily(data.spamProtection.maxDailyMessages);
 
-    setAutoRefillEnabled(data.autoRefill.enabled);
-    setAutoRefillThreshold(data.autoRefill.threshold);
-    setAutoRefillAmount(data.autoRefill.amount);
+      setAutoRefillEnabled(data.autoRefill.enabled);
+      setAutoRefillThreshold(data.autoRefill.threshold);
+      setAutoRefillAmount(data.autoRefill.amount);
 
-    // Load email settings
-    if (data.email) {
-      setEmailProvider(data.email.provider);
+      // Load email settings
+      if (data.email) {
+        setEmailProvider(data.email.provider);
       setSmtpHost(data.email.smtpHost || '');
       setSmtpPort(data.email.smtpPort || 587);
       setSmtpUser(data.email.smtpUser || '');
@@ -96,14 +138,17 @@ export default function Page() {
       setFromEmail(data.email.fromEmail || '');
       setFromName(data.email.fromName || '');
       setReplyTo(data.email.replyTo || '');
+      }
+
+      // Listen for updates
+      const handler = (e: any) => {
+        setSettings(e.detail);
+      };
+      window.addEventListener('settingsUpdated', handler);
+      return () => window.removeEventListener('settingsUpdated', handler);
     }
 
-    // Listen for updates
-    const handler = (e: any) => {
-      setSettings(e.detail);
-    };
-    window.addEventListener('settingsUpdated', handler);
-    return () => window.removeEventListener('settingsUpdated', handler);
+    loadData();
   }, []);
 
   const handleCreateTwilioAccount = async () => {
@@ -121,7 +166,7 @@ export default function Page() {
       const result = await response.json();
 
       if (result.setup) {
-        alert('Twilio integration not configured. Please add TWILIO_MASTER_ACCOUNT_SID and TWILIO_MASTER_AUTH_TOKEN to your .env.local file.');
+        showAlert('Twilio integration not configured. Please add TWILIO_MASTER_ACCOUNT_SID and TWILIO_MASTER_AUTH_TOKEN to your .env.local file.', 'Configuration Required');
         setCreatingAccount(false);
         return;
       }
@@ -138,7 +183,7 @@ export default function Page() {
         purchasedNumbers: []
       });
 
-      const updated = loadSettings();
+      const updated = await loadSettings();
       setSettings(updated);
 
       showSaveMessage('Twilio account created successfully! Now you can purchase phone numbers.');
@@ -146,7 +191,7 @@ export default function Page() {
 
     } catch (error: any) {
       console.error('Error creating Twilio account:', error);
-      alert('Error: ' + error.message);
+      showAlert('Error: ' + error.message, 'Error');
     } finally {
       setCreatingAccount(false);
     }
@@ -154,7 +199,7 @@ export default function Page() {
 
   const handleSearchNumbers = async () => {
     if (!settings?.twilio) {
-      alert('Please create a Twilio account first');
+      showAlert('Please create a Twilio account first', 'Account Required');
       return;
     }
 
@@ -181,12 +226,12 @@ export default function Page() {
 
       setAvailableNumbers(result.numbers);
       if (result.numbers.length === 0) {
-        alert('No numbers found. Try a different area code.');
+        showAlert('No numbers found. Try a different area code.', 'No Results');
       }
 
     } catch (error: any) {
       console.error('Error searching numbers:', error);
-      alert('Error: ' + error.message);
+      showAlert('Error: ' + error.message, 'Error');
     } finally {
       setSearchingNumbers(false);
     }
@@ -194,13 +239,21 @@ export default function Page() {
 
   const handlePurchaseNumber = async (phoneNumber: string) => {
     if (!settings?.twilio) {
-      alert('Twilio not configured');
+      showAlert('Twilio not configured', 'Configuration Error');
       return;
     }
 
-    if (!confirm(`Purchase ${phoneNumber} for approximately $1/month?`)) {
-      return;
-    }
+    showConfirm(
+      `Purchase ${phoneNumber} for approximately $1/month?`,
+      async () => {
+        await executePurchaseNumber(phoneNumber);
+      },
+      'Purchase Number'
+    );
+  };
+
+  const executePurchaseNumber = async (phoneNumber: string) => {
+    if (!settings?.twilio) return;
 
     setPurchasingNumber(phoneNumber);
 
@@ -224,7 +277,7 @@ export default function Page() {
       // Add to settings
       addPhoneNumber(result.phoneNumber, result.sid, result.friendlyName);
 
-      const updated = loadSettings();
+      const updated = await loadSettings();
       setSettings(updated);
 
       // Remove from available list
@@ -234,7 +287,7 @@ export default function Page() {
 
     } catch (error: any) {
       console.error('Error purchasing number:', error);
-      alert('Error: ' + error.message);
+      showAlert('Error: ' + error.message, 'Error');
     } finally {
       setPurchasingNumber(null);
     }
@@ -243,13 +296,21 @@ export default function Page() {
   const handleReleaseNumber = async (phoneNumber: string) => {
     if (!settings?.twilio) return;
 
-    if (!confirm(`Release ${phoneNumber}? This will cancel your subscription to this number.`)) {
-      return;
-    }
+    showConfirm(
+      `Release ${phoneNumber}? This will cancel your subscription to this number.`,
+      async () => {
+        await executeReleaseNumber(phoneNumber);
+      },
+      'Release Number'
+    );
+  };
+
+  const executeReleaseNumber = async (phoneNumber: string) => {
+    if (!settings?.twilio) return;
 
     const sid = getPhoneNumberSid(phoneNumber);
     if (!sid) {
-      alert('Could not find SID for this number');
+      showAlert('Could not find SID for this number', 'Error');
       return;
     }
 
@@ -273,14 +334,14 @@ export default function Page() {
       // Remove from settings
       removePhoneNumber(phoneNumber);
 
-      const updated = loadSettings();
+      const updated = await loadSettings();
       setSettings(updated);
 
       showSaveMessage(`Released ${phoneNumber} successfully`);
 
     } catch (error: any) {
       console.error('Error releasing number:', error);
-      alert('Error: ' + error.message);
+      showAlert('Error: ' + error.message, 'Error');
     }
   };
 
@@ -303,7 +364,7 @@ export default function Page() {
     showSaveMessage('Auto-refill settings saved!');
   };
 
-  const saveEmailSettings = () => {
+  const saveEmailSettings = async () => {
     const config: EmailConfig = {
       provider: emailProvider,
       fromEmail,
@@ -321,8 +382,8 @@ export default function Page() {
       config.sendgridApiKey = sendgridApiKey;
     }
 
-    updateEmailConfig(config);
-    const updated = loadSettings();
+    await updateEmailConfig(config);
+    const updated = await loadSettings();
     setSettings(updated);
     showSaveMessage('Email settings saved!');
   };
@@ -397,16 +458,6 @@ export default function Page() {
           }`}
         >
           Phone Numbers
-        </button>
-        <button
-          onClick={() => setActiveTab('email')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'email'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
-          }`}
-        >
-          Email
         </button>
         <button
           onClick={() => setActiveTab('spam')}
@@ -833,182 +884,6 @@ export default function Page() {
         </div>
       )}
 
-      {/* Email Configuration Tab */}
-      {activeTab === 'email' && (
-        <div className="card space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold mb-2">Email Configuration</h2>
-            <p className="text-white/70 mb-4">
-              Configure email settings to send welcome emails to new leads automatically.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Email Provider</label>
-              <select
-                value={emailProvider}
-                onChange={(e) => setEmailProvider(e.target.value as 'smtp' | 'sendgrid' | 'none')}
-                className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-              >
-                <option value="none">None (Disabled)</option>
-                <option value="smtp">SMTP</option>
-                <option value="sendgrid">SendGrid</option>
-              </select>
-            </div>
-
-            {/* Common email fields */}
-            {emailProvider !== 'none' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">From Email *</label>
-                  <input
-                    type="email"
-                    value={fromEmail}
-                    onChange={(e) => setFromEmail(e.target.value)}
-                    placeholder="noreply@yourdomain.com"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">From Name *</label>
-                  <input
-                    type="text"
-                    value={fromName}
-                    onChange={(e) => setFromName(e.target.value)}
-                    placeholder="Your Company Name"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Reply-To Email (Optional)</label>
-                  <input
-                    type="email"
-                    value={replyTo}
-                    onChange={(e) => setReplyTo(e.target.value)}
-                    placeholder="support@yourdomain.com"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* SMTP specific fields */}
-            {emailProvider === 'smtp' && (
-              <>
-                <div className="border-t pt-4 mt-4">
-                  <h3 className="font-medium mb-3">SMTP Settings</h3>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Host *</label>
-                  <input
-                    type="text"
-                    value={smtpHost}
-                    onChange={(e) => setSmtpHost(e.target.value)}
-                    placeholder="smtp.gmail.com"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Port *</label>
-                  <input
-                    type="number"
-                    value={smtpPort}
-                    onChange={(e) => setSmtpPort(Number(e.target.value))}
-                    placeholder="587"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                  <p className="text-sm text-white/60 mt-1">Common ports: 587 (TLS), 465 (SSL), 25 (Unsecured)</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Username *</label>
-                  <input
-                    type="text"
-                    value={smtpUser}
-                    onChange={(e) => setSmtpUser(e.target.value)}
-                    placeholder="your-email@gmail.com"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">SMTP Password *</label>
-                  <input
-                    type="password"
-                    value={smtpPass}
-                    onChange={(e) => setSmtpPass(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="smtpSecure"
-                    checked={smtpSecure}
-                    onChange={(e) => setSmtpSecure(e.target.checked)}
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="smtpSecure" className="text-sm">
-                    Use SSL/TLS (Port 465)
-                  </label>
-                </div>
-              </>
-            )}
-
-            {/* SendGrid specific fields */}
-            {emailProvider === 'sendgrid' && (
-              <>
-                <div className="border-t pt-4 mt-4">
-                  <h3 className="font-medium mb-3">SendGrid Settings</h3>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">SendGrid API Key *</label>
-                  <input
-                    type="password"
-                    value={sendgridApiKey}
-                    onChange={(e) => setSendgridApiKey(e.target.value)}
-                    placeholder="SG.••••••••"
-                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
-                  />
-                  <p className="text-sm text-white/60 mt-1">
-                    Get your API key from <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" className="text-[var(--accent)] hover:underline">SendGrid Dashboard</a>
-                  </p>
-                </div>
-              </>
-            )}
-
-            {emailProvider !== 'none' && (
-              <>
-                <button
-                  onClick={saveEmailSettings}
-                  className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:opacity-90"
-                >
-                  Save Email Settings
-                </button>
-
-                <div className="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h3 className="font-medium text-blue-900 mb-2">How Email Works</h3>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Welcome emails are automatically sent when new leads are imported</li>
-                    <li>• Each email costs 0.5 points (deducted from your balance)</li>
-                    <li>• Emails are only sent to leads that have an email address</li>
-                    <li>• View sent emails on the <a href="/email" className="font-medium underline">Email page</a></li>
-                  </ul>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Privacy Policy Tab */}
       {activeTab === 'privacy' && <PrivacyPolicyPage />}
 
@@ -1094,6 +969,18 @@ export default function Page() {
           </div>
         </div>
       )}
+
+      {/* Custom Modal */}
+      <CustomModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+        title={modalState.title}
+        type={modalState.type}
+        onConfirm={modalState.onConfirm}
+        onCancel={modalState.onCancel}
+      >
+        <p className="text-white/80">{modalState.message}</p>
+      </CustomModal>
     </div>
   );
 }

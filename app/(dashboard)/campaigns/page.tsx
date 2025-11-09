@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import CustomModal from "@/components/CustomModal";
 
 type Campaign = {
   id: string;
@@ -15,10 +16,24 @@ type Campaign = {
   credits_used?: number;
 };
 
+type ModalState = {
+  isOpen: boolean;
+  type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+};
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadCampaigns();
@@ -40,25 +55,39 @@ export default function CampaignsPage() {
   }
 
   async function deleteCampaign(id: string, name: string) {
-    if (!confirm(`Are you sure you want to delete campaign "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Campaign',
+      message: `Are you sure you want to delete campaign "${name}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/campaigns/delete?id=${id}`, {
+            method: 'DELETE',
+          });
+          const data = await response.json();
 
-    try {
-      const response = await fetch(`/api/campaigns/delete?id=${id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-
-      if (data.ok) {
-        await loadCampaigns();
-      } else {
-        alert(`Error: ${data.error || 'Failed to delete campaign'}`);
+          if (data.ok) {
+            await loadCampaigns();
+          } else {
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Error',
+              message: `Error: ${data.error || 'Failed to delete campaign'}`
+            });
+          }
+        } catch (error) {
+          console.error('Error deleting campaign:', error);
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete campaign'
+          });
+        }
       }
-    } catch (error) {
-      console.error('Error deleting campaign:', error);
-      alert('Failed to delete campaign');
-    }
+    });
   }
 
   const filteredCampaigns = campaigns.filter(campaign =>
@@ -68,6 +97,17 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        cancelText="Cancel"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[#e7eef9]">Campaigns</h1>

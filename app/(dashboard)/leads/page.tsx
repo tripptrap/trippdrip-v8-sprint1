@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getTemperatureDisplay } from "@/lib/leadScoring";
+import CustomModal from "@/components/CustomModal";
 
 type Lead = {
   id?: string | number;
@@ -40,6 +41,14 @@ type Campaign = {
   lead_count?: number;
 };
 
+type ModalState = {
+  isOpen: boolean;
+  type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+};
+
 const CANON_FIELDS = ["first_name","last_name","phone","email","state","zip_code","tags","status"] as const;
 type Canon = typeof CANON_FIELDS[number];
 type MapType = Record<Canon, string | "">;
@@ -52,6 +61,12 @@ function cap(s: string){ return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
 export default function LeadsPage() {
   const [toast, setToast] = useState<string>("");
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   /* Leads + filters */
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -126,26 +141,30 @@ export default function LeadsPage() {
   }
 
   async function deleteLead(id: string, name: string) {
-    if (!confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      return;
-    }
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Lead',
+      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/leads/delete?id=${id}`, { method: 'DELETE' });
+          const data = await res.json();
 
-    try {
-      const res = await fetch(`/api/leads/delete?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-
-      if (data.ok) {
-        setToast('Lead deleted successfully');
-        setTimeout(()=>setToast(''), 2500);
-        await fetchLeads();
-      } else {
-        setToast(`Error: ${data.error || 'Failed to delete lead'}`);
-        setTimeout(()=>setToast(''), 3500);
+          if (data.ok) {
+            setToast('Lead deleted successfully');
+            setTimeout(()=>setToast(''), 2500);
+            await fetchLeads();
+          } else {
+            setToast(`Error: ${data.error || 'Failed to delete lead'}`);
+            setTimeout(()=>setToast(''), 3500);
+          }
+        } catch (e: any) {
+          setToast(`Error: ${e?.message || 'Failed to delete lead'}`);
+          setTimeout(()=>setToast(''), 3500);
+        }
       }
-    } catch (e: any) {
-      setToast(`Error: ${e?.message || 'Failed to delete lead'}`);
-      setTimeout(()=>setToast(''), 3500);
-    }
+    });
   }
 
   async function deleteSelectedLeads() {
@@ -155,28 +174,32 @@ export default function LeadsPage() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} lead(s)? This action cannot be undone.`)) {
-      return;
-    }
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Leads',
+      message: `Are you sure you want to delete ${selectedIds.size} lead(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          const ids = Array.from(selectedIds).join(',');
+          const res = await fetch(`/api/leads/delete?ids=${ids}`, { method: 'DELETE' });
+          const data = await res.json();
 
-    try {
-      const ids = Array.from(selectedIds).join(',');
-      const res = await fetch(`/api/leads/delete?ids=${ids}`, { method: 'DELETE' });
-      const data = await res.json();
-
-      if (data.ok) {
-        setToast(`${data.deletedCount} lead(s) deleted successfully`);
-        setTimeout(()=>setToast(''), 2500);
-        setSelectedIds(new Set());
-        await fetchLeads();
-      } else {
-        setToast(`Error: ${data.error || 'Failed to delete leads'}`);
-        setTimeout(()=>setToast(''), 3500);
+          if (data.ok) {
+            setToast(`${data.deletedCount} lead(s) deleted successfully`);
+            setTimeout(()=>setToast(''), 2500);
+            setSelectedIds(new Set());
+            await fetchLeads();
+          } else {
+            setToast(`Error: ${data.error || 'Failed to delete leads'}`);
+            setTimeout(()=>setToast(''), 3500);
+          }
+        } catch (e: any) {
+          setToast(`Error: ${e?.message || 'Failed to delete leads'}`);
+          setTimeout(()=>setToast(''), 3500);
+        }
       }
-    } catch (e: any) {
-      setToast(`Error: ${e?.message || 'Failed to delete leads'}`);
-      setTimeout(()=>setToast(''), 3500);
-    }
+    });
   }
 
   async function updateDisposition(id: string, disposition: string) {
@@ -246,34 +269,38 @@ export default function LeadsPage() {
       return;
     }
 
-    if (!confirm(`Delete ${selectedIds.size} selected lead(s)? This action cannot be undone.`)) {
-      return;
-    }
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Leads',
+      message: `Delete ${selectedIds.size} selected lead(s)? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/leads/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadIds: Array.from(selectedIds)
+            })
+          });
+          const data = await res.json();
 
-    try {
-      const res = await fetch('/api/leads/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          leadIds: Array.from(selectedIds)
-        })
-      });
-      const data = await res.json();
-
-      if (data.ok) {
-        setToast(`${data.deletedCount} lead(s) deleted successfully`);
-        setTimeout(()=>setToast(''), 2500);
-        setBulkActionModal(null);
-        setSelectedIds(new Set());
-        await fetchLeads();
-      } else {
-        setToast(`Error: ${data.error || 'Failed to delete leads'}`);
-        setTimeout(()=>setToast(''), 3500);
+          if (data.ok) {
+            setToast(`${data.deletedCount} lead(s) deleted successfully`);
+            setTimeout(()=>setToast(''), 2500);
+            setBulkActionModal(null);
+            setSelectedIds(new Set());
+            await fetchLeads();
+          } else {
+            setToast(`Error: ${data.error || 'Failed to delete leads'}`);
+            setTimeout(()=>setToast(''), 3500);
+          }
+        } catch (e: any) {
+          setToast(`Error: ${e?.message || 'Failed to delete leads'}`);
+          setTimeout(()=>setToast(''), 3500);
+        }
       }
-    } catch (e: any) {
-      setToast(`Error: ${e?.message || 'Failed to delete leads'}`);
-      setTimeout(()=>setToast(''), 3500);
-    }
+    });
   }
 
   async function bulkCreateFollowUps() {
@@ -555,43 +582,55 @@ export default function LeadsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const proceed = confirm(
-      `AI will parse "${file.name}" and extract lead information.\n\n` +
-      `This costs 3 points. Continue?`
-    );
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'AI Parse Document',
+      message: `AI will parse "${file.name}" and extract lead information.\n\nThis costs 3 points. Continue?`,
+      onConfirm: async () => {
+        setBusy(true);
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("campaignName", "");
+          fd.append("tags", "[]");
 
-    if (!proceed) {
-      e.target.value = "";
-      return;
-    }
+          const res = await fetch("/api/leads/upload-document", {
+            method: "POST",
+            body: fd,
+          });
 
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("campaignName", "");
-      fd.append("tags", "[]");
+          const result = await res.json();
 
-      const res = await fetch("/api/leads/upload-document", {
-        method: "POST",
-        body: fd,
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        setToast(
-          `${result.message}\n` +
-          `Points used: ${result.pointsUsed || 0}`
-        );
-        fetchLeads();
-      } else {
-        alert(`Error: ${result.error || "Failed to parse document"}`);
+          if (result.success) {
+            setToast(
+              `${result.message}\n` +
+              `Points used: ${result.pointsUsed || 0}`
+            );
+            fetchLeads();
+          } else {
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Error',
+              message: `Error: ${result.error || "Failed to parse document"}`
+            });
+          }
+        } catch (err: any) {
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: `Error: ${err?.message || "Upload failed"}`
+          });
+        } finally {
+          setBusy(false);
+          e.target.value = "";
+        }
       }
-    } catch (err: any) {
-      alert(`Error: ${err?.message || "Upload failed"}`);
-    } finally {
-      setBusy(false);
+    });
+
+    if (!modal.isOpen) {
       e.target.value = "";
     }
   }
@@ -755,6 +794,17 @@ export default function LeadsPage() {
           {toast}
         </div>
       )}
+
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        cancelText="Cancel"
+      />
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

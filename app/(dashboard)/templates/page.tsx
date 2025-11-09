@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import CustomModal from "@/components/CustomModal";
 
 type DripMessage = {
   message: string;
@@ -238,6 +239,17 @@ export default function FlowsPage() {
   const [tempFlowName, setTempFlowName] = useState("");
   const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(false);
   const [createdAppointments, setCreatedAppointments] = useState<Array<{title: string, date: string, time: string, eventId?: string, htmlLink?: string}>>([]);
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   useEffect(() => {
     loadFlows().then(setFlows).catch(e => {
@@ -267,7 +279,12 @@ export default function FlowsPage() {
 
   async function createNewFlow() {
     if (!newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting) {
-      alert("Please fill in all required fields");
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing Information',
+        message: 'Please fill in all required fields'
+      });
       return;
     }
 
@@ -319,11 +336,21 @@ export default function FlowsPage() {
         setRequiresCall(false);
         setShowNewFlowDialog(false);
       } else {
-        alert("Failed to generate flow. Please try again.");
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Generation Failed',
+          message: 'Failed to generate flow. Please try again.'
+        });
       }
     } catch (error) {
       console.error("Error generating flow:", error);
-      alert("Error generating flow. Please try again.");
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error generating flow. Please try again.'
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -354,7 +381,12 @@ export default function FlowsPage() {
       setShowDeleteConfirm(false);
       setFlowToDelete(null);
     } else {
-      alert("Failed to delete flow. Please try again.");
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Failed to delete flow. Please try again.'
+      });
     }
   }
 
@@ -488,7 +520,12 @@ export default function FlowsPage() {
 
   async function generateAndInsertStep() {
     if (!selectedFlow || !stepPurpose.trim()) {
-      alert("Please describe what this step is for");
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing Information',
+        message: 'Please describe what this step is for'
+      });
       return;
     }
 
@@ -546,11 +583,21 @@ export default function FlowsPage() {
         setShowStepDialog(false);
         setInsertAfterIndex(-1);
       } else {
-        alert(data.error || "Failed to generate step. Please try again.");
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Generation Failed',
+          message: data.error || 'Failed to generate step. Please try again.'
+        });
       }
     } catch (error) {
       console.error("Error generating step:", error);
-      alert("Error generating step. Please try again.");
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error generating step. Please try again.'
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -558,7 +605,12 @@ export default function FlowsPage() {
 
   function saveManualStep() {
     if (!selectedFlow || !manualStep.yourMessage.trim()) {
-      alert("Please enter a message for this step");
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing Information',
+        message: 'Please enter a message for this step'
+      });
       return;
     }
 
@@ -602,7 +654,12 @@ export default function FlowsPage() {
   function deleteStep(stepId: string) {
     if (!selectedFlow) return;
     if (selectedFlow.steps.length <= 1) {
-      alert("Flow must have at least one step");
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Cannot Delete',
+        message: 'Flow must have at least one step'
+      });
       return;
     }
 
@@ -681,7 +738,12 @@ export default function FlowsPage() {
 
   function startTestFlow() {
     if (!selectedFlow || !selectedFlow.steps || selectedFlow.steps.length === 0) {
-      alert("No steps in flow to test");
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Cannot Test',
+        message: 'No steps in flow to test'
+      });
       return;
     }
 
@@ -1860,7 +1922,12 @@ export default function FlowsPage() {
                 <button
                   onClick={() => {
                     if (!manualFlowMessage.trim()) {
-                      alert("Please enter a message");
+                      setModal({
+                        isOpen: true,
+                        type: 'warning',
+                        title: 'Missing Information',
+                        message: 'Please enter a message'
+                      });
                       return;
                     }
 
@@ -1876,12 +1943,22 @@ export default function FlowsPage() {
                 <button
                   onClick={() => {
                     if (!manualFlowName.trim()) {
-                      alert("Please enter a flow name");
+                      setModal({
+                        isOpen: true,
+                        type: 'warning',
+                        title: 'Missing Information',
+                        message: 'Please enter a flow name'
+                      });
                       return;
                     }
 
                     if (manualFlowSteps.length === 0 && !manualFlowMessage.trim()) {
-                      alert("Please add at least one step");
+                      setModal({
+                        isOpen: true,
+                        type: 'warning',
+                        title: 'Missing Information',
+                        message: 'Please add at least one step'
+                      });
                       return;
                     }
 
@@ -2069,6 +2146,15 @@ export default function FlowsPage() {
           </div>
         </div>
       )}
+
+      {/* Custom Modal */}
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+      />
     </div>
   );
 }

@@ -1,252 +1,288 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import toast from 'react-hot-toast';
+import CustomModal from "@/components/CustomModal";
 
-type Email = {
-  id: string;
-  to: string;
-  subject: string;
-  body: string;
-  sent_at: string;
-  status: 'sent' | 'failed';
-  error?: string;
-  lead_id?: number;
-};
-
-export default function EmailPage() {
-  const [emails, setEmails] = useState<Email[]>([]);
+export default function CalendarPage() {
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [disconnectingCalendar, setDisconnectingCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'alert',
+  });
 
   useEffect(() => {
-    loadEmails();
+    checkCalendarConnection();
+
+    // Check for calendar connection status from OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('calendar_connected') === 'true') {
+      setCalendarConnected(true);
+      toast.success('Google Calendar connected successfully!');
+      window.history.replaceState({}, '', '/email');
+    } else if (urlParams.get('calendar_error')) {
+      toast.error(`Calendar connection error: ${urlParams.get('calendar_error')}`);
+      window.history.replaceState({}, '', '/email');
+    }
   }, []);
 
-  async function loadEmails() {
-    setLoading(true);
+  const checkCalendarConnection = async () => {
     try {
-      const response = await fetch('/api/emails');
+      const response = await fetch('/api/calendar/status');
       const data = await response.json();
-      if (data.ok) {
-        setEmails(data.items || []);
-      }
+      setCalendarConnected(data.connected || false);
     } catch (error) {
-      console.error('Error loading emails:', error);
+      console.error('Error checking calendar connection:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConnectCalendar = async () => {
+    setConnectingCalendar(true);
+    try {
+      const response = await fetch('/api/calendar/oauth');
+      const data = await response.json();
+
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        toast.error('Failed to initiate calendar connection');
+        setConnectingCalendar(false);
+      }
+    } catch (error: any) {
+      console.error('Error connecting calendar:', error);
+      toast.error(`Error: ${error.message}`);
+      setConnectingCalendar(false);
+    }
+  };
+
+  const handleDisconnectCalendar = async () => {
+    setModalState({
+      isOpen: true,
+      title: 'Disconnect Calendar',
+      message: 'Are you sure you want to disconnect Google Calendar?',
+      type: 'confirm',
+      onConfirm: async () => {
+        setDisconnectingCalendar(true);
+        try {
+          const response = await fetch('/api/calendar/disconnect', {
+            method: 'POST'
+          });
+
+          if (response.ok) {
+            setCalendarConnected(false);
+            toast.success('Google Calendar disconnected successfully');
+          } else {
+            toast.error('Failed to disconnect calendar');
+          }
+        } catch (error: any) {
+          console.error('Error disconnecting calendar:', error);
+          toast.error(`Error: ${error.message}`);
+        } finally {
+          setDisconnectingCalendar(false);
+        }
+      }
+    });
+  };
+
+  const closeModal = () => {
+    setModalState({
+      isOpen: false,
+      title: '',
+      message: '',
+      type: 'alert',
+    });
+  };
+
+  const handleModalConfirm = () => {
+    if (modalState.onConfirm) {
+      modalState.onConfirm();
+    }
+    closeModal();
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">Google Calendar</h1>
+        <div className="card p-8 text-center text-white/60">Loading...</div>
+      </div>
+    );
   }
-
-  const filteredEmails = emails.filter(email =>
-    email.to.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    email.subject.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const sentCount = emails.filter(e => e.status === 'sent').length;
-  const failedCount = emails.filter(e => e.status === 'failed').length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Email</h1>
-          <p className="text-[#9fb0c3] mt-1">View sent emails and configure email settings</p>
-        </div>
-        <Link
-          href="/settings?tab=email"
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-        >
-          Email Settings
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold">Google Calendar</h1>
+        <p className="text-white/70 mt-1">Connect your Google Calendar to enable AI-powered appointment scheduling</p>
       </div>
 
-      {/* Search */}
-      <div className="card">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by recipient or subject..."
-          className="w-full px-4 py-2 border rounded-lg"
-        />
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Total Emails</div>
-          <div className="text-3xl font-bold">{emails.length}</div>
-        </div>
-        <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Sent Successfully</div>
-          <div className="text-3xl font-bold text-green-600">{sentCount}</div>
-        </div>
-        <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Failed</div>
-          <div className="text-3xl font-bold text-red-600">{failedCount}</div>
-        </div>
-      </div>
-
-      {/* Emails List */}
-      <div className="card p-0">
-        {loading ? (
-          <div className="p-8 text-center text-[#9fb0c3]">Loading emails...</div>
-        ) : filteredEmails.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="text-[#9fb0c3] mb-4">
-              {searchQuery ? 'No emails found matching your search.' : 'No emails sent yet.'}
-            </div>
-            {!searchQuery && (
-              <div className="text-sm text-[#5a6b7f]">
-                Emails are automatically sent to new leads when you import them.
-                <br />
-                <Link href="/leads" className="text-blue-400 hover:underline">
-                  Import Leads
-                </Link>
-                {' '}to start sending welcome emails.
-              </div>
-            )}
+      {calendarConnected ? (
+        <div className="space-y-4">
+          <div className="card bg-green-500/10 border-green-500/30">
+            <h3 className="text-lg font-semibold text-green-400 mb-2">Calendar Connected</h3>
+            <p className="text-white/80">
+              Your Google Calendar is connected and ready to use.
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[#0c1420]/30 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Recipient</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Subject</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Sent At</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredEmails.map((email) => (
-                  <tr key={email.id} className="hover:bg-[#0c1420]/50">
-                    <td className="px-4 py-3">
-                      {email.status === 'sent' ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Sent
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Failed
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{email.to}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="max-w-xs truncate">{email.subject}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#9fb0c3]">
-                      {new Date(email.sent_at).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => setSelectedEmail(email)}
-                        className="text-blue-400 hover:underline text-sm"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="card">
+            <h3 className="text-lg font-medium mb-3">What You Can Do</h3>
+            <ul className="text-white/70 space-y-2">
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>AI can check your availability before scheduling meetings</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Automatically create calendar events when booking appointments</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Send calendar invites to leads via email</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Sync all lead interactions to your calendar</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Get email and popup reminders for upcoming appointments</span>
+              </li>
+            </ul>
           </div>
-        )}
-      </div>
 
-      {/* Email Detail Modal */}
-      {selectedEmail && (
-        <div
-          className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4"
-          onClick={() => setSelectedEmail(null)}
-        >
-          <div
-            className="bg-[#0f1722] border border-[#1a2637] rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-[#1a2637]">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold text-[#e7eef9]">Email Details</h2>
-                <button
-                  onClick={() => setSelectedEmail(null)}
-                  className="text-[#9fb0c3] hover:text-[#e7eef9] text-2xl"
-                >
-                  &times;
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedEmail.status === 'sent' ? (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Sent
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    Failed
-                  </span>
-                )}
-                <span className="text-sm text-[#9fb0c3]">
-                  {new Date(selectedEmail.sent_at).toLocaleString()}
-                </span>
-              </div>
-            </div>
+          <div className="card">
+            <h3 className="text-lg font-medium mb-3">Manage Connection</h3>
+            <button
+              onClick={handleDisconnectCalendar}
+              disabled={disconnectingCalendar}
+              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {disconnectingCalendar ? 'Disconnecting...' : 'Disconnect Calendar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="card bg-blue-500/10 border-blue-500/30">
+            <h3 className="text-xl font-semibold mb-3 text-blue-400">Connect Google Calendar</h3>
+            <p className="text-white/80 mb-4">
+              Connect your Google Calendar to enable smart scheduling features powered by AI.
+            </p>
+            <button
+              onClick={handleConnectCalendar}
+              disabled={connectingCalendar}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-lg hover:opacity-90 font-medium disabled:opacity-50 transition-all shadow-lg"
+            >
+              {connectingCalendar ? 'Connecting...' : 'Connect Google Calendar'}
+            </button>
+          </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#9fb0c3] mb-1">To</label>
-                <div className="text-[#e7eef9]">{selectedEmail.to}</div>
-              </div>
+          <div className="card">
+            <h3 className="text-lg font-medium mb-3">Features You'll Get</h3>
+            <ul className="text-white/70 space-y-2">
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>AI checks your calendar before suggesting meeting times</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Automatically create appointments when AI books meetings</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Send calendar invitations to leads</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Track all interactions in one place</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Email and popup reminders</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-green-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Completely free - no additional costs</span>
+              </li>
+            </ul>
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[#9fb0c3] mb-1">Subject</label>
-                <div className="text-[#e7eef9]">{selectedEmail.subject}</div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#9fb0c3] mb-1">Message</label>
-                <div className="bg-[#0c1420] border border-[#223246] rounded-lg p-4 whitespace-pre-wrap text-[#e7eef9]">
-                  {selectedEmail.body}
-                </div>
-              </div>
-
-              {selectedEmail.error && (
-                <div>
-                  <label className="block text-sm font-medium text-red-400 mb-1">Error</label>
-                  <div className="bg-red-900/20 border border-red-800/30 rounded-lg p-4 text-red-400">
-                    {selectedEmail.error}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t bg-[#0c1420]/30">
-              <button
-                onClick={() => setSelectedEmail(null)}
-                className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
-              >
-                Close
-              </button>
-            </div>
+          <div className="card bg-yellow-500/10 border-yellow-500/30">
+            <h3 className="text-lg font-medium text-yellow-400 mb-3">Privacy & Security</h3>
+            <ul className="text-white/70 space-y-2">
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>We only access your calendar data - nothing else</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span>OAuth 2.0 secure authentication</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+                <span>You can disconnect anytime</span>
+              </li>
+              <li className="flex items-start">
+                <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Your credentials are encrypted and secure</span>
+              </li>
+            </ul>
           </div>
         </div>
       )}
 
-      {/* Help */}
-      <div className="card bg-blue-900/20 border-blue-700/50">
-        <h3 className="font-semibold mb-2">About Email</h3>
-        <ul className="text-sm text-[#9fb0c3] space-y-1">
-          <li>• Welcome emails are automatically sent to new leads with email addresses</li>
-          <li>• Each email costs 0.5 points from your balance</li>
-          <li>• Configure your email provider in <Link href="/settings?tab=email" className="text-blue-400 hover:underline">Settings → Email</Link></li>
-          <li>• Supports SMTP (Gmail, Office 365, etc.) and SendGrid</li>
-          <li>• Track all sent emails and their delivery status here</li>
-        </ul>
-      </div>
+      <CustomModal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        onConfirm={modalState.type === 'confirm' ? handleModalConfirm : undefined}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import CustomModal from "@/components/CustomModal";
 
 type FollowUp = {
   id: string;
@@ -37,6 +38,14 @@ type Suggestion = {
   reason: string;
 };
 
+type ModalState = {
+  isOpen: boolean;
+  type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+};
+
 export default function FollowUpsPage() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -52,6 +61,12 @@ export default function FollowUpsPage() {
     notes: '',
     due_date: '',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+  });
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
   });
 
   useEffect(() => {
@@ -92,7 +107,12 @@ export default function FollowUpsPage() {
 
   async function createFollowUp() {
     if (!formData.title || !formData.due_date) {
-      alert('Please fill in required fields');
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing Fields',
+        message: 'Please fill in required fields'
+      });
       return;
     }
 
@@ -109,11 +129,21 @@ export default function FollowUpsPage() {
         setShowCreateModal(false);
         resetForm();
       } else {
-        alert(data.error || 'Failed to create follow-up');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to create follow-up'
+        });
       }
     } catch (error) {
       console.error('Error creating follow-up:', error);
-      alert('Failed to create follow-up');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to create follow-up'
+      });
     }
   }
 
@@ -129,32 +159,58 @@ export default function FollowUpsPage() {
       if (data.ok) {
         await loadFollowUps();
       } else {
-        alert(data.error || 'Failed to update follow-up');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to update follow-up'
+        });
       }
     } catch (error) {
       console.error('Error updating follow-up:', error);
-      alert('Failed to update follow-up');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update follow-up'
+      });
     }
   }
 
   async function deleteFollowUp(id: string) {
-    if (!confirm('Delete this follow-up?')) return;
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Follow-up',
+      message: 'Delete this follow-up?',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/follow-ups?id=${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`/api/follow-ups?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-      if (data.ok) {
-        await loadFollowUps();
-      } else {
-        alert(data.error || 'Failed to delete follow-up');
+          const data = await response.json();
+          if (data.ok) {
+            await loadFollowUps();
+          } else {
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Error',
+              message: data.error || 'Failed to delete follow-up'
+            });
+          }
+        } catch (error) {
+          console.error('Error deleting follow-up:', error);
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete follow-up'
+          });
+        }
       }
-    } catch (error) {
-      console.error('Error deleting follow-up:', error);
-      alert('Failed to delete follow-up');
-    }
+    });
   }
 
   async function createFromSuggestion(suggestion: Suggestion) {
@@ -177,13 +233,28 @@ export default function FollowUpsPage() {
         // Remove from suggestions
         setSuggestions(suggestions.filter(s => s.lead_id !== suggestion.lead_id));
         await loadFollowUps();
-        alert('Follow-up created successfully!');
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Follow-up created successfully!'
+        });
       } else {
-        alert(data.error || 'Failed to create follow-up');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to create follow-up'
+        });
       }
     } catch (error) {
       console.error('Error creating follow-up from suggestion:', error);
-      alert('Failed to create follow-up');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to create follow-up'
+      });
     }
   }
 
@@ -219,6 +290,17 @@ export default function FollowUpsPage() {
 
   return (
     <div className="space-y-6">
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        cancelText="Cancel"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[#e7eef9]">Follow-ups & Reminders</h1>

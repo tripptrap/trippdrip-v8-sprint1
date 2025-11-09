@@ -8,6 +8,7 @@ import { leads as seedLeads, threads as seedThreads, messages as seedMessages, f
 import { loadStore, saveStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { spendPoints, getPointsBalance } from "@/lib/pointsStore";
 import { calculateSMSCredits, getCharacterWarning } from "@/lib/creditCalculator";
+import CustomModal from "@/components/CustomModal";
 
 type Msg = { id:number; thread_id:number; direction:'in'|'out'; sender:'lead'|'agent'; body:string; created_at:string };
 type FlowStep = {
@@ -93,179 +94,22 @@ function TextsPageContent(){
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [flows, setFlows] = useState<ConversationFlow[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
-  function initializeDemoConversations() {
-    const demoLeads = [
-      {
-        id: "demo_lead_1",
-        first_name: "Sarah",
-        last_name: "Johnson",
-        phone: "+15551234567",
-        email: "sarah.johnson@example.com",
-        state: "CA",
-        tags: ["hot-lead", "interested", "demo"],
-        status: "active",
-        disposition: "qualified"
-      },
-      {
-        id: "demo_lead_2",
-        first_name: "Michael",
-        last_name: "Rodriguez",
-        phone: "+15559876543",
-        email: "m.rodriguez@example.com",
-        state: "TX",
-        tags: ["callback", "demo"],
-        status: "active",
-        disposition: "callback"
-      },
-      {
-        id: "demo_lead_3",
-        first_name: "Jennifer",
-        last_name: "Chen",
-        phone: "+15555551234",
-        email: "jennifer.chen@example.com",
-        state: "NY",
-        tags: ["sold", "demo", "vip"],
-        status: "sold",
-        disposition: "sold"
-      }
-    ];
-
-    const demoThreads = [
-      {
-        id: Date.now() + 1,
-        lead_id: "demo_lead_1",
-        lead_name: "Sarah Johnson",
-        lead_phone: "+15551234567",
-        channel: "sms",
-        last_message_snippet: "Great! It's 30% off all products until March 31st. Can I send you the catalog?",
-        last_sender: "agent",
-        unread: false,
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 35 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 2,
-        lead_id: "demo_lead_3",
-        lead_name: "Jennifer Chen",
-        lead_phone: "+15555551234",
-        channel: "sms",
-        last_message_snippet: "Just placed my order! Thanks so much!",
-        last_sender: "lead",
-        unread: true,
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 3,
-        lead_id: "demo_lead_2",
-        lead_name: "Michael Rodriguez",
-        lead_phone: "+15559876543",
-        channel: "sms",
-        last_message_snippet: "Can you call me back tomorrow? I have some questions.",
-        last_sender: "lead",
-        unread: true,
-        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
-      }
-    ];
-
-    const threadId1 = Date.now() + 1;
-    const threadId2 = Date.now() + 2;
-    const threadId3 = Date.now() + 3;
-
-    const demoMessages = [
-      // Sarah Johnson conversation
-      {
-        id: Date.now() + 10,
-        thread_id: threadId1,
-        direction: "out",
-        sender: "agent",
-        body: "Hi Sarah! Our Spring Sale is live with 30% off. Interested?",
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 11,
-        thread_id: threadId1,
-        direction: "in",
-        sender: "lead",
-        body: "Yes! Tell me more about this sale!",
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 12,
-        thread_id: threadId1,
-        direction: "out",
-        sender: "agent",
-        body: "Great! It's 30% off all products until March 31st. Can I send you the catalog?",
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 35 * 60 * 1000).toISOString()
-      },
-      // Jennifer Chen conversation (SOLD)
-      {
-        id: Date.now() + 13,
-        thread_id: threadId2,
-        direction: "out",
-        sender: "agent",
-        body: "Hi Jennifer! Our Spring Sale is live with 30% off. Interested?",
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 14,
-        thread_id: threadId2,
-        direction: "in",
-        sender: "lead",
-        body: "Absolutely! I've been waiting for this!",
-        created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 15,
-        thread_id: threadId2,
-        direction: "out",
-        sender: "agent",
-        body: "Perfect! I'll send you the details right now.",
-        created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 16,
-        thread_id: threadId2,
-        direction: "in",
-        sender: "lead",
-        body: "Just placed my order! Thanks so much!",
-        created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-      },
-      // Michael Rodriguez conversation
-      {
-        id: Date.now() + 17,
-        thread_id: threadId3,
-        direction: "out",
-        sender: "agent",
-        body: "Hey Michael, just checking in! Any questions about our service?",
-        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: Date.now() + 18,
-        thread_id: threadId3,
-        direction: "in",
-        sender: "lead",
-        body: "Can you call me back tomorrow? I have some questions.",
-        created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
-      }
-    ];
-
-    const s = loadStore() || { leads: [], threads: [], messages: [] };
-
-    // Add demo data
-    s.leads = [...demoLeads, ...s.leads];
-    s.threads = [...demoThreads, ...s.threads];
-    s.messages = [...demoMessages, ...s.messages];
-
-    saveStore(s);
-    alert('Demo conversations added! The page will refresh.');
-    window.location.reload();
-  }
   const search = useSearchParams();
 
-  const refresh = ()=>{ const s = loadStore(); if (s) setStore(s); };
+  const refresh = async ()=>{ const s = await loadStore(); if (s) setStore(s); };
 
   useEffect(()=>{
     refresh();
@@ -317,14 +161,14 @@ function TextsPageContent(){
   const activeLead   = useMemo(()=> activeThread ? findLead(activeThread.lead_id, store.leads) : null, [activeThread, store.leads]);
   const activeMsgs   = useMemo(()=> activeThread ? threadMessages(activeThread.id, store.messages) : [], [activeThread, store.messages]);
 
-  function sendSimulated(body:string){
+  async function sendSimulated(body:string){
     if (!activeThread) return;
-    const s = loadStore() || { leads:[], threads:[], messages:[] };
+    const s = await loadStore() || { leads:[], threads:[], messages:[] };
     const now = new Date().toISOString();
     s.messages.push({ id: Date.now(), thread_id: activeThread.id, direction: "out", sender: "agent", body, created_at: now });
     const th = s.threads.find((t:any)=> t.id===activeThread.id);
     if (th){ th.last_message_snippet = body; th.last_sender = "agent"; th.updated_at = now; th.unread = false; }
-    saveStore(s); // triggers live refresh via event
+    await saveStore(s); // triggers live refresh via event
   }
 
   async function scheduleMessage(body: string, scheduledFor: string) {
@@ -345,12 +189,27 @@ function TextsPageContent(){
       const data = await res.json();
 
       if (data.ok) {
-        alert(`Message scheduled for ${new Date(scheduledFor).toLocaleString()}`);
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Message Scheduled',
+          message: `Message scheduled for ${new Date(scheduledFor).toLocaleString()}`
+        });
       } else {
-        alert(`Error: ${data.error || 'Failed to schedule message'}`);
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Scheduling Failed',
+          message: data.error || 'Failed to schedule message'
+        });
       }
     } catch (e: any) {
-      alert(`Error: ${e?.message || 'Failed to schedule message'}`);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Scheduling Error',
+        message: e?.message || 'Failed to schedule message'
+      });
     }
   }
 
@@ -358,11 +217,17 @@ function TextsPageContent(){
     if (!activeThread || !activeLead) return;
 
     // Check points balance
-    const balance = getPointsBalance();
+    const balance = await getPointsBalance();
     if (balance < 1) {
-      if (confirm("You don't have enough points to generate an AI response. Would you like to purchase more points?")) {
-        window.location.href = "/points";
-      }
+      setModal({
+        isOpen: true,
+        type: 'confirm',
+        title: 'Insufficient Points',
+        message: "You don't have enough points to generate an AI response. Would you like to purchase more points?",
+        onConfirm: () => {
+          window.location.href = "/points";
+        }
+      });
       return;
     }
 
@@ -384,16 +249,26 @@ function TextsPageContent(){
       const data = await response.json();
       if (data.response) {
         // Deduct 1 point for AI response
-        const result = spendPoints(1, `AI response for ${activeLead.first_name} ${activeLead.last_name}`);
+        const result = await spendPoints(1, `AI response for ${activeLead.first_name} ${activeLead.last_name}`);
         if (result.success) {
-          sendSimulated(data.response);
+          await sendSimulated(data.response);
         } else {
-          alert("Failed to deduct points. Please try again.");
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Points Error',
+            message: 'Failed to deduct points. Please try again.'
+          });
         }
       }
     } catch (error) {
       console.error("Error generating AI response:", error);
-      alert("Failed to generate AI response");
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'AI Response Error',
+        message: 'Failed to generate AI response'
+      });
     } finally {
       setIsGeneratingResponse(false);
     }
@@ -448,7 +323,7 @@ function TextsPageContent(){
 {rows.map((t:any)=> {
                 const L = findLead(t.lead_id, store.leads);
                 const active = t.id === activeThreadId;
-                const flowStepTag = getThreadFlowStep(t.id);
+                const flowStepTag = t.flow_config;
                 const isSold = L.disposition === 'sold' || L.status === 'sold';
                 const isArchived = L.disposition === 'not_interested' || L.status === 'archived';
                 return (
@@ -492,12 +367,6 @@ function TextsPageContent(){
                 <div className="px-3 py-6 text-sm text-[var(--muted)] text-center">
                   No conversations yet.<br/>
                   <span className="text-xs">Import leads and start a campaign to begin texting.</span>
-                  <button
-                    onClick={initializeDemoConversations}
-                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-                  >
-                    Add Demo Conversations
-                  </button>
                 </div>
               )}
             </div>
@@ -564,6 +433,17 @@ function TextsPageContent(){
           )}
         </div>
       </div>
+
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Yes' : 'OK'}
+        cancelText="No"
+      />
     </div>
   );
 }

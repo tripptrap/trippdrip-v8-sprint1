@@ -6,6 +6,7 @@ import { addPoints as addPointsSupabase, getRecentTransactions as getRecentTrans
 import { type PointTransaction, type PlanType } from "@/lib/pointsStore";
 import { getDaysUntilRenewal } from "@/lib/renewalSystem";
 import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscriptionFeatures";
+import CustomModal from "@/components/CustomModal";
 
 type PointPack = {
   name: string;
@@ -80,6 +81,7 @@ export default function PointsPage() {
     avgDailySpend: 0,
     daysRemaining: 999
   });
+  const [modal, setModal] = useState<{isOpen: boolean, type: 'success'|'error'|'warning'|'info'|'confirm', title: string, message: string, onConfirm?: () => void}>({isOpen: false, type: 'info', title: '', message: ''});
 
   useEffect(() => {
     refreshData();
@@ -93,11 +95,11 @@ export default function PointsPage() {
 
     if (success === 'true' && points) {
       // Points are added by the webhook, just show confirmation
-      alert(`Payment successful! ${parseInt(points).toLocaleString()} points will be added to your account shortly.`);
+      setModal({isOpen: true, type: 'success', title: 'Payment Successful', message: `Payment successful! ${parseInt(points).toLocaleString()} points will be added to your account shortly.`});
       window.history.replaceState({}, '', '/points');
       refreshData(); // Refresh to show updated balance
     } else if (canceled === 'true') {
-      alert('Payment canceled. No charges were made.');
+      setModal({isOpen: true, type: 'warning', title: 'Payment Canceled', message: 'Payment canceled. No charges were made.'});
       window.history.replaceState({}, '', '/points');
     }
 
@@ -112,14 +114,14 @@ export default function PointsPage() {
       const result = await addPointsSupabase(points, `${packName} purchased`, 'purchase');
 
       if (result.success) {
-        alert(`Payment successful! ${points.toLocaleString()} points added to your account.`);
+        setModal({isOpen: true, type: 'success', title: 'Payment Successful', message: `Payment successful! ${points.toLocaleString()} points added to your account.`});
         await refreshData();
       } else {
-        alert(`Error adding points: ${result.error}`);
+        setModal({isOpen: true, type: 'error', title: 'Error Adding Points', message: `Error adding points: ${result.error}`});
       }
     } catch (error) {
       console.error('Error completing purchase:', error);
-      alert('Error completing purchase. Please contact support.');
+      setModal({isOpen: true, type: 'error', title: 'Purchase Error', message: 'Error completing purchase. Please contact support.'});
     }
 
     // Clean URL
@@ -179,7 +181,7 @@ export default function PointsPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      alert('Not authenticated');
+      setModal({isOpen: true, type: 'error', title: 'Authentication Required', message: 'Not authenticated'});
       return;
     }
 
@@ -187,12 +189,22 @@ export default function PointsPage() {
 
     // Confirm downgrade if going from premium to basic
     if (oldPlan === 'premium' && planType === 'basic') {
-      const confirmed = confirm(
-        'Are you sure you want to downgrade to Basic plan? You will lose Premium discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.'
-      );
-      if (!confirmed) return;
+      setModal({
+        isOpen: true,
+        type: 'confirm',
+        title: 'Confirm Downgrade',
+        message: 'Are you sure you want to downgrade to Basic plan? You will lose Premium discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.',
+        onConfirm: async () => {
+          await performPlanSwitch(planType, oldPlan, supabase, user.id);
+        }
+      });
+      return;
     }
 
+    await performPlanSwitch(planType, oldPlan, supabase, user.id);
+  }
+
+  async function performPlanSwitch(planType: PlanType, oldPlan: PlanType, supabase: any, userId: string) {
     // Update subscription tier in Supabase
     const newMonthlyCredits = planType === 'premium' ? 10000 : 3000;
 
@@ -210,10 +222,10 @@ export default function PointsPage() {
     const { error } = await supabase
       .from('users')
       .update(updateData)
-      .eq('id', user.id);
+      .eq('id', userId);
 
     if (error) {
-      alert(`Failed to switch plan: ${error.message}`);
+      setModal({isOpen: true, type: 'error', title: 'Plan Switch Failed', message: `Failed to switch plan: ${error.message}`});
       return;
     }
 
@@ -231,7 +243,7 @@ export default function PointsPage() {
       setTimeout(() => setShowCelebration(false), 5000);
     }
 
-    alert(`Successfully switched to ${planType === 'premium' ? 'Premium' : 'Basic'} plan!`);
+    setModal({isOpen: true, type: 'success', title: 'Plan Changed', message: `Successfully switched to ${planType === 'premium' ? 'Premium' : 'Basic'} plan!`});
   }
 
   async function handlePurchase(pack: PointPack) {
@@ -261,13 +273,19 @@ export default function PointsPage() {
 
       if (result.setup) {
         // Stripe not configured - fallback to simulated purchase
-        if (confirm(`Stripe not configured yet. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`)) {
-          const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
-          if (addResult.success) {
-            alert(`Successfully added ${pack.points.toLocaleString()} points! (Simulated - Set up Stripe for real payments)`);
-            await refreshData();
+        setModal({
+          isOpen: true,
+          type: 'confirm',
+          title: 'Stripe Not Configured',
+          message: `Stripe not configured yet. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`,
+          onConfirm: async () => {
+            const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
+            if (addResult.success) {
+              setModal({isOpen: true, type: 'success', title: 'Purchase Simulated', message: `Successfully added ${pack.points.toLocaleString()} points! (Simulated - Set up Stripe for real payments)`});
+              await refreshData();
+            }
           }
-        }
+        });
         return;
       }
 
@@ -282,13 +300,19 @@ export default function PointsPage() {
     } catch (error) {
       console.error('Purchase error:', error);
       // Fallback to simulated purchase
-      if (confirm(`Error connecting to payment processor. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`)) {
-        const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
-        if (addResult.success) {
-          alert(`Successfully added ${pack.points.toLocaleString()} points! (Simulated)`);
-          await refreshData();
+      setModal({
+        isOpen: true,
+        type: 'confirm',
+        title: 'Payment Error',
+        message: `Error connecting to payment processor. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`,
+        onConfirm: async () => {
+          const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
+          if (addResult.success) {
+            setModal({isOpen: true, type: 'success', title: 'Purchase Simulated', message: `Successfully added ${pack.points.toLocaleString()} points! (Simulated)`});
+            await refreshData();
+          }
         }
-      }
+      });
     }
   }
 
@@ -674,6 +698,16 @@ export default function PointsPage() {
           </div>
         </div>
       )}
+
+      {/* Custom Modal */}
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({...modal, isOpen: false})}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+      />
     </div>
   );
 }

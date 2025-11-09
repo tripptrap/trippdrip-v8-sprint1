@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import CustomModal from "@/components/CustomModal";
 
 type Tag = {
   id: string;
@@ -10,6 +11,14 @@ type Tag = {
   count: number;
   created_at?: string;
   updated_at?: string;
+};
+
+type ModalState = {
+  isOpen: boolean;
+  type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
+  title: string;
+  message: string;
+  onConfirm?: () => void;
 };
 
 const PRESET_COLORS = [
@@ -33,6 +42,12 @@ export default function TagsPage() {
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#3b82f6');
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadTags();
@@ -70,11 +85,21 @@ export default function TagsPage() {
         setNewTagName('');
         setNewTagColor('#3b82f6');
       } else {
-        alert(data.error || 'Failed to create tag');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to create tag'
+        });
       }
     } catch (error) {
       console.error('Error creating tag:', error);
-      alert('Failed to create tag');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to create tag'
+      });
     }
   }
 
@@ -99,32 +124,58 @@ export default function TagsPage() {
         setNewTagName('');
         setNewTagColor('#3b82f6');
       } else {
-        alert(data.error || 'Failed to update tag');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to update tag'
+        });
       }
     } catch (error) {
       console.error('Error updating tag:', error);
-      alert('Failed to update tag');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to update tag'
+      });
     }
   }
 
   async function deleteTag(id: string) {
-    if (!confirm('Delete this tag? It will not be removed from existing leads.')) return;
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Delete Tag',
+      message: 'Delete this tag? It will not be removed from existing leads.',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/tags?id=${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`/api/tags?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-      if (data.ok) {
-        await loadTags();
-      } else {
-        alert(data.error || 'Failed to delete tag');
+          const data = await response.json();
+          if (data.ok) {
+            await loadTags();
+          } else {
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Error',
+              message: data.error || 'Failed to delete tag'
+            });
+          }
+        } catch (error) {
+          console.error('Error deleting tag:', error);
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete tag'
+          });
+        }
       }
-    } catch (error) {
-      console.error('Error deleting tag:', error);
-      alert('Failed to delete tag');
-    }
+    });
   }
 
   function openEditModal(tag: Tag) {
@@ -148,6 +199,17 @@ export default function TagsPage() {
 
   return (
     <div className="space-y-6">
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        onConfirm={modal.onConfirm}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        cancelText="Cancel"
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Tags</h1>
