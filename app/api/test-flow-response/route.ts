@@ -339,16 +339,21 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
-          // Take first 2-3 available slots (already filtered for future times)
-          const slotsToShow = calendarSlots.slice(0, 3);
-          const timesList = slotsToShow.map(s => {
-            const timeMatch = s.formatted.match(/at (.+)$/);
-            return timeMatch ? timeMatch[1] : s.formatted;
-          }).join(', ');
+        if (requiresCall && allQuestionsAnswered) {
+          if (calendarSlots.length > 0) {
+            // Take first 2-3 available slots (already filtered for future times)
+            const slotsToShow = calendarSlots.slice(0, 3);
+            const timesList = slotsToShow.map(s => {
+              const timeMatch = s.formatted.match(/at (.+)$/);
+              return timeMatch ? timeMatch[1] : s.formatted;
+            }).join(', ');
 
-          console.log(`✅ OVERRIDE TRIGGERED! Showing ${slotsToShow.length} available times: ${timesList}`);
-          agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+            console.log(`✅ OVERRIDE TRIGGERED! Showing ${slotsToShow.length} available times: ${timesList}`);
+            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+          } else {
+            console.log('❌ No calendar slots available - showing error message');
+            agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
+          }
         } else if (requiresCall && calendarSlots.length > 0) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
@@ -363,6 +368,9 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           } else {
             console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
           }
+        } else if (requiresCall && calendarSlots.length === 0 && allQuestionsAnswered) {
+          console.log('❌ No calendar slots available - showing error message');
+          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
         } else {
           console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
         }
@@ -389,16 +397,21 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
-          // Take first 2-3 available slots (already filtered for future times)
-          const slotsToShow = calendarSlots.slice(0, 3);
-          const timesList = slotsToShow.map(s => {
-            const timeMatch = s.formatted.match(/at (.+)$/);
-            return timeMatch ? timeMatch[1] : s.formatted;
-          }).join(', ');
+        if (requiresCall && allQuestionsAnswered) {
+          if (calendarSlots.length > 0) {
+            // Take first 2-3 available slots (already filtered for future times)
+            const slotsToShow = calendarSlots.slice(0, 3);
+            const timesList = slotsToShow.map(s => {
+              const timeMatch = s.formatted.match(/at (.+)$/);
+              return timeMatch ? timeMatch[1] : s.formatted;
+            }).join(', ');
 
-          console.log(`✅ OVERRIDE TRIGGERED (matched path)! Showing ${slotsToShow.length} available times: ${timesList}`);
-          agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+            console.log(`✅ OVERRIDE TRIGGERED (matched path)! Showing ${slotsToShow.length} available times: ${timesList}`);
+            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+          } else {
+            console.log('❌ No calendar slots available (matched path) - showing error message');
+            agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
+          }
         } else if (requiresCall && calendarSlots.length > 0) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
@@ -413,6 +426,9 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           } else {
             console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
           }
+        } else if (requiresCall && calendarSlots.length === 0 && allQuestionsAnswered) {
+          console.log('❌ No calendar slots available (matched path) - showing error message');
+          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
         } else {
           console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
         }
