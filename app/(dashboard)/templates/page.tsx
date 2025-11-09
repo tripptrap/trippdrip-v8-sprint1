@@ -232,6 +232,8 @@ export default function FlowsPage() {
   const [manualFlowMessage, setManualFlowMessage] = useState("");
   const [manualFlowSteps, setManualFlowSteps] = useState<string[]>([]);
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [flowToDelete, setFlowToDelete] = useState<ConversationFlow | null>(null);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
   const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(false);
@@ -327,31 +329,38 @@ export default function FlowsPage() {
     }
   }
 
-  async function deleteFlow(flowId: string) {
+  function deleteFlow(flowId: string) {
     // Find the flow to check if it's AI-generated
-    const flowToDelete = flows.find(f => f.id === flowId);
-
-    // Show warning for AI-generated flows
-    if (flowToDelete?.isAIGenerated || flowToDelete?.is_ai_generated) {
-      const confirmMsg = "⚠️ Warning: This is an AI-generated flow.\n\nDeleting it will NOT refund your points. The points used to create this flow are non-refundable.\n\nAre you sure you want to delete this flow?";
-      if (!confirm(confirmMsg)) return;
-    } else {
-      if (!confirm("Delete this flow?")) return;
+    const flow = flows.find(f => f.id === flowId);
+    if (flow) {
+      setFlowToDelete(flow);
+      setShowDeleteConfirm(true);
     }
+  }
+
+  async function confirmDeleteFlow() {
+    if (!flowToDelete) return;
 
     // Delete from server first
-    const success = await deleteFlowFromServer(flowId);
+    const success = await deleteFlowFromServer(flowToDelete.id);
 
     if (success) {
       // Only update local state if server deletion succeeded
-      const updated = flows.filter(f => f.id !== flowId);
+      const updated = flows.filter(f => f.id !== flowToDelete.id);
       setFlows(updated);
-      if (selectedFlow?.id === flowId) {
+      if (selectedFlow?.id === flowToDelete.id) {
         setSelectedFlow(null);
       }
+      setShowDeleteConfirm(false);
+      setFlowToDelete(null);
     } else {
       alert("Failed to delete flow. Please try again.");
     }
+  }
+
+  function cancelDeleteFlow() {
+    setShowDeleteConfirm(false);
+    setFlowToDelete(null);
   }
 
   function updateStep(stepId: string, updates: Partial<FlowStep>) {
@@ -975,6 +984,66 @@ export default function FlowsPage() {
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && flowToDelete && (
+        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={cancelDeleteFlow}>
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border-b border-white/10 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    {flowToDelete.isAIGenerated || flowToDelete.is_ai_generated ? 'Delete AI-Generated Flow' : 'Delete Flow'}
+                  </h3>
+                  <p className="text-sm text-white/60">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-6 space-y-4">
+              {(flowToDelete.isAIGenerated || flowToDelete.is_ai_generated) && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium text-red-400">Warning: This is an AI-generated flow</p>
+                  <p className="text-sm text-white/70">
+                    Deleting it will <span className="font-semibold text-white">NOT refund your points</span>.
+                    The points used to create this flow are non-refundable.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <p className="text-sm text-white/90">
+                  Are you sure you want to delete <span className="font-semibold text-white">"{flowToDelete.name}"</span>?
+                </p>
+                <p className="text-sm text-white/60">
+                  All steps and configurations will be permanently removed.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex gap-3 justify-end">
+              <button
+                onClick={cancelDeleteFlow}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteFlow}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-500/50 transition-colors"
+              >
+                Delete Flow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showStepDialog && (
         <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]">
