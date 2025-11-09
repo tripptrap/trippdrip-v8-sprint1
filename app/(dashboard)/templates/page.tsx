@@ -840,7 +840,7 @@ export default function FlowsPage() {
         `${m.role === 'agent' ? 'Agent' : (m.role === 'user' ? 'User' : 'System')}: ${m.text}`
       ).join('\n');
 
-      // Send to simple flow handler (no complex steps, just questions)
+      // Send to AI flow handler with calendar integration
       const payload = {
         userMessage,
         currentStep,
@@ -852,14 +852,14 @@ export default function FlowsPage() {
         availableSlots: availableSlots
       };
 
-      console.log('📤 SENDING TO SIMPLE FLOW API:', {
-        requiredQuestions: payload.requiredQuestions,
+      console.log('📤 SENDING TO AI FLOW API:', {
+        currentStep: payload.currentStep?.id,
         requiresCall: payload.requiresCall,
         collectedInfo: payload.collectedInfo,
         userMessage: payload.userMessage
       });
 
-      const response = await fetch("/api/simple-flow-response", {
+      const response = await fetch("/api/test-flow-response", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
