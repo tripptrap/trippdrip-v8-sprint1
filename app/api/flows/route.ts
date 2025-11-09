@@ -14,9 +14,9 @@ export async function GET() {
       return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Fetch flows from flows table
+    // Fetch flows from conversation_flows table
     const { data: flows, error: flowsError } = await supabase
-      .from('flows')
+      .from('conversation_flows')
       .select('*')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
@@ -28,19 +28,20 @@ export async function GET() {
 
     // Map database format to expected format
     const mappedFlows = (flows || []).map(flow => ({
-      id: flow.id, // Use the database ID for deletion
+      id: flow.id,
       name: flow.name,
-      description: flow.description,
-      steps: flow.flow_config?.steps || [],
-      createdAt: flow.flow_config?.createdAt || flow.created_at,
-      updatedAt: flow.flow_config?.updatedAt || flow.updated_at,
-      isAIGenerated: flow.flow_config?.isAIGenerated || false,
-      is_active: flow.is_active,
+      description: flow.context?.whatOffering || '',
+      steps: flow.steps || [],
+      createdAt: flow.created_at,
+      updatedAt: flow.updated_at,
+      isAIGenerated: true,
+      is_active: true,
       created_at: flow.created_at,
       updated_at: flow.updated_at,
-      is_ai_generated: flow.flow_config?.isAIGenerated || false,
-      requiredQuestions: flow.flow_config?.requiredQuestions || [],
-      requiresCall: flow.flow_config?.requiresCall || false
+      is_ai_generated: true,
+      requiredQuestions: flow.required_questions || [],
+      requiresCall: flow.requires_call || false,
+      context: flow.context
     }));
 
     return NextResponse.json({ ok: true, items: mappedFlows });
