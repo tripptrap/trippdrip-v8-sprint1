@@ -182,6 +182,16 @@ function parseDateRequest(request: string): Date {
   const now = new Date();
   const lower = request.toLowerCase();
 
+  if (lower.includes('today')) {
+    return now;
+  }
+
+  if (lower.includes('tomorrow')) {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    return tomorrow;
+  }
+
   if (lower.includes('next week')) {
     const nextWeek = new Date(now);
     nextWeek.setDate(now.getDate() + 7);
@@ -194,16 +204,8 @@ function parseDateRequest(request: string): Date {
     return nextMonth;
   }
 
-  if (lower.includes('tomorrow')) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    return tomorrow;
-  }
-
-  // Default to next week
-  const nextWeek = new Date(now);
-  nextWeek.setDate(now.getDate() + 7);
-  return nextWeek;
+  // Default to today
+  return now;
 }
 
 // Get business hour slots (9 AM - 5 PM, Monday-Friday)
