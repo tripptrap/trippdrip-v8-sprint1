@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {} } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [] } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -26,10 +26,22 @@ export async function POST(req: NextRequest) {
       ? `\n\nINFORMATION ALREADY COLLECTED:\n${Object.entries(collectedInfo).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
       : '';
 
+    // Check which required questions are still missing
+    const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
+    const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
+
+    const requiredQuestionsText = requiredQuestions.length > 0
+      ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question} (save as "${q.fieldName}")`).join('\n')}\n\n${
+          allQuestionsAnswered
+            ? 'ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED! You can now proceed to the next step in the conversation flow.'
+            : `You MUST ask these questions and collect this information. Check what's already collected and ask for what's missing.\n\nMISSING QUESTIONS:\n${missingQuestions.map((q: any) => `- ${q.question}`).join('\n')}`
+        }`
+      : '';
+
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
@@ -71,7 +83,24 @@ CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE
 - If "Information Already Collected" shows you already know something, DON'T ask for it again
 - Example: If you know "Number of people: 1" (or client said "myself"), DON'T ask "How many people need coverage?"
 - Example: If you know "Current coverage: None", DON'T ask "What's your current coverage?"
+- Example: If you know "householdIncome: 40000", DON'T ask "What's your household income?" again
 - Use what you already know to have a natural conversation
+- MOVE FORWARD to the next piece of information you need, don't loop back to what you already have
+
+CONVERSATION FLOW RULES:
+- Once you have an answer to a question, NEVER ask it again - move on to the next question
+- If you already asked about household income and they answered, ask about something else (like zip code, coverage needs, etc.)
+- Keep the conversation progressing forward, don't get stuck in loops
+- Review the collected information before deciding what to ask next
+- NEVER repeat your previous message - each response should be unique and move the conversation forward
+- If you just asked something and they answered, acknowledge their answer and ask something NEW
+
+CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
+- DO NOT keep asking for more information
+- DO NOT loop back to ask questions again
+- You MUST use one of your preset responses that advances the conversation to the next step
+- Choose the response that best acknowledges you have all the information needed
+- Example: Use "Interested" or "Yes" response to move forward in the flow
 
 EXTRACT KEY INFORMATION from the client's responses:
 - Look for: number of people, coverage type, budget, timeline, current coverage, ages, gender, location, zip code, etc.
