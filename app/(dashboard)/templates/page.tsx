@@ -305,7 +305,8 @@ export default function FlowsPage() {
         body: JSON.stringify({
           flowName: newFlowName.trim(),
           context: flowContext,
-          requiredQuestions: validRequiredQuestions
+          requiredQuestions: validRequiredQuestions,
+          requiresCall: requiresCall
         })
       });
 

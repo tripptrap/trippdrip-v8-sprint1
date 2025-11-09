@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { flowName, context } = await req.json();
+    const { flowName, context, requiredQuestions, requiresCall } = await req.json();
 
     if (!flowName || !context || !context.whoYouAre || !context.whatOffering || !context.whoTexting) {
       return NextResponse.json(
@@ -67,6 +67,15 @@ export async function POST(req: NextRequest) {
         created_at: new Date().toISOString()
       });
 
+    // Build required questions section for prompt
+    const requiredQuestionsText = requiredQuestions && requiredQuestions.length > 0
+      ? `\n\nREQUIRED QUESTIONS (MUST ASK ONE AT A TIME):\nYou MUST create dedicated steps to ask each of these questions individually:\n${requiredQuestions.map((q: any, i: number) => `${i + 1}. ${q.question} (save response as "${q.fieldName}")`).join('\n')}\n\nIMPORTANT: Each required question should be its own step in the flow. DO NOT combine multiple questions into one message.`
+      : '';
+
+    const requiresCallText = requiresCall
+      ? '\n\nCALL REQUIREMENT:\nThis flow requires scheduling a phone call or Zoom meeting with the client. After collecting all required information, create a step to propose scheduling the call.'
+      : '';
+
     // Generate the flow with OpenAI
     const prompt = `You are an expert at creating effective text message conversation flows for sales and lead generation.
 
@@ -75,7 +84,7 @@ Context:
 - What they're offering: ${context.whatOffering}
 - Who they're texting: ${context.whoTexting}
 - Flow name: ${flowName}
-- Qualifying questions: ${context.qualifyingQuestions}
+- Qualifying questions: ${context.qualifyingQuestions}${requiredQuestionsText}${requiresCallText}
 
 Create a LINEAR conversation flow showing the OPTIMAL PATH where the client moves forward with the sale:
 
@@ -93,12 +102,20 @@ FLOW STRUCTURE (8-12 steps total):
 - Response options are there to handle ALTERNATE scenarios (objections, questions, pushback)
 
 CRITICAL STRUCTURE:
-1. Step 1: Initial outreach
-2. Step 2: Assume they responded positively - ask first qualifying question
-3. Step 3: Assume positive answer - ask next qualifying question
-4. Step 4-6: Continue qualifying (budget, timeline, needs)
-5. Step 7-8: Overcome final objections, set appointment
-6. Final steps: Book meeting, confirm details, close
+1. Step 1: Initial outreach / introduction
+2. Step 2: Gauge interest and qualify the lead
+3. Steps 3-N: Ask each REQUIRED QUESTION as a separate step (ONE QUESTION PER STEP)
+   - NEVER combine required questions into one message
+   - Each required question gets its own dedicated step
+   - Example: If there are 5 required questions, create 5 separate steps for them
+4. After all required questions: Overcome objections, build value
+5. If call required: Propose scheduling the call/meeting
+6. Final steps: Confirm appointment/next steps, close
+
+**CRITICAL RULE FOR REQUIRED QUESTIONS:**
+If required questions are provided, you MUST create individual steps for EACH question.
+Do NOT ask multiple required questions in the same message.
+Each required question should be asked conversationally, ONE AT A TIME.
 
 Each step should have:
 1. A SHORT message from the sender (1-2 sentences max - keep it concise like real texting)
