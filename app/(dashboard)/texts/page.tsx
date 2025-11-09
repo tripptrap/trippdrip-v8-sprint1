@@ -30,13 +30,26 @@ type ConversationFlow = {
 function findLead(id:number, leads:any[]){ return (leads||[]).find((l:any)=> l.id===id) || seedFindLead(id); }
 function threadMessages(thread_id:number, all:any[]){ return (all||[]).filter((m:any)=> m.thread_id===thread_id); }
 
-function loadFlows(): ConversationFlow[] {
+async function loadFlows(): Promise<ConversationFlow[]> {
   if (typeof window === "undefined") return [];
-  const data = localStorage.getItem("conversationFlows");
-  if (!data) return [];
+
   try {
-    return JSON.parse(data);
+    const response = await fetch('/api/flows');
+    const data = await response.json();
+
+    if (data.ok && data.items) {
+      return data.items.map((flow: any) => ({
+        id: flow.id,
+        name: flow.name,
+        steps: flow.steps || [],
+        createdAt: flow.created_at,
+        updatedAt: flow.updated_at
+      }));
+    }
+
+    return [];
   } catch (e) {
+    console.error("Error loading flows:", e);
     return [];
   }
 }
@@ -244,7 +257,10 @@ function TextsPageContent(){
 
   useEffect(()=>{
     refresh();
-    setFlows(loadFlows());
+    loadFlows().then(setFlows).catch(e => {
+      console.error("Error loading flows:", e);
+      setFlows([]);
+    });
     // live updates
     window.addEventListener(STORE_UPDATED_EVENT, refresh);
     window.addEventListener("storage", refresh);
