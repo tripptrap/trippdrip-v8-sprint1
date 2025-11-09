@@ -749,21 +749,14 @@ export default function LeadsPage() {
   function stop(e: React.MouseEvent) { e.stopPropagation(); }
 
   return (
-    <div className="min-h-screen bg-[#0b0f14] text-[#e7eef9]">
-      <div className="sticky top-0 z-20 border-b border-[#152133] bg-[#0d121a] px-5 py-3">
-        <div className="mx-auto flex items-center justify-between">
-          <div className="font-semibold text-[#9fb0c3]">Welcome back 👋</div>
-          <div className="text-xs text-[#9fb0c3]">v8 Sprint 1</div>
-        </div>
-      </div>
-
+    <div className="text-[#e7eef9]">
       {toast && (
         <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-md border border-[#1f3a2a] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] shadow">
           {toast}
         </div>
       )}
 
-      <div className="p-4 space-y-4 w-full overflow-x-auto">
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="m-0 text-xl font-semibold">Leads</h2>
           <div className="flex gap-2 relative">

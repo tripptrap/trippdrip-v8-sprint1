@@ -145,7 +145,7 @@ table tbody tr:hover {
 
 /* Container */
 .container {
-  max-width: 72rem;
+  width: 100%;
   margin: 0 auto;
   padding: 0 1rem;
 }
