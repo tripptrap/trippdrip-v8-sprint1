@@ -752,7 +752,8 @@ export default function FlowsPage() {
           allSteps: selectedFlow.steps,
           conversationHistory,
           collectedInfo,
-          requiredQuestions: selectedFlow.requiredQuestions || []
+          requiredQuestions: selectedFlow.requiredQuestions || [],
+          requiresCall: selectedFlow.requiresCall || false
         })
       });
 

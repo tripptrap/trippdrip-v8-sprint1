@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [] } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -21,14 +21,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check which required questions are still missing
+    const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
+    const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
+
+    // If flow requires call and all questions answered, check calendar availability
+    let availableTimesText = '';
+    if (requiresCall && allQuestionsAnswered) {
+      try {
+        const calendarResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+          body: JSON.stringify({
+            action: 'check-availability',
+            dateRequested: collectedInfo.timeline || collectedInfo.when || 'next week'
+          })
+        });
+
+        const calendarData = await calendarResponse.json();
+
+        if (calendarData.hasCalendar && calendarData.availableSlots) {
+          const slots = calendarData.availableSlots.map((slot: any, i: number) => `${i + 1}. ${slot.formatted}`).join('\n');
+          availableTimesText = `\n\nAVAILABLE CALENDAR TIMES:\nHere are my available times:\n${slots}\n\nOffer these times to the client and ask which works best for them.`;
+        }
+      } catch (error) {
+        console.error('Calendar check error:', error);
+      }
+    }
+
     // Build the AI prompt to determine the best response
     const collectedInfoText = Object.keys(collectedInfo).length > 0
       ? `\n\nINFORMATION ALREADY COLLECTED:\n${Object.entries(collectedInfo).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
       : '';
-
-    // Check which required questions are still missing
-    const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
-    const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
 
     const requiredQuestionsText = requiredQuestions.length > 0
       ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question} (save as "${q.fieldName}")`).join('\n')}\n\n${
@@ -41,7 +65,7 @@ export async function POST(req: NextRequest) {
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${availableTimesText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
