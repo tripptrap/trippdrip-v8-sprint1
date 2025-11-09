@@ -1,4 +1,4 @@
-// Points Management System
+// Points Management System - Supabase Version
 
 export type ActionType = 'sms_sent' | 'ai_response' | 'email_sent' | 'ai_chat' | 'flow_generation';
 
@@ -36,41 +36,37 @@ export const POINT_COSTS: Record<ActionType, number> = {
   flow_generation: 5     // 5 points for generating a flow
 };
 
-const STORAGE_KEY = 'userPoints';
-
-export function loadPoints(): PointsData {
+export async function loadPoints(): Promise<PointsData> {
   if (typeof window === 'undefined') return getDefaultPoints();
 
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (!data) {
-    const defaultData = getDefaultPoints();
-    savePoints(defaultData);
-    return defaultData;
-  }
+  try {
+    // This would need a new API endpoint to fetch user data + transactions
+    // For now, we'll use a combination of approaches
+    const response = await fetch('/api/user/points');
+    const data = await response.json();
 
-  return JSON.parse(data);
+    if (data.ok) {
+      return data.pointsData;
+    }
+
+    return getDefaultPoints();
+  } catch (error) {
+    console.error('Error loading points:', error);
+    return getDefaultPoints();
+  }
 }
 
-export function savePoints(data: PointsData): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-
-  // Trigger custom event for real-time updates
-  window.dispatchEvent(new CustomEvent('pointsUpdated', { detail: data }));
+// This function is deprecated - points are saved automatically via API calls
+export async function savePoints(data: PointsData): Promise<void> {
+  // Points are now managed through the database
+  // This function is kept for backward compatibility but does nothing
+  console.warn('savePoints() is deprecated - points are managed automatically');
 }
 
 export function getDefaultPoints(): PointsData {
   return {
     balance: 1000, // Starting balance with Basic plan
-    transactions: [
-      {
-        id: Date.now().toString(),
-        action_type: 'earn',
-        points_amount: 1000,
-        description: 'Monthly renewal - Basic plan',
-        created_at: new Date().toISOString()
-      }
-    ],
+    transactions: [],
     lastRenewal: new Date().toISOString(),
     autoTopUp: false,
     autoTopUpThreshold: 100,
@@ -79,50 +75,41 @@ export function getDefaultPoints(): PointsData {
   };
 }
 
-export function addPoints(amount: number, description: string, type: 'earn' | 'purchase' = 'purchase'): PointsData {
-  const data = loadPoints();
-
-  data.balance += amount;
-  data.transactions.unshift({
-    id: Date.now().toString(),
-    action_type: type,
-    points_amount: amount,
-    description,
-    created_at: new Date().toISOString()
-  });
-
-  savePoints(data);
-  return data;
+// Deprecated - use spendPoints API endpoint instead
+export async function addPoints(amount: number, description: string, type: 'earn' | 'purchase' = 'purchase'): Promise<PointsData> {
+  console.warn('addPoints() should use API endpoint instead');
+  return getDefaultPoints();
 }
 
-export function spendPoints(amount: number, description: string, actionType?: ActionType): { success: boolean; data?: PointsData; error?: string } {
-  const data = loadPoints();
+// Use the API endpoint to spend points
+export async function spendPoints(amount: number, description: string, actionType?: ActionType): Promise<{ success: boolean; data?: PointsData; error?: string }> {
+  try {
+    const response = await fetch('/api/points/spend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, description })
+    });
 
-  if (data.balance < amount) {
-    return { success: false, error: 'Insufficient points' };
+    const data = await response.json();
+
+    if (data.ok) {
+      // Dispatch event for UI updates
+      window.dispatchEvent(new CustomEvent('pointsUpdated', { 
+        detail: { balance: data.balance } 
+      }));
+
+      return { success: true, data: { ...getDefaultPoints(), balance: data.balance } };
+    }
+
+    return { success: false, error: data.error || 'Failed to spend points' };
+  } catch (error: any) {
+    console.error('Error spending points:', error);
+    return { success: false, error: error.message || 'Failed to spend points' };
   }
-
-  data.balance -= amount;
-  data.transactions.unshift({
-    id: Date.now().toString(),
-    action_type: 'spend',
-    points_amount: -amount,
-    description,
-    created_at: new Date().toISOString()
-  });
-
-  savePoints(data);
-
-  // Check if auto top-up is needed
-  if (data.autoTopUp && data.balance <= data.autoTopUpThreshold) {
-    handleAutoTopUp();
-  }
-
-  return { success: true, data };
 }
 
 // Spend points for a specific action
-export function spendPointsForAction(actionType: ActionType, count: number = 1): { success: boolean; data?: PointsData; error?: string } {
+export async function spendPointsForAction(actionType: ActionType, count: number = 1): Promise<{ success: boolean; data?: PointsData; error?: string }> {
   const costPerAction = POINT_COSTS[actionType];
   const totalCost = costPerAction * count;
 
@@ -138,8 +125,8 @@ export function spendPointsForAction(actionType: ActionType, count: number = 1):
 }
 
 // Check if user has enough points for an action
-export function canAffordAction(actionType: ActionType, count: number = 1): boolean {
-  const data = loadPoints();
+export async function canAffordAction(actionType: ActionType, count: number = 1): Promise<boolean> {
+  const data = await loadPoints();
   const cost = POINT_COSTS[actionType] * count;
   return data.balance >= cost;
 }
@@ -151,46 +138,32 @@ export function getActionCost(actionType: ActionType, count: number = 1): number
 
 // Handle auto top-up (placeholder for payment integration)
 function handleAutoTopUp(): void {
-  const data = loadPoints();
-
-  // In production, this would trigger a payment via Stripe
-  // For now, we'll just log and add points (you'll replace this with Stripe)
-  console.log('Auto top-up triggered! Balance:', data.balance);
-
-  // TODO: Integrate with Stripe to charge card
-  // For now, simulate auto top-up
-  addPoints(data.autoTopUpAmount, `Auto top-up - ${data.autoTopUpAmount} points`, 'purchase');
+  console.log('Auto top-up would be triggered here via Stripe');
 }
 
-// Enable/disable auto top-up
-export function setAutoTopUp(enabled: boolean, threshold?: number, amount?: number): PointsData {
-  const data = loadPoints();
-
-  data.autoTopUp = enabled;
-  if (threshold !== undefined) data.autoTopUpThreshold = threshold;
-  if (amount !== undefined) data.autoTopUpAmount = amount;
-
-  savePoints(data);
-  return data;
+// Enable/disable auto top-up - would need API endpoint
+export async function setAutoTopUp(enabled: boolean, threshold?: number, amount?: number): Promise<PointsData> {
+  console.warn('setAutoTopUp() needs API endpoint implementation');
+  return getDefaultPoints();
 }
 
-export function getPointsBalance(): number {
-  const data = loadPoints();
+export async function getPointsBalance(): Promise<number> {
+  const data = await loadPoints();
   return data.balance;
 }
 
-export function getRecentTransactions(limit: number = 10): PointTransaction[] {
-  const data = loadPoints();
+export async function getRecentTransactions(limit: number = 10): Promise<PointTransaction[]> {
+  const data = await loadPoints();
   return data.transactions.slice(0, limit);
 }
 
-export function getUsageStats(days: number = 7): {
+export async function getUsageStats(days: number = 7): Promise<{
   totalSpent: number;
   totalEarned: number;
   avgDailySpend: number;
   daysRemaining: number;
-} {
-  const data = loadPoints();
+}> {
+  const data = await loadPoints();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
@@ -217,53 +190,25 @@ export function getUsageStats(days: number = 7): {
   };
 }
 
-export function needsTopUp(): boolean {
-  const data = loadPoints();
+export async function needsTopUp(): Promise<boolean> {
+  const data = await loadPoints();
   return data.balance <= 200; // Alert threshold
 }
 
-export function checkMonthlyRenewal(): void {
-  const data = loadPoints();
-  const lastRenewal = new Date(data.lastRenewal);
-  const now = new Date();
-
-  // Check if a month has passed
-  const monthsSince = (now.getFullYear() - lastRenewal.getFullYear()) * 12 +
-                      (now.getMonth() - lastRenewal.getMonth());
-
-  if (monthsSince >= 1) {
-    const renewalAmount = data.planType === 'premium' ? 10000 : 1000;
-    const planName = data.planType === 'premium' ? 'Premium plan ($98.99)' : 'Basic plan ($30)';
-    addPoints(renewalAmount, `Monthly renewal - ${planName}`, 'earn');
-    data.lastRenewal = now.toISOString();
-    savePoints(data);
-  }
+export async function checkMonthlyRenewal(): Promise<void> {
+  console.warn('checkMonthlyRenewal() should be handled server-side');
 }
 
 // Get current plan type
-export function getCurrentPlan(): PlanType {
-  const data = loadPoints();
+export async function getCurrentPlan(): Promise<PlanType> {
+  const data = await loadPoints();
   return data.planType || 'basic';
 }
 
-// Switch plan type
-export function switchPlan(planType: PlanType): PointsData {
-  const data = loadPoints();
-  const oldPlan = data.planType;
-  data.planType = planType;
-
-  // Add a transaction noting the plan change
-  const planName = planType === 'premium' ? 'Premium ($98.99/mo)' : 'Basic ($30/mo)';
-  data.transactions.unshift({
-    id: Date.now().toString(),
-    action_type: 'earn',
-    points_amount: 0,
-    description: `Switched to ${planName}`,
-    created_at: new Date().toISOString()
-  });
-
-  savePoints(data);
-  return data;
+// Switch plan type - would need API endpoint
+export async function switchPlan(planType: PlanType): Promise<PointsData> {
+  console.warn('switchPlan() needs API endpoint implementation');
+  return getDefaultPoints();
 }
 
 // Get plan details

@@ -57,27 +57,39 @@ export type Settings = {
   };
 };
 
-const STORAGE_KEY = 'trippdrip.settings.v1';
-
-export function loadSettings(): Settings {
+export async function loadSettings(): Promise<Settings> {
   if (typeof window === 'undefined') return getDefaultSettings();
 
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (!data) {
-    const defaultSettings = getDefaultSettings();
-    saveSettings(defaultSettings);
-    return defaultSettings;
-  }
+  try {
+    const response = await fetch('/api/settings');
+    const data = await response.json();
 
-  return JSON.parse(data);
+    if (data.ok && data.settings) {
+      return data.settings;
+    }
+
+    return getDefaultSettings();
+  } catch (error) {
+    console.error('Error loading settings:', error);
+    return getDefaultSettings();
+  }
 }
 
-export function saveSettings(settings: Settings): void {
+export async function saveSettings(settings: Settings): Promise<void> {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 
-  // Trigger custom event for real-time updates
-  window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: settings }));
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+
+    // Trigger custom event for real-time updates
+    window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: settings }));
+  } catch (error) {
+    console.error('Error saving settings:', error);
+  }
 }
 
 export function getDefaultSettings(): Settings {
@@ -98,41 +110,41 @@ export function getDefaultSettings(): Settings {
 }
 
 // Update Twilio configuration
-export function updateTwilioConfig(config: TwilioConfig): Settings {
-  const settings = loadSettings();
+export async function updateTwilioConfig(config: TwilioConfig): Promise<Settings> {
+  const settings = await loadSettings();
   settings.smsProvider = 'twilio';
   settings.twilio = config;
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Update Stripe configuration
-export function updateStripeConfig(config: StripeConfig): Settings {
-  const settings = loadSettings();
+export async function updateStripeConfig(config: StripeConfig): Promise<Settings> {
+  const settings = await loadSettings();
   settings.stripe = config;
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Update spam protection settings
-export function updateSpamProtection(config: Partial<Settings['spamProtection']>): Settings {
-  const settings = loadSettings();
+export async function updateSpamProtection(config: Partial<Settings['spamProtection']>): Promise<Settings> {
+  const settings = await loadSettings();
   settings.spamProtection = { ...settings.spamProtection, ...config };
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Update auto refill settings
-export function updateAutoRefill(config: Partial<Settings['autoRefill']>): Settings {
-  const settings = loadSettings();
+export async function updateAutoRefill(config: Partial<Settings['autoRefill']>): Promise<Settings> {
+  const settings = await loadSettings();
   settings.autoRefill = { ...settings.autoRefill, ...config };
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Add a phone number to Twilio configuration
-export function addPhoneNumber(phoneNumber: string, sid?: string, friendlyName?: string): Settings {
-  const settings = loadSettings();
+export async function addPhoneNumber(phoneNumber: string, sid?: string, friendlyName?: string): Promise<Settings> {
+  const settings = await loadSettings();
   if (!settings.twilio) {
     throw new Error('Twilio not configured');
   }
@@ -157,13 +169,13 @@ export function addPhoneNumber(phoneNumber: string, sid?: string, friendlyName?:
     });
   }
 
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Remove a phone number from Twilio configuration
-export function removePhoneNumber(phoneNumber: string): Settings {
-  const settings = loadSettings();
+export async function removePhoneNumber(phoneNumber: string): Promise<Settings> {
+  const settings = await loadSettings();
   if (!settings.twilio) {
     throw new Error('Twilio not configured');
   }
@@ -180,26 +192,26 @@ export function removePhoneNumber(phoneNumber: string): Settings {
     );
   }
 
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Get phone number SID (needed for releasing)
-export function getPhoneNumberSid(phoneNumber: string): string | null {
-  const settings = loadSettings();
+export async function getPhoneNumberSid(phoneNumber: string): Promise<string | null> {
+  const settings = await loadSettings();
   const number = settings.twilio?.purchasedNumbers?.find(n => n.phoneNumber === phoneNumber);
   return number?.sid || null;
 }
 
 // Get available phone numbers for sending
-export function getAvailablePhoneNumbers(): string[] {
-  const settings = loadSettings();
+export async function getAvailablePhoneNumbers(): Promise<string[]> {
+  const settings = await loadSettings();
   return settings.twilio?.phoneNumbers || [];
 }
 
 // Check if SMS sending is properly configured
-export function isSMSConfigured(): boolean {
-  const settings = loadSettings();
+export async function isSMSConfigured(): Promise<boolean> {
+  const settings = await loadSettings();
   return settings.smsProvider === 'twilio' &&
          !!settings.twilio?.accountSid &&
          !!settings.twilio?.authToken &&
@@ -207,22 +219,22 @@ export function isSMSConfigured(): boolean {
 }
 
 // Check if Stripe is configured
-export function isStripeConfigured(): boolean {
-  const settings = loadSettings();
+export async function isStripeConfigured(): Promise<boolean> {
+  const settings = await loadSettings();
   return !!settings.stripe?.publishableKey && !!settings.stripe?.secretKey;
 }
 
 // Update email configuration
-export function updateEmailConfig(config: EmailConfig): Settings {
-  const settings = loadSettings();
+export async function updateEmailConfig(config: EmailConfig): Promise<Settings> {
+  const settings = await loadSettings();
   settings.email = config;
-  saveSettings(settings);
+  await saveSettings(settings);
   return settings;
 }
 
 // Check if email is properly configured
-export function isEmailConfigured(): boolean {
-  const settings = loadSettings();
+export async function isEmailConfigured(): Promise<boolean> {
+  const settings = await loadSettings();
   if (!settings.email || settings.email.provider === 'none') return false;
 
   if (settings.email.provider === 'smtp') {
