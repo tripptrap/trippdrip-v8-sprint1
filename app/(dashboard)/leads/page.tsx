@@ -759,7 +759,7 @@ export default function LeadsPage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="m-0 text-xl font-semibold">Leads</h2>
-          <div className="flex gap-2 relative">
+          <div className="flex flex-wrap gap-2 relative">
             <input
               value={q}
               onChange={(e)=>setQ(e.target.value)}
@@ -997,8 +997,8 @@ export default function LeadsPage() {
         )}
 
         {/* Leads table */}
-        <div className="overflow-hidden rounded-md border border-[#1a2637]">
-          <table className="w-full border-collapse text-sm">
+        <div className="overflow-x-auto rounded-md border border-[#1a2637]">
+          <table className="w-full border-collapse text-sm min-w-max">
             <thead>
               <tr className="bg-[#0f1722] text-left">
                 <th className="border-b border-[#1a2637] px-3 py-2">
