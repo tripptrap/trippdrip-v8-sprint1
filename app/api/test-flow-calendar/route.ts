@@ -216,6 +216,7 @@ function getBusinessHourSlots(
 ): Array<{ start: string; end: string; formatted: string }> {
   const slots: Array<{ start: string; end: string; formatted: string }> = [];
   const slotDuration = 60 * 60 * 1000; // 1 hour in milliseconds
+  const now = new Date(); // Current time to filter out past slots
 
   let currentDate = new Date(timeMin);
   const endDate = new Date(timeMax);
@@ -244,8 +245,9 @@ function getBusinessHourSlots(
 
     const slotEnd = new Date(currentDate.getTime() + slotDuration);
 
-    // Check if within business hours and not busy
-    if (slotEnd.getHours() <= 17) {
+    // CRITICAL: Only include slots that are in the future (haven't passed yet)
+    // Check if within business hours, not busy, AND in the future
+    if (slotEnd.getHours() <= 17 && currentDate > now) {
       const isSlotFree = !busySlots.some(busy => {
         const busyStart = new Date(busy.start);
         const busyEnd = new Date(busy.end);

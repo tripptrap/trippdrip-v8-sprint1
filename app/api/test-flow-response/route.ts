@@ -83,48 +83,83 @@ DO NOT DEVIATE FROM THIS. COPY THE TEXT ABOVE EXACTLY.`;
     let appointmentBooked = false;
     let bookedAppointmentInfo: any = null;
     if (requiresCall && availableSlots.length > 0 && userMessage) {
-      // Try to detect if user is selecting a time (e.g., "1", "option 2", "the first one", etc.)
-      const slotMatch = userMessage.match(/\b([1-5])\b|first|second|third|fourth|fifth/i);
-      if (slotMatch) {
-        let slotIndex = -1;
-        if (slotMatch[1]) {
-          slotIndex = parseInt(slotMatch[1]) - 1;
-        } else {
-          const wordMap: any = { 'first': 0, 'second': 1, 'third': 2, 'fourth': 3, 'fifth': 4 };
-          slotIndex = wordMap[slotMatch[0].toLowerCase()];
+      let selectedSlot = null;
+
+      // Try to detect if user is selecting a time by:
+      // 1. Time format (e.g., "1pm", "2:00", "3 PM", "10:00 AM")
+      // 2. Index/number (e.g., "1", "option 2", "the first one")
+
+      // First, try to match specific time mentions like "1pm", "2pm", "3:00 PM", etc.
+      const timeMatch = userMessage.match(/(\d{1,2})(?::00)?\s*(am|pm|AM|PM)/i);
+      if (timeMatch) {
+        const hour = parseInt(timeMatch[1]);
+        const period = timeMatch[2].toLowerCase();
+
+        // Convert to 24-hour format
+        let hour24 = hour;
+        if (period === 'pm' && hour !== 12) {
+          hour24 = hour + 12;
+        } else if (period === 'am' && hour === 12) {
+          hour24 = 0;
         }
 
-        if (slotIndex >= 0 && slotIndex < availableSlots.length) {
-          const selectedSlot = availableSlots[slotIndex];
+        // Find the slot that matches this time
+        selectedSlot = availableSlots.find((slot: any) => {
+          const slotDate = new Date(slot.start);
+          return slotDate.getHours() === hour24;
+        });
 
-          try {
-            // Book the appointment
-            const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
-              body: JSON.stringify({
-                action: 'book-appointment',
-                slotStart: selectedSlot.start,
-                slotEnd: selectedSlot.end,
-                clientName: collectedInfo.name || collectedInfo.fullName || 'Client',
-                clientEmail: collectedInfo.email || '',
-                summary: `Call with ${collectedInfo.name || collectedInfo.fullName || 'Client'}`,
-                description: `Scheduled call from conversation flow.\n\nCollected Information:\n${Object.entries(collectedInfo).map(([k, v]) => `${k}: ${v}`).join('\n')}`
-              })
-            });
+        if (selectedSlot) {
+          console.log(`✅ Matched time "${userMessage}" to slot at ${hour24}:00`);
+        }
+      }
 
-            const bookingData = await bookingResponse.json();
-
-            if (bookingData.success) {
-              appointmentBooked = true;
-              bookedAppointmentInfo = {
-                time: bookingData.formattedTime,
-                eventId: bookingData.eventId
-              };
-            }
-          } catch (error) {
-            console.error('Appointment booking error:', error);
+      // If no time match, try index/number matching
+      if (!selectedSlot) {
+        const slotMatch = userMessage.match(/\b([1-5])\b|first|second|third|fourth|fifth/i);
+        if (slotMatch) {
+          let slotIndex = -1;
+          if (slotMatch[1]) {
+            slotIndex = parseInt(slotMatch[1]) - 1;
+          } else {
+            const wordMap: any = { 'first': 0, 'second': 1, 'third': 2, 'fourth': 3, 'fifth': 4 };
+            slotIndex = wordMap[slotMatch[0].toLowerCase()];
           }
+
+          if (slotIndex >= 0 && slotIndex < availableSlots.length) {
+            selectedSlot = availableSlots[slotIndex];
+          }
+        }
+      }
+
+      if (selectedSlot) {
+        try {
+          // Book the appointment
+          const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test-flow-calendar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+            body: JSON.stringify({
+              action: 'book-appointment',
+              slotStart: selectedSlot.start,
+              slotEnd: selectedSlot.end,
+              clientName: collectedInfo.name || collectedInfo.fullName || 'Client',
+              clientEmail: collectedInfo.email || '',
+              summary: `Call with ${collectedInfo.name || collectedInfo.fullName || 'Client'}`,
+              description: `Scheduled call from conversation flow.\n\nCollected Information:\n${Object.entries(collectedInfo).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+            })
+          });
+
+          const bookingData = await bookingResponse.json();
+
+          if (bookingData.success) {
+            appointmentBooked = true;
+            bookedAppointmentInfo = {
+              time: bookingData.formattedTime,
+              eventId: bookingData.eventId
+            };
+          }
+        } catch (error) {
+          console.error('Appointment booking error:', error);
         }
       }
     }
