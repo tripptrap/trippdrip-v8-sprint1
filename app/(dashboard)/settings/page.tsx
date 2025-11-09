@@ -77,14 +77,14 @@ export default function Page() {
     isOpen: boolean;
     title: string;
     message: string;
-    type: 'alert' | 'confirm';
+    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
     onConfirm?: () => void;
     onCancel?: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
-    type: 'alert'
+    type: 'info'
   });
 
   // Helper functions for modals
@@ -93,7 +93,7 @@ export default function Page() {
       isOpen: true,
       title,
       message,
-      type: 'alert',
+      type: 'info',
       onConfirm: () => setModalState(prev => ({ ...prev, isOpen: false }))
     });
   };
