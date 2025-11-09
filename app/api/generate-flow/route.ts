@@ -290,8 +290,35 @@ Important:
         }));
       }
 
+      // Save the flow to the database
+      const { data: savedFlow, error: insertError } = await supabase
+        .from('conversation_flows')
+        .insert({
+          user_id: user.id,
+          name: flowName,
+          context: context,
+          steps: flowData.steps,
+          required_questions: requiredQuestions || [],
+          requires_call: requiresCall || false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Error saving flow to database:", insertError);
+        return NextResponse.json(
+          { error: `Failed to save flow: ${insertError.message}` },
+          { status: 500 }
+        );
+      }
+
+      console.log("✅ Flow saved to database:", savedFlow.id);
+
       return NextResponse.json({
         ...flowData,
+        flowId: savedFlow.id,
         pointsUsed: FLOW_CREATION_COST,
         remainingBalance: newBalance
       });
