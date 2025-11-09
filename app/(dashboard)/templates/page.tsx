@@ -841,19 +841,28 @@ export default function FlowsPage() {
       ).join('\n');
 
       // Send to simple flow handler (no complex steps, just questions)
+      const payload = {
+        userMessage,
+        currentStep,
+        allSteps: selectedFlow.steps,
+        conversationHistory,
+        collectedInfo,
+        requiredQuestions: selectedFlow.requiredQuestions || [],
+        requiresCall: selectedFlow.requiresCall || false,
+        availableSlots: availableSlots
+      };
+
+      console.log('📤 SENDING TO SIMPLE FLOW API:', {
+        requiredQuestions: payload.requiredQuestions,
+        requiresCall: payload.requiresCall,
+        collectedInfo: payload.collectedInfo,
+        userMessage: payload.userMessage
+      });
+
       const response = await fetch("/api/simple-flow-response", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userMessage,
-          currentStep,
-          allSteps: selectedFlow.steps,
-          conversationHistory,
-          collectedInfo,
-          requiredQuestions: selectedFlow.requiredQuestions || [],
-          requiresCall: selectedFlow.requiresCall || false,
-          availableSlots: availableSlots
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
