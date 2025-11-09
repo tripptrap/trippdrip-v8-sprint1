@@ -300,29 +300,8 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
     const apiKey = process.env.OPENAI_API_KEY;
 
-    // Build system message with calendar instructions at the top for highest priority
-    let systemMessage = "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown.";
-
-    if (requiresCall && calendarSlots.length > 0) {
-      const timesList = calendarSlots.map(s => {
-        const timeMatch = s.formatted.match(/at (.+)$/);
-        return timeMatch ? timeMatch[1] : s.formatted;
-      }).join(', ');
-
-      systemMessage = `🚨🚨🚨 CRITICAL CALENDAR INSTRUCTION - READ FIRST 🚨🚨🚨
-
-YOUR AVAILABLE TIMES TODAY ARE: ${timesList}
-
-MANDATORY RULE - YOU MUST FOLLOW THIS EXACTLY:
-When it's time to schedule (after collecting required info OR when discussing scheduling), you MUST include these specific times.
-
-YOU MUST PASTE THIS EXACT TEXT IN YOUR RESPONSE:
-"I have availability today at ${timesList}. Which time works best for you?"
-
-DO NOT ask "When are you available?" or "What time works for you?" - YOU must offer YOUR specific available times.
-
-` + systemMessage;
-    }
+    // Build system message
+    const systemMessage = "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown.";
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -377,6 +356,29 @@ DO NOT ask "When are you available?" or "What time works for you?" - YOU must of
       if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
         // Use AI's custom response, stay on current step
         agentResponse = aiDecision.customResponse;
+
+        // CRITICAL FIX: If we have real calendar slots and the response mentions scheduling/times,
+        // force-replace with actual available times
+        if (requiresCall && calendarSlots.length > 0) {
+          const timesList = calendarSlots.map(s => {
+            const timeMatch = s.formatted.match(/at (.+)$/);
+            return timeMatch ? timeMatch[1] : s.formatted;
+          }).join(', ');
+
+          // If the response contains scheduling language, ensure it has real times
+          if (agentResponse.match(/time|schedule|availability|available|when|call|chat|meet/i)) {
+            // Check if it has fake times or no specific times
+            const hasFakeTimes = agentResponse.match(/3pm|5pm|8pm|example/i);
+            const hasNoSpecificTimes = !agentResponse.match(/\d{1,2}:\d{2}\s*[AP]M|\d{1,2}\s*[AP]M/i);
+
+            if (hasFakeTimes || hasNoSpecificTimes) {
+              console.log('⚠️ AI response has scheduling language but wrong/missing times. Force-replacing with real calendar times.');
+              // Replace the scheduling part with real times
+              agentResponse = `Thank you! Let's discuss the best plans for you. I have availability at: ${timesList}. Which time works best for you?`;
+            }
+          }
+        }
+
         nextStepIndex = currentStepIndex;
       } else {
         // Get the matched response
