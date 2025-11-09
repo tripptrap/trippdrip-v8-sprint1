@@ -13,13 +13,13 @@ export default function CalendarPage() {
     isOpen: boolean;
     title: string;
     message: string;
-    type: 'alert' | 'confirm';
+    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
     onConfirm?: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
-    type: 'alert',
+    type: 'info',
   });
 
   useEffect(() => {
