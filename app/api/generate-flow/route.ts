@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       : '';
 
     const requiresCallText = requiresCall
-      ? '\n\nCALL REQUIREMENT:\nThis flow requires scheduling a phone call or Zoom meeting with the client.\n\nIMPORTANT SCHEDULING INSTRUCTIONS:\n- After collecting all required information, the system will check the agent\'s calendar and provide REAL available time slots\n- When available times are provided, you MUST show them to the client\n- Example: "Let\'s discuss the best plans for you. I have availability at: 3pm, 5pm, or 8pm. Which works for you?"\n- If NO calendar times are available today, let the client know: "I\'m fully booked today, but I have availability tomorrow at [times]. Would any of those work?"\n- DO NOT just ask "Would you like to schedule a call?" - always offer the specific available times from the calendar\n- If they\'re not available at the offered times, ask when they\'re free and set up a drip to follow up\n- Always show 3 real available time slots when offering to schedule'
+      ? '\n\nCALL REQUIREMENT:\nThis flow requires scheduling a phone call or Zoom meeting with the client.\n\nIMPORTANT: After collecting all required information, the next message should transition to scheduling by saying something like "Great! Let me check my calendar for available times." The system will automatically fetch real available time slots and show them to the client. Do NOT include specific times in your flow - the system handles that at runtime.'
       : '';
 
     // Generate the flow with OpenAI

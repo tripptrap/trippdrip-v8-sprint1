@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
     const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
     const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
 
+    console.log('🔍 DEBUG - Required questions:', requiredQuestions.length);
+    console.log('🔍 DEBUG - Missing questions:', missingQuestions.map((q: any) => q.fieldName));
+    console.log('🔍 DEBUG - All questions answered?', allQuestionsAnswered);
+    console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
+
     // If flow requires call, check calendar availability
     let calendarSlots: any[] = [];
     if (requiresCall) {
@@ -325,8 +330,15 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
       // Check if AI generated a custom response
       if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
         agentResponse = aiDecision.customResponse;
+        console.log('🤖 AI custom response:', agentResponse);
 
         // ONLY show calendar times if ALL required questions have been answered
+        console.log('🔍 Checking override conditions:', {
+          requiresCall,
+          calendarSlotsLength: calendarSlots.length,
+          allQuestionsAnswered
+        });
+
         if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
           // Take first 2-3 available slots (already filtered for future times)
           const slotsToShow = calendarSlots.slice(0, 3);
@@ -335,8 +347,10 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
 
-          console.log(`📅 All ${requiredQuestions.length} questions answered. Showing ${slotsToShow.length} available times: ${timesList}`);
+          console.log(`✅ OVERRIDE TRIGGERED! Showing ${slotsToShow.length} available times: ${timesList}`);
           agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+        } else {
+          console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
         }
 
         nextStepIndex = currentStepIndex;
@@ -352,8 +366,15 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
 
         // Always use the followUpMessage for the matched response
         agentResponse = matchedResponse.followUpMessage;
+        console.log('🎯 Matched response:', agentResponse);
 
         // ONLY show calendar times if ALL required questions have been answered
+        console.log('🔍 Checking override conditions (matched path):', {
+          requiresCall,
+          calendarSlotsLength: calendarSlots.length,
+          allQuestionsAnswered
+        });
+
         if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
           // Take first 2-3 available slots (already filtered for future times)
           const slotsToShow = calendarSlots.slice(0, 3);
@@ -362,8 +383,10 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
 
-          console.log(`📅 All ${requiredQuestions.length} questions answered (matched). Showing ${slotsToShow.length} available times: ${timesList}`);
+          console.log(`✅ OVERRIDE TRIGGERED (matched path)! Showing ${slotsToShow.length} available times: ${timesList}`);
           agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+        } else {
+          console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
         }
 
         // Check if this response has a nextStepId to follow for FUTURE messages
