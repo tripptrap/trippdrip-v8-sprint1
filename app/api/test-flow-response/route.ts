@@ -236,23 +236,13 @@ CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
 EXTRACT KEY INFORMATION from the client's responses:
 ${requiredQuestions.length > 0 ? `
 REQUIRED QUESTIONS TO TRACK:
-${requiredQuestions.map((q: any, i: number) => `${i + 1}. "${q.question}" - Create a short, descriptive camelCase field name for this (e.g., "householdIncome", "numberOfMembers", "preferredCoverage", etc.)`).join('\n')}
+${requiredQuestions.map((q: any, i: number) => `${i + 1}. "${q.question}"`).join('\n')}
 
 When you extract information that answers one of these questions, create a clear camelCase field name that describes what you're collecting.
-Examples:
-- "What is your household income?" → fieldName: "householdIncome", value: "50000"
-- "How many members?" → fieldName: "numberOfMembers", value: "4"
-- "What type of coverage?" → fieldName: "coverageType", value: "health insurance"
 ` : ''}
-- Look for: number of people, coverage type, budget, timeline, current coverage, ages, gender, location, zip code, etc.
-- Example: "im looking for coverage for myself" → Extract: Number of people = 1
-- Example: "i dont have any" (about coverage) → Extract: Current coverage = None
-- Example: "my wife and 2 kids" → Extract: Number of people = 4 (including client)
-- Example: "35m, 34f, 12f, 6m" → Extract: "Ages and genders": "35 (Male), 34 (Female), 12 (Female), 6 (Male)", "Number of people": "4"
-- Example: "32776" or "zip is 32776" → Extract: "Zip code": "32776"
-- Parse gender notation: "m" = Male, "f" = Female
-- IMPORTANT: All values in extractedInfo MUST be strings, never objects or arrays
-- Return extracted info in the "extractedInfo" field with clear, readable formatting
+- Extract any relevant information from the client's response
+- All values in extractedInfo MUST be strings, never objects or arrays
+- Return extracted info in the "extractedInfo" field
 
 When generating custom responses:
 - FIRST: Acknowledge what they said (show you heard them)
