@@ -119,6 +119,24 @@ function saveFlows(flows: ConversationFlow[]) {
 }
 
 // Helper function to convert date/time strings to ISO format for Google Calendar API
+// Helper function to generate camelCase field names from questions
+function generateFieldName(question: string): string {
+  // Remove question marks and other punctuation
+  let cleaned = question.replace(/[?.,!;:'"]/g, '');
+
+  // Split into words
+  const words = cleaned.trim().split(/\s+/);
+
+  // Convert to camelCase
+  if (words.length === 0) return '';
+
+  return words.map((word, idx) => {
+    const lower = word.toLowerCase();
+    if (idx === 0) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join('');
+}
+
 function parseAppointmentDateTime(dateStr: string, timeStr: string): { start: string; end: string } {
   const now = new Date();
   let appointmentDate = new Date();
@@ -248,8 +266,13 @@ export default function FlowsPage() {
     setIsGenerating(true);
 
     try {
-      // Filter out empty required questions
-      const validRequiredQuestions = requiredQuestions.filter(q => q.question.trim() && q.fieldName.trim());
+      // Filter out empty required questions and ensure field names are generated
+      const validRequiredQuestions = requiredQuestions
+        .filter(q => q.question.trim())
+        .map(q => ({
+          question: q.question,
+          fieldName: q.fieldName || generateFieldName(q.question)
+        }));
 
       const response = await fetch("/api/generate-flow", {
         method: "POST",
@@ -1053,7 +1076,7 @@ export default function FlowsPage() {
               <div className="space-y-3">
                 {requiredQuestions.map((q, idx) => (
                   <div key={idx} className="flex gap-2 items-start">
-                    <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="flex-1">
                       <input
                         type="text"
                         placeholder="Question (e.g., What's your household income?)"
@@ -1061,21 +1084,16 @@ export default function FlowsPage() {
                         onChange={e => {
                           const updated = [...requiredQuestions];
                           updated[idx].question = e.target.value;
+                          updated[idx].fieldName = generateFieldName(e.target.value);
                           setRequiredQuestions(updated);
                         }}
-                        className="input-dark px-3 py-2 rounded-lg text-sm"
+                        className="input-dark px-3 py-2 rounded-lg text-sm w-full"
                       />
-                      <input
-                        type="text"
-                        placeholder="Field name (e.g., householdIncome)"
-                        value={q.fieldName}
-                        onChange={e => {
-                          const updated = [...requiredQuestions];
-                          updated[idx].fieldName = e.target.value;
-                          setRequiredQuestions(updated);
-                        }}
-                        className="input-dark px-3 py-2 rounded-lg text-sm"
-                      />
+                      {q.fieldName && (
+                        <div className="text-xs text-[var(--muted)] mt-1 px-1">
+                          Field name: {q.fieldName}
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
