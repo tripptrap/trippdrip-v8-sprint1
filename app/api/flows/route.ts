@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Flow name is required' }, { status: 400 });
@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
         flow_config: {
           steps: steps,
           isAIGenerated: isAIGenerated || false,
+          requiredQuestions: requiredQuestions || [],
+          requiresCall: requiresCall || false,
           createdAt: now,
           updatedAt: now,
           id: id || crypto.randomUUID()
@@ -113,7 +115,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Flow ID is required' }, { status: 400 });
@@ -140,6 +142,8 @@ export async function PUT(req: NextRequest) {
       ...existingConfig,
       ...(steps !== undefined && { steps }),
       ...(isAIGenerated !== undefined && { isAIGenerated }),
+      ...(requiredQuestions !== undefined && { requiredQuestions }),
+      ...(requiresCall !== undefined && { requiresCall }),
       updatedAt: new Date().toISOString()
     };
 

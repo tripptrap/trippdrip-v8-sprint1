@@ -35,6 +35,7 @@ type ConversationFlow = {
   name: string;
   steps: FlowStep[];
   requiredQuestions?: RequiredQuestion[]; // Questions that must be answered
+  requiresCall?: boolean; // Whether this flow requires a phone/zoom call
   createdAt: string;
   updatedAt: string;
   isAIGenerated?: boolean; // Track if flow was created with AI
@@ -54,6 +55,7 @@ async function loadFlows(): Promise<ConversationFlow[]> {
         name: flow.name,
         steps: flow.steps || [],
         requiredQuestions: flow.required_questions || [],
+        requiresCall: flow.requires_call || false,
         createdAt: flow.created_at,
         updatedAt: flow.updated_at,
         isAIGenerated: flow.is_ai_generated
@@ -85,6 +87,7 @@ async function saveFlowToServer(flow: ConversationFlow): Promise<boolean> {
         name: flow.name,
         steps: flow.steps,
         requiredQuestions: flow.requiredQuestions || [],
+        requiresCall: flow.requiresCall || false,
         isAIGenerated: flow.isAIGenerated,
         description: ''
       })
@@ -200,6 +203,7 @@ export default function FlowsPage() {
     clientGoals: ""
   });
   const [requiredQuestions, setRequiredQuestions] = useState<RequiredQuestion[]>([]);
+  const [requiresCall, setRequiresCall] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [showStepDialog, setShowStepDialog] = useState(false);
@@ -295,6 +299,7 @@ export default function FlowsPage() {
           name: newFlowName.trim(),
           steps: stepsWithColors,
           requiredQuestions: validRequiredQuestions,
+          requiresCall: requiresCall,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           isAIGenerated: true
@@ -307,6 +312,7 @@ export default function FlowsPage() {
         setNewFlowName("");
         setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
         setRequiredQuestions([]);
+        setRequiresCall(false);
         setShowNewFlowDialog(false);
       } else {
         alert("Failed to generate flow. Please try again.");
@@ -1003,6 +1009,7 @@ export default function FlowsPage() {
                     setNewFlowName("");
                     setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
                     setRequiredQuestions([]);
+                    setRequiresCall(false);
                   }}
                   className="text-white/60 hover:text-white text-2xl leading-none"
                   disabled={isGenerating}
@@ -1112,6 +1119,19 @@ export default function FlowsPage() {
               </div>
             </div>
 
+            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-lg border border-white/10">
+              <input
+                type="checkbox"
+                id="requiresCall"
+                checked={requiresCall}
+                onChange={(e) => setRequiresCall(e.target.checked)}
+                className="w-5 h-5 rounded border-2 border-white/30 bg-white/10 checked:bg-blue-500 checked:border-blue-500 cursor-pointer"
+              />
+              <label htmlFor="requiresCall" className="text-sm font-medium text-white cursor-pointer flex-1">
+                This flow requires a phone call or Zoom meeting with the client
+              </label>
+            </div>
+
             <div>
               <label className="text-sm font-medium text-white mb-2 block">Client goals (optional)</label>
               <textarea
@@ -1138,6 +1158,7 @@ export default function FlowsPage() {
                   setNewFlowName("");
                   setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
                   setRequiredQuestions([]);
+                  setRequiresCall(false);
                 }}
                 className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
                 disabled={isGenerating}
