@@ -326,15 +326,17 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
       if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
         agentResponse = aiDecision.customResponse;
 
-        // SIMPLE FIX: If we have calendar slots and ANY mention of time/scheduling, show real times
+        // ONLY show calendar times if ALL required questions have been answered
         if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
-          const timesList = calendarSlots.map(s => {
+          // Take first 2-3 available slots (already filtered for future times)
+          const slotsToShow = calendarSlots.slice(0, 3);
+          const timesList = slotsToShow.map(s => {
             const timeMatch = s.formatted.match(/at (.+)$/);
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
 
-          console.log(`📅 All questions answered. Forcing calendar times: ${timesList}`);
-          agentResponse = `Thank you! I have availability at: ${timesList}. Which time works best for you?`;
+          console.log(`📅 All ${requiredQuestions.length} questions answered. Showing ${slotsToShow.length} available times: ${timesList}`);
+          agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
         }
 
         nextStepIndex = currentStepIndex;
@@ -351,15 +353,17 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         // Always use the followUpMessage for the matched response
         agentResponse = matchedResponse.followUpMessage;
 
-        // SIMPLE FIX: If all questions answered and we have calendar, show times
+        // ONLY show calendar times if ALL required questions have been answered
         if (requiresCall && calendarSlots.length > 0 && allQuestionsAnswered) {
-          const timesList = calendarSlots.map(s => {
+          // Take first 2-3 available slots (already filtered for future times)
+          const slotsToShow = calendarSlots.slice(0, 3);
+          const timesList = slotsToShow.map(s => {
             const timeMatch = s.formatted.match(/at (.+)$/);
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
 
-          console.log(`📅 All questions answered (matched response). Forcing calendar times: ${timesList}`);
-          agentResponse = `Thank you! I have availability at: ${timesList}. Which time works best for you?`;
+          console.log(`📅 All ${requiredQuestions.length} questions answered (matched). Showing ${slotsToShow.length} available times: ${timesList}`);
+          agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
         }
 
         // Check if this response has a nextStepId to follow for FUTURE messages
