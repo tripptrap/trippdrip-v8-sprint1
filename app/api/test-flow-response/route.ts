@@ -21,14 +21,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check which required questions are still missing
-    const missingQuestions = requiredQuestions.filter((q: any) => !collectedInfo[q.fieldName]);
-    const allQuestionsAnswered = requiredQuestions.length > 0 && missingQuestions.length === 0;
+    // Check if we have at least as many collected fields as required questions
+    // Since AI generates field names dynamically, we just need to ensure we've collected enough info
+    const collectedFieldsCount = Object.keys(collectedInfo).length;
+    const requiredQuestionsCount = requiredQuestions.length;
+    const allQuestionsAnswered = requiredQuestionsCount > 0 && collectedFieldsCount >= requiredQuestionsCount;
 
-    console.log('🔍 DEBUG - Required questions:', requiredQuestions.length);
-    console.log('🔍 DEBUG - Required field names:', requiredQuestions.map((q: any) => q.fieldName));
-    console.log('🔍 DEBUG - Missing questions:', missingQuestions.map((q: any) => q.fieldName));
-    console.log('🔍 DEBUG - All questions answered?', allQuestionsAnswered);
+    console.log('🔍 DEBUG - Required questions:', requiredQuestionsCount);
+    console.log('🔍 DEBUG - Required questions list:', requiredQuestions.map((q: any) => q.question));
+    console.log('🔍 DEBUG - Collected fields count:', collectedFieldsCount);
+    console.log('🔍 DEBUG - All questions answered?', allQuestionsAnswered, `(${collectedFieldsCount} >= ${requiredQuestionsCount})`);
     console.log('🔍 DEBUG - Collected info keys:', Object.keys(collectedInfo));
     console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
 
@@ -156,10 +158,10 @@ export async function POST(req: NextRequest) {
       : '';
 
     const requiredQuestionsText = requiredQuestions.length > 0
-      ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question} (save as "${q.fieldName}")`).join('\n')}\n\n${
+      ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question}`).join('\n')}\n\n${
           allQuestionsAnswered
             ? 'ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED! You can now proceed to the next step in the conversation flow.'
-            : `You MUST ask these questions and collect this information. Check what's already collected and ask for what's missing.\n\nMISSING QUESTIONS:\n${missingQuestions.map((q: any) => `- ${q.question}`).join('\n')}`
+            : `You MUST ask these questions and collect this information. You've collected ${collectedFieldsCount} out of ${requiredQuestionsCount} required answers. Keep asking until you have all ${requiredQuestionsCount} answers.`
         }`
       : '';
 
@@ -233,13 +235,14 @@ CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
 
 EXTRACT KEY INFORMATION from the client's responses:
 ${requiredQuestions.length > 0 ? `
-CRITICAL: When extracting information for required questions, you MUST use EXACTLY these field names:
-${requiredQuestions.map((q: any) => `- For "${q.question}" use field name: "${q.fieldName}"`).join('\n')}
+REQUIRED QUESTIONS TO TRACK:
+${requiredQuestions.map((q: any, i: number) => `${i + 1}. "${q.question}" - Create a short, descriptive camelCase field name for this (e.g., "householdIncome", "numberOfMembers", "preferredCoverage", etc.)`).join('\n')}
 
-DO NOT make up your own field names! Use the EXACT field names listed above.
-For example:
-- If the field name is "income", use "income" NOT "householdIncome"
-- If the field name is "householdMembers", use "householdMembers" exactly
+When you extract information that answers one of these questions, create a clear camelCase field name that describes what you're collecting.
+Examples:
+- "What is your household income?" → fieldName: "householdIncome", value: "50000"
+- "How many members?" → fieldName: "numberOfMembers", value: "4"
+- "What type of coverage?" → fieldName: "coverageType", value: "health insurance"
 ` : ''}
 - Look for: number of people, coverage type, budget, timeline, current coverage, ages, gender, location, zip code, etc.
 - Example: "im looking for coverage for myself" → Extract: Number of people = 1
