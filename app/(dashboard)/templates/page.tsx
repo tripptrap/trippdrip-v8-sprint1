@@ -25,10 +25,16 @@ type FlowStep = {
   };
 };
 
+type RequiredQuestion = {
+  question: string; // e.g., "What's your household income?"
+  fieldName: string; // e.g., "householdIncome"
+};
+
 type ConversationFlow = {
   id: string;
   name: string;
   steps: FlowStep[];
+  requiredQuestions?: RequiredQuestion[]; // Questions that must be answered
   createdAt: string;
   updatedAt: string;
   isAIGenerated?: boolean; // Track if flow was created with AI
@@ -47,6 +53,7 @@ async function loadFlows(): Promise<ConversationFlow[]> {
         id: flow.id,
         name: flow.name,
         steps: flow.steps || [],
+        requiredQuestions: flow.required_questions || [],
         createdAt: flow.created_at,
         updatedAt: flow.updated_at,
         isAIGenerated: flow.is_ai_generated
@@ -77,6 +84,7 @@ async function saveFlowToServer(flow: ConversationFlow): Promise<boolean> {
         id: existingFlow?.id || flow.id,  // Use database ID for updates
         name: flow.name,
         steps: flow.steps,
+        requiredQuestions: flow.requiredQuestions || [],
         isAIGenerated: flow.isAIGenerated,
         description: ''
       })
@@ -110,6 +118,58 @@ function saveFlows(flows: ConversationFlow[]) {
   });
 }
 
+// Helper function to convert date/time strings to ISO format for Google Calendar API
+function parseAppointmentDateTime(dateStr: string, timeStr: string): { start: string; end: string } {
+  const now = new Date();
+  let appointmentDate = new Date();
+
+  // Parse date string
+  const dateLower = dateStr.toLowerCase();
+  if (dateLower === 'today') {
+    appointmentDate = new Date(now);
+  } else if (dateLower === 'tomorrow') {
+    appointmentDate = new Date(now);
+    appointmentDate.setDate(appointmentDate.getDate() + 1);
+  } else {
+    // Handle day names (Monday, Tuesday, etc.)
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const targetDay = daysOfWeek.indexOf(dateLower);
+    if (targetDay !== -1) {
+      const currentDay = now.getDay();
+      let daysUntilTarget = targetDay - currentDay;
+      if (daysUntilTarget <= 0) daysUntilTarget += 7; // Next occurrence
+      appointmentDate = new Date(now);
+      appointmentDate.setDate(appointmentDate.getDate() + daysUntilTarget);
+    }
+  }
+
+  // Parse time string (format: "5:00 PM", "2:30 AM", etc.)
+  const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1]);
+    const minutes = parseInt(timeMatch[2]);
+    const period = timeMatch[3].toUpperCase();
+
+    // Convert to 24-hour format
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+
+    appointmentDate.setHours(hours, minutes, 0, 0);
+  } else {
+    // Default to 2:00 PM if parsing fails
+    appointmentDate.setHours(14, 0, 0, 0);
+  }
+
+  // Create end time (1 hour after start)
+  const endDate = new Date(appointmentDate);
+  endDate.setHours(endDate.getHours() + 1);
+
+  return {
+    start: appointmentDate.toISOString(),
+    end: endDate.toISOString()
+  };
+}
+
 export default function FlowsPage() {
   const [flows, setFlows] = useState<ConversationFlow[]>([]);
   const [selectedFlow, setSelectedFlow] = useState<ConversationFlow | null>(null);
@@ -119,9 +179,9 @@ export default function FlowsPage() {
     whoYouAre: "",
     whatOffering: "",
     whoTexting: "",
-    qualifyingQuestions: "",
     clientGoals: ""
   });
+  const [requiredQuestions, setRequiredQuestions] = useState<RequiredQuestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [showStepDialog, setShowStepDialog] = useState(false);
@@ -150,6 +210,8 @@ export default function FlowsPage() {
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
+  const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(false);
+  const [createdAppointments, setCreatedAppointments] = useState<Array<{title: string, date: string, time: string, eventId?: string, htmlLink?: string}>>([]);
 
   useEffect(() => {
     loadFlows().then(setFlows).catch(e => {
@@ -178,7 +240,7 @@ export default function FlowsPage() {
   }
 
   async function createNewFlow() {
-    if (!newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting || !flowContext.qualifyingQuestions) {
+    if (!newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting) {
       alert("Please fill in all required fields");
       return;
     }
@@ -186,12 +248,16 @@ export default function FlowsPage() {
     setIsGenerating(true);
 
     try {
+      // Filter out empty required questions
+      const validRequiredQuestions = requiredQuestions.filter(q => q.question.trim() && q.fieldName.trim());
+
       const response = await fetch("/api/generate-flow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           flowName: newFlowName.trim(),
-          context: flowContext
+          context: flowContext,
+          requiredQuestions: validRequiredQuestions
         })
       });
 
@@ -205,8 +271,10 @@ export default function FlowsPage() {
           id: Date.now().toString(),
           name: newFlowName.trim(),
           steps: stepsWithColors,
+          requiredQuestions: validRequiredQuestions,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          isAIGenerated: true
         };
 
         const updated = [...flows, newFlow];
@@ -214,7 +282,8 @@ export default function FlowsPage() {
         saveFlows(updated);
         setSelectedFlow(newFlow);
         setNewFlowName("");
-        setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", qualifyingQuestions: "", clientGoals: "" });
+        setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+        setRequiredQuestions([]);
         setShowNewFlowDialog(false);
       } else {
         alert("Failed to generate flow. Please try again.");
@@ -653,7 +722,8 @@ export default function FlowsPage() {
           currentStep,
           allSteps: selectedFlow.steps,
           conversationHistory,
-          collectedInfo
+          collectedInfo,
+          requiredQuestions: selectedFlow.requiredQuestions || []
         })
       });
 
@@ -665,6 +735,127 @@ export default function FlowsPage() {
         // Update collected info if AI extracted new information
         if (data.extractedInfo && Object.keys(data.extractedInfo).length > 0) {
           setCollectedInfo(prev => ({ ...prev, ...data.extractedInfo }));
+        }
+
+        // Create real calendar appointment if enabled and AI mentions booking/scheduling
+        if (enableCalendarAppointments && data.agentResponse) {
+          const appointmentKeywords = ['booked', 'scheduled', 'appointment set', 'meeting confirmed', 'calendar invite'];
+          const hasAppointment = appointmentKeywords.some(keyword =>
+            data.agentResponse.toLowerCase().includes(keyword)
+          );
+
+          if (hasAppointment) {
+            // Extract date and time from AI response
+            let extractedDate = 'Tomorrow';
+            let extractedTime = '2:00 PM';
+
+            const response = data.agentResponse.toLowerCase();
+
+            // Try to extract date
+            if (response.includes('today')) {
+              extractedDate = 'Today';
+            } else if (response.includes('tomorrow')) {
+              extractedDate = 'Tomorrow';
+            } else if (response.includes('monday')) {
+              extractedDate = 'Monday';
+            } else if (response.includes('tuesday')) {
+              extractedDate = 'Tuesday';
+            } else if (response.includes('wednesday')) {
+              extractedDate = 'Wednesday';
+            } else if (response.includes('thursday')) {
+              extractedDate = 'Thursday';
+            } else if (response.includes('friday')) {
+              extractedDate = 'Friday';
+            }
+
+            // Try to extract time (look for patterns like "5 PM", "3:30 PM", "at 5", etc.)
+            const timeMatch = response.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)/);
+            if (timeMatch) {
+              const hour = timeMatch[1];
+              const minutes = timeMatch[2] || '00';
+              const period = timeMatch[3].toUpperCase();
+              extractedTime = `${hour}:${minutes} ${period}`;
+            } else {
+              // Try simpler pattern like "at 5" or "at 3:30"
+              const simpleMatch = response.match(/at\s+(\d{1,2})(?::(\d{2}))?/);
+              if (simpleMatch) {
+                const hour = parseInt(simpleMatch[1]);
+                const minutes = simpleMatch[2] || '00';
+                // Assume PM for business hours (9-6), AM otherwise
+                const period = (hour >= 9 && hour <= 11) || hour <= 6 ? 'PM' : 'AM';
+                extractedTime = `${hour}:${minutes} ${period}`;
+              }
+            }
+
+            // Override with extracted info if available
+            if (data.extractedInfo?.date) extractedDate = data.extractedInfo.date;
+            if (data.extractedInfo?.time) extractedTime = data.extractedInfo.time;
+
+            // Convert to ISO datetime format for Google Calendar API
+            const appointmentDateTime = parseAppointmentDateTime(extractedDate, extractedTime);
+
+            // Build description from collected info
+            let description = `Flow: ${selectedFlow.name}\n\nCollected Information:\n`;
+            Object.entries(collectedInfo).forEach(([key, value]) => {
+              description += `${key}: ${value}\n`;
+            });
+            description += `\nConversation History:\n`;
+            testMessages.forEach((msg) => {
+              description += `${msg.role === 'user' ? 'User' : (msg.role === 'agent' ? 'Agent' : 'System')}: ${msg.text}\n`;
+            });
+
+            // Create the appointment via API
+            try {
+              const createResponse = await fetch('/api/calendar/create-event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  summary: selectedFlow.name,
+                  description: description,
+                  start: appointmentDateTime.start,
+                  end: appointmentDateTime.end,
+                  attendeeEmail: collectedInfo.email || undefined,
+                  attendeeName: collectedInfo.name || 'Test Lead',
+                  leadId: null // Test mode, no real lead
+                })
+              });
+
+              const createData = await createResponse.json();
+
+              if (createData.success) {
+                const newAppointment = {
+                  title: selectedFlow.name,
+                  date: extractedDate,
+                  time: extractedTime,
+                  eventId: createData.eventId,
+                  htmlLink: createData.htmlLink
+                };
+
+                setCreatedAppointments(prev => [...prev, newAppointment]);
+
+                // Add a system message showing the appointment was created
+                setTestMessages(prev => [...prev, {
+                  role: 'system',
+                  text: `📅 Calendar Appointment Created!\n\nTitle: ${newAppointment.title}\nDate: ${newAppointment.date}\nTime: ${newAppointment.time}\n\nView in Google Calendar: ${createData.htmlLink || 'Check your calendar'}`,
+                  timestamp: formatTimestamp(now)
+                }]);
+              } else {
+                console.error('Failed to create calendar event:', createData.error);
+                setTestMessages(prev => [...prev, {
+                  role: 'system',
+                  text: `⚠️ Failed to create calendar appointment: ${createData.error || 'Unknown error'}`,
+                  timestamp: formatTimestamp(now)
+                }]);
+              }
+            } catch (error: any) {
+              console.error('Error creating calendar event:', error);
+              setTestMessages(prev => [...prev, {
+                role: 'system',
+                text: `⚠️ Error creating calendar appointment. Make sure Google Calendar is connected.`,
+                timestamp: formatTimestamp(now)
+              }]);
+            }
+          }
         }
 
         // ALWAYS set up drips if AI provided them (for both custom and preset responses)
@@ -787,7 +978,8 @@ export default function FlowsPage() {
                   onClick={() => {
                     setShowNewFlowDialog(false);
                     setNewFlowName("");
-                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", qualifyingQuestions: "", clientGoals: "" });
+                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+                    setRequiredQuestions([]);
                   }}
                   className="text-white/60 hover:text-white text-2xl leading-none"
                   disabled={isGenerating}
@@ -844,15 +1036,62 @@ export default function FlowsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Key qualifying questions *</label>
-              <textarea
-                placeholder="e.g., 'Are you currently insured? What's your monthly budget? Do you have dependents? Any pre-existing conditions?'"
-                value={flowContext.qualifyingQuestions}
-                onChange={e => setFlowContext({...flowContext, qualifyingQuestions: e.target.value})}
-                className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                rows={3}
-              />
-              <p className="text-xs text-[var(--muted)] mt-1">What questions help you identify serious buyers vs tire-kickers?</p>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <label className="text-sm font-medium text-white block">Required Questions *</label>
+                  <p className="text-xs text-[var(--muted)] mt-1">Specific information the AI must collect from every client</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRequiredQuestions([...requiredQuestions, { question: '', fieldName: '' }])}
+                  className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                >
+                  <span className="text-lg leading-none">+</span> Add Question
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {requiredQuestions.map((q, idx) => (
+                  <div key={idx} className="flex gap-2 items-start">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Question (e.g., What's your household income?)"
+                        value={q.question}
+                        onChange={e => {
+                          const updated = [...requiredQuestions];
+                          updated[idx].question = e.target.value;
+                          setRequiredQuestions(updated);
+                        }}
+                        className="input-dark px-3 py-2 rounded-lg text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Field name (e.g., householdIncome)"
+                        value={q.fieldName}
+                        onChange={e => {
+                          const updated = [...requiredQuestions];
+                          updated[idx].fieldName = e.target.value;
+                          setRequiredQuestions(updated);
+                        }}
+                        className="input-dark px-3 py-2 rounded-lg text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRequiredQuestions(requiredQuestions.filter((_, i) => i !== idx))}
+                      className="text-red-400 hover:text-red-300 text-xl leading-none px-2 py-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {requiredQuestions.length === 0 && (
+                  <div className="text-sm text-[var(--muted)] bg-white/5 rounded-lg p-3 text-center">
+                    No required questions yet. Click "+ Add Question" to add one.
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -871,7 +1110,7 @@ export default function FlowsPage() {
               <button
                 onClick={createNewFlow}
                 className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting || !flowContext.qualifyingQuestions}
+                disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting}
               >
                 {isGenerating ? "Generating Flow..." : "Generate Flow with AI"}
               </button>
@@ -879,7 +1118,8 @@ export default function FlowsPage() {
                 onClick={() => {
                   setShowNewFlowDialog(false);
                   setNewFlowName("");
-                  setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", qualifyingQuestions: "", clientGoals: "" });
+                  setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+                  setRequiredQuestions([]);
                 }}
                 className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
                 disabled={isGenerating}
@@ -1223,6 +1463,17 @@ export default function FlowsPage() {
                 <div className="text-sm text-[var(--muted)] mt-1">
                   You are the client - respond naturally to test your flow
                 </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableCalendarAppointments}
+                      onChange={(e) => setEnableCalendarAppointments(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800 cursor-pointer"
+                    />
+                    <span className="text-sm text-white">📅 Enable Calendar Appointments</span>
+                  </label>
+                </div>
               </div>
               <button
                 onClick={resetTestFlow}
@@ -1327,6 +1578,20 @@ export default function FlowsPage() {
                     {pendingDrips.map((drip, idx) => (
                       <div key={idx} className="text-xs text-orange-100/70">
                         • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Calendar Appointments */}
+              {enableCalendarAppointments && createdAppointments.length > 0 && (
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-purple-200 mb-2">📅 Calendar Appointments Created ({createdAppointments.length})</div>
+                  <div className="space-y-1">
+                    {createdAppointments.map((appt, idx) => (
+                      <div key={idx} className="text-xs text-purple-100/70">
+                        • <span className="font-medium text-purple-200">{appt.title}</span> - {appt.date} at {appt.time}
                       </div>
                     ))}
                   </div>
@@ -1596,6 +1861,67 @@ export default function FlowsPage() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Flow Generation Loading Modal */}
+      {isGenerating && (
+        <div className="fixed inset-0 md:left-64 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[99999]">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-purple-500/20">
+            <div className="text-center">
+              {/* Animated AI Icon */}
+              <div className="mb-6 relative">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-purple-500/50">
+                  <svg className="w-10 h-10 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                {/* Orbiting dots */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 animate-spin-slow">
+                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-pink-400 rounded-full"></div>
+                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Text */}
+              <h3 className="text-2xl font-bold text-white mb-2">
+                Generating Your Flow
+              </h3>
+              <p className="text-gray-300 mb-4">
+                Our AI is crafting a personalized conversation flow...
+              </p>
+
+              {/* Progress indicators */}
+              <div className="space-y-2 text-left">
+                <div className="flex items-center text-sm text-gray-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  <span>Analyzing your business context</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                  <span>Building conversation steps</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-400">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                  <span>Optimizing response paths</span>
+                </div>
+              </div>
+
+              {/* Loading bar */}
+              <div className="mt-6 bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 animate-shimmer bg-[length:200%_100%]"></div>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-4">
+                This usually takes 10-20 seconds
+              </p>
             </div>
           </div>
         </div>
