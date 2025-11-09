@@ -54,22 +54,34 @@ async function loadFlows(): Promise<ConversationFlow[]> {
   }
 }
 
-function getThreadFlowStep(threadId: number): { label: string; color: string } | null {
+async function getThreadFlowStep(threadId: number): Promise<{ label: string; color: string } | null> {
   if (typeof window === "undefined") return null;
-  const data = localStorage.getItem(`thread_${threadId}_flowStep`);
-  if (!data) return null;
+
   try {
-    return JSON.parse(data);
+    const response = await fetch(`/api/threads/${threadId}`);
+    const data = await response.json();
+
+    if (data.ok && data.thread && data.thread.flow_config) {
+      return data.thread.flow_config;
+    }
+    return null;
   } catch (e) {
+    console.error('Error loading thread flow step:', e);
     return null;
   }
 }
 
-function setThreadFlowStep(threadId: number, tag: { label: string; color: string } | null) {
-  if (tag) {
-    localStorage.setItem(`thread_${threadId}_flowStep`, JSON.stringify(tag));
-  } else {
-    localStorage.removeItem(`thread_${threadId}_flowStep`);
+async function setThreadFlowStep(threadId: number, tag: { label: string; color: string } | null) {
+  try {
+    await fetch(`/api/threads/${threadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flow_config: tag
+      })
+    });
+  } catch (e) {
+    console.error('Error setting thread flow step:', e);
   }
 }
 

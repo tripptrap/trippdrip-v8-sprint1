@@ -44,12 +44,13 @@ export default function Sidebar(){
 
   // Detect user plan type and listen for changes
   useEffect(() => {
-    const updatePlan = () => {
+    const updatePlan = async () => {
       try {
-        const points = localStorage.getItem('userPoints');
-        if (points) {
-          const data = JSON.parse(points);
-          setUserPlan(data.planType || 'basic');
+        const response = await fetch('/api/user/plan');
+        const data = await response.json();
+
+        if (data.ok && data.planType) {
+          setUserPlan(data.planType);
         }
       } catch (e) {
         console.error('Error loading user plan:', e);
@@ -58,12 +59,20 @@ export default function Sidebar(){
 
     updatePlan();
 
-    // Listen for storage changes (plan upgrades)
-    window.addEventListener('storage', updatePlan);
+    // Listen for plan type changes
+    const handlePlanChange = (event: any) => {
+      if (event.detail?.planType) {
+        setUserPlan(event.detail.planType);
+      } else {
+        updatePlan();
+      }
+    };
+
+    window.addEventListener('planTypeChanged', handlePlanChange);
     window.addEventListener(STORE_UPDATED_EVENT, updatePlan);
 
     return () => {
-      window.removeEventListener('storage', updatePlan);
+      window.removeEventListener('planTypeChanged', handlePlanChange);
       window.removeEventListener(STORE_UPDATED_EVENT, updatePlan);
     };
   }, []);

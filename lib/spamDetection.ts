@@ -113,14 +113,14 @@ export function checkSpamRisk(message: string, recipientCount: number = 1): Spam
 }
 
 // Check sending velocity (rate limiting)
-export function checkSendingVelocity(): {
+export async function checkSendingVelocity(): Promise<{
   allowed: boolean;
   messagesInLastHour: number;
   messagesInLastDay: number;
   hourlyLimit: number;
   dailyLimit: number;
   recommendation: string;
-} {
+}> {
   if (typeof window === 'undefined') {
     return {
       allowed: true,
@@ -132,62 +132,83 @@ export function checkSendingVelocity(): {
     };
   }
 
-  const now = Date.now();
-  const oneHourAgo = now - (60 * 60 * 1000);
-  const oneDayAgo = now - (24 * 60 * 60 * 1000);
+  try {
+    // Get sending history from Supabase
+    const response = await fetch('/api/spam/history');
+    const data = await response.json();
 
-  // Get sending history from localStorage
-  const historyKey = 'sendingHistory';
-  const rawHistory = localStorage.getItem(historyKey);
-  const history: number[] = rawHistory ? JSON.parse(rawHistory) : [];
-
-  // Clean old entries
-  const cleanedHistory = history.filter(timestamp => timestamp > oneDayAgo);
-
-  // Count messages
-  const messagesInLastHour = cleanedHistory.filter(t => t > oneHourAgo).length;
-  const messagesInLastDay = cleanedHistory.length;
-
-  // Limits
-  const hourlyLimit = 100;
-  const dailyLimit = 1000;
-
-  const allowed = messagesInLastHour < hourlyLimit && messagesInLastDay < dailyLimit;
-
-  let recommendation = '';
-  if (!allowed) {
-    if (messagesInLastHour >= hourlyLimit) {
-      recommendation = `Hourly limit reached (${hourlyLimit}). Please wait.`;
-    } else if (messagesInLastDay >= dailyLimit) {
-      recommendation = `Daily limit reached (${dailyLimit}). Try again tomorrow.`;
+    if (!data.ok) {
+      console.error('Error loading sending history:', data.error);
+      return {
+        allowed: true,
+        messagesInLastHour: 0,
+        messagesInLastDay: 0,
+        hourlyLimit: 100,
+        dailyLimit: 1000,
+        recommendation: 'Unable to check velocity'
+      };
     }
-  }
 
-  return {
-    allowed,
-    messagesInLastHour,
-    messagesInLastDay,
-    hourlyLimit,
-    dailyLimit,
-    recommendation
-  };
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+    const history: number[] = data.history || [];
+
+    // Count messages
+    const messagesInLastHour = history.filter(t => t > oneHourAgo).length;
+    const messagesInLastDay = history.length;
+
+    // Limits
+    const hourlyLimit = 100;
+    const dailyLimit = 1000;
+
+    const allowed = messagesInLastHour < hourlyLimit && messagesInLastDay < dailyLimit;
+
+    let recommendation = '';
+    if (!allowed) {
+      if (messagesInLastHour >= hourlyLimit) {
+        recommendation = `Hourly limit reached (${hourlyLimit}). Please wait.`;
+      } else if (messagesInLastDay >= dailyLimit) {
+        recommendation = `Daily limit reached (${dailyLimit}). Try again tomorrow.`;
+      }
+    }
+
+    return {
+      allowed,
+      messagesInLastHour,
+      messagesInLastDay,
+      hourlyLimit,
+      dailyLimit,
+      recommendation
+    };
+  } catch (error) {
+    console.error('Error checking sending velocity:', error);
+    return {
+      allowed: true,
+      messagesInLastHour: 0,
+      messagesInLastDay: 0,
+      hourlyLimit: 100,
+      dailyLimit: 1000,
+      recommendation: 'Unable to check velocity'
+    };
+  }
 }
 
 // Record a message send
-export function recordMessageSent(): void {
+export async function recordMessageSent(phoneNumber?: string, recipientCount?: number): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  const historyKey = 'sendingHistory';
-  const rawHistory = localStorage.getItem(historyKey);
-  const history: number[] = rawHistory ? JSON.parse(rawHistory) : [];
-
-  history.push(Date.now());
-
-  // Keep only last 24 hours
-  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-  const cleanedHistory = history.filter(timestamp => timestamp > oneDayAgo);
-
-  localStorage.setItem(historyKey, JSON.stringify(cleanedHistory));
+  try {
+    await fetch('/api/spam/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber,
+        recipientCount: recipientCount || 1
+      })
+    });
+  } catch (error) {
+    console.error('Error recording message send:', error);
+  }
 }
 
 // Get spam risk color for UI

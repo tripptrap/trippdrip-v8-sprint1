@@ -21,23 +21,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{
           __html: `
             (function() {
-              function updateFavicon() {
+              async function updateFavicon() {
                 try {
-                  // Set dynamic favicon based on user plan
-                  const points = localStorage.getItem('userPoints');
                   let faviconPath = '/logo-premium.png'; // Default for login/public pages
 
-                  if (points) {
-                    const data = JSON.parse(points);
+                  // Fetch plan type from API
+                  try {
+                    const response = await fetch('/api/user/plan');
+                    const data = await response.json();
 
-                    // Update favicon based on plan
-                    if (data.planType === 'professional' || data.planType === 'premium') {
-                      faviconPath = '/logo-premium.png';
-                      document.documentElement.style.setProperty('--accent', '#a855f7');
-                      document.documentElement.style.setProperty('--accent-hover', '#9333ea');
-                    } else {
-                      faviconPath = '/logo-basic.png';
+                    if (data.ok && data.planType) {
+                      // Update favicon based on plan
+                      if (data.planType === 'professional' || data.planType === 'premium') {
+                        faviconPath = '/logo-premium.png';
+                        document.documentElement.style.setProperty('--accent', '#a855f7');
+                        document.documentElement.style.setProperty('--accent-hover', '#9333ea');
+                      } else {
+                        faviconPath = '/logo-basic.png';
+                      }
                     }
+                  } catch (apiError) {
+                    console.log('User not logged in or API error:', apiError);
                   }
 
                   // Update favicon dynamically
@@ -60,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               updateFavicon();
 
               // Listen for plan changes
-              window.addEventListener('storage', updateFavicon);
+              window.addEventListener('planTypeChanged', updateFavicon);
             })();
           `
         }} />
