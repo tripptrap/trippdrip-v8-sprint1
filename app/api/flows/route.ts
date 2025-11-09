@@ -28,7 +28,7 @@ export async function GET() {
 
     // Map database format to expected format
     const mappedFlows = (flows || []).map(flow => ({
-      id: flow.flow_config?.id || flow.id,
+      id: flow.id, // Use the database ID for deletion
       name: flow.name,
       description: flow.description,
       steps: flow.flow_config?.steps || [],
@@ -38,7 +38,9 @@ export async function GET() {
       is_active: flow.is_active,
       created_at: flow.created_at,
       updated_at: flow.updated_at,
-      is_ai_generated: flow.flow_config?.isAIGenerated || false
+      is_ai_generated: flow.flow_config?.isAIGenerated || false,
+      requiredQuestions: flow.flow_config?.requiredQuestions || [],
+      requiresCall: flow.flow_config?.requiresCall || false
     }));
 
     return NextResponse.json({ ok: true, items: mappedFlows });

@@ -326,13 +326,30 @@ export default function FlowsPage() {
     }
   }
 
-  function deleteFlow(flowId: string) {
-    if (!confirm("Delete this flow?")) return;
-    const updated = flows.filter(f => f.id !== flowId);
-    setFlows(updated);
-    saveFlows(updated);
-    if (selectedFlow?.id === flowId) {
-      setSelectedFlow(null);
+  async function deleteFlow(flowId: string) {
+    // Find the flow to check if it's AI-generated
+    const flowToDelete = flows.find(f => f.id === flowId);
+
+    // Show warning for AI-generated flows
+    if (flowToDelete?.isAIGenerated || flowToDelete?.is_ai_generated) {
+      const confirmMsg = "⚠️ Warning: This is an AI-generated flow.\n\nDeleting it will NOT refund your points. The points used to create this flow are non-refundable.\n\nAre you sure you want to delete this flow?";
+      if (!confirm(confirmMsg)) return;
+    } else {
+      if (!confirm("Delete this flow?")) return;
+    }
+
+    // Delete from server first
+    const success = await deleteFlowFromServer(flowId);
+
+    if (success) {
+      // Only update local state if server deletion succeeded
+      const updated = flows.filter(f => f.id !== flowId);
+      setFlows(updated);
+      if (selectedFlow?.id === flowId) {
+        setSelectedFlow(null);
+      }
+    } else {
+      alert("Failed to delete flow. Please try again.");
     }
   }
 
