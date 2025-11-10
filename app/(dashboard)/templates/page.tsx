@@ -848,7 +848,7 @@ export default function FlowsPage() {
         conversationHistory,
         collectedInfo,
         requiredQuestions: selectedFlow.requiredQuestions || [],
-        requiresCall: enableCalendarAppointments,
+        requiresCall: (selectedFlow.requiredQuestions || []).length > 0,
         availableSlots: availableSlots
       };
 
@@ -1690,17 +1690,14 @@ export default function FlowsPage() {
                 <div className="text-sm text-[var(--muted)] mt-1">
                   You are the client - respond naturally to test your flow
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={enableCalendarAppointments}
-                      onChange={(e) => setEnableCalendarAppointments(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800 cursor-pointer"
-                    />
-                    <span className="text-sm text-white">📅 Enable Calendar Appointments</span>
-                  </label>
-                </div>
+                {(selectedFlow?.requiredQuestions || []).length > 0 && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-green-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Calendar integration enabled ({(selectedFlow?.requiredQuestions || []).length} questions to collect)</span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={resetTestFlow}
