@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { google } from 'googleapis';
 import { DateTime } from "luxon";
 import { validateAndFixResponse, logQualityMetrics } from "@/lib/ai/responseQuality";
+import {
+  upsertLeadFromConversation,
+  createSession,
+  updateSession,
+  completeSession,
+  trackLeadActivity
+} from "@/lib/conversations/sessionManager";
+import { generateTemplatedResponse } from "@/lib/ai/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false, sessionId, flowId } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -29,6 +37,52 @@ export async function POST(req: NextRequest) {
     const collectedFieldsCount = Object.keys(collectedInfo).length;
     const requiredQuestionsCount = requiredQuestions.length;
     const allQuestionsAnswered = requiredQuestionsCount > 0 && collectedFieldsCount >= requiredQuestionsCount;
+
+    // LEAD & SESSION TRACKING
+    let currentSessionId: string | null = sessionId || null;
+    let currentLeadId: string | null = null;
+
+    // Create or update lead from collected info (if we have any data)
+    if (collectedFieldsCount > 0 && flowId) {
+      try {
+        const { leadId } = await upsertLeadFromConversation(user.id, collectedInfo, flowId);
+        currentLeadId = leadId;
+        console.log('📊 Lead tracked:', leadId ? 'updated/created' : 'failed');
+      } catch (error) {
+        console.error('Error upserting lead:', error);
+        // Continue anyway - lead tracking shouldn't block conversation
+      }
+    }
+
+    // Create session on first message (no sessionId provided)
+    if (!currentSessionId && collectedFieldsCount === 0 && flowId) {
+      try {
+        const { sessionId: newSessionId } = await createSession(user.id, {
+          flowId,
+          leadId: currentLeadId || undefined,
+          collectedInfo,
+          conversationHistory
+        });
+        currentSessionId = newSessionId;
+        console.log('📊 Session created:', newSessionId);
+      } catch (error) {
+        console.error('Error creating session:', error);
+      }
+    }
+
+    // Update existing session with latest state
+    if (currentSessionId) {
+      try {
+        await updateSession(user.id, currentSessionId, {
+          collectedInfo,
+          conversationHistory,
+          leadId: currentLeadId || undefined
+        });
+        console.log('📊 Session updated:', currentSessionId);
+      } catch (error) {
+        console.error('Error updating session:', error);
+      }
+    }
 
     console.log('🔍 DEBUG - Required questions:', requiredQuestionsCount);
     console.log('🔍 DEBUG - Required questions list:', requiredQuestions.map((q: any) => q.question));
@@ -333,6 +387,40 @@ export async function POST(req: NextRequest) {
                   time: selectedSlot.formatted || selectedSlot.display,
                   eventId: bookingData.eventId
                 };
+
+                // Complete session and track activity
+                if (currentSessionId) {
+                  try {
+                    await completeSession(
+                      user.id,
+                      currentSessionId,
+                      true,
+                      selectedSlot.start,
+                      bookingData.eventId
+                    );
+                    console.log('📊 Session completed:', currentSessionId);
+                  } catch (error) {
+                    console.error('Error completing session:', error);
+                  }
+                }
+
+                if (currentLeadId) {
+                  try {
+                    await trackLeadActivity(
+                      user.id,
+                      currentLeadId,
+                      'appointment_scheduled',
+                      `Appointment scheduled for ${selectedSlot.formatted || selectedSlot.display}`,
+                      {
+                        eventId: bookingData.eventId,
+                        time: selectedSlot.start
+                      }
+                    );
+                    console.log('📊 Activity tracked: appointment_scheduled');
+                  } catch (error) {
+                    console.error('Error tracking activity:', error);
+                  }
+                }
               }
             } else {
               console.log('❌ Time slot already booked by someone else');
@@ -731,7 +819,9 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         extractedInfo: aiDecision.extractedInfo || {},
         availableSlots: calendarSlots,
         appointmentBooked: appointmentBooked,
-        appointmentInfo: bookedAppointmentInfo
+        appointmentInfo: bookedAppointmentInfo,
+        sessionId: currentSessionId,
+        leadId: currentLeadId
       });
 
     } catch (parseError) {
