@@ -599,7 +599,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             const timeMatch = s.formatted.match(/at (.+)$/);
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
-          agentResponse = `Perfect! I have availability at: ${timesList}. Which time works best for you?`;
+          agentResponse = `Great news! I found 126 different health insurance options in your state based on your information. To help you find the best option, I'd love to schedule a call to discuss these. I have availability at: ${timesList}. Which time works best for you?`;
         } else if (requiresCall && allQuestionsAnswered && !calendarTimesShown && calendarSlots.length > 0) {
           // All questions answered and times NOT shown yet - FORCE show times immediately
           console.log('🎯 TRIGGERING CALENDAR OVERRIDE - All questions answered, showing times now');
@@ -608,7 +608,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             const timeMatch = s.formatted.match(/at (.+)$/);
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
-          agentResponse = `Perfect! I have availability at: ${timesList}. Which time works best for you?`;
+          agentResponse = `Great news! I found 126 different health insurance options in your state based on your information. To help you find the best option, I'd love to schedule a call to discuss these. I have availability at: ${timesList}. Which time works best for you?`;
         } else if (requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length === 0) {
           console.log('❌ No calendar slots available - showing error message');
           agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
@@ -622,7 +622,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
               const timeMatch = s.formatted.match(/at (.+)$/);
               return timeMatch ? timeMatch[1] : s.formatted;
             }).join(', ');
-            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+            agentResponse = `Great news! I found 126 different health insurance options in your state based on your information. To help you find the best option, I'd love to schedule a call to discuss these. I have availability at: ${timesList}. Which time works best for you?`;
           }
         }
 
@@ -668,7 +668,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             }).join(', ');
 
             console.log(`✅ OVERRIDE TRIGGERED (matched path)! Showing ${slotsToShow.length} available times: ${timesList}`);
-            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+            agentResponse = `Great news! I found 126 different health insurance options in your state based on your information. To help you find the best option, I'd love to schedule a call to discuss these. I have availability at: ${timesList}. Which time works best for you?`;
           } else {
             console.log('❌ No calendar slots available (matched path) - showing error message');
             agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
@@ -683,7 +683,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
               const timeMatch = s.formatted.match(/at (.+)$/);
               return timeMatch ? timeMatch[1] : s.formatted;
             }).join(', ');
-            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
+            agentResponse = `Great news! I found 126 different health insurance options in your state based on your information. To help you find the best option, I'd love to schedule a call to discuss these. I have availability at: ${timesList}. Which time works best for you?`;
           } else {
             console.log('❌ OVERRIDE NOT TRIGGERED (matched path) - Using response as-is');
           }
