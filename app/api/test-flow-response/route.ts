@@ -144,10 +144,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check if calendar times have been shown to user
+    // Only allow booking AFTER we've shown the times in a previous response
+    const calendarTimesShown = conversationHistory && conversationHistory.includes('Which time works best for you?');
+
     // Check if user is selecting a time slot
     let appointmentBooked = false;
     let bookedAppointmentInfo: any = null;
-    if (requiresCall && calendarSlots.length > 0 && userMessage) {
+
+    // ONLY check for booking if calendar times were already shown in conversation
+    if (requiresCall && calendarSlots.length > 0 && userMessage && calendarTimesShown) {
       let selectedSlot = null;
 
       console.log(`🔍 Checking if "${userMessage}" is selecting a time from ${calendarSlots.length} available slots`);
@@ -353,13 +359,27 @@ CRITICAL: ACTUALLY ANSWER THEIR QUESTIONS
 - Bad: "what can you help me find?" → "What specifically would you like to know?"
 - Good: "what can you help me find?" → "I help you find health insurance coverage! Are you looking for yourself or your family?"
 
-CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE
-- If "Information Already Collected" shows you already know something, DON'T ask for it again
-- Example: If you know "Number of people: 1" (or client said "myself"), DON'T ask "How many people need coverage?"
-- Example: If you know "Current coverage: None", DON'T ask "What's your current coverage?"
-- Example: If you know "householdIncome: 40000", DON'T ask "What's your household income?" again
-- Use what you already know to have a natural conversation
-- MOVE FORWARD to the next piece of information you need, don't loop back to what you already have
+🚨 CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE 🚨
+**BEFORE YOU GENERATE YOUR RESPONSE:**
+1. LOOK at the "INFORMATION ALREADY COLLECTED" section above
+2. CHECK what information is already there
+3. DO NOT ask for anything that's already collected - asking again is a CRITICAL ERROR
+
+EXAMPLES OF WHAT NOT TO DO:
+- ❌ BAD: "householdIncome: 24k" is collected → You ask "What's your household income?"
+- ❌ BAD: "householdMembers: 3" is collected → You ask "How many people are in your household?"
+- ❌ BAD: "name: John" is collected → You ask "What's your name?"
+
+WHAT TO DO INSTEAD:
+- ✅ GOOD: Check collected info first, then ask for MISSING information only
+- ✅ GOOD: If you have income and members, ask for something NEW like zip code, coverage type, etc.
+- ✅ GOOD: Use what you already know to sound natural: "Thanks John! Since you mentioned 3 people..."
+
+**MANDATORY PRE-RESPONSE CHECKLIST:**
+Before generating your response, ask yourself:
+1. "What information do I ALREADY have?" (Check INFORMATION ALREADY COLLECTED section)
+2. "What information am I STILL MISSING?" (Check REQUIRED QUESTIONS section)
+3. "Am I about to ask for something I already know?" (If YES, STOP and ask something else!)
 
 CONVERSATION FLOW RULES:
 - Once you have an answer to a question, NEVER ask it again - move on to the next question
@@ -368,6 +388,7 @@ CONVERSATION FLOW RULES:
 - Review the collected information before deciding what to ask next
 - NEVER repeat your previous message - each response should be unique and move the conversation forward
 - If you just asked something and they answered, acknowledge their answer and ask something NEW
+- ASKING A DUPLICATE QUESTION IS THE WORST MISTAKE YOU CAN MAKE - Always check collected info first!
 
 CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
 - DO NOT keep asking for more information
