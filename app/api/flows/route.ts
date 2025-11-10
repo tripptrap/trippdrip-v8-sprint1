@@ -74,23 +74,18 @@ export async function POST(req: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // Create flow using existing schema
+    // Create flow using conversation_flows table
     const { data, error } = await supabase
-      .from('flows')
+      .from('conversation_flows')
       .insert({
         user_id: user.id,
         name: name.trim(),
-        description: description || null,
-        flow_config: {
-          steps: steps,
-          isAIGenerated: isAIGenerated || false,
-          requiredQuestions: requiredQuestions || [],
-          requiresCall: requiresCall || false,
-          createdAt: now,
-          updatedAt: now,
-          id: id || crypto.randomUUID()
-        },
-        is_active: true,
+        context: { whatOffering: description || '' },
+        steps: steps,
+        required_questions: requiredQuestions || [],
+        requires_call: requiresCall || false,
+        created_at: now,
+        updated_at: now
       })
       .select()
       .single();
@@ -124,34 +119,21 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Flow ID is required' }, { status: 400 });
     }
 
-    // Get existing flow to merge config
-    const { data: existingFlow } = await supabase
-      .from('flows')
-      .select('flow_config')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single();
-
-    const existingConfig = existingFlow?.flow_config || {};
-
-    // Update flow using existing schema
-    const updateData: any = {};
-
-    if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined) updateData.description = description;
-
-    // Merge flow_config
-    updateData.flow_config = {
-      ...existingConfig,
-      ...(steps !== undefined && { steps }),
-      ...(isAIGenerated !== undefined && { isAIGenerated }),
-      ...(requiredQuestions !== undefined && { requiredQuestions }),
-      ...(requiresCall !== undefined && { requiresCall }),
-      updatedAt: new Date().toISOString()
+    // Update flow using conversation_flows table
+    const updateData: any = {
+      updated_at: new Date().toISOString()
     };
 
+    if (name !== undefined) updateData.name = name.trim();
+    if (description !== undefined) {
+      updateData.context = { whatOffering: description };
+    }
+    if (steps !== undefined) updateData.steps = steps;
+    if (requiredQuestions !== undefined) updateData.required_questions = requiredQuestions;
+    if (requiresCall !== undefined) updateData.requires_call = requiresCall;
+
     const { data, error } = await supabase
-      .from('flows')
+      .from('conversation_flows')
       .update(updateData)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -189,7 +171,7 @@ export async function DELETE(req: NextRequest) {
 
     // Delete flow
     const { error } = await supabase
-      .from('flows')
+      .from('conversation_flows')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
