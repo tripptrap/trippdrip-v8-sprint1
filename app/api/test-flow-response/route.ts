@@ -584,14 +584,22 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        // Don't override - the AI now includes times naturally from the prompt
-        // Only override if there's a problem (no slots available or fake times)
-        if (requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length === 0) {
-          console.log('❌ No calendar slots available - showing error message');
-          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
-        } else if (appointmentBooked) {
+        // Override AI response with calendar times when appropriate
+        if (appointmentBooked) {
           // If appointment was just booked, keep the AI's natural acknowledgment
           console.log('✅ Appointment booked - keeping AI response');
+        } else if (requiresCall && allQuestionsAnswered && !calendarTimesShown && calendarSlots.length > 0) {
+          // All questions answered and times NOT shown yet - FORCE show times immediately
+          console.log('🎯 TRIGGERING CALENDAR OVERRIDE - All questions answered, showing times now');
+          const slotsToShow = calendarSlots.slice(0, 3);
+          const timesList = slotsToShow.map(s => {
+            const timeMatch = s.formatted.match(/at (.+)$/);
+            return timeMatch ? timeMatch[1] : s.formatted;
+          }).join(', ');
+          agentResponse = `Perfect! I have availability at: ${timesList}. Which time works best for you?`;
+        } else if (requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length === 0) {
+          console.log('❌ No calendar slots available - showing error message');
+          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
         } else if (requiresCall && calendarSlots.length > 0 && !allQuestionsAnswered) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
@@ -603,14 +611,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
               return timeMatch ? timeMatch[1] : s.formatted;
             }).join(', ');
             agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
-          } else {
-            console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
           }
-        } else if (requiresCall && calendarSlots.length === 0 && allQuestionsAnswered) {
-          console.log('❌ No calendar slots available - showing error message');
-          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
-        } else {
-          console.log('❌ OVERRIDE NOT TRIGGERED - Using AI response as-is');
         }
 
         nextStepIndex = currentStepIndex;
