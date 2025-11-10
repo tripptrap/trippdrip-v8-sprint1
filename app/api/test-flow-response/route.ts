@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
           });
 
           // Set up token refresh handler
-          oauth2Client.on('tokens', async (tokens) => {
+          oauth2Client.on('tokens', async (tokens: any) => {
             if (tokens.refresh_token) {
               await supabase
                 .from('users')
