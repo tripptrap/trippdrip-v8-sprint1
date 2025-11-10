@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { google } from 'googleapis';
 import { DateTime } from "luxon";
+import { validateAndFixResponse, logQualityMetrics } from "@/lib/ai/responseQuality";
 
 export const dynamic = "force-dynamic";
 
@@ -559,6 +560,26 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
       if (aiDecision.matchedResponseIndex === null && aiDecision.customResponse) {
         agentResponse = aiDecision.customResponse;
         console.log('🤖 AI custom response:', agentResponse);
+
+        // QUALITY CHECK: Validate and potentially fix the AI response
+        const qualityCheck = validateAndFixResponse(agentResponse, {
+          allQuestionsAnswered,
+          requiredQuestions,
+          collectedFieldsCount
+        });
+
+        if (qualityCheck.wasFixed) {
+          console.log('✨ AI response improved by quality check');
+          console.log('Issues found:', qualityCheck.issues);
+          agentResponse = qualityCheck.response;
+        }
+
+        // Log quality metrics for monitoring
+        logQualityMetrics(agentResponse, {
+          allQuestionsAnswered,
+          requiredQuestions,
+          collectedFieldsCount
+        }, qualityCheck.wasFixed);
 
         // If calendar is enabled and all questions answered, check if response contains time mentions
         console.log('🔍 Checking override conditions:', {
