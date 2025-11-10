@@ -250,6 +250,7 @@ export default function FlowsPage() {
     title: '',
     message: ''
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     loadFlows().then(setFlows).catch(e => {
@@ -1454,212 +1455,280 @@ export default function FlowsPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-12 gap-4">
-              {/* Left sidebar: Rebuttal/Alternate Steps - Only show for AI flows */}
-              {selectedFlow.isAIGenerated !== false && (
-                <div className="col-span-12 lg:col-span-4 space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
-                  <div className="sticky top-0 bg-[#0a0a0a] pb-3 z-10 pt-2">
-                    <div className="text-sm font-semibold text-amber-400 mb-2">
-                      📋 Rebuttal & Alternate Paths
-                    </div>
-                    <div className="text-xs text-[var(--muted)]">
-                      How objections/questions flow back to main path
-                    </div>
+            <div className="space-y-4">
+              {/* Flow Header with Test Button */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
+                  <div className="text-sm text-[var(--muted)]">
+                    {selectedFlow.steps.length} step{selectedFlow.steps.length !== 1 ? 's' : ''} • {selectedFlow.isAIGenerated !== false ? 'AI Generated' : 'Manual'}
                   </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={startTestFlow}
+                    className="bg-green-600 hover:bg-green-700 border border-green-500/50 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
+                  >
+                    Test Flow
+                  </button>
+                </div>
+              </div>
 
-                  {/* Display response flow navigation */}
-                  {selectedFlow.steps.map((step, stepIndex) => (
-                    <div key={step.id} className="space-y-2">
-                      {step.responses && step.responses.length > 0 && (
-                        <>
-                          <div className="text-xs font-semibold text-amber-300 mt-4 mb-2">
-                            Step {stepIndex + 1} Rebuttals
-                          </div>
-                          {step.responses.map((response, responseIndex) => {
-                            const nextStepId = (response as any).nextStepId;
-                            const action = (response as any).action;
-                            const nextStepIndex = nextStepId
-                              ? selectedFlow.steps.findIndex(s => s.id === nextStepId)
-                              : -1;
-
-                            return (
-                              <div
-                                key={responseIndex}
-                                className="border border-amber-500/30 rounded-lg p-2.5 bg-amber-500/10"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="text-xs font-bold text-amber-400 flex-1">
-                                    {response.label || `Response ${responseIndex + 1}`}
-                                  </div>
-                                  {action === 'end' ? (
-                                    <div className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 whitespace-nowrap">
-                                      ⚠️ Ends
-                                    </div>
-                                  ) : nextStepIndex >= 0 ? (
-                                    <div className="text-[10px] px-2 py-0.5 rounded bg-green-500/20 text-green-400 whitespace-nowrap">
-                                      → Step {nextStepIndex + 1}
-                                    </div>
-                                  ) : (
-                                    <div className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 whitespace-nowrap">
-                                      ↻ Loop
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-                    </div>
-                  ))}
-
-                  {selectedFlow.steps.every(s => !s.responses || s.responses.length === 0) && (
-                    <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/10">
-                      <div className="text-xs text-amber-300">
-                        No response options yet. Expand "Client Response Options" to add rebuttal paths.
+              {/* Required Questions (Prominent Display) */}
+              {selectedFlow.requiredQuestions && selectedFlow.requiredQuestions.length > 0 && (
+                <div className="border border-blue-500/30 rounded-xl p-4 bg-blue-500/10">
+                  <div className="flex items-center gap-2 mb-3">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div className="text-sm font-semibold text-blue-300">Required Questions</div>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedFlow.requiredQuestions.map((q, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <div className="text-blue-400 font-bold text-sm mt-0.5">{idx + 1}.</div>
+                        <div className="flex-1">
+                          <div className="text-sm text-white">{q.question}</div>
+                          <div className="text-xs text-blue-300/70 mt-0.5">Field: {q.fieldName}</div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                  {selectedFlow.requiresCall && (
+                    <div className="mt-3 pt-3 border-t border-blue-500/30 flex items-center gap-2 text-sm text-blue-300">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      <span>This flow requires a phone/Zoom call</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Right: Main Flow Steps */}
-              <div className={selectedFlow.isAIGenerated !== false ? "col-span-12 lg:col-span-8 space-y-4" : "col-span-12 space-y-4"}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
-                    <div className="text-sm text-[var(--muted)]">
-                      Main flow - optimal path to close
-                    </div>
+              {/* Advanced Details Toggle */}
+              <div className="border border-white/20 rounded-xl overflow-hidden bg-white/5">
+                <button
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-sm font-medium text-white">Advanced Details</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={startTestFlow}
-                      className="bg-green-600 hover:bg-green-700 border border-green-500/50 px-3 py-1.5 rounded text-xs text-white font-medium transition-colors"
-                    >
-                      Test
-                    </button>
+                  <svg
+                    className={`w-5 h-5 text-white/60 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showAdvanced && (
+                  <div className="border-t border-white/20 p-4 space-y-4">
+                    {/* Rebuttal & Alternate Paths - Only show for AI flows */}
+                    {selectedFlow.isAIGenerated !== false && (
+                      <div className="border border-amber-500/30 rounded-lg p-4 bg-amber-500/10">
+                        <div className="text-sm font-semibold text-amber-400 mb-2">
+                          📋 Rebuttal & Alternate Paths
+                        </div>
+                        <div className="text-xs text-[var(--muted)] mb-4">
+                          How objections/questions flow back to main path
+                        </div>
+
+                        {/* Display response flow navigation */}
+                        <div className="space-y-3">
+                          {selectedFlow.steps.map((step, stepIndex) => (
+                            <div key={step.id} className="space-y-2">
+                              {step.responses && step.responses.length > 0 && (
+                                <>
+                                  <div className="text-xs font-semibold text-amber-300 mt-3 mb-2">
+                                    Step {stepIndex + 1} Rebuttals
+                                  </div>
+                                  {step.responses.map((response, responseIndex) => {
+                                    const nextStepId = (response as any).nextStepId;
+                                    const action = (response as any).action;
+                                    const nextStepIndex = nextStepId
+                                      ? selectedFlow.steps.findIndex(s => s.id === nextStepId)
+                                      : -1;
+
+                                    return (
+                                      <div
+                                        key={responseIndex}
+                                        className="border border-amber-500/30 rounded-lg p-2.5 bg-amber-500/5"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="text-xs font-bold text-amber-400 flex-1">
+                                            {response.label || `Response ${responseIndex + 1}`}
+                                          </div>
+                                          {action === 'end' ? (
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 whitespace-nowrap">
+                                              ⚠️ Ends
+                                            </div>
+                                          ) : nextStepIndex >= 0 ? (
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-green-500/20 text-green-400 whitespace-nowrap">
+                                              → Step {nextStepIndex + 1}
+                                            </div>
+                                          ) : (
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 whitespace-nowrap">
+                                              ↻ Loop
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </div>
+                          ))}
+
+                          {selectedFlow.steps.every(s => !s.responses || s.responses.length === 0) && (
+                            <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/5">
+                              <div className="text-xs text-amber-300">
+                                No response options yet. Expand "Client Response Options" to add rebuttal paths.
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+              </div>
+
+              {/* Main Flow Steps */}
+              <div className="space-y-4">
+                <div className="text-sm font-semibold text-white px-1">Flow Steps</div>
 
                 {selectedFlow.steps.map((step, stepIndex) => (
                   <div key={step.id}>
                     {/* Main Step Card */}
-                <div className="border border-white/10 rounded-xl p-4 bg-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-sm font-bold text-white/60">STEP {stepIndex + 1}</div>
-                      {step.tag && (
-                        <div
-                          className="px-3 py-1 rounded-full text-xs font-medium"
-                          style={{
-                            backgroundColor: `${step.tag.color}20`,
-                            color: step.tag.color,
-                            border: `1px solid ${step.tag.color}40`
-                          }}
-                        >
-                          {step.tag.label}
+                    <div className="border border-white/10 rounded-xl p-4 bg-white/5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm font-bold text-white/60">STEP {stepIndex + 1}</div>
+                          {step.tag && (
+                            <div
+                              className="px-3 py-1 rounded-full text-xs font-medium"
+                              style={{
+                                backgroundColor: `${step.tag.color}20`,
+                                color: step.tag.color,
+                                border: `1px solid ${step.tag.color}40`
+                              }}
+                            >
+                              {step.tag.label}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    {selectedFlow.steps.length > 1 && (
-                      <button
-                        onClick={() => deleteStep(step.id)}
-                        className="text-red-400 text-xs hover:text-red-300"
-                      >
-                        Delete Step
-                      </button>
-                    )}
-                  </div>
+                        {selectedFlow.steps.length > 1 && (
+                          <button
+                            onClick={() => deleteStep(step.id)}
+                            className="text-red-400 text-xs hover:text-red-300"
+                          >
+                            Delete Step
+                          </button>
+                        )}
+                      </div>
 
-                  {/* Step Tag Editor */}
-                  <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
-                    <div className="text-xs font-medium text-white mb-2">Step Tag (visible to team)</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div>
-                        <input
-                          type="text"
-                          value={step.tag?.label || ''}
-                          onChange={e => updateStep(step.id, {
-                            tag: { label: e.target.value, color: step.tag?.color || '#3B82F6' }
-                          })}
-                          placeholder="e.g., 'Qualification', 'Follow-up'"
-                          className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                      {/* Your Message */}
+                      <div className="mb-4">
+                        <div className="text-sm font-medium mb-2 text-green-400">Your Message:</div>
+                        <textarea
+                          value={step.yourMessage}
+                          onChange={e => updateStep(step.id, { yourMessage: e.target.value })}
+                          className="input-dark w-full px-4 py-3 rounded-lg min-h-[100px]"
+                          placeholder="Type your message here..."
                         />
                       </div>
-                      <div className="flex gap-2">
-                        {['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'].map(color => (
-                          <button
-                            key={color}
-                            onClick={() => updateStep(step.id, {
-                              tag: { label: step.tag?.label || `Step ${stepIndex + 1}`, color }
-                            })}
-                            className={`w-8 h-8 rounded-lg border-2 ${
-                              step.tag?.color === color ? 'border-white' : 'border-white/20'
-                            }`}
-                            style={{ backgroundColor: color }}
-                            title={color}
-                          />
-                        ))}
+
+                      {/* Step Advanced Options - Collapsible */}
+                      <div className="border-t border-white/10 pt-4">
+                        <button
+                          onClick={() => toggleStepExpansion(step.id)}
+                          className="w-full flex items-center justify-between text-sm font-medium mb-3 text-purple-400 hover:text-purple-300 transition-colors"
+                        >
+                          <span>Advanced Options</span>
+                          <svg
+                            className={`w-5 h-5 transition-transform ${expandedSteps.has(step.id) ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {expandedSteps.has(step.id) && (
+                          <div className="space-y-4">
+                            {/* Step Tag Editor */}
+                            <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                              <div className="text-xs font-medium text-white mb-2">Step Tag (visible to team)</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div>
+                                  <input
+                                    type="text"
+                                    value={step.tag?.label || ''}
+                                    onChange={e => updateStep(step.id, {
+                                      tag: { label: e.target.value, color: step.tag?.color || '#3B82F6' }
+                                    })}
+                                    placeholder="e.g., 'Qualification', 'Follow-up'"
+                                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  {['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'].map(color => (
+                                    <button
+                                      key={color}
+                                      onClick={() => updateStep(step.id, {
+                                        tag: { label: step.tag?.label || `Step ${stepIndex + 1}`, color }
+                                      })}
+                                      className={`w-8 h-8 rounded-lg border-2 ${
+                                        step.tag?.color === color ? 'border-white' : 'border-white/20'
+                                      }`}
+                                      style={{ backgroundColor: color }}
+                                      title={color}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Response Options */}
+                            <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                              <div className="text-xs font-medium text-blue-300 mb-3">Client Response Options ({step.responses.length})</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {step.responses.map((response, responseIndex) => (
+                                  <div key={responseIndex} className="border border-blue-500/30 rounded-lg p-3 bg-blue-500/10">
+                                    <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
+
+                                    <input
+                                      type="text"
+                                      value={response.label}
+                                      onChange={e => updateResponse(step.id, responseIndex, { label: e.target.value })}
+                                      className="input-dark w-full px-3 py-2 rounded-lg text-sm mb-2"
+                                      placeholder="Label (e.g., 'Interested')"
+                                    />
+
+                                    <div className="text-xs text-[var(--muted)] mb-1">Your reply if they say this:</div>
+                                    <textarea
+                                      value={response.followUpMessage}
+                                      onChange={e => updateResponse(step.id, responseIndex, { followUpMessage: e.target.value })}
+                                      className="input-dark w-full px-3 py-2 rounded-lg text-sm min-h-[70px]"
+                                      placeholder="Your follow-up message..."
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Your Message */}
-                  <div className="mb-4">
-                    <div className="text-sm font-medium mb-2 text-green-400">Your Message:</div>
-                    <textarea
-                      value={step.yourMessage}
-                      onChange={e => updateStep(step.id, { yourMessage: e.target.value })}
-                      className="input-dark w-full px-4 py-3 rounded-lg min-h-[100px]"
-                      placeholder="Type your message here..."
-                    />
-                  </div>
-
-                  {/* 4 Response Options - Collapsible */}
-                  <div>
-                    <button
-                      onClick={() => toggleStepExpansion(step.id)}
-                      className="w-full flex items-center justify-between text-sm font-medium mb-3 text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      <span>Client Response Options ({step.responses.length})</span>
-                      <svg
-                        className={`w-5 h-5 transition-transform ${expandedSteps.has(step.id) ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-
-                    {expandedSteps.has(step.id) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {step.responses.map((response, responseIndex) => (
-                          <div key={responseIndex} className="border border-blue-500/30 rounded-lg p-3 bg-blue-500/10">
-                            <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
-
-                            <input
-                              type="text"
-                              value={response.label}
-                              onChange={e => updateResponse(step.id, responseIndex, { label: e.target.value })}
-                              className="input-dark w-full px-3 py-2 rounded-lg text-sm mb-2"
-                              placeholder="Label (e.g., 'Interested')"
-                            />
-
-                            <div className="text-xs text-[var(--muted)] mb-1">Your reply if they say this:</div>
-                            <textarea
-                              value={response.followUpMessage}
-                              onChange={e => updateResponse(step.id, responseIndex, { followUpMessage: e.target.value })}
-                              className="input-dark w-full px-3 py-2 rounded-lg text-sm min-h-[70px]"
-                              placeholder="Your follow-up message..."
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
 
                     {/* Insert Step Button - show after each step */}
                     <div className="flex justify-center my-2">
