@@ -848,7 +848,7 @@ export default function FlowsPage() {
         conversationHistory,
         collectedInfo,
         requiredQuestions: selectedFlow.requiredQuestions || [],
-        requiresCall: selectedFlow.requiresCall || false,
+        requiresCall: enableCalendarAppointments,
         availableSlots: availableSlots
       };
 
