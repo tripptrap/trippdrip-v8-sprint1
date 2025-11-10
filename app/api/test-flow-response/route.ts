@@ -597,9 +597,9 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             return timeMatch ? timeMatch[1] : s.formatted;
           }).join(', ');
           agentResponse = `Perfect! I have availability at: ${timesList}. Which time works best for you?`;
-        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check/i.test(agentResponse)) {
-          // If response mentions checking calendar, replace with actual times
-          console.log('🔄 Replacing "check calendar" message with actual times');
+        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly/i.test(agentResponse)) {
+          // If response mentions checking calendar or sending times, replace with actual times
+          console.log('🔄 Replacing calendar-related message with actual times');
           const slotsToShow = calendarSlots.slice(0, 3);
           const timesList = slotsToShow.map(s => {
             const timeMatch = s.formatted.match(/at (.+)$/);
@@ -660,9 +660,9 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             console.log('❌ No calendar slots available (matched path) - showing error message');
             agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
           }
-        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check/i.test(agentResponse)) {
-          // If response mentions checking calendar, replace with actual times
-          console.log('🔄 Replacing "check calendar" message with actual times (matched path)');
+        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly/i.test(agentResponse)) {
+          // If response mentions checking calendar or sending times, replace with actual times
+          console.log('🔄 Replacing calendar-related message with actual times (matched path)');
           const slotsToShow = calendarSlots.slice(0, 3);
           const timesList = slotsToShow.map(s => {
             const timeMatch = s.formatted.match(/at (.+)$/);
