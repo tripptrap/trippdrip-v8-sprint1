@@ -319,12 +319,12 @@ export default function FlowsPage() {
 
       const data = await response.json();
 
-      if (data.steps) {
+      if (data.steps && data.flowId) {
         // Assign automatic colors to steps (last step = green)
         const stepsWithColors = assignStepColors(data.steps);
 
         const newFlow: ConversationFlow = {
-          id: Date.now().toString(),
+          id: data.flowId, // Use the database-generated ID from the API
           name: newFlowName.trim(),
           steps: stepsWithColors,
           requiredQuestions: validRequiredQuestions,
@@ -334,9 +334,10 @@ export default function FlowsPage() {
           isAIGenerated: true
         };
 
+        // Don't call saveFlows - the flow is already saved by the API
+        // Just update local state
         const updated = [...flows, newFlow];
         setFlows(updated);
-        saveFlows(updated);
         setSelectedFlow(newFlow);
         setNewFlowName("");
         setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
