@@ -396,7 +396,7 @@ export async function POST(req: NextRequest) {
                       currentSessionId,
                       true,
                       selectedSlot.start,
-                      bookingData.eventId
+                      bookingData.eventId || undefined
                     );
                     console.log('📊 Session completed:', currentSessionId);
                   } catch (error) {
