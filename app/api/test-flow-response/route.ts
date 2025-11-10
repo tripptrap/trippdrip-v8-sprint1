@@ -575,7 +575,8 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        if (requiresCall && allQuestionsAnswered) {
+        // Only show calendar times if appointment hasn't been booked yet
+        if (requiresCall && allQuestionsAnswered && !appointmentBooked) {
           if (calendarSlots.length > 0) {
             // Take first 2-3 available slots (already filtered for future times)
             const slotsToShow = calendarSlots.slice(0, 3);
@@ -590,6 +591,10 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             console.log('❌ No calendar slots available - showing error message');
             agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
           }
+        } else if (appointmentBooked) {
+          // If appointment was just booked, the booking confirmation is already in agentResponse
+          // Don't override it - keep the AI's natural acknowledgment
+          console.log('✅ Appointment booked - keeping AI response');
         } else if (requiresCall && calendarSlots.length > 0) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
