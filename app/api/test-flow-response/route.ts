@@ -162,8 +162,50 @@ export async function POST(req: NextRequest) {
       // 1. Time format (e.g., "1pm", "2:00", "3 PM", "10:00 AM")
       // 2. Index/number (e.g., "1", "option 2", "the first one")
 
-      // First, try to match specific time mentions like "1pm", "2pm", "3:00 PM", etc.
-      const timeMatch = userMessage.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)/i);
+      // First, try to match specific time mentions like "1pm", "2pm", "3:00 PM", "1030", "930", etc.
+      // Try matching with AM/PM first
+      let timeMatch = userMessage.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)/i);
+
+      // If no AM/PM match, try matching 3-4 digit time format like "930" or "1030"
+      if (!timeMatch) {
+        const shortMatch = userMessage.match(/\b(\d{3,4})\b/);
+        if (shortMatch) {
+          const timeStr = shortMatch[1].padStart(4, '0'); // "930" -> "0930"
+          const hour = parseInt(timeStr.substring(0, 2));
+          const minute = parseInt(timeStr.substring(2, 4));
+
+          // Only consider valid times (hour 0-23, minute 0-59)
+          if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+            // For times without AM/PM, match against available slots
+            console.log(`🕐 Trying to match short time format "${shortMatch[1]}" (${hour}:${minute.toString().padStart(2, '0')})`);
+
+            selectedSlot = calendarSlots.find((slot: any) => {
+              const displayMatch = slot.display.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+              if (displayMatch) {
+                let slotHour = parseInt(displayMatch[1]);
+                const slotMinute = parseInt(displayMatch[2]);
+                const slotPeriod = displayMatch[3].toLowerCase();
+
+                if (slotPeriod === 'pm' && slotHour !== 12) {
+                  slotHour += 12;
+                } else if (slotPeriod === 'am' && slotHour === 12) {
+                  slotHour = 0;
+                }
+
+                const matches = slotHour === hour && slotMinute === minute;
+                console.log(`  - Checking slot "${slot.display}" (${slotHour}:${slotMinute.toString().padStart(2, '0')}) against ${hour}:${minute.toString().padStart(2, '0')}: ${matches ? 'MATCH' : 'no match'}`);
+                return matches;
+              }
+              return false;
+            });
+
+            if (selectedSlot) {
+              console.log(`✅ Matched short time "${shortMatch[1]}" to slot: ${selectedSlot.display}`);
+            }
+          }
+        }
+      }
+
       if (timeMatch) {
         const hour = parseInt(timeMatch[1]);
         const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
