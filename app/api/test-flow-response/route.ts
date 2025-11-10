@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
 
             if ((conflictCheck.data.items || []).length === 0) {
               // Build detailed description with all collected info
-              let descriptionParts = [];
+              let descriptionParts: string[] = [];
 
               // Add each collected field to description
               Object.entries(collectedInfo).forEach(([key, value]) => {
