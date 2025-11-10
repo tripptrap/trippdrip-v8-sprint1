@@ -385,6 +385,15 @@ ${conversationHistory || 'This is the start of the conversation'}${collectedInfo
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
 
+${Object.keys(collectedInfo).length > 0 ? `
+⚠️ CRITICAL WARNING: Your last message above may ask for information you ALREADY HAVE.
+IGNORE that part of the message if you already collected that information!
+Instead, acknowledge their answer and ask for something you DON'T have yet.
+For example:
+- If you asked "What's your income?" and they answered, and you already have "income" in collected info, DON'T ask for income again!
+- Instead say: "Thanks for that info! Now, could you tell me [something you DON'T have yet]?"
+` : ''}
+
 CLIENT'S RESPONSE:
 "${userMessage}"
 
