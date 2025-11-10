@@ -808,6 +808,26 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         console.log('📝 AI extracted info:', JSON.stringify(aiDecision.extractedInfo));
       }
 
+      // TEMPLATE FALLBACK: Use templated response if AI response is empty or problematic
+      if (!agentResponse || agentResponse.trim().length === 0) {
+        try {
+          const templatedResponse = generateTemplatedResponse({
+            allQuestionsAnswered,
+            requiredQuestions,
+            collectedFieldsCount,
+            currentField: currentStep?.field,
+            userName: collectedInfo.name
+          });
+
+          if (templatedResponse) {
+            agentResponse = templatedResponse;
+            console.log('📋 Using templated fallback response');
+          }
+        } catch (error) {
+          console.error('Error generating templated response:', error);
+        }
+      }
+
       return NextResponse.json({
         agentResponse: agentResponse,
         nextStepIndex: nextStepIndex,
