@@ -379,7 +379,7 @@ export async function POST(req: NextRequest) {
       ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question}`).join('\n')}\n\n${
           allQuestionsAnswered
             ? `ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED!${showCalendarTimes ? ' Since calendar is enabled, you MUST show the available times listed above in your response.' : ' You can now proceed to the next step in the conversation flow.'}`
-            : `You MUST ask these questions and collect this information. You've collected ${collectedFieldsCount} out of ${requiredQuestionsCount} required answers. Keep asking until you have all ${requiredQuestionsCount} answers.`
+            : `⚠️ CRITICAL: You have collected ${collectedFieldsCount} out of ${requiredQuestionsCount} required answers. You MUST ask the NEXT unanswered question immediately. DO NOT mention calendar availability, DO NOT say you'll get back to them, DO NOT ask if they have other questions. Your ONLY job right now is to ask the next required question from the list above. Ask it NOW in your response.`
         }`
       : '';
 
@@ -590,7 +590,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         if (appointmentBooked) {
           // If appointment was just booked, keep the AI's natural acknowledgment
           console.log('✅ Appointment booked - keeping AI response');
-        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly|let me check|checking my|i'll send|showing.*times/i.test(agentResponse)) {
+        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly|let me check|checking my|i'll send|showing.*times|get back to you.*information|more information shortly/i.test(agentResponse)) {
           // If response mentions checking calendar or sending times, replace with actual times
           // This runs FIRST to catch AI-generated calendar messages regardless of question status
           console.log('🔄 Replacing calendar-related message with actual times (detected message pattern)');
@@ -649,7 +649,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
         });
 
         // Check calendar-related messages FIRST, regardless of allQuestionsAnswered status
-        if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly|let me check|checking my|i'll send|showing.*times/i.test(agentResponse)) {
+        if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check|send you.*available times|available times.*shortly|let me check|checking my|i'll send|showing.*times|get back to you.*information|more information shortly/i.test(agentResponse)) {
           // If response mentions checking calendar or sending times, replace with actual times
           console.log('🔄 Replacing calendar-related message with actual times (matched path - detected pattern)');
           const slotsToShow = calendarSlots.slice(0, 3);
