@@ -365,10 +365,19 @@ export async function POST(req: NextRequest) {
       ? `\n\nINFORMATION ALREADY COLLECTED:\n${Object.entries(collectedInfo).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
       : '';
 
+    // If calendar is enabled and all questions are answered, prepare calendar times info
+    const showCalendarTimes = requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length > 0;
+    const calendarTimesText = showCalendarTimes
+      ? `\n\n📅 CALENDAR TIMES AVAILABLE:\nThe following times are available: ${calendarSlots.slice(0, 3).map(s => {
+          const timeMatch = s.formatted.match(/at (.+)$/);
+          return timeMatch ? timeMatch[1] : s.formatted;
+        }).join(', ')}\nYou MUST include these times in your response and ask which one works best.`
+      : '';
+
     const requiredQuestionsText = requiredQuestions.length > 0
       ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question}`).join('\n')}\n\n${
           allQuestionsAnswered
-            ? 'ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED! You can now proceed to the next step in the conversation flow.'
+            ? `ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED!${showCalendarTimes ? ' Since calendar is enabled, you MUST show the available times listed above in your response.' : ' You can now proceed to the next step in the conversation flow.'}`
             : `You MUST ask these questions and collect this information. You've collected ${collectedFieldsCount} out of ${requiredQuestionsCount} required answers. Keep asking until you have all ${requiredQuestionsCount} answers.`
         }`
       : '';
@@ -380,7 +389,7 @@ export async function POST(req: NextRequest) {
     const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
 
 CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${requiredQuestionsText}${appointmentBookedText}
+${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${calendarTimesText}${requiredQuestionsText}${appointmentBookedText}
 
 YOUR LAST MESSAGE:
 "${currentStep.yourMessage}"
@@ -575,27 +584,15 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        // Only show calendar times if appointment hasn't been booked yet
-        if (requiresCall && allQuestionsAnswered && !appointmentBooked) {
-          if (calendarSlots.length > 0) {
-            // Take first 2-3 available slots (already filtered for future times)
-            const slotsToShow = calendarSlots.slice(0, 3);
-            const timesList = slotsToShow.map(s => {
-              const timeMatch = s.formatted.match(/at (.+)$/);
-              return timeMatch ? timeMatch[1] : s.formatted;
-            }).join(', ');
-
-            console.log(`✅ OVERRIDE TRIGGERED! Showing ${slotsToShow.length} available times: ${timesList}`);
-            agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
-          } else {
-            console.log('❌ No calendar slots available - showing error message');
-            agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
-          }
+        // Don't override - the AI now includes times naturally from the prompt
+        // Only override if there's a problem (no slots available or fake times)
+        if (requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length === 0) {
+          console.log('❌ No calendar slots available - showing error message');
+          agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
         } else if (appointmentBooked) {
-          // If appointment was just booked, the booking confirmation is already in agentResponse
-          // Don't override it - keep the AI's natural acknowledgment
+          // If appointment was just booked, keep the AI's natural acknowledgment
           console.log('✅ Appointment booked - keeping AI response');
-        } else if (requiresCall && calendarSlots.length > 0) {
+        } else if (requiresCall && calendarSlots.length > 0 && !allQuestionsAnswered) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
           if (hasFakeTimes) {
