@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
     console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
 
     // If flow requires call, check calendar availability
+    // Fetch calendar slots even if not all questions answered yet, so they're ready when needed
     let calendarSlots: any[] = [];
-    if (requiresCall && allQuestionsAnswered) {
+    if (requiresCall) {
       try {
         // Get user's Google Calendar tokens from database
         const { data: userData, error: userError } = await supabase
