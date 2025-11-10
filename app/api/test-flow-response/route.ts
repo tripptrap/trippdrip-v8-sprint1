@@ -208,27 +208,86 @@ export async function POST(req: NextRequest) {
 
       if (selectedSlot) {
         try {
-          // Book the appointment
-          const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/book-slot`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              start: selectedSlot.start,
-              end: selectedSlot.end,
-              name: collectedInfo.name || collectedInfo.fullName || 'Client',
-              email: collectedInfo.email || '',
-              phone: collectedInfo.phone || ''
-            })
-          });
+          // Book the appointment directly using authenticated calendar API
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry')
+            .eq('id', user.id)
+            .single();
 
-          const bookingData = await bookingResponse.json();
+          if (!userError && userData?.google_calendar_refresh_token) {
+            const oauth2Client = new google.auth.OAuth2(
+              process.env.GOOGLE_CLIENT_ID,
+              process.env.GOOGLE_CLIENT_SECRET,
+              `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/oauth/callback`
+            );
 
-          if (bookingData.ok) {
-            appointmentBooked = true;
-            bookedAppointmentInfo = {
-              time: selectedSlot.formatted || selectedSlot.display,
-              eventId: bookingData.eventId
-            };
+            oauth2Client.setCredentials({
+              access_token: userData.google_calendar_access_token,
+              refresh_token: userData.google_calendar_refresh_token,
+              expiry_date: userData.google_calendar_token_expiry ? new Date(userData.google_calendar_token_expiry).getTime() : undefined
+            });
+
+            oauth2Client.on('tokens', async (tokens) => {
+              if (tokens.refresh_token) {
+                await supabase
+                  .from('users')
+                  .update({
+                    google_calendar_access_token: tokens.access_token,
+                    google_calendar_refresh_token: tokens.refresh_token,
+                    google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
+                  })
+                  .eq('id', user.id);
+              } else if (tokens.access_token) {
+                await supabase
+                  .from('users')
+                  .update({
+                    google_calendar_access_token: tokens.access_token,
+                    google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
+                  })
+                  .eq('id', user.id);
+              }
+            });
+
+            const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+            // Re-check to avoid double booking
+            const conflictCheck = await calendar.events.list({
+              calendarId: 'primary',
+              timeMin: selectedSlot.start,
+              timeMax: selectedSlot.end,
+              singleEvents: true,
+              orderBy: "startTime",
+            });
+
+            if ((conflictCheck.data.items || []).length === 0) {
+              const event = {
+                summary: `Call with ${collectedInfo.name || collectedInfo.fullName || "Prospect"}`,
+                description: collectedInfo.phone ? `Phone: ${collectedInfo.phone}` : "",
+                start: { dateTime: selectedSlot.start },
+                end: { dateTime: selectedSlot.end },
+                attendees: collectedInfo.email ? [{ email: collectedInfo.email }] : [],
+              };
+
+              const created = await calendar.events.insert({
+                calendarId: 'primary',
+                requestBody: event,
+              });
+
+              console.log(`✅ Booked appointment: ${created.data.id}`);
+
+              const bookingData = { ok: true, eventId: created.data.id };
+
+              if (bookingData.ok) {
+                appointmentBooked = true;
+                bookedAppointmentInfo = {
+                  time: selectedSlot.formatted || selectedSlot.display,
+                  eventId: bookingData.eventId
+                };
+              }
+            } else {
+              console.log('❌ Time slot already booked by someone else');
+            }
           }
         } catch (error) {
           console.error('Appointment booking error:', error);
