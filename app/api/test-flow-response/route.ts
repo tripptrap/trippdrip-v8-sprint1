@@ -645,7 +645,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
           allQuestionsAnswered
         });
 
-        if (requiresCall && allQuestionsAnswered) {
+        if (requiresCall && allQuestionsAnswered && !calendarTimesShown) {
           if (calendarSlots.length > 0) {
             // Take first 2-3 available slots (already filtered for future times)
             const slotsToShow = calendarSlots.slice(0, 3);
@@ -660,6 +660,15 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
             console.log('❌ No calendar slots available (matched path) - showing error message');
             agentResponse = `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`;
           }
+        } else if (requiresCall && calendarSlots.length > 0 && !calendarTimesShown && /check.*calendar|calendar.*check/i.test(agentResponse)) {
+          // If response mentions checking calendar, replace with actual times
+          console.log('🔄 Replacing "check calendar" message with actual times (matched path)');
+          const slotsToShow = calendarSlots.slice(0, 3);
+          const timesList = slotsToShow.map(s => {
+            const timeMatch = s.formatted.match(/at (.+)$/);
+            return timeMatch ? timeMatch[1] : s.formatted;
+          }).join(', ');
+          agentResponse = `Great! I have availability at: ${timesList}. Which time works best for you?`;
         } else if (requiresCall && calendarSlots.length > 0) {
           // Even if not all questions answered, if the response mentions times, replace them
           const hasFakeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)|\d{1,2}\s*(?:AM|PM|am|pm)/i.test(agentResponse);
