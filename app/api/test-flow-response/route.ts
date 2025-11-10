@@ -36,23 +36,29 @@ export async function POST(req: NextRequest) {
     console.log('🔍 DEBUG - Collected info keys:', Object.keys(collectedInfo));
     console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
 
-    // If flow requires call, check calendar availability
-    // Fetch calendar slots even if not all questions answered yet, so they're ready when needed
+    // OPTIMIZATION: Fetch user calendar data once if calendar is required
+    // This avoids duplicate database queries for calendar slots AND booking
+    // Calendar slots are cached for the entire request duration (no re-fetch on each message)
+    let userData: any = null;
+    let oauth2Client: any = null;
     let calendarSlots: any[] = [];
+
     if (requiresCall) {
       try {
-        // Get user's Google Calendar tokens from database
-        const { data: userData, error: userError } = await supabase
+        // Get user's Google Calendar tokens from database ONCE
+        const { data: fetchedUserData, error: userError } = await supabase
           .from('users')
           .select('google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry')
           .eq('id', user.id)
           .single();
 
-        if (userError || !userData?.google_calendar_refresh_token) {
+        if (userError || !fetchedUserData?.google_calendar_refresh_token) {
           console.log('📅 Google Calendar not connected for user');
         } else {
-          // Set up OAuth client
-          const oauth2Client = new google.auth.OAuth2(
+          // Cache userData for reuse in booking
+          userData = fetchedUserData;
+          // Set up OAuth client and cache it for reuse
+          oauth2Client = new google.auth.OAuth2(
             process.env.GOOGLE_CLIENT_ID,
             process.env.GOOGLE_CLIENT_SECRET,
             `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/oauth/callback`
@@ -274,47 +280,8 @@ export async function POST(req: NextRequest) {
 
       if (selectedSlot) {
         try {
-          // Book the appointment directly using authenticated calendar API
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry')
-            .eq('id', user.id)
-            .single();
-
-          if (!userError && userData?.google_calendar_refresh_token) {
-            const oauth2Client = new google.auth.OAuth2(
-              process.env.GOOGLE_CLIENT_ID,
-              process.env.GOOGLE_CLIENT_SECRET,
-              `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/oauth/callback`
-            );
-
-            oauth2Client.setCredentials({
-              access_token: userData.google_calendar_access_token,
-              refresh_token: userData.google_calendar_refresh_token,
-              expiry_date: userData.google_calendar_token_expiry ? new Date(userData.google_calendar_token_expiry).getTime() : undefined
-            });
-
-            oauth2Client.on('tokens', async (tokens) => {
-              if (tokens.refresh_token) {
-                await supabase
-                  .from('users')
-                  .update({
-                    google_calendar_access_token: tokens.access_token,
-                    google_calendar_refresh_token: tokens.refresh_token,
-                    google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
-                  })
-                  .eq('id', user.id);
-              } else if (tokens.access_token) {
-                await supabase
-                  .from('users')
-                  .update({
-                    google_calendar_access_token: tokens.access_token,
-                    google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
-                  })
-                  .eq('id', user.id);
-              }
-            });
-
+          // OPTIMIZATION: Reuse cached userData and oauth2Client instead of refetching
+          if (userData && oauth2Client) {
             const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
             // Re-check to avoid double booking
@@ -327,9 +294,24 @@ export async function POST(req: NextRequest) {
             });
 
             if ((conflictCheck.data.items || []).length === 0) {
+              // Build detailed description with all collected info
+              let descriptionParts = [];
+
+              // Add each collected field to description
+              Object.entries(collectedInfo).forEach(([key, value]) => {
+                if (value && typeof value === 'string') {
+                  // Format key as Title Case
+                  const formattedKey = key.replace(/([A-Z])/g, ' $1').trim()
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
+                  descriptionParts.push(`${formattedKey}: ${value}`);
+                }
+              });
+
               const event = {
                 summary: `Call with ${collectedInfo.name || collectedInfo.fullName || "Prospect"}`,
-                description: collectedInfo.phone ? `Phone: ${collectedInfo.phone}` : "",
+                description: descriptionParts.length > 0 ? descriptionParts.join('\n') : "New prospect call",
                 start: { dateTime: selectedSlot.start },
                 end: { dateTime: selectedSlot.end },
                 attendees: collectedInfo.email ? [{ email: collectedInfo.email }] : [],
