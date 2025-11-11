@@ -9,6 +9,7 @@ import { loadStore, saveStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { spendPoints, getPointsBalance } from "@/lib/pointsStore";
 import { calculateSMSCredits, getCharacterWarning } from "@/lib/creditCalculator";
 import CustomModal from "@/components/CustomModal";
+import SendSMSModal from "@/components/SendSMSModal";
 
 type Msg = { id:number; thread_id:number; direction:'in'|'out'; sender:'lead'|'agent'; body:string; created_at:string };
 type FlowStep = {
@@ -94,6 +95,7 @@ function TextsPageContent(){
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [flows, setFlows] = useState<ConversationFlow[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
+  const [showSendModal, setShowSendModal] = useState(false);
   const [modal, setModal] = useState<{
     isOpen: boolean;
     type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
@@ -283,6 +285,15 @@ function TextsPageContent(){
           <p className="text-sm text-[var(--muted)] mt-1">Manage your text conversations with leads</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowSendModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Send Message
+          </button>
           {flows.length > 0 && (
             <div className="flex items-center gap-2">
               <label className="text-sm text-white">Flow:</label>
@@ -444,6 +455,15 @@ function TextsPageContent(){
         message={modal.message}
         confirmText={modal.type === 'confirm' ? 'Yes' : 'OK'}
         cancelText="No"
+      />
+
+      <SendSMSModal
+        isOpen={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        onSuccess={() => {
+          setShowSendModal(false);
+          refresh();
+        }}
       />
     </div>
   );

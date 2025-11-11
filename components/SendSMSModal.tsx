@@ -34,6 +34,7 @@ export default function SendSMSModal({
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [channel, setChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [manualPhone, setManualPhone] = useState('');
 
   // Load campaigns/flows when modal opens
   useEffect(() => {
@@ -72,8 +73,9 @@ export default function SendSMSModal({
       return;
     }
 
-    if (!leadPhone) {
-      setError('No phone number available for this lead');
+    const phoneToUse = leadPhone || manualPhone;
+    if (!phoneToUse) {
+      setError('Please enter a phone number');
       return;
     }
 
@@ -86,7 +88,7 @@ export default function SendSMSModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId,
-          toPhone: leadPhone,
+          toPhone: phoneToUse,
           messageBody: message,
           channel,
         }),
@@ -185,6 +187,23 @@ export default function SendSMSModal({
               </label>
             </div>
           </div>
+
+          {/* Phone Number Input (if no lead phone provided) */}
+          {!leadPhone && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={manualPhone}
+                onChange={(e) => setManualPhone(e.target.value)}
+                placeholder="+1234567890 or 1234567890"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={sending || success}
+              />
+            </div>
+          )}
 
           {/* Template/Flow Selector */}
           <div>
