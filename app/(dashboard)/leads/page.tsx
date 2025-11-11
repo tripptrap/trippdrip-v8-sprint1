@@ -15,7 +15,29 @@ type Lead = {
   status?: string;
   score?: number;
   temperature?: 'hot' | 'warm' | 'cold';
+  last_interaction_at?: string;
+  conversation_state?: any;
   [k: string]: any;
+};
+
+type ConversationSession = {
+  id: string;
+  status: 'active' | 'completed' | 'recovered' | 'abandoned';
+  started_at: string;
+  last_activity_at: string;
+  completed_at?: string;
+  appointment_booked?: boolean;
+  appointment_time?: string;
+  collected_info?: any;
+  conversation_history?: any[];
+};
+
+type LeadActivity = {
+  id: string;
+  activity_type: string;
+  description: string;
+  created_at: string;
+  metadata?: any;
 };
 
 type ImportSummary = {
@@ -91,6 +113,12 @@ export default function LeadsPage() {
 
   /* Disposition dropdown per lead */
   const [dispositionMenuOpen, setDispositionMenuOpen] = useState<{ [key: string]: boolean }>({});
+
+  /* Lead details modal */
+  const [selectedLeadDetails, setSelectedLeadDetails] = useState<string | null>(null);
+  const [leadSessions, setLeadSessions] = useState<ConversationSession[]>([]);
+  const [leadActivities, setLeadActivities] = useState<LeadActivity[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   /* Bulk actions */
   const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
@@ -419,6 +447,33 @@ export default function LeadsPage() {
       setTimeout(()=>setToast(''), 3500);
     } finally {
       setRecalculatingScores(false);
+    }
+  }
+
+  async function viewLeadDetails(leadId: string) {
+    setSelectedLeadDetails(leadId);
+    setLoadingDetails(true);
+    setLeadSessions([]);
+    setLeadActivities([]);
+
+    try {
+      // Fetch sessions for this lead
+      const sessionsRes = await fetch(`/api/conversations/sessions?leadId=${leadId}`);
+      const sessionsData = await sessionsRes.json();
+      if (sessionsData.ok) {
+        setLeadSessions(sessionsData.sessions || []);
+      }
+
+      // Fetch activities for this lead
+      const activitiesRes = await fetch(`/api/leads/activities?leadId=${leadId}`);
+      const activitiesData = await activitiesRes.json();
+      if (activitiesData.ok) {
+        setLeadActivities(activitiesData.activities || []);
+      }
+    } catch (error) {
+      console.error('Error fetching lead details:', error);
+    } finally {
+      setLoadingDetails(false);
     }
   }
 
@@ -1124,12 +1179,20 @@ export default function LeadsPage() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <button
-                        onClick={() => deleteLead(id, name)}
-                        className="text-sm text-red-400 hover:text-red-300"
-                      >
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => viewLeadDetails(id)}
+                          className="text-sm text-blue-400 hover:text-blue-300"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => deleteLead(id, name)}
+                          className="text-sm text-red-400 hover:text-red-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1591,6 +1654,114 @@ export default function LeadsPage() {
               >
                 Delete {selectedIds.size} Lead(s)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Details Modal */}
+      {selectedLeadDetails && (
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={() => setSelectedLeadDetails(null)}>
+          <div className="w-full max-w-4xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Lead Details</div>
+              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setSelectedLeadDetails(null)}>Close</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {loadingDetails ? (
+                <div className="text-center py-8 text-[#9fb0c3]">Loading details...</div>
+              ) : (
+                <>
+                  {/* Conversation Sessions */}
+                  <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
+                    <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      Conversation Sessions
+                    </h3>
+                    {leadSessions.length === 0 ? (
+                      <p className="text-sm text-[#9fb0c3]">No conversation sessions yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {leadSessions.map((session) => (
+                          <div key={session.id} className="border border-[#1a2637] bg-[#0c1420] rounded-lg p-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  session.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                                  session.status === 'active' ? 'bg-blue-500/20 text-blue-400' :
+                                  session.status === 'recovered' ? 'bg-purple-500/20 text-purple-400' :
+                                  'bg-orange-500/20 text-orange-400'
+                                }`}>
+                                  {session.status}
+                                </span>
+                                {session.appointment_booked && (
+                                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400">
+                                    Appointment Booked
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-[#9fb0c3]">
+                                {new Date(session.started_at).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="text-sm space-y-1">
+                              <div className="text-[#9fb0c3]">
+                                Last Activity: {new Date(session.last_activity_at).toLocaleString()}
+                              </div>
+                              {session.appointment_time && (
+                                <div className="text-green-400">
+                                  Appointment: {new Date(session.appointment_time).toLocaleString()}
+                                </div>
+                              )}
+                              {session.conversation_history && session.conversation_history.length > 0 && (
+                                <div className="text-blue-400">
+                                  Messages: {session.conversation_history.length}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lead Activities */}
+                  <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
+                    <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Activity Timeline
+                    </h3>
+                    {leadActivities.length === 0 ? (
+                      <p className="text-sm text-[#9fb0c3]">No activities recorded yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {leadActivities.map((activity) => (
+                          <div key={activity.id} className="border-l-2 border-blue-500 pl-3 py-2">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="text-sm font-semibold text-white capitalize">
+                                  {activity.activity_type.replace(/_/g, ' ')}
+                                </div>
+                                <div className="text-sm text-[#9fb0c3] mt-1">
+                                  {activity.description}
+                                </div>
+                              </div>
+                              <div className="text-xs text-[#9fb0c3] ml-3">
+                                {new Date(activity.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
