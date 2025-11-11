@@ -1,7 +1,7 @@
 // Twilio SMS and RCS utility functions
 import twilio from 'twilio';
 
-// Initialize Twilio client
+// Initialize Twilio client (master account - only used as fallback)
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -23,6 +23,9 @@ export interface SendSMSParams {
   from?: string; // Optional: override default Twilio phone number
   channel?: 'sms' | 'rcs'; // Channel type (default: sms)
   mediaUrl?: string[]; // Optional: media URLs for MMS/RCS
+  // User-specific credentials (for multi-tenant subaccount support)
+  userAccountSid?: string;
+  userAuthToken?: string;
 }
 
 export interface SendSMSResult {
@@ -39,10 +42,19 @@ export interface SendSMSResult {
  * @returns Result object with success status and message SID or error
  */
 export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
-  const { to, message, from, channel = 'sms', mediaUrl } = params;
+  const { to, message, from, channel = 'sms', mediaUrl, userAccountSid, userAuthToken } = params;
+
+  // Use user-specific credentials if provided, otherwise use master account
+  let clientToUse: twilio.Twilio | null = twilioClient;
+
+  if (userAccountSid && userAuthToken) {
+    // Create a client with user's subaccount credentials
+    console.log(`🔐 Using user-specific Twilio subaccount: ${userAccountSid}`);
+    clientToUse = twilio(userAccountSid, userAuthToken);
+  }
 
   // Validate Twilio is configured
-  if (!twilioClient) {
+  if (!clientToUse) {
     return {
       success: false,
       error: 'Twilio client not initialized. Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.',
@@ -107,7 +119,7 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
       messageParams.mediaUrl = mediaUrl;
     }
 
-    const twilioMessage = await twilioClient.messages.create(messageParams);
+    const twilioMessage = await clientToUse.messages.create(messageParams);
 
     return {
       success: true,

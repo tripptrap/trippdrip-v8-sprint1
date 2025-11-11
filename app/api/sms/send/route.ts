@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { spendPointsForAction } from '@/lib/pointsSupabase';
 import { sendSMS } from '@/lib/twilio';
+import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,12 +77,28 @@ export async function POST(req: NextRequest) {
 
     console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone}...`);
 
-    // Send SMS or WhatsApp via Twilio utility
+    // Get user's Twilio subaccount credentials
+    const userCredentials = await getUserTwilioCredentials(user.id);
+
+    let userAccountSid: string | undefined;
+    let userAuthToken: string | undefined;
+
+    if (userCredentials.success) {
+      userAccountSid = userCredentials.accountSid;
+      userAuthToken = userCredentials.authToken;
+      console.log(`🔐 Using user's Twilio subaccount for sending`);
+    } else {
+      console.log(`⚠️ User has no subaccount, using master account: ${userCredentials.error}`);
+    }
+
+    // Send SMS or RCS via Twilio utility
     const result = await sendSMS({
       to: toPhone,
       message: messageBody,
       from: fromPhone,
       channel,
+      userAccountSid,
+      userAuthToken,
     });
 
     if (!result.success) {

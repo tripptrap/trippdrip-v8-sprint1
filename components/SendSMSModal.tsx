@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Send, Loader2 } from 'lucide-react';
 
 interface SendSMSModalProps {
@@ -26,6 +26,36 @@ export default function SendSMSModal({
   const [success, setSuccess] = useState(false);
   const [fromNumber, setFromNumber] = useState('');
   const [toPhone, setToPhone] = useState(leadPhone || '');
+  const [availableNumbers, setAvailableNumbers] = useState<Array<{ phone_number: string; friendly_name?: string; is_primary: boolean }>>([]);
+  const [loadingNumbers, setLoadingNumbers] = useState(true);
+
+  // Load user's Twilio phone numbers when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadTwilioNumbers();
+    }
+  }, [isOpen]);
+
+  const loadTwilioNumbers = async () => {
+    try {
+      setLoadingNumbers(true);
+      const response = await fetch('/api/twilio/numbers');
+      const data = await response.json();
+
+      if (data.success && data.numbers && data.numbers.length > 0) {
+        setAvailableNumbers(data.numbers);
+        // Auto-select primary number if available
+        const primary = data.numbers.find((n: any) => n.is_primary);
+        if (primary && !fromNumber) {
+          setFromNumber(primary.phone_number);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading Twilio numbers:', error);
+    } finally {
+      setLoadingNumbers(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -125,12 +155,36 @@ export default function SendSMSModal({
               value={fromNumber}
               onChange={(e) => setFromNumber(e.target.value)}
               className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white"
-              disabled={sending || success}
+              disabled={sending || success || loadingNumbers}
             >
-              <option value="">Select a number...</option>
-              <option value="+18336587355">+1 (833) 658-7355 (SMS)</option>
-              <option value="+15558917942">+1 (555) 891-7942 (RCS)</option>
+              <option value="">
+                {loadingNumbers ? 'Loading numbers...' : 'Select a number...'}
+              </option>
+
+              {/* User's Twilio numbers from their subaccount */}
+              {availableNumbers.length > 0 && (
+                <>
+                  {availableNumbers.map((num) => (
+                    <option key={num.phone_number} value={num.phone_number}>
+                      {num.phone_number} {num.friendly_name ? `(${num.friendly_name})` : ''} {num.is_primary ? '★' : ''}
+                    </option>
+                  ))}
+                </>
+              )}
+
+              {/* Fallback to master account numbers if user has no numbers */}
+              {availableNumbers.length === 0 && !loadingNumbers && (
+                <>
+                  <option value="+18336587355">+1 (833) 658-7355 (SMS - Master)</option>
+                  <option value="+15558917942">+1 (555) 891-7942 (RCS - Master)</option>
+                </>
+              )}
             </select>
+            {availableNumbers.length === 0 && !loadingNumbers && (
+              <p className="text-xs text-gray-400 mt-2">
+                Using master account numbers. Purchase your own numbers in Twilio to see them here.
+              </p>
+            )}
           </div>
 
           {/* To Phone Number Input */}
