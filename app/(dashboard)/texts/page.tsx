@@ -428,6 +428,7 @@ function TextsPageContent(){
                 isGenerating={isGeneratingResponse}
                 isSold={activeLead?.disposition === 'sold' || activeLead?.status === 'sold'}
                 onSchedule={scheduleMessage}
+                lead={activeLead}
               />
             </div>
           )}
@@ -454,7 +455,8 @@ function Composer({
   onGenerateAI,
   isGenerating,
   isSold,
-  onSchedule
+  onSchedule,
+  lead
 }: {
   onSend: (body: string) => void;
   useAI: boolean;
@@ -462,18 +464,62 @@ function Composer({
   isGenerating: boolean;
   isSold?: boolean;
   onSchedule?: (body: string, scheduledFor: string) => void;
+  lead?: any;
 }) {
   const [text, setText] = useState("");
   const [mediaCount, setMediaCount] = useState(0);
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
+  const [channel, setChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   // Calculate credits in real-time
   const creditCalc = useMemo(() => calculateSMSCredits(text, mediaCount), [text, mediaCount]);
   const charWarning = useMemo(() => getCharacterWarning(text.length), [text.length]);
 
-  function handleSend() {
+  async function sendRealMessage(body: string) {
+    if (!lead || !lead.phone) {
+      setError('No phone number available for this lead');
+      return;
+    }
+
+    setSending(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          toPhone: lead.phone,
+          messageBody: body,
+          channel,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Failed to send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+
+      // Also update the simulated store
+      onSend(body);
+    } catch (err: any) {
+      setError(err.message || `Failed to send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleSend() {
     if (scheduleMode && scheduledDate && scheduledTime && text.trim() && onSchedule) {
       // Schedule the message
       const scheduledFor = `${scheduledDate}T${scheduledTime}:00`;
@@ -487,8 +533,8 @@ function Composer({
       // If AI mode is on and no text, generate AI response
       onGenerateAI();
     } else if (text.trim()) {
-      // If there's text, send it
-      onSend(text.trim());
+      // Send real SMS/WhatsApp message
+      await sendRealMessage(text.trim());
       setText('');
       setMediaCount(0);
     }
@@ -496,8 +542,48 @@ function Composer({
 
   return (
     <div className={`p-3 border-t ${isSold ? "border-green-500/30 bg-green-900/10" : "border-white/10"}`}>
-      {/* Schedule Toggle */}
-      <div className="mb-2 flex items-center gap-2">
+      {/* Error & Success Messages */}
+      {error && (
+        <div className="mb-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-2 bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded text-xs">
+          {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} sent successfully!
+        </div>
+      )}
+
+      {/* Channel Selector & Schedule Toggle */}
+      <div className="mb-2 flex items-center gap-4">
+        {/* Channel Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">Send via:</span>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input
+              type="radio"
+              value="sms"
+              checked={channel === 'sms'}
+              onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
+              className="w-3 h-3"
+              disabled={sending || success}
+            />
+            <span className="text-xs text-gray-300">SMS</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input
+              type="radio"
+              value="whatsapp"
+              checked={channel === 'whatsapp'}
+              onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
+              className="w-3 h-3"
+              disabled={sending || success}
+            />
+            <span className="text-xs text-gray-300">WhatsApp</span>
+          </label>
+        </div>
+
+        {/* Schedule Toggle */}
         <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
           <input
             type="checkbox"
@@ -554,9 +640,9 @@ function Composer({
             <button
               className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
               onClick={handleSend}
-              disabled={isGenerating || (scheduleMode && (!scheduledDate || !scheduledTime))}
+              disabled={isGenerating || sending || (scheduleMode && (!scheduledDate || !scheduledTime))}
             >
-              {isGenerating ? "Generating..." : scheduleMode ? "Schedule" : text.trim() ? "Send" : "AI Reply"}
+              {isGenerating ? "Generating..." : sending ? "Sending..." : scheduleMode ? "Schedule" : text.trim() ? `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}` : "AI Reply"}
             </button>
           </>
         ) : (
@@ -567,19 +653,19 @@ function Composer({
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && text.trim() && !scheduleMode) {
+                if (e.key === 'Enter' && !e.shiftKey && text.trim() && !scheduleMode && !sending) {
                   e.preventDefault();
-                  onSend(text.trim());
-                  setText('');
+                  handleSend();
                 }
               }}
+              disabled={sending}
             />
             <button
-              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 ${isSold ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-green-600 hover:bg-green-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
               onClick={handleSend}
-              disabled={!text.trim() || (scheduleMode && (!scheduledDate || !scheduledTime))}
+              disabled={!text.trim() || sending || (scheduleMode && (!scheduledDate || !scheduledTime))}
             >
-              {scheduleMode ? "Schedule" : "Send"}
+              {sending ? "Sending..." : scheduleMode ? "Schedule" : `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`}
             </button>
           </>
         )}
