@@ -1,11 +1,11 @@
-// Twilio SMS and WhatsApp utility functions
+// Twilio SMS and RCS utility functions
 import twilio from 'twilio';
 
 // Initialize Twilio client
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+const twilioRCSNumber = process.env.TWILIO_RCS_NUMBER;
 
 if (!accountSid || !authToken) {
   console.warn('⚠️ Twilio credentials not configured. SMS functionality will not work.');
@@ -21,8 +21,8 @@ export interface SendSMSParams {
   to: string;
   message: string;
   from?: string; // Optional: override default Twilio phone number
-  channel?: 'sms' | 'whatsapp'; // Channel type (default: sms)
-  mediaUrl?: string[]; // Optional: media URLs for MMS/WhatsApp
+  channel?: 'sms' | 'rcs'; // Channel type (default: sms)
+  mediaUrl?: string[]; // Optional: media URLs for MMS/RCS
 }
 
 export interface SendSMSResult {
@@ -30,11 +30,11 @@ export interface SendSMSResult {
   messageSid?: string;
   error?: string;
   status?: string;
-  channel?: 'sms' | 'whatsapp';
+  channel?: 'sms' | 'rcs';
 }
 
 /**
- * Send SMS or WhatsApp message using Twilio
+ * Send SMS or RCS message using Twilio
  * @param params - Message parameters (to, message, optional from, channel, mediaUrl)
  * @returns Result object with success status and message SID or error
  */
@@ -52,15 +52,12 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
 
   // Determine the from number based on channel
   let fromNumber: string;
-  if (channel === 'whatsapp') {
-    if (from) {
-      fromNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-    } else if (twilioWhatsAppNumber) {
-      fromNumber = twilioWhatsAppNumber.startsWith('whatsapp:') ? twilioWhatsAppNumber : `whatsapp:${twilioWhatsAppNumber}`;
-    } else {
+  if (channel === 'rcs') {
+    fromNumber = from || twilioRCSNumber || '';
+    if (!fromNumber) {
       return {
         success: false,
-        error: 'No WhatsApp number configured. Set TWILIO_WHATSAPP_NUMBER in environment variables.',
+        error: 'No RCS number configured. Set TWILIO_RCS_NUMBER in environment variables.',
         channel,
       };
     }
@@ -84,36 +81,17 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
     };
   }
 
-  // Format recipient number based on channel
+  // Format recipient number - Ensure phone number is in E.164 format (+1XXXXXXXXXX)
+  // RCS and SMS both use the same format
   let formattedTo = to.trim();
-  if (channel === 'whatsapp') {
-    // WhatsApp numbers need 'whatsapp:' prefix
-    if (!formattedTo.startsWith('whatsapp:')) {
-      // Ensure E.164 format for the number part
-      let phoneNumber = formattedTo.replace(/^whatsapp:/, '');
-      if (!phoneNumber.startsWith('+')) {
-        const digits = phoneNumber.replace(/\D/g, '');
-        if (digits.length === 10) {
-          phoneNumber = `+1${digits}`;
-        } else if (digits.length === 11 && digits.startsWith('1')) {
-          phoneNumber = `+${digits}`;
-        } else {
-          phoneNumber = `+${digits}`;
-        }
-      }
-      formattedTo = `whatsapp:${phoneNumber}`;
-    }
-  } else {
-    // SMS - Ensure phone number is in E.164 format (+1XXXXXXXXXX)
-    if (!formattedTo.startsWith('+')) {
-      const digits = formattedTo.replace(/\D/g, '');
-      if (digits.length === 10) {
-        formattedTo = `+1${digits}`;
-      } else if (digits.length === 11 && digits.startsWith('1')) {
-        formattedTo = `+${digits}`;
-      } else {
-        formattedTo = `+${digits}`;
-      }
+  if (!formattedTo.startsWith('+')) {
+    const digits = formattedTo.replace(/\D/g, '');
+    if (digits.length === 10) {
+      formattedTo = `+1${digits}`;
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      formattedTo = `+${digits}`;
+    } else {
+      formattedTo = `+${digits}`;
     }
   }
 

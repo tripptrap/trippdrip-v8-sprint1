@@ -129,7 +129,7 @@ export default function SendSMSModal({
             >
               <option value="">Select a number...</option>
               <option value="+18336587355">+1 (833) 658-7355 (SMS)</option>
-              <option value="whatsapp:+15558917942">+1 (555) 891-7942 (WhatsApp)</option>
+              <option value="+15558917942">+1 (555) 891-7942 (RCS)</option>
             </select>
           </div>
 
