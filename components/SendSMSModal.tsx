@@ -44,6 +44,8 @@ export default function SendSMSModal({
   }, [isOpen]);
 
   const loadCampaigns = async () => {
+    if (typeof window === 'undefined') return;
+
     setLoadingCampaigns(true);
     try {
       const response = await fetch('/api/campaigns');
@@ -53,6 +55,7 @@ export default function SendSMSModal({
       }
     } catch (err) {
       console.error('Failed to load campaigns:', err);
+      setError('');
     } finally {
       setLoadingCampaigns(false);
     }
@@ -121,58 +124,53 @@ export default function SendSMSModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1a1f2e] rounded-lg shadow-xl max-w-lg w-full border border-white/10">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div>
-            <h2 className="text-lg font-semibold">
-              Send {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} Message
+            <h2 className="text-xl font-semibold text-white">
+              Send Message
             </h2>
-            {leadName && (
-              <p className="text-sm text-gray-600">
-                To: {leadName} ({leadPhone})
-              </p>
-            )}
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-300 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
-              {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} message sent successfully!
+            <div className="bg-green-900/20 border border-green-500/50 text-green-300 px-4 py-3 rounded">
+              Message sent successfully!
             </div>
           )}
 
           {/* Channel Selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-white mb-3">
               Send via
             </label>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <label className="flex items-center cursor-pointer">
                 <input
                   type="radio"
                   value="sms"
                   checked={channel === 'sms'}
                   onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
-                  className="mr-2"
+                  className="w-4 h-4 text-blue-600"
                   disabled={sending || success}
                 />
-                <span className="text-sm">SMS</span>
+                <span className="ml-2 text-sm text-gray-300">SMS</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -180,10 +178,10 @@ export default function SendSMSModal({
                   value="whatsapp"
                   checked={channel === 'whatsapp'}
                   onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
-                  className="mr-2"
+                  className="w-4 h-4 text-blue-600"
                   disabled={sending || success}
                 />
-                <span className="text-sm">WhatsApp</span>
+                <span className="ml-2 text-sm text-gray-300">WhatsApp</span>
               </label>
             </div>
           </div>
@@ -191,7 +189,7 @@ export default function SendSMSModal({
           {/* Phone Number Input (if no lead phone provided) */}
           {!leadPhone && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-white mb-3">
                 Phone Number
               </label>
               <input
@@ -199,7 +197,7 @@ export default function SendSMSModal({
                 value={manualPhone}
                 onChange={(e) => setManualPhone(e.target.value)}
                 placeholder="+1234567890 or 1234567890"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white placeholder-gray-500"
                 disabled={sending || success}
               />
             </div>
@@ -207,16 +205,16 @@ export default function SendSMSModal({
 
           {/* Template/Flow Selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-white mb-3">
               Use Campaign Flow (Optional)
             </label>
             <select
               value={selectedCampaign}
               onChange={(e) => handleTemplateSelect(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white"
               disabled={sending || success || loadingCampaigns}
             >
-              <option value="">-- Type message manually or select a flow --</option>
+              <option value=""></option>
               {campaigns.map((campaign) => (
                 <option key={campaign.id} value={campaign.id}>
                   {campaign.name}
@@ -225,8 +223,9 @@ export default function SendSMSModal({
             </select>
           </div>
 
+          {/* Message */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-semibold text-white mb-3">
               Message
             </label>
             <textarea
@@ -234,10 +233,10 @@ export default function SendSMSModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type your message here or select a campaign flow above..."
               rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm text-white placeholder-gray-500"
               disabled={sending || success}
             />
-            <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
+            <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
               <span>{characterCount} characters</span>
               <span>{smsCount} SMS</span>
             </div>
@@ -245,10 +244,10 @@ export default function SendSMSModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 bg-[#0f1419]">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 rounded-md transition-colors"
             disabled={sending}
           >
             Cancel
@@ -256,7 +255,7 @@ export default function SendSMSModal({
           <button
             onClick={handleSend}
             disabled={sending || !message.trim() || success}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {sending ? (
               <>
@@ -266,7 +265,7 @@ export default function SendSMSModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Send {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                Send SMS
               </>
             )}
           </button>
