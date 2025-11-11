@@ -176,7 +176,6 @@ export default function SendSMSModal({
               {availableNumbers.length === 0 && !loadingNumbers && (
                 <>
                   <option value="+18336587355">+1 (833) 658-7355 (SMS - Master)</option>
-                  <option value="+15558917942">+1 (555) 891-7942 (RCS - Master)</option>
                 </>
               )}
             </select>

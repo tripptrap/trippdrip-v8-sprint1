@@ -5,7 +5,6 @@ import twilio from 'twilio';
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const twilioRCSNumber = process.env.TWILIO_RCS_NUMBER;
 
 if (!accountSid || !authToken) {
   console.warn('⚠️ Twilio credentials not configured. SMS functionality will not work.');
@@ -62,26 +61,14 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
     };
   }
 
-  // Determine the from number based on channel
-  let fromNumber: string;
-  if (channel === 'rcs') {
-    fromNumber = from || twilioRCSNumber || '';
-    if (!fromNumber) {
-      return {
-        success: false,
-        error: 'No RCS number configured. Set TWILIO_RCS_NUMBER in environment variables.',
-        channel,
-      };
-    }
-  } else {
-    fromNumber = from || twilioPhoneNumber || '';
-    if (!fromNumber) {
-      return {
-        success: false,
-        error: 'No Twilio phone number configured. Set TWILIO_PHONE_NUMBER in environment variables.',
-        channel,
-      };
-    }
+  // Determine the from number
+  const fromNumber = from || twilioPhoneNumber || '';
+  if (!fromNumber) {
+    return {
+      success: false,
+      error: 'No Twilio phone number configured. Set TWILIO_PHONE_NUMBER in environment variables.',
+      channel,
+    };
   }
 
   // Validate recipient phone number
