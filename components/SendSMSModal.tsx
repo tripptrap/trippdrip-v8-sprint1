@@ -33,8 +33,8 @@ export default function SendSMSModal({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
-  const [channel, setChannel] = useState<'sms' | 'whatsapp'>('sms');
-  const [manualPhone, setManualPhone] = useState('');
+  const [fromNumber, setFromNumber] = useState('');
+  const [toPhone, setToPhone] = useState(leadPhone || '');
 
   // Load campaigns/flows when modal opens
   useEffect(() => {
@@ -76,9 +76,13 @@ export default function SendSMSModal({
       return;
     }
 
-    const phoneToUse = leadPhone || manualPhone;
-    if (!phoneToUse) {
-      setError('Please enter a phone number');
+    if (!toPhone) {
+      setError('Please select or enter a phone number');
+      return;
+    }
+
+    if (!fromNumber) {
+      setError('Please select a from number');
       return;
     }
 
@@ -91,16 +95,16 @@ export default function SendSMSModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId,
-          toPhone: phoneToUse,
+          toPhone: toPhone,
+          from: fromNumber,
           messageBody: message,
-          channel,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send SMS');
+        throw new Error(data.error || 'Failed to send message');
       }
 
       setSuccess(true);
@@ -112,7 +116,7 @@ export default function SendSMSModal({
         onSuccess?.();
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to send SMS');
+      setError(err.message || 'Failed to send message');
     } finally {
       setSending(false);
     }
@@ -155,53 +159,37 @@ export default function SendSMSModal({
             </div>
           )}
 
-          {/* Channel Selector */}
+          {/* From Number Selector */}
           <div>
             <label className="block text-sm font-semibold text-white mb-3">
-              Send via
+              From Number
             </label>
-            <div className="flex gap-4">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  value="sms"
-                  checked={channel === 'sms'}
-                  onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
-                  className="w-4 h-4 text-blue-600"
-                  disabled={sending || success}
-                />
-                <span className="ml-2 text-sm text-gray-300">SMS</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  value="whatsapp"
-                  checked={channel === 'whatsapp'}
-                  onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
-                  className="w-4 h-4 text-blue-600"
-                  disabled={sending || success}
-                />
-                <span className="ml-2 text-sm text-gray-300">WhatsApp</span>
-              </label>
-            </div>
+            <select
+              value={fromNumber}
+              onChange={(e) => setFromNumber(e.target.value)}
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white"
+              disabled={sending || success}
+            >
+              <option value="">Select a number...</option>
+              <option value="+18336587355">+1 (833) 658-7355 (SMS)</option>
+              <option value="whatsapp:+15558917942">+1 (555) 891-7942 (WhatsApp)</option>
+            </select>
           </div>
 
-          {/* Phone Number Input (if no lead phone provided) */}
-          {!leadPhone && (
-            <div>
-              <label className="block text-sm font-semibold text-white mb-3">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                value={manualPhone}
-                onChange={(e) => setManualPhone(e.target.value)}
-                placeholder="+1234567890 or 1234567890"
-                className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white placeholder-gray-500"
-                disabled={sending || success}
-              />
-            </div>
-          )}
+          {/* To Phone Number Input */}
+          <div>
+            <label className="block text-sm font-semibold text-white mb-3">
+              To Number
+            </label>
+            <input
+              type="tel"
+              value={toPhone}
+              onChange={(e) => setToPhone(e.target.value)}
+              placeholder="+1234567890 or 1234567890"
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white placeholder-gray-500"
+              disabled={sending || success}
+            />
+          </div>
 
           {/* Template/Flow Selector */}
           <div>
@@ -265,7 +253,7 @@ export default function SendSMSModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Send SMS
+                Send Message
               </>
             )}
           </button>
