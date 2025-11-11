@@ -38,7 +38,7 @@ export default function SendSMSModal({
 
   // Load campaigns/flows when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && typeof window !== 'undefined') {
       loadCampaigns();
     }
   }, [isOpen]);
@@ -55,7 +55,7 @@ export default function SendSMSModal({
       }
     } catch (err) {
       console.error('Failed to load campaigns:', err);
-      setError('');
+      // Don't show error to user for campaigns loading failure
     } finally {
       setLoadingCampaigns(false);
     }
