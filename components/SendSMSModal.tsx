@@ -33,6 +33,7 @@ export default function SendSMSModal({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [channel, setChannel] = useState<'sms' | 'whatsapp'>('sms');
 
   // Load campaigns/flows when modal opens
   useEffect(() => {
@@ -87,6 +88,7 @@ export default function SendSMSModal({
           leadId,
           toPhone: leadPhone,
           messageBody: message,
+          channel,
         }),
       });
 
@@ -122,7 +124,9 @@ export default function SendSMSModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h2 className="text-lg font-semibold">Send SMS</h2>
+            <h2 className="text-lg font-semibold">
+              Send {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} Message
+            </h2>
             {leadName && (
               <p className="text-sm text-gray-600">
                 To: {leadName} ({leadPhone})
@@ -147,9 +151,40 @@ export default function SendSMSModal({
 
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
-              SMS sent successfully!
+              {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} message sent successfully!
             </div>
           )}
+
+          {/* Channel Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Send via
+            </label>
+            <div className="flex gap-3">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  value="sms"
+                  checked={channel === 'sms'}
+                  onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
+                  className="mr-2"
+                  disabled={sending || success}
+                />
+                <span className="text-sm">SMS</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  value="whatsapp"
+                  checked={channel === 'whatsapp'}
+                  onChange={(e) => setChannel(e.target.value as 'sms' | 'whatsapp')}
+                  className="mr-2"
+                  disabled={sending || success}
+                />
+                <span className="text-sm">WhatsApp</span>
+              </label>
+            </div>
+          </div>
 
           {/* Template/Flow Selector */}
           <div>
@@ -212,7 +247,7 @@ export default function SendSMSModal({
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Send SMS
+                Send {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
               </>
             )}
           </button>

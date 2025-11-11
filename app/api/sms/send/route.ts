@@ -24,6 +24,7 @@ interface SendSMSRequest {
   messageBody?: string;
   templateId?: string;
   isAutomated?: boolean;
+  channel?: 'sms' | 'whatsapp'; // Channel type
 }
 
 export async function POST(req: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const toPhone = body.toPhone || body.to;
     const messageBody = body.messageBody || body.message;
     const fromPhone = body.from || process.env.TWILIO_PHONE_NUMBER;
-    const { leadId, campaignId, templateId, isAutomated = false, isBulk = false } = body;
+    const { leadId, campaignId, templateId, isAutomated = false, isBulk = false, channel = 'sms' } = body;
 
     // Validate inputs
     if (!toPhone || !messageBody) {
@@ -73,13 +74,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`📤 Sending SMS to ${toPhone}...`);
+    console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone}...`);
 
-    // Send SMS via Twilio utility
+    // Send SMS or WhatsApp via Twilio utility
     const result = await sendSMS({
       to: toPhone,
       message: messageBody,
       from: fromPhone,
+      channel,
     });
 
     if (!result.success) {
