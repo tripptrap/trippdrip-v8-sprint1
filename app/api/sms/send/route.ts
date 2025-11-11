@@ -24,7 +24,7 @@ interface SendSMSRequest {
   messageBody?: string;
   templateId?: string;
   isAutomated?: boolean;
-  channel?: 'sms' | 'whatsapp'; // Channel type
+  channel?: 'sms' | 'rcs'; // Channel type
 }
 
 export async function POST(req: NextRequest) {
