@@ -16,7 +16,7 @@ export default function SendSMSModal({
   isOpen,
   onClose,
   leadId,
-  leadName,
+  leadName = '',
   leadPhone,
   onSuccess,
 }: SendSMSModalProps) {
