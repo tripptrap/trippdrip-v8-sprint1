@@ -1,13 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Send, Loader2, FileText } from 'lucide-react';
-
-interface Campaign {
-  id: string;
-  name: string;
-  steps: Array<{ delay: number; message: string }>;
-}
+import { useState } from 'react';
+import { X, Send, Loader2 } from 'lucide-react';
 
 interface SendSMSModalProps {
   isOpen: boolean;
@@ -30,45 +24,8 @@ export default function SendSMSModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState('');
-  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [fromNumber, setFromNumber] = useState('');
   const [toPhone, setToPhone] = useState(leadPhone || '');
-
-  // Load campaigns/flows when modal opens
-  useEffect(() => {
-    if (isOpen && typeof window !== 'undefined') {
-      loadCampaigns();
-    }
-  }, [isOpen]);
-
-  const loadCampaigns = async () => {
-    if (typeof window === 'undefined') return;
-
-    setLoadingCampaigns(true);
-    try {
-      const response = await fetch('/api/campaigns');
-      const data = await response.json();
-      if (data.ok && data.campaigns) {
-        setCampaigns(data.campaigns);
-      }
-    } catch (err) {
-      console.error('Failed to load campaigns:', err);
-      // Don't show error to user for campaigns loading failure
-    } finally {
-      setLoadingCampaigns(false);
-    }
-  };
-
-  const handleTemplateSelect = (campaignId: string) => {
-    setSelectedCampaign(campaignId);
-    const campaign = campaigns.find(c => c.id === campaignId);
-    if (campaign && campaign.steps && campaign.steps.length > 0) {
-      // Use the first step's message as the template
-      setMessage(campaign.steps[0].message || '');
-    }
-  };
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -191,26 +148,6 @@ export default function SendSMSModal({
             />
           </div>
 
-          {/* Template/Flow Selector */}
-          <div>
-            <label className="block text-sm font-semibold text-white mb-3">
-              Use Campaign Flow (Optional)
-            </label>
-            <select
-              value={selectedCampaign}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
-              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white"
-              disabled={sending || success || loadingCampaigns}
-            >
-              <option value=""></option>
-              {campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Message */}
           <div>
             <label className="block text-sm font-semibold text-white mb-3">
@@ -219,7 +156,7 @@ export default function SendSMSModal({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message here or select a campaign flow above..."
+              placeholder="Type your message here..."
               rows={6}
               className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm text-white placeholder-gray-500"
               disabled={sending || success}
