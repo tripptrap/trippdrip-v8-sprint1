@@ -33,6 +33,13 @@ export default function SendSMSModal({
   useEffect(() => {
     if (isOpen) {
       loadTwilioNumbers();
+      // Reset form when modal opens
+      if (!leadPhone) {
+        setToPhone('');
+      }
+      setMessage('');
+      setError('');
+      setSuccess(false);
     }
   }, [isOpen]);
 
@@ -44,11 +51,13 @@ export default function SendSMSModal({
 
       if (data.success && data.numbers && data.numbers.length > 0) {
         setAvailableNumbers(data.numbers);
-        // Auto-select primary number if available
+        // Auto-select primary number if available, otherwise select first number
         const primary = data.numbers.find((n: any) => n.is_primary);
-        if (primary && !fromNumber) {
-          setFromNumber(primary.phone_number);
-        }
+        const numberToSelect = primary ? primary.phone_number : data.numbers[0].phone_number;
+        setFromNumber(numberToSelect);
+        console.log('Auto-selected number:', numberToSelect);
+      } else {
+        console.log('No numbers found:', data);
       }
     } catch (error) {
       console.error('Error loading Twilio numbers:', error);
