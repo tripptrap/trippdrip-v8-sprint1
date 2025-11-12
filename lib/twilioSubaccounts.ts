@@ -28,6 +28,8 @@ export interface CreateSubaccountResult {
   authToken?: string;
   error?: string;
   friendlyName?: string;
+  phoneNumber?: string;
+  phoneSid?: string;
 }
 
 export interface GetUserCredentialsResult {
@@ -98,11 +100,103 @@ export async function createTwilioSubaccount(
       };
     }
 
+    // Auto-purchase a phone number for the new subaccount
+    console.log(`📞 Auto-purchasing phone number for ${userEmail}...`);
+
+    let purchasedNumber = null;
+    let purchasedSid = null;
+
+    try {
+      // Use the subaccount client to purchase a number
+      const subaccountClient = twilio(subaccount.sid, authToken);
+
+      // Search for available local numbers (trying a few common area codes)
+      const areaCodesToTry = ['415', '646', '213', '305', '512', '720'];
+      let availableNumbers = null;
+
+      for (const areaCode of areaCodesToTry) {
+        try {
+          const numbers = await subaccountClient.availablePhoneNumbers('US')
+            .local
+            .list({ areaCode, limit: 1 });
+
+          if (numbers && numbers.length > 0) {
+            availableNumbers = numbers;
+            console.log(`✅ Found available number in area code ${areaCode}`);
+            break;
+          }
+        } catch (err) {
+          console.log(`⏭️  No numbers in area code ${areaCode}, trying next...`);
+          continue;
+        }
+      }
+
+      if (!availableNumbers || availableNumbers.length === 0) {
+        // Try without area code filter
+        availableNumbers = await subaccountClient.availablePhoneNumbers('US')
+          .local
+          .list({ limit: 1 });
+      }
+
+      if (availableNumbers && availableNumbers.length > 0) {
+        const numberToPurchase = availableNumbers[0].phoneNumber;
+
+        // Configure webhook URL
+        const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/sms-webhook`;
+
+        // Purchase the number
+        const purchasedPhoneNumber = await subaccountClient.incomingPhoneNumbers.create({
+          phoneNumber: numberToPurchase,
+          smsUrl: webhookUrl,
+          smsMethod: 'POST',
+          statusCallback: webhookUrl,
+          statusCallbackMethod: 'POST',
+        });
+
+        purchasedNumber = purchasedPhoneNumber.phoneNumber;
+        purchasedSid = purchasedPhoneNumber.sid;
+
+        console.log(`✅ Auto-purchased number: ${purchasedNumber} (${purchasedSid})`);
+
+        // Save the purchased number to the database
+        const { error: numberError } = await supabase
+          .from('user_twilio_numbers')
+          .insert({
+            user_id: userId,
+            phone_number: purchasedNumber,
+            phone_sid: purchasedSid,
+            friendly_name: purchasedNumber,
+            capabilities: {
+              voice: purchasedPhoneNumber.capabilities?.voice || false,
+              sms: purchasedPhoneNumber.capabilities?.sms || false,
+              mms: purchasedPhoneNumber.capabilities?.mms || false,
+              rcs: false
+            },
+            is_primary: true, // First number is primary
+            status: 'active',
+            purchased_at: new Date().toISOString()
+          });
+
+        if (numberError) {
+          console.error('❌ Error saving auto-purchased number:', numberError);
+        } else {
+          console.log(`✅ Saved auto-purchased number to database`);
+        }
+      } else {
+        console.log('⚠️  No available numbers found for auto-purchase');
+      }
+    } catch (purchaseError: any) {
+      console.error('⚠️  Could not auto-purchase number:', purchaseError.message);
+      // Don't fail the entire subaccount creation if number purchase fails
+    }
+
     return {
       success: true,
       subaccountSid: subaccount.sid,
       authToken: authToken,
       friendlyName: friendlyName,
+      phoneNumber: purchasedNumber || undefined,
+      phoneSid: purchasedSid || undefined,
     };
   } catch (error: any) {
     console.error('❌ Error creating Twilio subaccount:', error);

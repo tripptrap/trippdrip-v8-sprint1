@@ -162,6 +162,9 @@ export async function POST(req: NextRequest) {
 
             if (subaccountResult.success) {
               console.log(`✅ Twilio subaccount created for user ${userId}: ${subaccountResult.subaccountSid}`);
+              if (subaccountResult.phoneNumber) {
+                console.log(`✅ Auto-purchased phone number: ${subaccountResult.phoneNumber} (${subaccountResult.phoneSid})`);
+              }
             } else {
               console.error(`❌ Failed to create Twilio subaccount for user ${userId}:`, subaccountResult.error);
             }
