@@ -29,16 +29,34 @@ export default function SignUpPage() {
 
     setLoading(true);
 
-    // Mock registration - will be replaced with real authentication
-    setTimeout(() => {
-      if (name && email && password) {
-        toast.success('Account created! Welcome to HyveWyre™');
-        router.push('/dashboard');
-      } else {
-        toast.error('Please fill in all fields');
+    try {
+      // Create user with Supabase Auth
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          name,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create account');
       }
+
+      toast.success('Account created! Welcome to HyveWyre™');
+
+      // Redirect to onboarding to select membership plan
+      router.push('/auth/onboarding');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      toast.error(error.message || 'Failed to create account');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
