@@ -1,17 +1,35 @@
-// API Route: Search Available Phone Numbers
+// API Route: Search Available Phone Numbers (using user's subaccount)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
 
 export async function POST(req: NextRequest) {
   try {
-    const { accountSid, authToken, countryCode = 'US', areaCode, contains } = await req.json();
+    // Authenticate user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!accountSid || !authToken) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: 'Twilio credentials required' },
-        { status: 400 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
+
+    // Get user's Twilio subaccount credentials
+    const credentialsResult = await getUserTwilioCredentials(user.id);
+
+    if (!credentialsResult.success || !credentialsResult.accountSid || !credentialsResult.authToken) {
+      return NextResponse.json(
+        { error: 'No Twilio subaccount found. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
+    const { countryCode = 'US', areaCode, contains } = await req.json();
+    const accountSid = credentialsResult.accountSid;
+    const authToken = credentialsResult.authToken;
 
     // Build search URL with filters
     const baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${countryCode}/Local.json`;

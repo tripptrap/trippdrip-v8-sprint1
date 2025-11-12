@@ -1,17 +1,43 @@
-// API Route: Release/Delete Phone Number from Twilio
+// API Route: Release/Delete Phone Number from Twilio (using user's subaccount)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
 
 export async function POST(req: NextRequest) {
   try {
-    const { accountSid, authToken, phoneSid } = await req.json();
+    // Authenticate user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!accountSid || !authToken || !phoneSid) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: 'Missing required fields: accountSid, authToken, phoneSid' },
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's Twilio subaccount credentials
+    const credentialsResult = await getUserTwilioCredentials(user.id);
+
+    if (!credentialsResult.success || !credentialsResult.accountSid || !credentialsResult.authToken) {
+      return NextResponse.json(
+        { error: 'No Twilio subaccount found. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
+    const { phoneSid } = await req.json();
+
+    if (!phoneSid) {
+      return NextResponse.json(
+        { error: 'Phone SID is required' },
         { status: 400 }
       );
     }
+
+    const accountSid = credentialsResult.accountSid;
+    const authToken = credentialsResult.authToken;
 
     // Release the phone number via Twilio API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${phoneSid}.json`;
@@ -33,6 +59,18 @@ export async function POST(req: NextRequest) {
         },
         { status: response.status }
       );
+    }
+
+    // Delete from database
+    const { error: dbError } = await supabase
+      .from('user_twilio_numbers')
+      .delete()
+      .eq('phone_sid', phoneSid)
+      .eq('user_id', user.id);
+
+    if (dbError) {
+      console.error('Error deleting phone number from database:', dbError);
+      // Continue anyway - number was released from Twilio
     }
 
     return NextResponse.json({

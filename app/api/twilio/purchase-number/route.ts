@@ -1,17 +1,43 @@
-// API Route: Purchase Phone Number from Twilio
+// API Route: Purchase Phone Number from Twilio (using user's subaccount)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
 
 export async function POST(req: NextRequest) {
   try {
-    const { accountSid, authToken, phoneNumber } = await req.json();
+    // Authenticate user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!accountSid || !authToken || !phoneNumber) {
+    if (authError || !user) {
       return NextResponse.json(
-        { error: 'Missing required fields: accountSid, authToken, phoneNumber' },
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's Twilio subaccount credentials
+    const credentialsResult = await getUserTwilioCredentials(user.id);
+
+    if (!credentialsResult.success || !credentialsResult.accountSid || !credentialsResult.authToken) {
+      return NextResponse.json(
+        { error: 'No Twilio subaccount found. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
+    const { phoneNumber } = await req.json();
+
+    if (!phoneNumber) {
+      return NextResponse.json(
+        { error: 'Phone number is required' },
         { status: 400 }
       );
     }
+
+    const accountSid = credentialsResult.accountSid;
+    const authToken = credentialsResult.authToken;
 
     // Purchase the phone number via Twilio API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`;
@@ -41,6 +67,32 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await response.json();
+
+    // Save the purchased number to the database
+    const { error: dbError } = await supabase
+      .from('user_twilio_numbers')
+      .insert({
+        user_id: user.id,
+        phone_number: result.phone_number,
+        phone_sid: result.sid,
+        friendly_name: result.friendly_name || result.phone_number,
+        capabilities: {
+          voice: result.capabilities?.voice || false,
+          sms: result.capabilities?.sms || false,
+          mms: result.capabilities?.mms || false,
+          rcs: false
+        },
+        is_primary: false, // First number will be set as primary manually
+        status: 'active',
+        purchased_at: new Date().toISOString()
+      });
+
+    if (dbError) {
+      console.error('Error saving phone number to database:', dbError);
+      // Continue anyway - number was purchased successfully
+    } else {
+      console.log(`✅ Saved phone number ${result.phone_number} for user ${user.id}`);
+    }
 
     return NextResponse.json({
       success: true,
