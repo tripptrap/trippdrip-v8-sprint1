@@ -67,7 +67,7 @@ export default function OnboardingPage() {
       <div className="max-w-5xl w-full">
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <img src="/icon.png" alt="HyveWyre™" className="h-32 w-32 rounded-3xl" />
+            <img src="/logo-premium.png" alt="HyveWyre™" className="h-32 w-32 rounded-3xl" />
           </div>
           <h1 className="text-4xl font-bold mb-3" style={{ color: '#e6e9f0' }}>
             Welcome to HyveWyre™!
@@ -167,7 +167,7 @@ export default function OnboardingPage() {
             }}
           >
             <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-              RECOMMENDED
+              POPULAR
             </div>
 
             <div className="text-center mb-6">
