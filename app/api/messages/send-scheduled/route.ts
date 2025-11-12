@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserTwilioCredentials } from "@/lib/twilioSubaccounts";
+import { sendSMS } from "@/lib/twilio";
 
 /**
  * Cron job endpoint to send scheduled messages
@@ -54,20 +56,40 @@ export async function GET(req: NextRequest) {
     // Process each message
     for (const msg of messagesToSend) {
       try {
-        // Get user's Twilio settings
+        // Get user's credentials and data
         const { data: userData } = await supabase
           .from('users')
-          .select('twilio_config, credits')
+          .select('credits')
           .eq('id', msg.user_id)
           .single();
 
-        if (!userData || !userData.twilio_config) {
-          throw new Error('User Twilio config not found');
+        if (!userData) {
+          throw new Error('User not found');
         }
 
         // Check if user has enough credits
         if ((userData.credits || 0) < (msg.credits_cost || 0)) {
           throw new Error('Insufficient credits');
+        }
+
+        // Get user's Twilio subaccount credentials
+        const twilioCredentials = await getUserTwilioCredentials(msg.user_id);
+
+        if (!twilioCredentials.success) {
+          throw new Error('User Twilio subaccount not found or inactive');
+        }
+
+        // Get user's primary phone number
+        const { data: primaryNumber } = await supabase
+          .from('user_twilio_numbers')
+          .select('phone_number')
+          .eq('user_id', msg.user_id)
+          .eq('is_primary', true)
+          .eq('status', 'active')
+          .single();
+
+        if (!primaryNumber) {
+          throw new Error('No active phone number found for user');
         }
 
         // Get lead information
@@ -81,35 +103,24 @@ export async function GET(req: NextRequest) {
           throw new Error('Lead phone number not found');
         }
 
-        const twilioConfig = userData.twilio_config;
-
-        // Send via Twilio API (SMS only for now)
+        // Send via Twilio using sendSMS helper (supports subaccounts)
         if (msg.channel === 'sms') {
-          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
-          const params = new URLSearchParams();
-          params.append('To', lead.phone);
-          params.append('From', twilioConfig.phoneNumbers?.[0] || '');
-          params.append('Body', msg.body);
-
-          const response = await fetch(twilioUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${twilioConfig.accountSid}:${twilioConfig.authToken}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params
+          const result = await sendSMS({
+            to: lead.phone,
+            message: msg.body,
+            from: primaryNumber.phone_number,
+            userAccountSid: twilioCredentials.accountSid,
+            userAuthToken: twilioCredentials.authToken,
           });
 
-          const result = await response.json();
-
-          if (response.ok) {
+          if (result.success) {
             // Update message status to sent
             await supabase
               .from('scheduled_messages')
               .update({
                 status: 'sent',
                 sent_at: new Date().toISOString(),
-                message_sid: result.sid
+                message_sid: result.messageSid
               })
               .eq('id', msg.id);
 
@@ -171,7 +182,7 @@ export async function GET(req: NextRequest) {
 
             sentCount++;
           } else {
-            throw new Error(result.message || 'Twilio send failed');
+            throw new Error(result.error || 'Twilio send failed');
           }
         } else if (msg.channel === 'email') {
           // TODO: Add email sending logic

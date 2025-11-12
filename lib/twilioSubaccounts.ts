@@ -111,7 +111,7 @@ export async function createTwilioSubaccount(
       const subaccountClient = twilio(subaccount.sid, authToken);
 
       // Search for available local numbers (trying a few common area codes)
-      const areaCodesToTry = ['415', '646', '213', '305', '512', '720'];
+      const areaCodesToTry = [415, 646, 213, 305, 512, 720];
       let availableNumbers = null;
 
       for (const areaCode of areaCodesToTry) {
@@ -141,16 +141,21 @@ export async function createTwilioSubaccount(
       if (availableNumbers && availableNumbers.length > 0) {
         const numberToPurchase = availableNumbers[0].phoneNumber;
 
-        // Configure webhook URL
-        const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/sms-webhook`;
+        // Configure webhook URLs
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com';
+        const smsWebhookUrl = `${siteUrl}/api/twilio/sms-webhook`;
+        const statusCallbackUrl = `${siteUrl}/api/twilio/status-callback`;
+        const voiceWebhookUrl = `${siteUrl}/api/twilio/voice-webhook`;
 
-        // Purchase the number
+        // Purchase the number with all webhooks configured
         const purchasedPhoneNumber = await subaccountClient.incomingPhoneNumbers.create({
           phoneNumber: numberToPurchase,
-          smsUrl: webhookUrl,
+          smsUrl: smsWebhookUrl,
           smsMethod: 'POST',
-          statusCallback: webhookUrl,
+          statusCallback: statusCallbackUrl,
           statusCallbackMethod: 'POST',
+          voiceUrl: voiceWebhookUrl,
+          voiceMethod: 'POST',
         });
 
         purchasedNumber = purchasedPhoneNumber.phoneNumber;

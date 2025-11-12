@@ -106,6 +106,10 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResult> {
       messageParams.mediaUrl = mediaUrl;
     }
 
+    // Add status callback URL to track delivery status
+    const statusCallbackUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/status-callback`;
+    messageParams.statusCallback = statusCallbackUrl;
+
     const twilioMessage = await clientToUse.messages.create(messageParams);
 
     return {

@@ -46,13 +46,19 @@ export async function POST(req: NextRequest) {
     params.append('PhoneNumber', phoneNumber);
 
     // Configure SMS webhook to receive incoming messages
-    const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/sms-webhook`;
-    params.append('SmsUrl', webhookUrl);
+    const smsWebhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/sms-webhook`;
+    params.append('SmsUrl', smsWebhookUrl);
     params.append('SmsMethod', 'POST');
 
-    // Configure status callback for delivery tracking
-    params.append('StatusCallback', webhookUrl);
+    // Configure status callback for message delivery tracking
+    const statusCallbackUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/status-callback`;
+    params.append('StatusCallback', statusCallbackUrl);
     params.append('StatusCallbackMethod', 'POST');
+
+    // Configure voice webhook for incoming calls
+    const voiceWebhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/voice-webhook`;
+    params.append('VoiceUrl', voiceWebhookUrl);
+    params.append('VoiceMethod', 'POST');
 
     const response = await fetch(twilioUrl, {
       method: 'POST',
