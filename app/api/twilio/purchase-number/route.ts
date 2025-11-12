@@ -45,6 +45,15 @@ export async function POST(req: NextRequest) {
     const params = new URLSearchParams();
     params.append('PhoneNumber', phoneNumber);
 
+    // Configure SMS webhook to receive incoming messages
+    const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hyvewyre.com'}/api/twilio/sms-webhook`;
+    params.append('SmsUrl', webhookUrl);
+    params.append('SmsMethod', 'POST');
+
+    // Configure status callback for delivery tracking
+    params.append('StatusCallback', webhookUrl);
+    params.append('StatusCallbackMethod', 'POST');
+
     const response = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
