@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { spendPointsForAction } from '@/lib/pointsSupabase';
+import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendSMS } from '@/lib/twilio';
 import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
 

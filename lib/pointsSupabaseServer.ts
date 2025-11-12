@@ -1,7 +1,7 @@
-// Points Management with Supabase (CLIENT-SIDE)
-// For server-side usage (API routes), use pointsSupabaseServer.ts instead
+// Server-Side Points Management with Supabase
+// This file is for use in API routes and server components only
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export type ActionType = 'sms_sent' | 'ai_response' | 'document_upload' | 'bulk_message' | 'flow_creation';
 
@@ -14,28 +14,7 @@ export const POINT_COSTS: Record<ActionType, number> = {
   flow_creation: 15         // 15 points for flow creation
 };
 
-// Get user's current balance from Supabase
-export async function getPointsBalance(): Promise<number> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) return 0;
-
-  const { data, error } = await supabase
-    .from('users')
-    .select('credits')
-    .eq('id', user.id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching balance:', error);
-    return 0;
-  }
-
-  return data?.credits || 0;
-}
-
-// Spend points for a specific action
+// Spend points for a specific action (SERVER-SIDE)
 export async function spendPointsForAction(
   actionType: ActionType,
   count: number = 1
@@ -54,13 +33,13 @@ export async function spendPointsForAction(
   return await spendPoints(totalCost, actionDescriptions[actionType], actionType);
 }
 
-// Spend points
+// Spend points (SERVER-SIDE)
 export async function spendPoints(
   amount: number,
   description: string,
   actionType?: ActionType
 ): Promise<{ success: boolean; balance?: number; error?: string }> {
-  const supabase = createClient();
+  const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
@@ -111,23 +90,16 @@ export async function spendPoints(
     console.error('Error recording transaction:', transactionError);
   }
 
-  // Dispatch event for UI updates
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('pointsUpdated', {
-      detail: { balance: newBalance }
-    }));
-  }
-
   return { success: true, balance: newBalance };
 }
 
-// Add points (for purchases)
+// Add points (SERVER-SIDE for purchases)
 export async function addPoints(
   amount: number,
   description: string,
   type: 'earn' | 'purchase' = 'purchase'
 ): Promise<{ success: boolean; balance?: number; error?: string }> {
-  const supabase = createClient();
+  const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
@@ -174,31 +146,40 @@ export async function addPoints(
     console.error('Error recording transaction:', transactionError);
   }
 
-  // Dispatch event for UI updates
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('pointsUpdated', {
-      detail: { balance: newBalance }
-    }));
-  }
-
   return { success: true, balance: newBalance };
 }
 
-// Check if user can afford an action
+// Check if user can afford an action (SERVER-SIDE)
 export async function canAffordAction(actionType: ActionType, count: number = 1): Promise<boolean> {
   const cost = POINT_COSTS[actionType] * count;
-  const balance = await getPointsBalance();
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return false;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('credits')
+    .eq('id', user.id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching balance:', error);
+    return false;
+  }
+
+  const balance = data?.credits || 0;
   return balance >= cost;
 }
 
-// Get action cost
+// Get action cost (PURE FUNCTION - works everywhere)
 export function getActionCost(actionType: ActionType, count: number = 1): number {
   return POINT_COSTS[actionType] * count;
 }
 
-// Get recent transactions
+// Get recent transactions (SERVER-SIDE)
 export async function getRecentTransactions(limit: number = 10) {
-  const supabase = createClient();
+  const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return [];
