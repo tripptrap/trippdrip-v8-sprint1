@@ -7,6 +7,7 @@ import { findLead as seedFindLead } from "@/lib/db";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/messages",  label: "Messages" },
   { href: "/leads",     label: "Leads" },
   { href: "/bulk-sms",  label: "Bulk SMS" },
   { href: "/texts",     label: "Texts" },

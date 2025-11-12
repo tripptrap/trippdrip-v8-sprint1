@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { POINT_COSTS } from "@/lib/pointsSupabase";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import { MessageSquare } from 'lucide-react';
+import SendSMSModal from '@/components/SendSMSModal';
 
 interface AnalyticsData {
   totalLeads: number;
@@ -27,6 +29,7 @@ export default function Dashboard(){
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [chartLoading, setChartLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30');
+  const [showSendModal, setShowSendModal] = useState(false);
 
   useEffect(() => {
     fetchAnalytics();
@@ -309,6 +312,25 @@ export default function Dashboard(){
           Credits automatically renew every 30 days based on your subscription plan. Unused credits roll over.
         </p>
       </div>
+
+      {/* Floating Send Message Button */}
+      <button
+        onClick={() => setShowSendModal(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-50"
+        title="Send Message"
+      >
+        <MessageSquare className="w-6 h-6" />
+      </button>
+
+      {/* Send SMS Modal */}
+      <SendSMSModal
+        isOpen={showSendModal}
+        onClose={() => setShowSendModal(false)}
+        onSuccess={() => {
+          // Optionally refresh analytics after sending
+          fetchAnalytics();
+        }}
+      />
     </div>
   );
 }
