@@ -162,6 +162,65 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
+    // Create or update thread for this conversation
+    const { data: existingThread } = await supabase
+      .from('threads')
+      .select('id, messages_from_user')
+      .eq('user_id', user.id)
+      .eq('phone_number', toPhone)
+      .eq('channel', channel)
+      .single();
+
+    let threadId: string;
+
+    if (existingThread) {
+      // Update existing thread
+      const { data: updatedThread } = await supabase
+        .from('threads')
+        .update({
+          last_message: messageBody.substring(0, 255),
+          updated_at: new Date().toISOString(),
+          messages_from_user: (existingThread.messages_from_user || 0) + 1,
+        })
+        .eq('id', existingThread.id)
+        .select('id')
+        .single();
+
+      threadId = updatedThread?.id || existingThread.id;
+    } else {
+      // Create new thread
+      const { data: newThread } = await supabase
+        .from('threads')
+        .insert({
+          user_id: user.id,
+          phone_number: toPhone,
+          channel: channel,
+          last_message: messageBody.substring(0, 255),
+          messages_from_user: 1,
+          messages_from_lead: 0,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      threadId = newThread?.id || '';
+    }
+
+    // Add message to thread
+    if (threadId) {
+      await supabase.from('messages').insert({
+        thread_id: threadId,
+        sender: fromPhone,
+        recipient: toPhone,
+        body: messageBody,
+        direction: 'outbound',
+        status: result.status || 'sent',
+        message_sid: result.messageSid,
+        created_at: new Date().toISOString(),
+      });
+    }
+
     // Log activity for lead if leadId provided
     if (leadId && smsMessage) {
       await supabase.from('lead_activities').insert({

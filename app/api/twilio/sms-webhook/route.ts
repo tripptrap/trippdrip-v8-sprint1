@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const { data: existingThread } = await supabaseAdmin
       .from('threads')
-      .select('id')
+      .select('id, messages_from_lead')
       .eq('user_id', userId)
       .eq('phone_number', from)
       .eq('channel', 'sms')
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
         .update({
           last_message: messageBody,
           updated_at: new Date().toISOString(),
+          messages_from_lead: (existingThread.messages_from_lead || 0) + 1,
         })
         .eq('id', threadId);
     } else {
@@ -116,6 +117,8 @@ export async function POST(req: NextRequest) {
           channel: 'sms',
           status: 'active',
           last_message: messageBody,
+          messages_from_lead: 1,
+          messages_from_user: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
