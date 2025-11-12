@@ -29,6 +29,8 @@ interface AvailableNumber {
     sms: boolean;
     mms: boolean;
   };
+  monthlyPrice?: string;
+  setupPrice?: string;
 }
 
 export default function PhoneNumbersPage() {
@@ -223,16 +225,21 @@ export default function PhoneNumbersPage() {
                     className="p-4 bg-gray-900/50 border border-white/5 rounded-lg hover:border-white/10 transition-colors"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-lg">
-                          {number.phone_number}
-                        </span>
-                        {number.is_primary && (
-                          <span className="flex items-center gap-1 px-2 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded text-xs">
-                            <Star className="h-3 w-3" />
-                            Primary
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono font-semibold text-lg">
+                            {number.phone_number}
                           </span>
-                        )}
+                          {number.is_primary && (
+                            <span className="flex items-center gap-1 px-2 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded text-xs">
+                              <Star className="h-3 w-3" />
+                              Primary
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          $1.00/month • Purchased {new Date(number.purchased_at).toLocaleDateString()}
+                        </div>
                       </div>
                       <button
                         onClick={() => releaseNumber(number.phone_sid, number.phone_number)}
@@ -242,7 +249,7 @@ export default function PhoneNumbersPage() {
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap gap-1 mb-2">
+                    <div className="flex flex-wrap gap-1">
                       {number.capabilities.sms && (
                         <span className="px-2 py-1 bg-gray-700/50 text-gray-300 rounded text-xs">
                           SMS
@@ -259,10 +266,6 @@ export default function PhoneNumbersPage() {
                         </span>
                       )}
                     </div>
-
-                    <p className="text-xs text-gray-500">
-                      Purchased {new Date(number.purchased_at).toLocaleDateString()}
-                    </p>
                   </div>
                 ))}
               </div>
@@ -341,10 +344,15 @@ export default function PhoneNumbersPage() {
                       className="p-3 bg-gray-900/50 border border-white/5 rounded-lg hover:border-white/10 transition-colors"
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <span className="font-mono font-semibold block">
-                            {number.phoneNumber}
-                          </span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono font-semibold">
+                              {number.phoneNumber}
+                            </span>
+                            <span className="text-xs text-green-400 font-semibold">
+                              $1.00/mo
+                            </span>
+                          </div>
                           <span className="text-xs text-gray-400">
                             {number.locality}, {number.region}
                           </span>
