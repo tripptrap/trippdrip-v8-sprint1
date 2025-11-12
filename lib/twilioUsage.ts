@@ -74,7 +74,7 @@ export async function fetchSubaccountUsage(
       category: record.category,
       description: record.description,
       count: parseInt(record.count, 10) || 0,
-      price: record.price,
+      price: String(record.price),
       priceUnit: record.priceUnit,
       startDate: new Date(record.startDate),
       endDate: new Date(record.endDate),
