@@ -27,19 +27,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { countryCode = 'US', areaCode, contains } = await req.json();
+    const { countryCode = 'US', areaCode, contains, tollFree = false } = await req.json();
     const accountSid = credentialsResult.accountSid;
     const authToken = credentialsResult.authToken;
 
+    // Determine number type (TollFree or Local)
+    const numberType = tollFree ? 'TollFree' : 'Local';
+
     // Build search URL with filters
-    const baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${countryCode}/Local.json`;
+    const baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${countryCode}/${numberType}.json`;
     const params = new URLSearchParams();
 
-    if (areaCode) {
-      params.append('AreaCode', areaCode);
-    }
-    if (contains) {
-      params.append('Contains', contains);
+    // For local numbers, add area code and contains filters
+    if (!tollFree) {
+      if (areaCode) {
+        params.append('AreaCode', areaCode);
+      }
+      if (contains) {
+        params.append('Contains', contains);
+      }
     }
 
     const searchUrl = `${baseUrl}?${params.toString()}`;

@@ -33,6 +33,8 @@ interface AvailableNumber {
   setupPrice?: string;
 }
 
+type NumberType = 'local' | 'tollfree';
+
 export default function PhoneNumbersPage() {
   const [myNumbers, setMyNumbers] = useState<TwilioNumber[]>([]);
   const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
@@ -42,6 +44,7 @@ export default function PhoneNumbersPage() {
   const [areaCode, setAreaCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [numberType, setNumberType] = useState<NumberType>('tollfree');
 
   // Show message temporarily
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -70,8 +73,9 @@ export default function PhoneNumbersPage() {
 
   // Search for available numbers
   const searchNumbers = async () => {
-    if (!areaCode && !searchQuery) {
-      showMessage('error', 'Please enter an area code or search query');
+    // For toll-free, we don't need area code or search query
+    if (numberType === 'local' && !areaCode && !searchQuery) {
+      showMessage('error', 'Please enter an area code or search query for local numbers');
       return;
     }
 
@@ -84,8 +88,9 @@ export default function PhoneNumbersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           countryCode: 'US',
-          areaCode: areaCode || undefined,
-          contains: searchQuery || undefined,
+          areaCode: numberType === 'local' ? (areaCode || undefined) : undefined,
+          contains: numberType === 'local' ? (searchQuery || undefined) : undefined,
+          tollFree: numberType === 'tollfree',
         }),
       });
 
@@ -286,38 +291,97 @@ export default function PhoneNumbersPage() {
           </div>
           <div className="p-6">
             <div className="space-y-4">
+              {/* Number Type Tabs */}
+              <div className="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+                <button
+                  onClick={() => {
+                    setNumberType('tollfree');
+                    setAvailableNumbers([]);
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                    numberType === 'tollfree'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Toll-Free (Recommended)
+                </button>
+                <button
+                  onClick={() => {
+                    setNumberType('local');
+                    setAvailableNumbers([]);
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                    numberType === 'local'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  Local (Requires A2P)
+                </button>
+              </div>
+
+              {/* Info Banner */}
+              {numberType === 'tollfree' && (
+                <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                  <div className="flex gap-2">
+                    <div className="text-green-400 font-semibold text-sm">✓ Works Immediately</div>
+                  </div>
+                  <p className="text-xs text-green-300 mt-1">
+                    Toll-free numbers (1-800, 1-888, etc.) work instantly. No A2P registration required!
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Cost: ~$2/month</p>
+                </div>
+              )}
+
+              {numberType === 'local' && (
+                <div className="p-4 bg-amber-900/20 border border-amber-700 rounded-lg">
+                  <div className="flex gap-2">
+                    <div className="text-amber-400 font-semibold text-sm">⚠ A2P Registration Required</div>
+                  </div>
+                  <p className="text-xs text-amber-300 mt-1">
+                    Local numbers (10-digit) require A2P 10DLC registration. Messages will be blocked until approved (1-7 days).
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Cost: ~$1/month + $15 A2P registration fee</p>
+                </div>
+              )}
+
               {/* Search Form */}
               <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Area Code (optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 415"
-                    value={areaCode}
-                    onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                    maxLength={3}
-                    className="w-full px-3 py-2 bg-gray-900/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30"
-                  />
-                </div>
+                {numberType === 'local' && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">
+                        Area Code (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 415"
+                        value={areaCode}
+                        onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                        maxLength={3}
+                        className="w-full px-3 py-2 bg-gray-900/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    Contains (optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 555"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30"
-                  />
-                </div>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">
+                        Contains (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 555"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-900/50 border border-white/10 rounded-lg focus:outline-none focus:border-white/30"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <button
                   onClick={searchNumbers}
-                  disabled={searching || (!areaCode && !searchQuery)}
+                  disabled={searching || (numberType === 'local' && !areaCode && !searchQuery)}
                   className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   {searching ? (
@@ -328,7 +392,7 @@ export default function PhoneNumbersPage() {
                   ) : (
                     <>
                       <Search className="h-4 w-4" />
-                      Search Numbers
+                      {numberType === 'tollfree' ? 'Find Toll-Free Numbers' : 'Search Local Numbers'}
                     </>
                   )}
                 </button>
