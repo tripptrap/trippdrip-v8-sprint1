@@ -33,14 +33,28 @@ interface AvailableNumber {
   setupPrice?: string;
 }
 
+interface PoolNumber {
+  id: string;
+  phone_number: string;
+  phone_sid: string;
+  friendly_name: string;
+  number_type: string;
+  capabilities: any;
+  is_verified: boolean;
+  monthly_cost: number;
+}
+
 type NumberType = 'local' | 'tollfree';
 
 export default function PhoneNumbersPage() {
   const [myNumbers, setMyNumbers] = useState<TwilioNumber[]>([]);
   const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
+  const [poolNumbers, setPoolNumbers] = useState<PoolNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [claimingPool, setClaimingPool] = useState(false);
+  const [loadingPool, setLoadingPool] = useState(false);
   const [areaCode, setAreaCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -169,8 +183,54 @@ export default function PhoneNumbersPage() {
     }
   };
 
+  // Load available pool numbers
+  const loadPoolNumbers = async () => {
+    try {
+      setLoadingPool(true);
+      const response = await fetch('/api/number-pool/available');
+      const data = await response.json();
+
+      if (data.success) {
+        setPoolNumbers(data.numbers || []);
+      }
+    } catch (error) {
+      console.error('Error loading pool numbers:', error);
+    } finally {
+      setLoadingPool(false);
+    }
+  };
+
+  // Claim a number from the pool
+  const claimPoolNumber = async (numberId: string) => {
+    setClaimingPool(true);
+
+    try {
+      const response = await fetch('/api/number-pool/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numberId }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showMessage('success', data.message || 'Number claimed successfully! You can start sending messages immediately.');
+        await fetchMyNumbers();
+        await loadPoolNumbers(); // Refresh pool
+      } else {
+        showMessage('error', data.error || 'Failed to claim number');
+      }
+    } catch (error) {
+      console.error('Error claiming pool number:', error);
+      showMessage('error', 'Failed to claim number');
+    } finally {
+      setClaimingPool(false);
+    }
+  };
+
   useEffect(() => {
     fetchMyNumbers();
+    loadPoolNumbers();
   }, []);
 
   return (
@@ -194,6 +254,66 @@ export default function PhoneNumbersPage() {
           Manage your Twilio phone numbers. Purchase new numbers or view your existing ones.
         </p>
       </div>
+
+      {/* Instant Access Pool Banner */}
+      {poolNumbers.length > 0 && (
+        <div className="mb-6 p-6 bg-gradient-to-r from-green-900/20 to-blue-900/20 border-2 border-green-500/50 rounded-lg">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full uppercase">
+                  Instant Access
+                </div>
+                <h2 className="text-2xl font-bold text-white">Start Sending Messages Now!</h2>
+              </div>
+              <p className="text-green-200 mb-4">
+                Claim a pre-verified number from our shared pool and send messages immediately - no waiting for verification!
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {poolNumbers.slice(0, 3).map((poolNum) => (
+                  <div key={poolNum.id} className="flex-1 min-w-[250px] p-4 bg-gray-900/50 border border-white/10 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="font-mono font-semibold text-lg text-white">
+                          {poolNum.phone_number}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • ${poolNum.monthly_cost}/mo
+                        </div>
+                      </div>
+                      <div className="text-green-400 text-xs font-semibold">
+                        ✓ Verified
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => claimPoolNumber(poolNum.id)}
+                      disabled={claimingPool}
+                      className="w-full mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      {claimingPool ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Claiming...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Claim This Number
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {poolNumbers.length > 3 && (
+                <p className="text-sm text-gray-400 mt-4">
+                  +{poolNumbers.length - 3} more numbers available
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* My Numbers Section */}
