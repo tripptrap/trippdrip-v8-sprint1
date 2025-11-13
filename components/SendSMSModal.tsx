@@ -173,18 +173,24 @@ export default function SendSMSModal({
               {/* User's Twilio numbers from their subaccount */}
               {availableNumbers.length > 0 && (
                 <>
-                  {availableNumbers.map((num) => (
-                    <option key={num.phone_number} value={num.phone_number}>
-                      {num.phone_number} {num.friendly_name ? `(${num.friendly_name})` : ''} {num.is_primary ? '★' : ''}
-                    </option>
-                  ))}
+                  {availableNumbers.map((num) => {
+                    // Determine if toll-free based on area code (800, 888, 877, 866, 855, 844, 833)
+                    const isTollFree = /^\+1(800|888|877|866|855|844|833)/.test(num.phone_number);
+                    const numberType = isTollFree ? 'Toll-Free' : 'Local';
+
+                    return (
+                      <option key={num.phone_number} value={num.phone_number}>
+                        {num.phone_number} - {numberType}{num.is_primary ? ' ★' : ''}
+                      </option>
+                    );
+                  })}
                 </>
               )}
 
               {/* Fallback to master account numbers if user has no numbers */}
               {availableNumbers.length === 0 && !loadingNumbers && (
                 <>
-                  <option value="+18336587355">+1 (833) 658-7355 (SMS - Master)</option>
+                  <option value="+18336587355">+1 (833) 658-7355 - Toll-Free (Master)</option>
                 </>
               )}
             </select>
