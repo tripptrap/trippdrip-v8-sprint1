@@ -19,6 +19,7 @@ const navItems = [
   { href: "/analytics", label: "Analytics" },
   { href: "/analytics-automation", label: "Automation Analytics" },
   { href: "/templates", label: "Flows" },
+  { href: "/ai-workflows", label: "AI Workflows" },
   { href: "/integrations", label: "Integrations" },
   { href: "/phone-numbers", label: "Phone Numbers" },
   { href: "/points",    label: "Points" },

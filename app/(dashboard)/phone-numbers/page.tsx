@@ -251,7 +251,7 @@ export default function PhoneNumbersPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Phone Numbers</h1>
         <p className="text-gray-400">
-          Manage your Twilio phone numbers. Purchase new numbers or view your existing ones.
+          Manage your unified phone numbers. Each number supports both SMS and Voice calls - use the same number for texting and calling your leads.
         </p>
       </div>
 
@@ -374,19 +374,24 @@ export default function PhoneNumbersPage() {
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap gap-1">
-                      {number.capabilities.sms && (
-                        <span className="px-2 py-1 bg-gray-700/50 text-gray-300 rounded text-xs">
+                    <div className="flex flex-wrap gap-2">
+                      {number.capabilities.sms && number.capabilities.voice && (
+                        <span className="px-3 py-1 bg-green-900/30 border border-green-700 text-green-400 rounded text-xs font-medium">
+                          📱 Unified: SMS + Voice
+                        </span>
+                      )}
+                      {number.capabilities.sms && !number.capabilities.voice && (
+                        <span className="px-2 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded text-xs">
                           SMS
                         </span>
                       )}
                       {number.capabilities.mms && (
-                        <span className="px-2 py-1 bg-gray-700/50 text-gray-300 rounded text-xs">
+                        <span className="px-2 py-1 bg-purple-900/30 border border-purple-700 text-purple-400 rounded text-xs">
                           MMS
                         </span>
                       )}
-                      {number.capabilities.voice && (
-                        <span className="px-2 py-1 bg-gray-700/50 text-gray-300 rounded text-xs">
+                      {number.capabilities.voice && !number.capabilities.sms && (
+                        <span className="px-2 py-1 bg-orange-900/30 border border-orange-700 text-orange-400 rounded text-xs">
                           Voice
                         </span>
                       )}
