@@ -23,6 +23,7 @@ const navItems = [
   { href: "/integrations", label: "Integrations" },
   { href: "/phone-numbers", label: "Phone Numbers" },
   { href: "/points",    label: "Points" },
+  { href: "/referrals", label: "Referrals" },
   { href: "/tags",      label: "Tags" },
   { href: "/roadmap",   label: "Roadmap" },
   { href: "/contact",   label: "Contact" },
