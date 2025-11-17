@@ -64,6 +64,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check DNC list BEFORE sending
+    const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
+      p_user_id: user.id,
+      p_phone_number: toPhone
+    });
+
+    if (dncError) {
+      console.error('Error checking DNC list:', dncError);
+    } else if (dncCheck) {
+      const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
+
+      if (dncResult.on_dnc_list) {
+        console.log(`🚫 Message blocked - ${toPhone} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list, reason: ${dncResult.reason})`);
+
+        // Log blocked message to history
+        await supabase.from('dnc_history').insert({
+          user_id: user.id,
+          phone_number: toPhone,
+          normalized_phone: dncResult.normalized_phone,
+          action: 'blocked',
+          list_type: dncResult.on_user_list ? 'user' : 'global',
+          result: true,
+          metadata: {
+            reason: dncResult.reason,
+            source: dncResult.source,
+            message_body: messageBody,
+            campaign_id: campaignId
+          }
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Message blocked: Recipient is on Do Not Call list',
+            on_dnc_list: true,
+            dnc_reason: dncResult.reason,
+            list_type: dncResult.on_user_list ? 'user' : 'global'
+          },
+          { status: 403 } // Forbidden
+        );
+      }
+    }
+
     // Check and deduct points BEFORE sending
     const actionType = isBulk ? 'bulk_message' : 'sms_sent';
     const pointsResult = await spendPointsForAction(actionType, 1);
