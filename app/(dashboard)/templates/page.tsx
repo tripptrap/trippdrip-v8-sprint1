@@ -234,6 +234,7 @@ export default function FlowsPage() {
   const [manualFlowSteps, setManualFlowSteps] = useState<string[]>([]);
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
   const [flowToDelete, setFlowToDelete] = useState<ConversationFlow | null>(null);
   const [editingFlowName, setEditingFlowName] = useState(false);
   const [tempFlowName, setTempFlowName] = useState("");
@@ -1056,6 +1057,12 @@ export default function FlowsPage() {
           <p className="text-sm text-[var(--muted)] mt-1">Create AI-powered conversation flows for your campaigns</p>
         </div>
         <div className="flex gap-2">
+          <a
+            href="/ai-workflows"
+            className="bg-green-600 hover:bg-green-700 border border-green-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+          >
+            📚 Browse Templates
+          </a>
           <button
             onClick={() => setShowNewFlowDialog(true)}
             className="bg-blue-600 hover:bg-blue-700 border border-blue-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
