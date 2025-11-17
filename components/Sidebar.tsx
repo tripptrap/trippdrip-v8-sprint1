@@ -25,6 +25,7 @@ const navItems = [
   { href: "/points",    label: "Points" },
   { href: "/tags",      label: "Tags" },
   { href: "/roadmap",   label: "Roadmap" },
+  { href: "/contact",   label: "Contact" },
   { href: "/settings",  label: "Settings" },
 ];
 
