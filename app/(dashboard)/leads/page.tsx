@@ -131,6 +131,8 @@ export default function LeadsPage() {
   const [bulkFollowUpNotes, setBulkFollowUpNotes] = useState("");
   const [bulkFollowUpDueDate, setBulkFollowUpDueDate] = useState("");
   const [bulkFollowUpPriority, setBulkFollowUpPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [reDripCampaignId, setReDripCampaignId] = useState("");
+  const [reDripResetProgress, setReDripResetProgress] = useState(true);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -141,12 +143,23 @@ export default function LeadsPage() {
   async function fetchLeads() {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (q.trim()) params.set("q", q.trim());
-      if (selectedTags.length) params.set("tags", selectedTags.join(","));
-      const res = await fetch(`/api/leads?${params.toString()}`);
-      const data = await res.json();
-      setLeads(Array.isArray(data?.items) ? data.items : []);
+      // Check if demo mode is active
+      const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
+
+      if (isDemoMode) {
+        // Use demo data
+        const { getDemoLeads } = await import('@/lib/demoData');
+        const demoLeads = getDemoLeads();
+        setLeads(demoLeads);
+      } else {
+        // Fetch real data
+        const params = new URLSearchParams();
+        if (q.trim()) params.set("q", q.trim());
+        if (selectedTags.length) params.set("tags", selectedTags.join(","));
+        const res = await fetch(`/api/leads?${params.toString()}`);
+        const data = await res.json();
+        setLeads(Array.isArray(data?.items) ? data.items : []);
+      }
     } catch {
       setLeads([]);
     } finally {
@@ -1020,6 +1033,12 @@ export default function LeadsPage() {
                       >
                         Create Follow-ups
                       </button>
+                      <button
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-purple-400"
+                        onClick={() => { setBulkActionModal('reDrip'); setBulkActionsOpen(false); }}
+                      >
+                        🔄 Re-Drip to Campaign
+                      </button>
                       <div className="border-t border-[#1a2637] my-1" />
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
@@ -1620,6 +1639,98 @@ export default function LeadsPage() {
                 className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
               >
                 Create Follow-ups
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkActionModal === 'reDrip' && (
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
+          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[500px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-[#a78bfa]">🔄 Re-Drip to Campaign</div>
+              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
+              <div>
+                <label className="block text-xs text-[#9fb0c3] mb-1">Select Campaign *</label>
+                <select
+                  value={reDripCampaignId}
+                  onChange={(e) => setReDripCampaignId(e.target.value)}
+                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                >
+                  <option value="">Choose a campaign...</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-[#9fb0c3] mt-1">
+                  Re-enroll selected leads in this drip campaign
+                </p>
+              </div>
+              <div className="p-3 bg-purple-600/10 border border-purple-500/30 rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reDripResetProgress}
+                    onChange={(e) => setReDripResetProgress(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-purple-300">
+                    Reset progress and start from beginning
+                  </span>
+                </label>
+                <p className="text-xs text-purple-300/60 mt-1 ml-6">
+                  Leads will restart the campaign from step 1, even if they've completed it before
+                </p>
+              </div>
+              <p className="text-xs text-[#9fb0c3]">
+                Re-enrolling {selectedIds.size} lead(s) into the campaign
+              </p>
+            </div>
+            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+              <button
+                onClick={() => setBulkActionModal(null)}
+                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reDripCampaignId) {
+                    setToast('Please select a campaign');
+                    return;
+                  }
+                  try {
+                    const response = await fetch('/api/drip-campaigns/re-enroll', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        campaignId: reDripCampaignId,
+                        leadIds: Array.from(selectedIds),
+                        resetProgress: reDripResetProgress,
+                      }),
+                    });
+                    const data = await response.json();
+                    if (data.ok) {
+                      setToast(data.message || 'Leads re-enrolled successfully');
+                      setBulkActionModal(null);
+                      setSelectedIds(new Set());
+                      setReDripCampaignId('');
+                    } else {
+                      setToast(data.error || 'Failed to re-enroll leads');
+                    }
+                  } catch (error) {
+                    setToast('Error re-enrolling leads');
+                  }
+                }}
+                disabled={!reDripCampaignId}
+                className="rounded-md border border-purple-500/30 bg-purple-600/20 px-4 py-2 text-sm text-purple-300 hover:bg-purple-600/30 disabled:opacity-50"
+              >
+                Re-Enroll Leads
               </button>
             </div>
           </div>

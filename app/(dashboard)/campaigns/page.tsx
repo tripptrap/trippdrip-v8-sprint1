@@ -42,10 +42,35 @@ export default function CampaignsPage() {
   async function loadCampaigns() {
     setLoading(true);
     try {
-      const response = await fetch('/api/campaigns');
-      const data = await response.json();
-      if (data.ok) {
-        setCampaigns(data.items || []);
+      // Check if demo mode is active
+      const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
+
+      if (isDemoMode) {
+        // Use demo data
+        const { getDemoCampaigns } = await import('@/lib/demoData');
+        const demoCampaigns = getDemoCampaigns();
+
+        // Transform demo campaigns to match Campaign type
+        const transformedCampaigns = demoCampaigns.map((campaign: any) => ({
+          id: campaign.id,
+          name: campaign.name,
+          created_at: campaign.created_at,
+          updated_at: campaign.created_at,
+          tags_applied: campaign.type === 'drip' ? ['Health Insurance'] : ['Auto Insurance'],
+          lead_ids: [],
+          lead_count: Math.floor(campaign.total_sent * 0.8),
+          messages_sent: campaign.total_sent,
+          credits_used: campaign.total_sent,
+        }));
+
+        setCampaigns(transformedCampaigns);
+      } else {
+        // Fetch real data
+        const response = await fetch('/api/campaigns');
+        const data = await response.json();
+        if (data.ok) {
+          setCampaigns(data.items || []);
+        }
       }
     } catch (error) {
       console.error('Error loading campaigns:', error);

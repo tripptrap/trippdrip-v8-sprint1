@@ -44,7 +44,6 @@ export interface SubscriptionFeatures {
   // Additional Features
   priorityDelivery: boolean;
   dedicatedNumber: boolean;
-  teamMembers: number;
   customIntegrations: boolean;
 }
 
@@ -75,7 +74,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 0,
     priorityDelivery: false,
     dedicatedNumber: false,
-    teamMembers: 0,
     customIntegrations: false
   },
 
@@ -105,7 +103,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 10,
     priorityDelivery: false,
     dedicatedNumber: false,
-    teamMembers: 3,
     customIntegrations: false
   },
 
@@ -135,7 +132,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 30,
     priorityDelivery: true,
     dedicatedNumber: true,
-    teamMembers: -1, // Unlimited
     customIntegrations: true
   }
 };
@@ -277,6 +273,5 @@ export const FEATURE_NAMES: Record<keyof SubscriptionFeatures, string> = {
   pointPackDiscount: 'Point Pack Discount',
   priorityDelivery: 'Priority Message Delivery',
   dedicatedNumber: 'Dedicated Phone Number',
-  teamMembers: 'Team Members',
   customIntegrations: 'Custom Integrations'
 };

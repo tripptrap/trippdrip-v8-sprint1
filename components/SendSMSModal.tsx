@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Send, Loader2 } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw } from 'lucide-react';
 
 interface SendSMSModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ export default function SendSMSModal({
   const [toPhone, setToPhone] = useState(leadPhone || '');
   const [availableNumbers, setAvailableNumbers] = useState<Array<{ phone_number: string; friendly_name?: string; is_primary: boolean }>>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(true);
+  const [rephrasing, setRephrasing] = useState(false);
 
   // Load user's Twilio phone numbers when modal opens
   useEffect(() => {
@@ -63,6 +64,58 @@ export default function SendSMSModal({
       console.error('Error loading Twilio numbers:', error);
     } finally {
       setLoadingNumbers(false);
+    }
+  };
+
+  const handleRephrase = async (style: 'shorter' | 'longer' | 'professional' | 'rewrite') => {
+    if (!message.trim()) {
+      setError('Please enter a message to rephrase');
+      return;
+    }
+
+    setRephrasing(true);
+    setError('');
+
+    const prompts = {
+      shorter: 'Make this message shorter and more concise while keeping the main point:',
+      longer: 'Make this message longer and more detailed while staying conversational:',
+      professional: 'Make this message more professional and polished:',
+      rewrite: 'Rewrite this message in a different way while keeping the same meaning:'
+    };
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: `${prompts[style]}\n\n"${message}"\n\nProvide only the rephrased message, no explanations.`
+            }
+          ],
+          model: 'gpt-4o-mini'
+        }),
+      });
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        throw new Error('Invalid response from server. Please try again.');
+      }
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to rephrase message');
+      }
+
+      if (data.reply) {
+        setMessage(data.reply.trim());
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to rephrase message');
+    } finally {
+      setRephrasing(false);
     }
   };
 
@@ -221,14 +274,76 @@ export default function SendSMSModal({
             <label className="block text-sm font-semibold text-white mb-3">
               Message
             </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message here..."
-              rows={6}
-              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm text-white placeholder-gray-500"
-              disabled={sending || success}
-            />
+            <div className="relative">
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type your message here..."
+                rows={6}
+                className={`w-full px-3 py-2.5 bg-[#0c1420] border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm text-white placeholder-gray-500 transition-all ${
+                  rephrasing
+                    ? 'border-purple-500/50 ring-2 ring-purple-500/30 animate-pulse'
+                    : 'border-white/20'
+                }`}
+                disabled={sending || success || rephrasing}
+              />
+              {rephrasing && (
+                <div className="absolute inset-0 bg-purple-500/10 rounded-md flex items-center justify-center backdrop-blur-[1px]">
+                  <div className="bg-purple-600/90 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
+                    <span className="text-sm font-medium text-white">AI is rephrasing...</span>
+                    <RefreshCw className="w-4 h-4 text-purple-200 animate-spin" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* AI Rephrase Buttons */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => handleRephrase('shorter')}
+                disabled={!message.trim() || rephrasing || sending || success}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                title="Make message shorter"
+              >
+                <Minimize2 className="w-3 h-3" />
+                Shorter
+              </button>
+              <button
+                onClick={() => handleRephrase('longer')}
+                disabled={!message.trim() || rephrasing || sending || success}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                title="Make message longer"
+              >
+                <Maximize2 className="w-3 h-3" />
+                Longer
+              </button>
+              <button
+                onClick={() => handleRephrase('professional')}
+                disabled={!message.trim() || rephrasing || sending || success}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                title="Make message more professional"
+              >
+                <Briefcase className="w-3 h-3" />
+                Professional
+              </button>
+              <button
+                onClick={() => handleRephrase('rewrite')}
+                disabled={!message.trim() || rephrasing || sending || success}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                title="Rewrite message"
+              >
+                <RefreshCw className={`w-3 h-3 ${rephrasing ? 'animate-spin' : ''}`} />
+                Rewrite
+              </button>
+              <div className={`flex items-center gap-1 text-xs ml-auto transition-all ${
+                rephrasing ? 'text-purple-300' : 'text-purple-400/60'
+              }`}>
+                <Sparkles className={`w-3 h-3 ${rephrasing ? 'animate-pulse' : ''}`} />
+                <span>{rephrasing ? 'Processing...' : 'AI'}</span>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
               <span>{characterCount} characters</span>
               <span>{smsCount} SMS</span>

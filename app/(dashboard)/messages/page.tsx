@@ -52,14 +52,47 @@ export default function MessagesPage() {
   const loadThreads = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/messages/threads');
-      const data = await response.json();
 
-      if (data.success) {
-        setThreads(data.threads || []);
+      // Check if demo mode is active
+      const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
+
+      if (isDemoMode) {
+        // Use demo data
+        const { getDemoConversations } = await import('@/lib/demoData');
+        const demoConversations = getDemoConversations();
+
+        // Transform demo conversations to thread format
+        const demoThreads = demoConversations.map((conv: any) => ({
+          id: conv.id,
+          lead_id: conv.lead_id,
+          lead_name: conv.lead_name || `Lead ${conv.lead_id.split('-')[2]}`,
+          lead_phone: '+1234567890',
+          phone_number: '+1234567890',
+          channel: 'sms' as const,
+          last_message: conv.messages[conv.messages.length - 1]?.body || '',
+          last_message_at: conv.messages[conv.messages.length - 1]?.created_at || new Date().toISOString(),
+          updated_at: conv.messages[conv.messages.length - 1]?.created_at || new Date().toISOString(),
+          status: 'active' as const,
+          unread_count: 0,
+        }));
+
+        setThreads(demoThreads);
+
         // Auto-select first thread
-        if (data.threads && data.threads.length > 0 && !selectedThread) {
-          setSelectedThread(data.threads[0]);
+        if (demoThreads.length > 0 && !selectedThread) {
+          setSelectedThread(demoThreads[0]);
+        }
+      } else {
+        // Fetch real data
+        const response = await fetch('/api/messages/threads');
+        const data = await response.json();
+
+        if (data.success) {
+          setThreads(data.threads || []);
+          // Auto-select first thread
+          if (data.threads && data.threads.length > 0 && !selectedThread) {
+            setSelectedThread(data.threads[0]);
+          }
         }
       }
     } catch (error) {
@@ -72,11 +105,31 @@ export default function MessagesPage() {
   const loadMessages = async (threadId: string) => {
     try {
       setLoadingMessages(true);
-      const response = await fetch(`/api/messages/threads/${threadId}`);
-      const data = await response.json();
 
-      if (data.success) {
-        setMessages(data.messages || []);
+      // Check if demo mode is active
+      const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
+
+      if (isDemoMode) {
+        // Use demo data
+        const { getDemoConversations } = await import('@/lib/demoData');
+        const demoConversations = getDemoConversations();
+
+        // Find the conversation for this thread
+        const conversation = demoConversations.find((conv: any) => conv.id === threadId);
+
+        if (conversation) {
+          setMessages(conversation.messages || []);
+        } else {
+          setMessages([]);
+        }
+      } else {
+        // Fetch real data
+        const response = await fetch(`/api/messages/threads/${threadId}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setMessages(data.messages || []);
+        }
       }
     } catch (error) {
       console.error('Error loading messages:', error);

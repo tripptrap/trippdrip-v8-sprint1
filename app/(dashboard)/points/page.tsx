@@ -540,7 +540,7 @@ export default function PointsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-green-400">✓</span>
-                <span>Up to {SUBSCRIPTION_FEATURES.starter.teamMembers} team members</span>
+                <span>Individual account</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-white/40">·</span>

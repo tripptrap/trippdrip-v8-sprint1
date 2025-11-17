@@ -160,6 +160,282 @@ export default function PreviewPage() {
         </div>
       </div>
 
+      {/* Comparison Section */}
+      <div className="max-w-7xl mx-auto px-6 py-20">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Why Choose HyveWyre™?
+          </h2>
+          <p className="text-xl text-white/60 max-w-3xl mx-auto">
+            We're not just another marketing platform. Here's how we stack up against the competition.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-white/20">
+                <th className="text-left p-4 text-white/60 font-medium">Feature</th>
+                <th className="p-4 text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+                    <img src="/logo-premium.png" alt="HyveWyre" className="w-6 h-6 rounded" />
+                    <span className="text-white font-bold">HyveWyre™</span>
+                  </div>
+                </th>
+                <th className="p-4 text-center text-white/60 font-medium">TextDrip</th>
+                <th className="p-4 text-center text-white/60 font-medium">Ringy</th>
+                <th className="p-4 text-center text-white/60 font-medium">ActiveCampaign</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">AI-Powered Responses</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Basic</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-xl">✗</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Limited</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">SMS + Email Combined</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-sm">SMS Only</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Instant Number Access</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-sm">1-7 days</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-sm">1-7 days</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-gray-500/20 rounded-full">
+                    <span className="text-gray-400 text-sm">N/A</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Built-in CRM</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Basic</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Sentiment Analysis</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-xl">✗</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-xl">✗</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-xl">✗</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Smart Auto-Replies</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Basic</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Basic</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-sm">Basic</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Drag & Drop Campaigns</td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
+                    <span className="text-yellow-400 text-xl">✓</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                    <span className="text-red-400 text-xl">✗</span>
+                  </span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="inline-flex items-center justify-center w-8 h-8 bg-green-500/20 rounded-full">
+                    <span className="text-green-400 text-xl">✓</span>
+                  </span>
+                </td>
+              </tr>
+
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Starting Price</td>
+                <td className="p-4 text-center">
+                  <span className="text-green-400 font-bold">$30/mo</span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">$149/mo</span>
+                  <div className="text-xs text-white/40">+ per message fees</div>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">$109/mo</span>
+                  <div className="text-xs text-white/40">+ per user fees</div>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">$49/mo</span>
+                  <div className="text-xs text-white/40">limited features</div>
+                </td>
+              </tr>
+
+              <tr className="hover:bg-white/5 transition-colors">
+                <td className="p-4 text-white">Setup Time</td>
+                <td className="p-4 text-center">
+                  <span className="text-green-400 font-bold">5 minutes</span>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">1-2 hours</span>
+                  <div className="text-xs text-white/40">complex setup</div>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">30-45 minutes</span>
+                  <div className="text-xs text-white/40">phone integration</div>
+                </td>
+                <td className="p-4 text-center">
+                  <span className="text-white/60">1 hour</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Key Differentiators */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+          <div className="p-6 bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl">
+            <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Start Messaging Instantly</h3>
+            <p className="text-white/70">
+              Unlike TextDrip and Ringy where you wait 1-7 days for A2P verification, claim a pre-verified number from our shared pool and start sending messages in seconds.
+            </p>
+          </div>
+
+          <div className="p-6 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-xl">
+            <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">True AI Intelligence</h3>
+            <p className="text-white/70">
+              While others offer basic automation, we provide GPT-4 powered responses, sentiment analysis, and smart replies that actually understand context and tone.
+            </p>
+          </div>
+
+          <div className="p-6 bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-xl">
+            <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">All-in-One Platform</h3>
+            <p className="text-white/70">
+              Why pay $149-$109/mo for TextDrip or Ringy when you get SMS, email, built-in CRM, AI automation, and sentiment analysis in one platform for just $30/mo?
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Pricing Section */}
       <div id="pricing" className="max-w-7xl mx-auto px-6 py-20">
         <div className="text-center mb-12">

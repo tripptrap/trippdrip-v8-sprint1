@@ -99,8 +99,8 @@ export default function Topbar(){
               <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)} />
               <div className="absolute right-0 mt-2 w-56 bg-[#1a1f2e] border border-white/10 rounded-lg shadow-xl z-20">
                 <div className="p-3 border-b border-white/10">
-                  <div className="font-medium text-white">{user?.name || 'User'}</div>
-                  <div className="text-sm text-[var(--muted)]">{user?.email || ''}</div>
+                  <div className="font-medium text-white truncate">{user?.name || 'User'}</div>
+                  <div className="text-sm text-[var(--muted)] truncate" title={user?.email || ''}>{user?.email || ''}</div>
                 </div>
                 <div className="py-1">
                   <Link href="/settings" className="block px-4 py-2 hover:bg-white/5 transition-colors" onClick={() => setShowUserMenu(false)}>

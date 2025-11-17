@@ -128,7 +128,7 @@ async function processScheduledMessages(supabase: any) {
             .update({ credits: user.credits - message.credits_cost })
             .eq('id', message.user_id);
 
-          // Create message record
+          // Create message record with automation tracking
           await supabase
             .from('messages')
             .insert({
@@ -141,6 +141,8 @@ async function processScheduledMessages(supabase: any) {
               status: 'sent',
               credits_cost: message.credits_cost,
               segments: message.segments,
+              is_automated: true,
+              automation_source: 'scheduled',
             });
 
           // Mark scheduled message as sent
@@ -195,6 +197,8 @@ async function processScheduledMessages(supabase: any) {
               channel: 'email',
               status: 'sent',
               credits_cost: message.credits_cost,
+              is_automated: true,
+              automation_source: 'scheduled',
             });
 
           await supabase
@@ -257,6 +261,18 @@ async function processScheduledCampaigns(supabase: any) {
   // Process each campaign
   for (const campaign of readyCampaigns) {
     try {
+      // Check if user is within quiet hours
+      const { data: withinQuietHours } = await supabase
+        .rpc('is_within_quiet_hours', {
+          user_id_param: campaign.user_id,
+          check_time: new Date().toISOString()
+        });
+
+      if (!withinQuietHours) {
+        // Skip this campaign - outside quiet hours
+        console.log(`Skipping campaign ${campaign.id} - outside quiet hours for user ${campaign.user_id}`);
+        continue;
+      }
       // Calculate how many leads to send to in this batch
       const leadsPerBatch = Math.ceil((campaign.total_leads * campaign.percentage_per_batch) / 100);
 
@@ -325,7 +341,7 @@ async function processScheduledCampaigns(supabase: any) {
               .update({ credits: user.credits - creditsNeeded })
               .eq('id', campaign.user_id);
 
-            // Create message record
+            // Create message record with automation tracking
             await supabase
               .from('messages')
               .insert({
@@ -338,6 +354,9 @@ async function processScheduledCampaigns(supabase: any) {
                 status: 'sent',
                 credits_cost: creditsNeeded,
                 segments,
+                is_automated: true,
+                automation_source: 'bulk_campaign',
+                campaign_id: campaign.id,
               });
 
             // Update lead last_contacted

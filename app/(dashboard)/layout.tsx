@@ -2,12 +2,16 @@
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar"
 import Topbar from "@/components/Topbar"
+import DemoModeBanner from "@/components/DemoModeBanner"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419] relative">
+      {/* Demo Mode Banner */}
+      <DemoModeBanner />
+
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10 pointer-events-none">
         <div className="absolute inset-0" style={{

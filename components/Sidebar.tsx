@@ -9,6 +9,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/messages",  label: "Messages" },
   { href: "/leads",     label: "Leads" },
+  { href: "/lead-scraper", label: "Lead Scraper" },
   { href: "/bulk-sms",  label: "Bulk SMS" },
   { href: "/texts",     label: "Texts" },
   { href: "/scheduled", label: "Scheduled" },
@@ -16,10 +17,12 @@ const navItems = [
   { href: "/email",     label: "Calendar" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/analytics", label: "Analytics" },
+  { href: "/analytics-automation", label: "Automation Analytics" },
   { href: "/templates", label: "Flows" },
   { href: "/phone-numbers", label: "Phone Numbers" },
   { href: "/points",    label: "Points" },
   { href: "/tags",      label: "Tags" },
+  { href: "/roadmap",   label: "Roadmap" },
   { href: "/settings",  label: "Settings" },
 ];
 

@@ -67,6 +67,12 @@ export default function Page() {
   const [areaCode, setAreaCode] = useState('');
   const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
 
+  // Quiet hours settings
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
+  const [quietHoursStart, setQuietHoursStart] = useState('08:00');
+  const [quietHoursEnd, setQuietHoursEnd] = useState('20:00');
+  const [userTimezone, setUserTimezone] = useState('America/New_York');
+
   // Account deletion
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -138,6 +144,18 @@ export default function Page() {
       setFromEmail(data.email.fromEmail || '');
       setFromName(data.email.fromName || '');
       setReplyTo(data.email.replyTo || '');
+      }
+
+      // Load quiet hours settings
+      const quietHoursRes = await fetch('/api/settings/quiet-hours');
+      if (quietHoursRes.ok) {
+        const quietHoursData = await quietHoursRes.json();
+        if (quietHoursData.ok) {
+          setQuietHoursEnabled(quietHoursData.quietHours.enabled);
+          setQuietHoursStart(quietHoursData.quietHours.start.substring(0, 5)); // Convert HH:MM:SS to HH:MM
+          setQuietHoursEnd(quietHoursData.quietHours.end.substring(0, 5));
+          setUserTimezone(quietHoursData.quietHours.timezone);
+        }
       }
 
       // Listen for updates
@@ -391,6 +409,32 @@ export default function Page() {
   const showSaveMessage = (msg: string) => {
     setSaveMessage(msg);
     setTimeout(() => setSaveMessage(''), 3000);
+  };
+
+  const handleSaveQuietHours = async () => {
+    try {
+      const response = await fetch('/api/settings/quiet-hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: quietHoursEnabled,
+          start: quietHoursStart,
+          end: quietHoursEnd,
+          timezone: userTimezone
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.ok) {
+        showSaveMessage('Quiet hours updated successfully');
+        toast.success('Quiet hours settings saved');
+      } else {
+        toast.error(result.error || 'Failed to save quiet hours');
+      }
+    } catch (error: any) {
+      toast.error(`Error: ${error.message}`);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -899,6 +943,145 @@ export default function Page() {
       {/* Account Management Tab */}
       {activeTab === 'account' && (
         <div className="space-y-6">
+          {/* Demo Mode */}
+          <div className="card border-purple-500/30 bg-purple-500/5">
+            <h2 className="text-xl font-semibold text-purple-400 mb-4">🎭 Demo Mode</h2>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-white mb-1">Enable Demo Mode</h3>
+                    <p className="text-sm text-white/70">
+                      Try out the platform with realistic sample data including leads, conversations, campaigns, and flows.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true'}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          localStorage.setItem('demo_mode', 'true');
+                          window.location.reload();
+                        } else {
+                          localStorage.setItem('demo_mode', 'false');
+                          window.location.reload();
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                  </label>
+                </div>
+
+                <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-3 mt-3">
+                  <h4 className="font-medium text-purple-200 text-sm mb-2">Demo mode includes:</h4>
+                  <ul className="text-sm text-purple-300/80 space-y-1 ml-4 list-disc">
+                    <li>8 sample leads with various statuses and priorities</li>
+                    <li>Realistic conversation threads with messages</li>
+                    <li>Active and completed campaigns with statistics</li>
+                    <li>Pre-configured conversation flows</li>
+                  </ul>
+                  <p className="text-xs text-purple-300/60 mt-3">
+                    💡 Perfect for exploring features, taking screenshots, or demonstrating the platform to clients.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quiet Hours */}
+          <div className="card border-blue-500/30 bg-blue-500/5">
+            <h2 className="text-xl font-semibold text-blue-400 mb-4">🌙 Quiet Hours</h2>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-white mb-1">Enable Quiet Hours</h3>
+                    <p className="text-sm text-white/70">
+                      Prevent automated messages from being sent outside of specified hours (8am-8pm by default)
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={quietHoursEnabled}
+                      onChange={(e) => setQuietHoursEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                  </label>
+                </div>
+
+                {quietHoursEnabled && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">
+                          Start Time
+                        </label>
+                        <input
+                          type="time"
+                          value={quietHoursStart}
+                          onChange={(e) => setQuietHoursStart(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">
+                          End Time
+                        </label>
+                        <input
+                          type="time"
+                          value={quietHoursEnd}
+                          onChange={(e) => setQuietHoursEnd(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-white mb-2">
+                          Your Timezone
+                        </label>
+                        <select
+                          value={userTimezone}
+                          onChange={(e) => setUserTimezone(e.target.value)}
+                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                        >
+                          <option value="America/New_York">Eastern (ET)</option>
+                          <option value="America/Chicago">Central (CT)</option>
+                          <option value="America/Denver">Mountain (MT)</option>
+                          <option value="America/Los_Angeles">Pacific (PT)</option>
+                          <option value="America/Phoenix">Arizona (MST)</option>
+                          <option value="America/Anchorage">Alaska (AKT)</option>
+                          <option value="Pacific/Honolulu">Hawaii (HST)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-3">
+                      <h4 className="font-medium text-blue-200 text-sm mb-2">How it works:</h4>
+                      <ul className="text-sm text-blue-300/80 space-y-1 ml-4 list-disc">
+                        <li>Messages scheduled outside quiet hours will be delayed until the next allowed window</li>
+                        <li>Bulk campaigns and drip sequences respect these time restrictions</li>
+                        <li>Times are converted to your local timezone automatically</li>
+                        <li>Helps maintain compliance and improve engagement rates</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+
+                <button
+                  onClick={handleSaveQuietHours}
+                  className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Save Quiet Hours
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Danger Zone */}
           <div className="card border-red-500/30 bg-red-500/5">
             <h2 className="text-xl font-semibold text-red-400 mb-4">Danger Zone</h2>

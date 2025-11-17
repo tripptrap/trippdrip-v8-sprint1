@@ -207,8 +207,20 @@ export async function POST(req: NextRequest) {
       threadId = newThread?.id || '';
     }
 
-    // Add message to thread
+    // Add message to thread with automation tracking
     if (threadId) {
+      // Determine automation source
+      let automationSource = null;
+      if (isAutomated) {
+        if (templateId) {
+          automationSource = 'flow';
+        } else if (campaignId) {
+          automationSource = isBulk ? 'bulk_campaign' : 'drip_campaign';
+        } else {
+          automationSource = 'scheduled';
+        }
+      }
+
       await supabase.from('messages').insert({
         thread_id: threadId,
         sender: fromPhone,
@@ -218,6 +230,12 @@ export async function POST(req: NextRequest) {
         status: result.status || 'sent',
         message_sid: result.messageSid,
         created_at: new Date().toISOString(),
+        is_automated: isAutomated,
+        automation_source: automationSource,
+        flow_id: templateId || null,
+        campaign_id: campaignId || null,
+        user_id: user.id,
+        lead_id: leadId || null,
       });
     }
 
