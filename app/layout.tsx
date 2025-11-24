@@ -4,8 +4,8 @@ import Topbar from "@/components/Topbar";
 import { Toaster } from "react-hot-toast";
 
 export const metadata = {
-  title: "HyveWyre™",
-  description: "Mass texting + campaign management",
+  title: "HyveWyre - AI-Powered SMS Marketing Platform for Insurance & Real Estate Agents",
+  description: "HyveWyre is an AI-powered SMS marketing and lead management platform built for insurance agents and real estate professionals. Automate conversations, manage leads, and boost conversions with smart messaging workflows.",
 };
 
 export const viewport = {

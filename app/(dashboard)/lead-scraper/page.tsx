@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Play, Download, Loader2, Check, AlertCircle, Zap } from 'lucide-react';
+import { Globe, Play, Download, Loader2, Check, AlertCircle, Zap, Edit2, Save, X } from 'lucide-react';
 import { SCRAPER_TEMPLATES } from '@/lib/scraper';
 
 export default function LeadScraperPage() {
@@ -12,6 +12,8 @@ export default function LeadScraperPage() {
   const [running, setRunning] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [editingScraperId, setEditingScraperId] = useState<string | null>(null);
+  const [editUrl, setEditUrl] = useState('');
 
   useEffect(() => {
     loadScrapers();
@@ -81,6 +83,43 @@ export default function LeadScraperPage() {
     } catch (error) {
       console.error('Error creating scraper:', error);
       showMessage('error', 'Failed to create scraper from template');
+    }
+  };
+
+  const startEdit = (scraper: any) => {
+    setEditingScraperId(scraper.id);
+    setEditUrl(scraper.start_url);
+  };
+
+  const cancelEdit = () => {
+    setEditingScraperId(null);
+    setEditUrl('');
+  };
+
+  const saveUrl = async (scraperId: string) => {
+    try {
+      const response = await fetch('/api/scraper/configs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: scraperId,
+          start_url: editUrl,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showMessage('success', 'URL updated successfully!');
+        setEditingScraperId(null);
+        setEditUrl('');
+        loadScrapers();
+      } else {
+        showMessage('error', data.error || 'Failed to update URL');
+      }
+    } catch (error) {
+      console.error('Error updating URL:', error);
+      showMessage('error', 'Failed to update URL');
     }
   };
 
@@ -269,32 +308,72 @@ export default function LeadScraperPage() {
           <div className="space-y-3">
             {scrapers.filter(s => !s.is_template).map(scraper => (
               <div key={scraper.id} className="p-4 bg-white/5 border border-white/10 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-white">{scraper.name}</h3>
-                    <p className="text-sm text-white/60">{scraper.start_url}</p>
-                    <p className="text-xs text-white/40 mt-1">
-                      {scraper.total_records_scraped} leads scraped · {scraper.total_runs} runs
-                    </p>
+                {editingScraperId === scraper.id ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-white/60 mb-2">Target URL</label>
+                      <input
+                        type="url"
+                        value={editUrl}
+                        onChange={(e) => setEditUrl(e.target.value)}
+                        placeholder="https://example.com"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveUrl(scraper.id)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save URL
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg flex items-center gap-2 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => runScraper(scraper.id)}
-                    disabled={running === scraper.id}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    {running === scraper.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        Run Now
-                      </>
-                    )}
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white">{scraper.name}</h3>
+                      <p className="text-sm text-white/60">{scraper.start_url}</p>
+                      <p className="text-xs text-white/40 mt-1">
+                        {scraper.total_records_scraped} leads scraped · {scraper.total_runs} runs
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => startEdit(scraper)}
+                        className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        title="Edit URL"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => runScraper(scraper.id)}
+                        disabled={running === scraper.id}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                      >
+                        {running === scraper.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Run Now
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

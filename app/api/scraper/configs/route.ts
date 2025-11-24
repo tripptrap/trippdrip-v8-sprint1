@@ -142,6 +142,58 @@ export async function PUT(req: NextRequest) {
   }
 }
 
+// PATCH: Partial update scraper config (e.g., just URL)
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, start_url } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Scraper ID is required' }, { status: 400 });
+    }
+
+    const updates: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update start_url and target_domain if provided
+    if (start_url) {
+      updates.start_url = start_url;
+      try {
+        updates.target_domain = new URL(start_url).hostname;
+      } catch (e) {
+        return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('scraper_configs')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating scraper:', error);
+      return NextResponse.json({ error: 'Failed to update scraper' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, scraper: data });
+
+  } catch (error: any) {
+    console.error('Patch scraper error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
 // DELETE: Delete scraper config
 export async function DELETE(req: NextRequest) {
   try {

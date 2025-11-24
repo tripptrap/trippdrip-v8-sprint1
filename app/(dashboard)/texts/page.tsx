@@ -32,6 +32,70 @@ type ConversationFlow = {
 function findLead(id:number, leads:any[]){ return (leads||[]).find((l:any)=> l.id===id) || seedFindLead(id); }
 function threadMessages(thread_id:number, all:any[]){ return (all||[]).filter((m:any)=> m.thread_id===thread_id); }
 
+// Helper function to guess timezone from phone number area code
+function getTimezoneFromPhone(phone: string | undefined): string {
+  if (!phone) return '';
+
+  // Extract area code (first 3 digits after +1 or just first 3 digits)
+  const cleaned = phone.replace(/\D/g, '');
+  const areaCode = cleaned.length >= 10 ? cleaned.substring(cleaned.length - 10, cleaned.length - 7) : '';
+
+  // Common area code to timezone mappings (abbreviated)
+  const timezoneMap: { [key: string]: string } = {
+    // Eastern Time
+    '212': 'ET', '646': 'ET', '917': 'ET', '347': 'ET', // NYC
+    '305': 'ET', '786': 'ET', '954': 'ET', // Miami
+    '404': 'ET', '678': 'ET', '770': 'ET', // Atlanta
+    '617': 'ET', '857': 'ET', // Boston
+    '202': 'ET', // DC
+    '215': 'ET', '267': 'ET', // Philadelphia
+    '407': 'ET', '321': 'ET', // Orlando
+    '704': 'ET', '980': 'ET', // Charlotte
+
+    // Central Time
+    '312': 'CT', '773': 'CT', '872': 'CT', // Chicago
+    '713': 'CT', '281': 'CT', '832': 'CT', // Houston
+    '214': 'CT', '469': 'CT', '972': 'CT', // Dallas
+    '210': 'CT', '726': 'CT', // San Antonio
+    '512': 'CT', '737': 'CT', // Austin
+    '314': 'CT', // St. Louis
+    '504': 'CT', // New Orleans
+    '615': 'CT', '629': 'CT', // Nashville
+
+    // Mountain Time
+    '303': 'MT', '720': 'MT', // Denver
+    '602': 'MT', '623': 'MT', '480': 'MT', // Phoenix
+    '505': 'MT', // Albuquerque
+    '801': 'MT', '385': 'MT', // Salt Lake City
+
+    // Pacific Time
+    '213': 'PT', '310': 'PT', '323': 'PT', '424': 'PT', '818': 'PT', // LA
+    '415': 'PT', '628': 'PT', // San Francisco
+    '619': 'PT', '858': 'PT', // San Diego
+    '206': 'PT', '253': 'PT', // Seattle
+    '503': 'PT', '971': 'PT', // Portland
+    '702': 'PT', // Las Vegas
+  };
+
+  return timezoneMap[areaCode] || '';
+}
+
+function getCurrentTimeInTimezone(timezone: string): string {
+  if (!timezone) return '';
+
+  try {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${timeString} ${timezone}`;
+  } catch (e) {
+    return '';
+  }
+}
+
 async function loadFlows(): Promise<ConversationFlow[]> {
   if (typeof window === "undefined") return [];
 
@@ -409,7 +473,19 @@ function TextsPageContent(){
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-lg font-semibold text-white">{activeLead?.first_name} {activeLead?.last_name}</div>
-                    <div className="text-xs text-[var(--muted)]">{activeLead?.phone}</div>
+                    <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                      <span>{activeLead?.phone}</span>
+                      {(() => {
+                        const timezone = getTimezoneFromPhone(activeLead?.phone);
+                        const currentTime = getCurrentTimeInTimezone(timezone);
+                        return currentTime ? (
+                          <>
+                            <span className="text-white/20">•</span>
+                            <span className="text-blue-400" title={`Lead's local time`}>🕐 {currentTime}</span>
+                          </>
+                        ) : null;
+                      })()}
+                    </div>
                   </div>
                   {useAI && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">

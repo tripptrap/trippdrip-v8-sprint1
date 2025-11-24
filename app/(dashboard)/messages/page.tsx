@@ -4,6 +4,43 @@ import { useState, useEffect } from 'react';
 import { MessageSquare, Send, Phone, User, Clock, Search, Plus } from 'lucide-react';
 import SendSMSModal from '@/components/SendSMSModal';
 
+// Helper function to guess timezone from phone number area code
+function getTimezoneFromPhone(phone: string | undefined): string {
+  if (!phone) return '';
+
+  const cleaned = phone.replace(/\D/g, '');
+  const areaCode = cleaned.length >= 10 ? cleaned.substring(cleaned.length - 10, cleaned.length - 7) : '';
+
+  const timezoneMap: { [key: string]: string } = {
+    '212': 'ET', '646': 'ET', '917': 'ET', '347': 'ET', '305': 'ET', '786': 'ET', '954': 'ET',
+    '404': 'ET', '678': 'ET', '770': 'ET', '617': 'ET', '857': 'ET', '202': 'ET', '215': 'ET',
+    '267': 'ET', '407': 'ET', '321': 'ET', '704': 'ET', '980': 'ET',
+    '312': 'CT', '773': 'CT', '872': 'CT', '713': 'CT', '281': 'CT', '832': 'CT', '214': 'CT',
+    '469': 'CT', '972': 'CT', '210': 'CT', '726': 'CT', '512': 'CT', '737': 'CT', '314': 'CT',
+    '504': 'CT', '615': 'CT', '629': 'CT',
+    '303': 'MT', '720': 'MT', '602': 'MT', '623': 'MT', '480': 'MT', '505': 'MT', '801': 'MT', '385': 'MT',
+    '213': 'PT', '310': 'PT', '323': 'PT', '424': 'PT', '818': 'PT', '415': 'PT', '628': 'PT',
+    '619': 'PT', '858': 'PT', '206': 'PT', '253': 'PT', '503': 'PT', '971': 'PT', '702': 'PT',
+  };
+
+  return timezoneMap[areaCode] || '';
+}
+
+function getCurrentTimeInTimezone(timezone: string): string {
+  if (!timezone) return '';
+  try {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${timeString} ${timezone}`;
+  } catch (e) {
+    return '';
+  }
+}
+
 interface Thread {
   id: string;
   phone_number: string;
@@ -294,7 +331,19 @@ export default function MessagesPage() {
                       <h2 className="font-semibold text-white">
                         {formatPhoneNumber(selectedThread.phone_number)}
                       </h2>
-                      <p className="text-sm text-gray-400">{selectedThread.channel.toUpperCase()}</p>
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <span>{selectedThread.channel.toUpperCase()}</span>
+                        {(() => {
+                          const timezone = getTimezoneFromPhone(selectedThread.phone_number);
+                          const currentTime = getCurrentTimeInTimezone(timezone);
+                          return currentTime ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-blue-400" title="Lead's local time">🕐 {currentTime}</span>
+                            </>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

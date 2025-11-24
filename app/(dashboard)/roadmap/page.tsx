@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp } from 'lucide-react';
+import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Search } from 'lucide-react';
 
 type RoadmapStatus = 'completed' | 'in-progress' | 'planned';
 
@@ -118,6 +118,15 @@ const roadmapItems: RoadmapItem[] = [
     category: 'compliance',
     quarter: 'Q2 2025',
     icon: Shield
+  },
+  {
+    id: 'lead-scraper',
+    title: 'Premium Lead Scraper',
+    description: 'Automatically extract leads from Zillow, Realtor.com, Yelp, Google Maps, and other business directories with premium Apify integration.',
+    status: 'planned',
+    category: 'integrations',
+    quarter: 'Q2 2025',
+    icon: Search
   },
 ];
 

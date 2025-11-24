@@ -23,14 +23,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Scraper ID is required' }, { status: 400 });
     }
 
-    // Check if user has enough points
-    const { data: pointsData } = await supabase
-      .from('user_subscriptions')
-      .select('points_balance')
-      .eq('user_id', user.id)
+    // Check if user has enough points (from users.credits table)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', user.id)
       .single();
 
-    const currentPoints = pointsData?.points_balance || 0;
+    const currentPoints = userData?.credits || 0;
 
     if (currentPoints < SCRAPER_RUN_COST) {
       return NextResponse.json({

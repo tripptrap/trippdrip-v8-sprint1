@@ -14,6 +14,12 @@ import { generateTemplatedResponse } from "@/lib/ai/templates";
 
 export const dynamic = "force-dynamic";
 
+// Helper function to strip markdown bold formatting from responses
+function stripMarkdownBold(text: string): string {
+  // Remove **bold** and __bold__ markdown syntax
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -829,7 +835,7 @@ CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-u
       }
 
       return NextResponse.json({
-        agentResponse: agentResponse,
+        agentResponse: stripMarkdownBold(agentResponse),
         nextStepIndex: nextStepIndex,
         reasoning: aiDecision.reasoning,
         matchedResponseIndex: aiDecision.matchedResponseIndex,

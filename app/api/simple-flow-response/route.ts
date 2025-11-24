@@ -3,6 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+// Helper function to strip markdown bold formatting from responses
+function stripMarkdownBold(text: string): string {
+  // Remove **bold** and __bold__ markdown syntax
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -38,7 +44,7 @@ export async function POST(req: NextRequest) {
         if (nextQuestion) {
           // Ask the next question
           return NextResponse.json({
-            agentResponse: nextQuestion.question,
+            agentResponse: stripMarkdownBold(nextQuestion.question),
             extractedInfo: updatedInfo,
             collectedInfo: updatedInfo,
             done: false
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (!userMessage && requiredQuestions && requiredQuestions.length > 0) {
       const firstQuestion = requiredQuestions[0];
       return NextResponse.json({
-        agentResponse: firstQuestion.question,
+        agentResponse: stripMarkdownBold(firstQuestion.question),
         collectedInfo,
         done: false
       });
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
           }).join(', ');
 
           return NextResponse.json({
-            agentResponse: `Great! I have availability at: ${timesList}. Which time works best for you?`,
+            agentResponse: stripMarkdownBold(`Great! I have availability at: ${timesList}. Which time works best for you?`),
             extractedInfo: collectedInfo,
             availableSlots: slotsToShow,
             done: false,
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
         } else {
           // No calendar slots available
           return NextResponse.json({
-            agentResponse: `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`,
+            agentResponse: stripMarkdownBold(`I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`),
             extractedInfo: collectedInfo,
             done: false
           });
@@ -104,7 +110,7 @@ export async function POST(req: NextRequest) {
       } catch (error) {
         console.error('Calendar error:', error);
         return NextResponse.json({
-          agentResponse: `I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`,
+          agentResponse: stripMarkdownBold(`I apologize, but I'm unable to access my calendar at the moment. Please try again shortly.`),
           extractedInfo: collectedInfo,
           done: false
         });
@@ -113,7 +119,7 @@ export async function POST(req: NextRequest) {
 
     // No call required, we're done
     return NextResponse.json({
-      agentResponse: "Thank you! I have all the information I need. Someone will be in touch shortly.",
+      agentResponse: stripMarkdownBold("Thank you! I have all the information I need. Someone will be in touch shortly."),
       extractedInfo: collectedInfo,
       done: true
     });

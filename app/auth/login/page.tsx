@@ -70,7 +70,9 @@ export default function LoginPage() {
       <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img src="/logo-premium.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl shadow-lg" />
+            <div className="h-20 w-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">HW</span>
+            </div>
           </div>
           <h1 className="text-3xl font-bold mb-2 text-white">HyveWyre™</h1>
           <p className="text-white/60">Sign in to your account</p>

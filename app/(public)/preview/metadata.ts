@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import PreviewClient from './PreviewClient';
 
 export const metadata: Metadata = {
   title: 'HyveWyre - AI-Powered SMS Marketing for Insurance & Real Estate | Automate Lead Conversations',
@@ -18,7 +17,3 @@ export const metadata: Metadata = {
     description: 'Automate conversations and close more deals with AI-powered SMS marketing.',
   },
 };
-
-export default function PreviewPage() {
-  return <PreviewClient />;
-}

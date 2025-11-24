@@ -1,0 +1,184 @@
+{
+  "business_profile": {
+    "friendly_name": "HyveWyre Business Profile",
+    "business_name": "HyveWyre",
+    "business_type": "LLC",
+    "business_registration_number": "YOUR_EIN_HERE",
+    "business_registration_identifier": "EIN",
+    "website": "https://hyvewyre.com",
+    "business_regions_of_operation": ["US"],
+    "business_industry": "Technology/SaaS",
+    "social_media_profiles": []
+  },
+
+  "business_address": {
+    "street": "12325 Magnolia Street",
+    "city": "San Antonio",
+    "state": "FL",
+    "state_province_region": "Florida",
+    "postal_code": "33576",
+    "country": "US"
+  },
+
+  "authorized_representative_1": {
+    "first_name": "Tripp",
+    "last_name": "Browning",
+    "email": "tripp@hyvewyre.com",
+    "phone_number": "+1XXXXXXXXXX",
+    "job_title": "Developer & Authorized Representative",
+    "job_position": "Technical Lead",
+    "business_title": "Authorized Representative"
+  },
+
+  "authorized_representative_2": {
+    "first_name": "Carson",
+    "last_name": "Rios",
+    "email": "operations@hyvewyre.com",
+    "phone_number": "+1XXXXXXXXXX",
+    "job_title": "Operations / Authorized Representative",
+    "job_position": "Operations Manager",
+    "business_title": "Authorized Representative"
+  },
+
+  "brand_registration": {
+    "brand_name": "HyveWyre",
+    "brand_type": "STARTER",
+    "vertical": "TECHNOLOGY",
+    "description": "AI-powered SMS communication platform that empowers insurance agents, real estate professionals, and sales teams to engage with leads through automated conversation flows, bulk messaging, and unified SMS/Voice communication. Built to help businesses scale their customer outreach while maintaining compliance and personalization.",
+    "website": "https://hyvewyre.com",
+    "ein": "YOUR_EIN_HERE",
+    "stock_ticker": null,
+    "russell_3000": false,
+    "government_entity": false,
+    "nonprofit": false,
+    "publicly_traded": false
+  },
+
+  "campaign_use_case_1": {
+    "use_case": "CUSTOMER_CARE",
+    "use_case_summary": "Account Notifications & Customer Support",
+    "description": "We send account notifications, appointment reminders, policy updates, claim status notifications, and customer support messages to insurance clients and real estate customers who have explicitly opted in through our web platform or mobile app.",
+    "embedded_link": true,
+    "embedded_phone": true,
+    "affiliate_marketing": false,
+    "number_pool": false,
+    "direct_lending": false,
+    "subscriber_optin": true,
+    "subscriber_optout": true,
+    "subscriber_help": true,
+    "age_gated": false,
+    "message_flow": "Two-way conversation with customers responding to automated flows and agent messages",
+    "opt_in_keywords": ["START", "YES", "SUBSCRIBE"],
+    "opt_out_keywords": ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"],
+    "help_keywords": ["HELP", "INFO", "SUPPORT"],
+    "sample_messages": [
+      "Hi John! Your insurance quote request has been received. An agent will contact you within 24 hours. Reply HELP for support or STOP to unsubscribe.",
+      "Your policy #12345 has been renewed for another year. View full details: https://portal.hyvewyre.com/policy/12345",
+      "Reminder: Your appointment with Agent Smith is tomorrow at 2:00 PM. Reply CONFIRM to acknowledge or RESCHEDULE to change.",
+      "Thank you for your payment of $150.00. Your home insurance policy is now active. Questions? Reply with your concern or call us.",
+      "Your claim #98765 status: Under Review. Expected resolution: 3-5 business days. Track progress: https://hyvewyre.com/claims/98765"
+    ],
+    "opt_in_message": "Thanks for signing up with HyveWyre! You'll receive account updates, reminders, and notifications. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to unsubscribe.",
+    "opt_out_message": "You've been unsubscribed from HyveWyre notifications. You won't receive further messages. Text START to resubscribe or email support@hyvewyre.com for assistance.",
+    "help_message": "HyveWyre Help: We provide SMS notifications for insurance and real estate services. Support: support@hyvewyre.com. Reply STOP to unsubscribe.",
+    "message_volume": "10000"
+  },
+
+  "campaign_use_case_2": {
+    "use_case": "MARKETING",
+    "use_case_summary": "Marketing & Promotional Campaigns",
+    "description": "We send marketing messages including new product announcements, promotional offers, real estate listings, open house invitations, and special discounts to customers who have explicitly opted in via our website signup forms or SMS keyword subscriptions.",
+    "embedded_link": true,
+    "embedded_phone": true,
+    "affiliate_marketing": false,
+    "number_pool": false,
+    "direct_lending": false,
+    "subscriber_optin": true,
+    "subscriber_optout": true,
+    "subscriber_help": true,
+    "age_gated": false,
+    "message_flow": "Primarily one-way marketing messages with option for recipients to respond with questions",
+    "opt_in_keywords": ["JOIN", "DEALS", "SUBSCRIBE", "START"],
+    "opt_out_keywords": ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"],
+    "help_keywords": ["HELP", "INFO", "SUPPORT"],
+    "sample_messages": [
+      "New listing alert! Beautiful 4br/3ba home in Miami - $450,000. Virtual tour and photos: https://hyvewyre.com/listing/123. Text INFO for details.",
+      "Flash Sale! Save 20% on home insurance quotes this weekend only. Get your free personalized quote: https://hyvewyre.com/quote. Expires Sunday.",
+      "Open House This Sunday! 2-4 PM at 789 Oak Street. 3br/2ba, newly renovated. RSVP: https://hyvewyre.com/openhouse/789. Reply YES to confirm attendance.",
+      "Your neighborhood home values are up 8% this quarter! Get a free home evaluation from our experts: https://hyvewyre.com/evaluate",
+      "Bundle & Save! Combine home + auto insurance and save up to $500/year. See your savings: https://hyvewyre.com/bundle. Limited time offer."
+    ],
+    "opt_in_message": "Welcome to HyveWyre promotions! You'll get exclusive deals, new listings, and special offers. Msg frequency: 2-4/week. Msg & data rates may apply. Reply HELP for help, STOP to opt out.",
+    "opt_out_message": "You're unsubscribed from HyveWyre marketing messages. You won't receive promotional texts. You'll still get important account notifications. Text START to resubscribe.",
+    "help_message": "HyveWyre Marketing Help: Receive real estate listings and insurance offers. Questions? support@hyvewyre.com or call 1-XXX-XXX-XXXX. Reply STOP to unsubscribe.",
+    "message_volume": "25000"
+  },
+
+  "campaign_use_case_3": {
+    "use_case": "CONVERSATIONAL",
+    "use_case_summary": "AI-Powered Conversation Flows",
+    "description": "We facilitate two-way conversational messaging using AI-powered flows for lead qualification, appointment scheduling, quote requests, and customer inquiries. Customers initiate conversations or respond to prompts, and our system engages in natural back-and-forth dialogue to collect information and provide assistance.",
+    "embedded_link": true,
+    "embedded_phone": true,
+    "affiliate_marketing": false,
+    "number_pool": false,
+    "direct_lending": false,
+    "subscriber_optin": true,
+    "subscriber_optout": true,
+    "subscriber_help": true,
+    "age_gated": false,
+    "message_flow": "Interactive two-way conversations with multiple message exchanges",
+    "opt_in_keywords": ["START", "CHAT", "BEGIN"],
+    "opt_out_keywords": ["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"],
+    "help_keywords": ["HELP", "INFO", "SUPPORT", "AGENT"],
+    "sample_messages": [
+      "Agent: Hi! I see you're interested in a home insurance quote. What type of property do you want to insure? (1: Single Family, 2: Condo, 3: Multi-family)",
+      "Lead: 1",
+      "Agent: Great! Is this your primary residence or a rental property?",
+      "Lead: Primary",
+      "Agent: Perfect! To get you an accurate quote, what's your home's zip code?",
+      "Lead: 33576",
+      "Agent: Thank you! One moment while I calculate your personalized quote... Your estimated quote: $1,200/year. Would you like to speak with an agent to finalize? Reply YES or NO.",
+      "Lead: Yes",
+      "Agent: Excellent! An agent will call you within the next hour. In the meantime, view your quote details: https://hyvewyre.com/quote/xyz. Have a great day!"
+    ],
+    "opt_in_message": "You're connected to HyveWyre! Our AI assistant will help you. Msg frequency varies based on conversation. Reply HELP for help, STOP to end conversation.",
+    "opt_out_message": "Conversation ended. You're unsubscribed from this thread. For new inquiries, visit hyvewyre.com or text START. Contact support@hyvewyre.com for help.",
+    "help_message": "HyveWyre Conversation Help: You're chatting with our AI assistant. For human agent: reply AGENT. Technical support: support@hyvewyre.com. Reply STOP to end.",
+    "message_volume": "15000"
+  },
+
+  "compliance": {
+    "opt_in_process": "Users opt-in through explicit consent on our website (checkbox during signup), SMS keyword subscription (text JOIN to number), web forms with clear terms, or by initiating contact through our platform. Opt-in language clearly states message types, frequency, and standard rates apply.",
+    "opt_out_process": "Users can opt-out anytime by replying STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, or QUIT to any message. Opt-out is processed immediately, confirmed with a final message, and user is added to internal DNC list. Users can also opt-out via account settings or by contacting support.",
+    "help_process": "Users can get help by replying HELP to any message, which provides contact information and support options. Additional support available at support@hyvewyre.com or through in-app help center.",
+    "privacy_policy": "https://hyvewyre.com/privacy",
+    "terms_of_service": "https://hyvewyre.com/terms",
+    "dnc_compliance": "We maintain internal DNC list accessible at /dnc in the platform. Numbers on DNC are automatically blocked before sending. We honor both user-specific and global DNC lists.",
+    "tcpa_compliance": true,
+    "ctia_best_practices": true,
+    "carrier_guidelines": true
+  },
+
+  "documents_needed": [
+    "Business registration document (Articles of Incorporation, LLC Certificate, DBA Filing)",
+    "Tax ID document (IRS EIN Confirmation Letter, SS-4 Form, W-9)",
+    "Business address proof (Recent utility bill, Bank statement, Lease agreement)",
+    "Authorized representative ID (Driver's license or Passport) - Optional but recommended"
+  ],
+
+  "notes": {
+    "important": [
+      "Replace YOUR_EIN_HERE with actual EIN/Tax ID",
+      "Replace +1XXXXXXXXXX with actual phone numbers",
+      "All documents must be clear, readable PDFs",
+      "Business name must match exactly across all documents",
+      "Address must match business registration documents",
+      "Website must be live and accessible",
+      "Privacy policy and Terms of Service must be published on website"
+    ],
+    "timeline": "Business Profile: 2-7 days | Brand Registration: 0-24 hours | Campaign Approval: 3-5 days",
+    "costs": "Business Profile: Free | Brand: $4 one-time | Each Campaign: $10/month",
+    "support": "For help: support@twilio.com or https://support.twilio.com"
+  }
+}

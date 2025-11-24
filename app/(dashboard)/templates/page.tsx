@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import CustomModal from "@/components/CustomModal";
+import { TrendingUp, MessageSquare, Users, Clock } from 'lucide-react';
 
 type DripMessage = {
   message: string;
@@ -233,6 +234,8 @@ export default function FlowsPage() {
   const [manualFlowMessage, setManualFlowMessage] = useState("");
   const [manualFlowSteps, setManualFlowSteps] = useState<string[]>([]);
   const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
+  const [flowStats, setFlowStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
   const [flowToDelete, setFlowToDelete] = useState<ConversationFlow | null>(null);
@@ -266,6 +269,36 @@ export default function FlowsPage() {
       setEnableCalendarAppointments(true);
     }
   }, [requiresCall]);
+
+  // Load flow stats when a flow is selected
+  useEffect(() => {
+    const loadFlowStats = async () => {
+      if (!selectedFlow?.id) {
+        setFlowStats(null);
+        return;
+      }
+
+      setLoadingStats(true);
+      try {
+        const response = await fetch(`/api/analytics/automation?days=30`);
+        const data = await response.json();
+
+        if (data.ok && data.flowPerformance) {
+          const currentFlowStats = data.flowPerformance.find(
+            (f: any) => f.flow_id === selectedFlow.id
+          );
+          setFlowStats(currentFlowStats || null);
+        }
+      } catch (error) {
+        console.error('Error loading flow stats:', error);
+        setFlowStats(null);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadFlowStats();
+  }, [selectedFlow?.id]);
 
   function assignStepColors(steps: FlowStep[]): FlowStep[] {
     // Color progression: Blue -> Purple -> Orange -> Green (last step)
@@ -1480,6 +1513,60 @@ export default function FlowsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Flow Statistics */}
+              {flowStats && !loadingStats && (
+                <div className="card bg-blue-900/10 border-blue-700/30">
+                  <h3 className="text-sm font-semibold text-[#e7eef9] mb-3 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-400" />
+                    Flow Performance (Last 30 Days)
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                        <MessageSquare className="h-4 w-4" />
+                        <span>Messages Sent</span>
+                      </div>
+                      <div className="text-2xl font-bold text-[#e7eef9]">{flowStats.messages_sent || 0}</div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                        <Users className="h-4 w-4" />
+                        <span>Unique Leads</span>
+                      </div>
+                      <div className="text-2xl font-bold text-[#e7eef9]">{flowStats.unique_leads || 0}</div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                        <TrendingUp className="h-4 w-4" />
+                        <span>Response Rate</span>
+                      </div>
+                      <div className={`text-2xl font-bold ${
+                        flowStats.response_rate >= 50 ? 'text-green-400' :
+                        flowStats.response_rate >= 25 ? 'text-orange-400' :
+                        'text-red-400'
+                      }`}>
+                        {flowStats.response_rate || 0}%
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                        <Clock className="h-4 w-4" />
+                        <span>Avg Response Time</span>
+                      </div>
+                      <div className="text-2xl font-bold text-[#e7eef9]">
+                        {flowStats.avg_response_time_minutes ? `${Math.round(flowStats.avg_response_time_minutes)}m` : '-'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loadingStats && (
+                <div className="card bg-blue-900/10 border-blue-700/30">
+                  <div className="text-sm text-[#9fb0c3]">Loading flow statistics...</div>
+                </div>
+              )}
 
               {/* Required Questions (Prominent Display) */}
               {selectedFlow.requiredQuestions && selectedFlow.requiredQuestions.length > 0 && (

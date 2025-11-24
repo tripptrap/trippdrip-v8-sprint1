@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { spendPoints } from '@/lib/pointsStore';
 import { createClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
+import { AlertTriangle, CheckCircle, XCircle, Sparkles } from 'lucide-react';
 
 type ConversationFlow = {
   id: string;
@@ -47,6 +48,10 @@ export default function BulkSMSPage() {
   // Compose state
   const [messageBody, setMessageBody] = useState('');
 
+  // Spam detection state
+  const [spamCheck, setSpamCheck] = useState<any>(null);
+  const [checkingSpam, setCheckingSpam] = useState(false);
+
   // Results state
   const [sendResults, setSendResults] = useState<SendResult[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -60,6 +65,35 @@ export default function BulkSMSPage() {
     window.addEventListener('pointsUpdated', handleUpdate);
     return () => window.removeEventListener('pointsUpdated', handleUpdate);
   }, []);
+
+  // Check spam when message changes
+  useEffect(() => {
+    if (!messageBody || messageBody.length < 10) {
+      setSpamCheck(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingSpam(true);
+      try {
+        const response = await fetch('/api/spam/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: messageBody, autoClean: false })
+        });
+        const data = await response.json();
+        if (data.ok) {
+          setSpamCheck(data);
+        }
+      } catch (error) {
+        console.error('Error checking spam:', error);
+      } finally {
+        setCheckingSpam(false);
+      }
+    }, 500); // Debounce for 500ms
+
+    return () => clearTimeout(timer);
+  }, [messageBody]);
 
   async function loadInitialData() {
     // Load points from Supabase
@@ -226,6 +260,27 @@ export default function BulkSMSPage() {
     setFilteredLeads([]);
     setMessageBody('');
     setSendResults([]);
+    setSpamCheck(null);
+  }
+
+  async function handleCleanMessage() {
+    if (!spamCheck?.cleanedMessage) return;
+
+    try {
+      const response = await fetch('/api/spam/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageBody, autoClean: true })
+      });
+      const data = await response.json();
+      if (data.ok && data.cleanedMessage) {
+        setMessageBody(data.cleanedMessage);
+        toast.success('Message cleaned! Spam words replaced.');
+      }
+    } catch (error) {
+      console.error('Error cleaning message:', error);
+      toast.error('Failed to clean message');
+    }
   }
 
   const toggleTag = (tag: string) => {
@@ -405,6 +460,146 @@ export default function BulkSMSPage() {
               Approx. {Math.ceil(messageBody.length / 160)} SMS segment(s)
             </span>
           </div>
+
+          {/* Spam Detection Results */}
+          {checkingSpam && (
+            <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-400 border-t-transparent rounded-full"></div>
+                Checking for spam trigger words...
+              </div>
+            </div>
+          )}
+
+          {!checkingSpam && spamCheck && spamCheck.spamDetection && (
+            <div className="mt-3 space-y-3">
+              {/* Spam Score Indicator */}
+              <div className={`p-4 rounded-lg border ${
+                spamCheck.spamDetection.isSpammy
+                  ? spamCheck.spamDetection.spamScore >= 60
+                    ? 'bg-red-500/10 border-red-500/30'
+                    : 'bg-orange-500/10 border-orange-500/30'
+                  : 'bg-green-500/10 border-green-500/30'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {spamCheck.spamDetection.isSpammy ? (
+                      spamCheck.spamDetection.spamScore >= 60 ? (
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      ) : (
+                        <AlertTriangle className="h-5 w-5 text-orange-400" />
+                      )
+                    ) : (
+                      <CheckCircle className="h-5 w-5 text-green-400" />
+                    )}
+                    <span className={`font-semibold ${
+                      spamCheck.spamDetection.isSpammy
+                        ? spamCheck.spamDetection.spamScore >= 60
+                          ? 'text-red-300'
+                          : 'text-orange-300'
+                        : 'text-green-300'
+                    }`}>
+                      {spamCheck.spamDetection.isSpammy
+                        ? spamCheck.spamDetection.spamScore >= 60
+                          ? 'High Spam Risk'
+                          : 'Moderate Spam Risk'
+                        : 'Low Spam Risk'}
+                    </span>
+                  </div>
+                  <span className={`text-lg font-bold ${
+                    spamCheck.spamDetection.isSpammy
+                      ? spamCheck.spamDetection.spamScore >= 60
+                        ? 'text-red-400'
+                        : 'text-orange-400'
+                      : 'text-green-400'
+                  }`}>
+                    {spamCheck.spamDetection.spamScore}/100
+                  </span>
+                </div>
+
+                {spamCheck.spamDetection.detectedWords.length > 0 && (
+                  <div className="text-sm text-white/80 mb-2">
+                    Found {spamCheck.spamDetection.detectedWords.length} spam trigger word(s)
+                  </div>
+                )}
+
+                {spamCheck.quality && spamCheck.quality.score < 70 && (
+                  <div className="text-sm text-white/60 mt-2">
+                    Message Quality Score: {spamCheck.quality.score}/100
+                  </div>
+                )}
+              </div>
+
+              {/* Detected Words */}
+              {spamCheck.spamDetection.detectedWords.length > 0 && (
+                <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
+                  <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-400" />
+                    Detected Spam Words
+                  </h4>
+                  <div className="space-y-2">
+                    {spamCheck.spamDetection.detectedWords.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-start gap-3 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          item.severity === 'high'
+                            ? 'bg-red-500/20 text-red-300'
+                            : item.severity === 'medium'
+                            ? 'bg-orange-500/20 text-orange-300'
+                            : 'bg-yellow-500/20 text-yellow-300'
+                        }`}>
+                          {item.severity}
+                        </span>
+                        <div className="flex-1">
+                          <div className="text-white font-medium">"{item.word}"</div>
+                          <div className="text-[var(--muted)] text-xs mt-1">
+                            Alternatives: {item.alternatives.slice(0, 3).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleCleanMessage}
+                    className="mt-4 w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Auto-Clean Message
+                  </button>
+                </div>
+              )}
+
+              {/* Quality Issues */}
+              {spamCheck.quality && spamCheck.quality.issues.length > 0 && (
+                <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
+                  <h4 className="text-sm font-semibold text-white mb-2">Quality Issues:</h4>
+                  <ul className="space-y-1">
+                    {spamCheck.quality.issues.map((issue: string, idx: number) => (
+                      <li key={idx} className="text-sm text-[var(--muted)] flex items-start gap-2">
+                        <span className="text-orange-400 mt-0.5">•</span>
+                        {issue}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {spamCheck.quality && spamCheck.quality.recommendations.length > 0 && (
+                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <h4 className="text-sm font-semibold text-blue-300 mb-2">Recommendations:</h4>
+                  <ul className="space-y-1">
+                    {spamCheck.quality.recommendations.map((rec: string, idx: number) => (
+                      <li key={idx} className="text-sm text-white/80 flex items-start gap-2">
+                        <span className="text-blue-400 mt-0.5">→</span>
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Preview */}
