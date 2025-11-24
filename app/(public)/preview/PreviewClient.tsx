@@ -855,37 +855,37 @@ export default function PreviewClient() {
             </div>
 
             {/* Demo Content */}
-            <div className="flex h-[calc(100%-64px)]">
+            <div className="flex h-[calc(100%-64px)]" onClick={(e) => e.stopPropagation()}>
               {/* Sidebar */}
-              <div className="w-64 bg-white/5 border-r border-white/10 p-4 pointer-events-auto">
+              <div className="w-64 bg-white/5 border-r border-white/10 p-4">
                 <div className="space-y-2">
-                  <div className="px-4 py-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-white font-medium">
+                  <button className="w-full px-4 py-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-white font-medium text-left">
                     Dashboard
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Leads (247)
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Messages (12)
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Campaigns (8)
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     AI Workflows (5)
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Analytics
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Templates (23)
-                  </div>
-                  <div className="px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
                     Phone Numbers
-                  </div>
-                  <div className="px-4 py-3 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 rounded-lg text-orange-300 font-medium cursor-pointer hover:from-orange-500/30 hover:to-amber-500/30 transition-all">
+                  </button>
+                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 rounded-lg text-orange-300 font-medium hover:from-orange-500/30 hover:to-amber-500/30 transition-all text-left">
                     Plans & Billing
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -922,19 +922,19 @@ export default function PreviewClient() {
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-                  <button className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-all text-left">
+                  <button onClick={(e) => e.preventDefault()} className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-all text-left cursor-pointer">
                     <div className="text-blue-400 font-semibold">Send Campaign</div>
                     <div className="text-white/60 text-sm mt-1">Start new outreach</div>
                   </button>
-                  <button className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-all text-left">
+                  <button onClick={(e) => e.preventDefault()} className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-all text-left cursor-pointer">
                     <div className="text-purple-400 font-semibold">Add Lead</div>
                     <div className="text-white/60 text-sm mt-1">Import or create</div>
                   </button>
-                  <button className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg hover:bg-green-500/20 transition-all text-left">
+                  <button onClick={(e) => e.preventDefault()} className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg hover:bg-green-500/20 transition-all text-left cursor-pointer">
                     <div className="text-green-400 font-semibold">AI Workflow</div>
                     <div className="text-white/60 text-sm mt-1">Setup automation</div>
                   </button>
-                  <button className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg hover:bg-orange-500/20 transition-all text-left">
+                  <button onClick={(e) => e.preventDefault()} className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg hover:bg-orange-500/20 transition-all text-left cursor-pointer">
                     <div className="text-orange-400 font-semibold">View Analytics</div>
                     <div className="text-white/60 text-sm mt-1">Deep dive stats</div>
                   </button>
