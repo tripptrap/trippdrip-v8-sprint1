@@ -82,31 +82,33 @@ export default function PreviewClient() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.6, duration: 0.6 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-col items-center justify-center gap-4"
           >
-            <motion.button
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20"
-            >
-              View Pricing
-            </motion.button>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Link
-                href="/auth/register"
-                className="inline-block px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-all border border-white/10"
+            <div className="flex items-center justify-center gap-4">
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20"
               >
-                Create Account
-              </Link>
-            </motion.div>
+                View Pricing
+              </motion.button>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Link
+                  href="/auth/register"
+                  className="inline-block px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-all border border-white/10"
+                >
+                  Create Account
+                </Link>
+              </motion.div>
+            </div>
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.05, boxShadow: "0 15px 30px rgba(16, 185, 129, 0.25)" }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowDemo(true)}
-              className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-all border border-white/10"
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-emerald-500/20"
             >
               View Demo
             </motion.button>
