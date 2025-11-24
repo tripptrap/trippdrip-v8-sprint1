@@ -9,6 +9,78 @@ export default function PreviewClient() {
   const [selectedPlan, setSelectedPlan] = useState<string>('basic');
   const [showDemo, setShowDemo] = useState(false);
   const [demoTab, setDemoTab] = useState('dashboard');
+  const [selectedConversation, setSelectedConversation] = useState(0);
+  const [selectedLead, setSelectedLead] = useState<number | null>(null);
+
+  const demoConversations = [
+    {
+      id: 0,
+      name: 'Michael Chen',
+      phone: '(555) 234-5678',
+      message: 'Thanks for the info!',
+      time: '2m ago',
+      unread: true,
+      messages: [
+        { sender: 'lead', text: "Hi! I'm interested in home insurance quotes.", time: '10:32 AM' },
+        { sender: 'agent', text: "Great! I'd be happy to help. What type of property do you own?", time: '10:35 AM' },
+        { sender: 'lead', text: 'Single family home, 3 bed 2 bath.', time: '10:38 AM' },
+        { sender: 'agent', text: 'Perfect! What\'s the approximate square footage and age of the home?', time: '10:40 AM' },
+        { sender: 'lead', text: 'About 2,000 sq ft, built in 2010', time: '10:42 AM' },
+      ]
+    },
+    {
+      id: 1,
+      name: 'Jennifer Martinez',
+      phone: '(555) 345-6789',
+      message: 'What are the rates?',
+      time: '1h ago',
+      unread: true,
+      messages: [
+        { sender: 'lead', text: 'Hi, I got your message about property insurance', time: '9:15 AM' },
+        { sender: 'agent', text: 'Yes! Thanks for reaching out. Are you looking for home or commercial property insurance?', time: '9:18 AM' },
+        { sender: 'lead', text: 'Home insurance for my new house', time: '9:22 AM' },
+        { sender: 'agent', text: 'Congratulations on the new home! I can definitely help with that. When did you close?', time: '9:25 AM' },
+        { sender: 'lead', text: 'Last week. What are the rates?', time: '9:30 AM' },
+      ]
+    },
+    {
+      id: 2,
+      name: 'David Thompson',
+      phone: '(555) 456-7890',
+      message: "I'm interested",
+      time: '3h ago',
+      unread: false,
+      messages: [
+        { sender: 'lead', text: 'Saw your listing for the 3BR on Oak Street', time: '7:45 AM' },
+        { sender: 'agent', text: 'Great property! Are you looking to schedule a showing?', time: '7:50 AM' },
+        { sender: 'lead', text: "I'm interested. What's the HOA fee?", time: '8:00 AM' },
+        { sender: 'agent', text: 'The HOA is $250/month and includes lawn care and pool access. Would you like to see it this weekend?', time: '8:05 AM' },
+      ]
+    },
+    {
+      id: 3,
+      name: 'Sarah Johnson',
+      phone: '(555) 567-8901',
+      message: 'Can we schedule a call?',
+      time: '1d ago',
+      unread: false,
+      messages: [
+        { sender: 'lead', text: 'Hi, I need to review my current policy', time: 'Yesterday 2:30 PM' },
+        { sender: 'agent', text: 'Of course! I can help you review your policy. What concerns do you have?', time: 'Yesterday 2:35 PM' },
+        { sender: 'lead', text: 'My premium went up and I want to understand why', time: 'Yesterday 2:40 PM' },
+        { sender: 'agent', text: 'I understand your concern. Can we schedule a call to review the details together?', time: 'Yesterday 2:45 PM' },
+        { sender: 'lead', text: 'Can we schedule a call?', time: 'Yesterday 3:00 PM' },
+      ]
+    },
+  ];
+
+  const demoLeads = [
+    { id: 1, name: 'Michael Chen', phone: '(555) 234-5678', email: 'mchen@email.com', status: 'Active', temp: 'Hot', last: '2 hours ago', state: 'CA', tags: ['Insurance', 'Hot Lead'] },
+    { id: 2, name: 'Jennifer Martinez', phone: '(555) 345-6789', email: 'jmartinez@email.com', status: 'Active', temp: 'Warm', last: '1 day ago', state: 'TX', tags: ['New Home', 'Insurance'] },
+    { id: 3, name: 'David Thompson', phone: '(555) 456-7890', email: 'dthompson@email.com', status: 'Active', temp: 'Hot', last: '3 hours ago', state: 'FL', tags: ['Real Estate', 'Showing'] },
+    { id: 4, name: 'Sarah Johnson', phone: '(555) 567-8901', email: 'sjohnson@email.com', status: 'Nurture', temp: 'Warm', last: '2 days ago', state: 'NY', tags: ['Policy Review'] },
+    { id: 5, name: 'Robert Williams', phone: '(555) 678-9012', email: 'rwilliams@email.com', status: 'Active', temp: 'Cold', last: '1 week ago', state: 'WA', tags: ['Follow-up'] },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
@@ -1162,7 +1234,7 @@ export default function PreviewClient() {
                   <>
                     <div className="mb-6">
                       <h2 className="text-2xl font-bold text-white mb-2">Leads</h2>
-                      <p className="text-white/60">Manage and organize your leads</p>
+                      <p className="text-white/60">Manage and organize your leads - Click a lead to view details</p>
                     </div>
 
                     {/* Search and Filters */}
@@ -1177,48 +1249,102 @@ export default function PreviewClient() {
                       </button>
                     </div>
 
-                    {/* Leads Table */}
-                    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-white/5 border-b border-white/10">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Name</th>
-                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Phone</th>
-                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Status</th>
-                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Temperature</th>
-                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Last Contact</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[
-                            { name: 'Michael Chen', phone: '(555) 234-5678', status: 'Active', temp: 'Hot', last: '2 hours ago' },
-                            { name: 'Jennifer Martinez', phone: '(555) 345-6789', status: 'Active', temp: 'Warm', last: '1 day ago' },
-                            { name: 'David Thompson', phone: '(555) 456-7890', status: 'Active', temp: 'Hot', last: '3 hours ago' },
-                            { name: 'Sarah Johnson', phone: '(555) 567-8901', status: 'Nurture', temp: 'Warm', last: '2 days ago' },
-                            { name: 'Robert Williams', phone: '(555) 678-9012', status: 'Active', temp: 'Cold', last: '1 week ago' },
-                          ].map((lead, i) => (
-                            <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="px-4 py-3 text-white">{lead.name}</td>
-                              <td className="px-4 py-3 text-white/60">{lead.phone}</td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-sm rounded-full">
-                                  {lead.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 text-sm rounded-full ${
-                                  lead.temp === 'Hot' ? 'bg-red-500/20 text-red-400' :
-                                  lead.temp === 'Warm' ? 'bg-orange-500/20 text-orange-400' :
-                                  'bg-blue-500/20 text-blue-400'
-                                }`}>
-                                  {lead.temp}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-white/60">{lead.last}</td>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Leads Table */}
+                      <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-white/5 border-b border-white/10">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Name</th>
+                              <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Phone</th>
+                              <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Status</th>
+                              <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Temp</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {demoLeads.map((lead) => (
+                              <tr
+                                key={lead.id}
+                                onClick={() => setSelectedLead(lead.id)}
+                                className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${
+                                  selectedLead === lead.id ? 'bg-blue-500/10' : ''
+                                }`}
+                              >
+                                <td className="px-4 py-3 text-white">{lead.name}</td>
+                                <td className="px-4 py-3 text-white/60">{lead.phone}</td>
+                                <td className="px-4 py-3">
+                                  <span className="px-2 py-1 bg-green-500/20 text-green-400 text-sm rounded-full">
+                                    {lead.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 text-sm rounded-full ${
+                                    lead.temp === 'Hot' ? 'bg-red-500/20 text-red-400' :
+                                    lead.temp === 'Warm' ? 'bg-orange-500/20 text-orange-400' :
+                                    'bg-blue-500/20 text-blue-400'
+                                  }`}>
+                                    {lead.temp}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Lead Details Panel */}
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+                        {selectedLead ? (
+                          <>
+                            <h3 className="text-white font-semibold text-lg mb-4">Lead Details</h3>
+                            {(() => {
+                              const lead = demoLeads.find(l => l.id === selectedLead);
+                              if (!lead) return null;
+                              return (
+                                <div className="space-y-4">
+                                  <div>
+                                    <div className="text-white/60 text-sm">Name</div>
+                                    <div className="text-white font-medium">{lead.name}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-white/60 text-sm">Phone</div>
+                                    <div className="text-white">{lead.phone}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-white/60 text-sm">Email</div>
+                                    <div className="text-white">{lead.email}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-white/60 text-sm">State</div>
+                                    <div className="text-white">{lead.state}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-white/60 text-sm">Tags</div>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {lead.tags.map((tag, i) => (
+                                        <span key={i} className="px-2 py-1 bg-blue-500/20 text-blue-400 text-sm rounded">
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-white/60 text-sm">Last Contact</div>
+                                    <div className="text-white">{lead.last}</div>
+                                  </div>
+                                  <button className="w-full mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                                    Send Message
+                                  </button>
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          <div className="text-center py-10 text-white/40">
+                            Select a lead to view details
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -1241,13 +1367,14 @@ export default function PreviewClient() {
                             className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40"
                           />
                         </div>
-                        {[
-                          { name: 'Michael Chen', message: 'Thanks for the info!', time: '2m ago', unread: true },
-                          { name: 'Jennifer Martinez', message: 'What are the rates?', time: '1h ago', unread: true },
-                          { name: 'David Thompson', message: 'I\'m interested', time: '3h ago', unread: false },
-                          { name: 'Sarah Johnson', message: 'Can we schedule a call?', time: '1d ago', unread: false },
-                        ].map((conv, i) => (
-                          <div key={i} className={`p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer ${conv.unread ? 'bg-blue-500/5' : ''}`}>
+                        {demoConversations.map((conv) => (
+                          <div
+                            key={conv.id}
+                            onClick={() => setSelectedConversation(conv.id)}
+                            className={`p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors ${
+                              selectedConversation === conv.id ? 'bg-blue-500/10 border-l-4 border-l-blue-500' : ''
+                            } ${conv.unread ? 'bg-blue-500/5' : ''}`}
+                          >
                             <div className="flex items-center justify-between mb-1">
                               <div className="text-white font-medium">{conv.name}</div>
                               <div className="text-white/40 text-sm">{conv.time}</div>
@@ -1260,28 +1387,22 @@ export default function PreviewClient() {
                       {/* Conversation View */}
                       <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-xl flex flex-col">
                         <div className="p-4 border-b border-white/10">
-                          <div className="text-white font-semibold">Michael Chen</div>
-                          <div className="text-white/60 text-sm">(555) 234-5678</div>
+                          <div className="text-white font-semibold">{demoConversations[selectedConversation].name}</div>
+                          <div className="text-white/60 text-sm">{demoConversations[selectedConversation].phone}</div>
                         </div>
                         <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                          <div className="flex justify-start">
-                            <div className="bg-white/10 rounded-lg px-4 py-2 max-w-[70%]">
-                              <div className="text-white">Hi! I'm interested in home insurance quotes.</div>
-                              <div className="text-white/40 text-xs mt-1">10:32 AM</div>
+                          {demoConversations[selectedConversation].messages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`rounded-lg px-4 py-2 max-w-[70%] ${
+                                msg.sender === 'agent' ? 'bg-blue-600' : 'bg-white/10'
+                              }`}>
+                                <div className="text-white">{msg.text}</div>
+                                <div className={`text-xs mt-1 ${msg.sender === 'agent' ? 'text-white/60' : 'text-white/40'}`}>
+                                  {msg.time}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex justify-end">
-                            <div className="bg-blue-600 rounded-lg px-4 py-2 max-w-[70%]">
-                              <div className="text-white">Great! I'd be happy to help. What type of property do you own?</div>
-                              <div className="text-white/60 text-xs mt-1">10:35 AM</div>
-                            </div>
-                          </div>
-                          <div className="flex justify-start">
-                            <div className="bg-white/10 rounded-lg px-4 py-2 max-w-[70%]">
-                              <div className="text-white">Single family home, 3 bed 2 bath.</div>
-                              <div className="text-white/40 text-xs mt-1">10:38 AM</div>
-                            </div>
-                          </div>
+                          ))}
                         </div>
                         <div className="p-4 border-t border-white/10">
                           <input
