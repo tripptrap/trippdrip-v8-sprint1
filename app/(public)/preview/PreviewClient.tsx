@@ -857,7 +857,7 @@ export default function PreviewClient() {
             {/* Demo Content */}
             <div className="flex h-[calc(100%-64px)]">
               {/* Sidebar */}
-              <div className="w-64 bg-white/5 border-r border-white/10 p-4">
+              <div className="w-64 bg-white/5 border-r border-white/10 p-4 pointer-events-auto">
                 <div className="space-y-2">
                   <div className="px-4 py-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-white font-medium">
                     Dashboard
@@ -890,7 +890,7 @@ export default function PreviewClient() {
               </div>
 
               {/* Main Content */}
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div className="flex-1 p-6 overflow-y-auto pointer-events-auto">
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-white mb-2">Dashboard Overview</h2>
                   <p className="text-white/60">Welcome back, Sarah - Here's your performance for March 2025</p>
