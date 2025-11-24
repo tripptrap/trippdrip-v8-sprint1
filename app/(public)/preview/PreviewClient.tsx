@@ -8,6 +8,7 @@ import { SUBSCRIPTION_FEATURES } from "@/lib/subscriptionFeatures";
 export default function PreviewClient() {
   const [selectedPlan, setSelectedPlan] = useState<string>('basic');
   const [showDemo, setShowDemo] = useState(false);
+  const [demoTab, setDemoTab] = useState('dashboard');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
@@ -859,31 +860,94 @@ export default function PreviewClient() {
               {/* Sidebar */}
               <div className="w-64 bg-white/5 border-r border-white/10 p-4">
                 <div className="space-y-2">
-                  <button className="w-full px-4 py-3 bg-blue-500/20 border border-blue-500/30 rounded-lg text-white font-medium text-left">
+                  <button
+                    onClick={() => setDemoTab('dashboard')}
+                    className={`w-full px-4 py-3 rounded-lg text-left font-medium transition-all ${
+                      demoTab === 'dashboard'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Dashboard
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('leads')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'leads'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Leads (247)
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('messages')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'messages'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Messages (12)
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('campaigns')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'campaigns'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Campaigns (8)
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('workflows')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'workflows'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     AI Workflows (5)
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('analytics')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'analytics'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Analytics
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('templates')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'templates'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Templates (23)
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 text-white/60 hover:bg-white/5 rounded-lg transition-colors cursor-pointer text-left">
+                  <button
+                    onClick={() => setDemoTab('phone')}
+                    className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
+                      demoTab === 'phone'
+                        ? 'bg-blue-500/20 border border-blue-500/30 text-white font-medium'
+                        : 'text-white/60 hover:bg-white/5'
+                    }`}
+                  >
                     Phone Numbers
                   </button>
-                  <button onClick={(e) => e.preventDefault()} className="w-full px-4 py-3 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 rounded-lg text-orange-300 font-medium hover:from-orange-500/30 hover:to-amber-500/30 transition-all text-left">
+                  <button
+                    onClick={() => setDemoTab('plans')}
+                    className={`w-full px-4 py-3 rounded-lg text-left font-medium transition-all ${
+                      demoTab === 'plans'
+                        ? 'bg-gradient-to-r from-orange-500/30 to-amber-500/30 border border-orange-500/50 text-orange-200'
+                        : 'bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/40 text-orange-300 hover:from-orange-500/30 hover:to-amber-500/30'
+                    }`}
+                  >
                     Plans & Billing
                   </button>
                 </div>
