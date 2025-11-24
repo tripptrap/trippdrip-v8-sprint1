@@ -955,10 +955,12 @@ export default function PreviewClient() {
 
               {/* Main Content */}
               <div className="flex-1 p-6 overflow-y-auto pointer-events-auto">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-white mb-2">Dashboard Overview</h2>
-                  <p className="text-white/60">Welcome back, Sarah - Here's your performance for March 2025</p>
-                </div>
+                {demoTab === 'dashboard' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">Dashboard Overview</h2>
+                      <p className="text-white/60">Welcome back, Sarah - Here's your performance for March 2025</p>
+                    </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1152,6 +1154,308 @@ export default function PreviewClient() {
                     Create Free Account
                   </Link>
                 </div>
+                  </>
+                )}
+
+                {/* LEADS TAB */}
+                {demoTab === 'leads' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">Leads</h2>
+                      <p className="text-white/60">Manage and organize your leads</p>
+                    </div>
+
+                    {/* Search and Filters */}
+                    <div className="flex gap-4 mb-6">
+                      <input
+                        type="text"
+                        placeholder="Search leads..."
+                        className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40"
+                      />
+                      <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                        + Add Lead
+                      </button>
+                    </div>
+
+                    {/* Leads Table */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-white/5 border-b border-white/10">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Name</th>
+                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Phone</th>
+                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Status</th>
+                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Temperature</th>
+                            <th className="px-4 py-3 text-left text-white/80 text-sm font-medium">Last Contact</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { name: 'Michael Chen', phone: '(555) 234-5678', status: 'Active', temp: 'Hot', last: '2 hours ago' },
+                            { name: 'Jennifer Martinez', phone: '(555) 345-6789', status: 'Active', temp: 'Warm', last: '1 day ago' },
+                            { name: 'David Thompson', phone: '(555) 456-7890', status: 'Active', temp: 'Hot', last: '3 hours ago' },
+                            { name: 'Sarah Johnson', phone: '(555) 567-8901', status: 'Nurture', temp: 'Warm', last: '2 days ago' },
+                            { name: 'Robert Williams', phone: '(555) 678-9012', status: 'Active', temp: 'Cold', last: '1 week ago' },
+                          ].map((lead, i) => (
+                            <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="px-4 py-3 text-white">{lead.name}</td>
+                              <td className="px-4 py-3 text-white/60">{lead.phone}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-sm rounded-full">
+                                  {lead.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 text-sm rounded-full ${
+                                  lead.temp === 'Hot' ? 'bg-red-500/20 text-red-400' :
+                                  lead.temp === 'Warm' ? 'bg-orange-500/20 text-orange-400' :
+                                  'bg-blue-500/20 text-blue-400'
+                                }`}>
+                                  {lead.temp}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-white/60">{lead.last}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+
+                {/* MESSAGES TAB */}
+                {demoTab === 'messages' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">Messages</h2>
+                      <p className="text-white/60">View and respond to conversations</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
+                      {/* Conversations List */}
+                      <div className="bg-white/5 border border-white/10 rounded-xl overflow-y-auto">
+                        <div className="p-4 border-b border-white/10">
+                          <input
+                            type="text"
+                            placeholder="Search conversations..."
+                            className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40"
+                          />
+                        </div>
+                        {[
+                          { name: 'Michael Chen', message: 'Thanks for the info!', time: '2m ago', unread: true },
+                          { name: 'Jennifer Martinez', message: 'What are the rates?', time: '1h ago', unread: true },
+                          { name: 'David Thompson', message: 'I\'m interested', time: '3h ago', unread: false },
+                          { name: 'Sarah Johnson', message: 'Can we schedule a call?', time: '1d ago', unread: false },
+                        ].map((conv, i) => (
+                          <div key={i} className={`p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer ${conv.unread ? 'bg-blue-500/5' : ''}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-white font-medium">{conv.name}</div>
+                              <div className="text-white/40 text-sm">{conv.time}</div>
+                            </div>
+                            <div className="text-white/60 text-sm truncate">{conv.message}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Conversation View */}
+                      <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-xl flex flex-col">
+                        <div className="p-4 border-b border-white/10">
+                          <div className="text-white font-semibold">Michael Chen</div>
+                          <div className="text-white/60 text-sm">(555) 234-5678</div>
+                        </div>
+                        <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                          <div className="flex justify-start">
+                            <div className="bg-white/10 rounded-lg px-4 py-2 max-w-[70%]">
+                              <div className="text-white">Hi! I'm interested in home insurance quotes.</div>
+                              <div className="text-white/40 text-xs mt-1">10:32 AM</div>
+                            </div>
+                          </div>
+                          <div className="flex justify-end">
+                            <div className="bg-blue-600 rounded-lg px-4 py-2 max-w-[70%]">
+                              <div className="text-white">Great! I'd be happy to help. What type of property do you own?</div>
+                              <div className="text-white/60 text-xs mt-1">10:35 AM</div>
+                            </div>
+                          </div>
+                          <div className="flex justify-start">
+                            <div className="bg-white/10 rounded-lg px-4 py-2 max-w-[70%]">
+                              <div className="text-white">Single family home, 3 bed 2 bath.</div>
+                              <div className="text-white/40 text-xs mt-1">10:38 AM</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-4 border-t border-white/10">
+                          <input
+                            type="text"
+                            placeholder="Type a message..."
+                            className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* CAMPAIGNS TAB */}
+                {demoTab === 'campaigns' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">Campaigns</h2>
+                      <p className="text-white/60">Create and manage SMS campaigns</p>
+                    </div>
+
+                    <button className="mb-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
+                      + Create New Campaign
+                    </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { name: 'Spring Home Insurance Follow-up', contacts: 847, sent: 847, opened: 577, replied: 203, status: 'Completed' },
+                        { name: 'New Property Listing Alerts', contacts: 1203, sent: 1203, opened: 876, replied: 637, status: 'Active' },
+                        { name: 'Policy Renewal Reminders', contacts: 523, sent: 0, opened: 0, replied: 0, status: 'Scheduled' },
+                        { name: 'Open House Invitations', contacts: 342, sent: 342, opened: 248, replied: 89, status: 'Completed' },
+                      ].map((campaign, i) => (
+                        <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-xl hover:border-blue-500/30 transition-colors">
+                          <div className="flex items-start justify-between mb-4">
+                            <h3 className="text-white font-semibold text-lg">{campaign.name}</h3>
+                            <span className={`px-3 py-1 text-sm rounded-full ${
+                              campaign.status === 'Active' ? 'bg-green-500/20 text-green-400' :
+                              campaign.status === 'Scheduled' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {campaign.status}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-white/60 text-sm">Contacts</div>
+                              <div className="text-white text-xl font-bold">{campaign.contacts}</div>
+                            </div>
+                            <div>
+                              <div className="text-white/60 text-sm">Sent</div>
+                              <div className="text-white text-xl font-bold">{campaign.sent}</div>
+                            </div>
+                            <div>
+                              <div className="text-white/60 text-sm">Opened</div>
+                              <div className="text-white text-xl font-bold">{campaign.opened}</div>
+                            </div>
+                            <div>
+                              <div className="text-white/60 text-sm">Replied</div>
+                              <div className="text-white text-xl font-bold">{campaign.replied}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* WORKFLOWS TAB */}
+                {demoTab === 'workflows' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">AI Workflows</h2>
+                      <p className="text-white/60">Automate conversations with AI</p>
+                    </div>
+
+                    <button className="mb-6 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors">
+                      + Create AI Workflow
+                    </button>
+
+                    <div className="space-y-4">
+                      {[
+                        { name: 'New Lead Qualifier', trigger: 'New lead added', actions: 'Send welcome, Ask questions, Qualify', active: true, conversations: 1203 },
+                        { name: 'Policy Renewal Assistant', trigger: 'Policy expiring soon', actions: 'Send reminder, Answer questions, Schedule call', active: true, conversations: 847 },
+                        { name: 'Property Info Collector', trigger: 'Lead expresses interest', actions: 'Collect property details, Provide estimate', active: true, conversations: 623 },
+                        { name: 'Appointment Scheduler', trigger: 'Lead ready to meet', actions: 'Find available times, Book appointment, Send confirmation', active: false, conversations: 234 },
+                      ].map((workflow, i) => (
+                        <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-xl">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h3 className="text-white font-semibold text-lg mb-1">{workflow.name}</h3>
+                              <div className="text-white/60 text-sm">
+                                <span className="font-medium">Trigger:</span> {workflow.trigger}
+                              </div>
+                              <div className="text-white/60 text-sm">
+                                <span className="font-medium">Actions:</span> {workflow.actions}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <div className="text-white text-2xl font-bold">{workflow.conversations}</div>
+                                <div className="text-white/60 text-sm">conversations</div>
+                              </div>
+                              <div className={`px-3 py-1 rounded-full text-sm ${
+                                workflow.active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {workflow.active ? 'Active' : 'Inactive'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* ANALYTICS TAB */}
+                {demoTab === 'analytics' && (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-2xl font-bold text-white mb-2">Analytics</h2>
+                      <p className="text-white/60">Track your performance metrics</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="text-white/60 mb-2">Total Messages Sent</div>
+                        <div className="text-3xl font-bold text-white">12,847</div>
+                        <div className="text-green-400 text-sm mt-2">↑ 34% from last month</div>
+                      </div>
+                      <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="text-white/60 mb-2">Average Response Rate</div>
+                        <div className="text-3xl font-bold text-white">72.4%</div>
+                        <div className="text-green-400 text-sm mt-2">↑ 8.3% from last month</div>
+                      </div>
+                      <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="text-white/60 mb-2">Appointments Booked</div>
+                        <div className="text-3xl font-bold text-white">234</div>
+                        <div className="text-green-400 text-sm mt-2">↑ 12% from last month</div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 bg-white/5 border border-white/10 rounded-xl">
+                      <h3 className="text-white font-semibold text-lg mb-4">Message Volume (Last 7 Days)</h3>
+                      <div className="h-64 flex items-end justify-between gap-2">
+                        {[45, 62, 58, 73, 81, 95, 88].map((height, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center">
+                            <div className="w-full bg-gradient-to-t from-blue-600 to-purple-600 rounded-t" style={{ height: `${height}%` }}></div>
+                            <div className="text-white/60 text-sm mt-2">
+                              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* TEMPLATES, PHONE, PLANS - Placeholder for now */}
+                {(demoTab === 'templates' || demoTab === 'phone' || demoTab === 'plans') && (
+                  <div className="text-center py-20">
+                    <div className="text-white/60 mb-4">
+                      {demoTab === 'templates' && 'Message Templates'}
+                      {demoTab === 'phone' && 'Phone Number Management'}
+                      {demoTab === 'plans' && 'Plans & Billing'}
+                    </div>
+                    <p className="text-white/40">This section is available in the full application</p>
+                    <Link
+                      href="/auth/register"
+                      className="inline-block mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all"
+                    >
+                      Sign Up to Access
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
