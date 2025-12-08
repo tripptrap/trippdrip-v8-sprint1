@@ -24,7 +24,23 @@ export async function GET() {
       return NextResponse.json({ ok: false, campaigns: [], error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, campaigns: campaigns || [] });
+    // Get lead counts for each campaign
+    const campaignsWithCounts = await Promise.all(
+      (campaigns || []).map(async (campaign) => {
+        const { count } = await supabase
+          .from('leads')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('campaign_id', campaign.id);
+
+        return {
+          ...campaign,
+          lead_count: count || 0,
+        };
+      })
+    );
+
+    return NextResponse.json({ ok: true, campaigns: campaignsWithCounts, items: campaignsWithCounts });
   } catch (error: any) {
     console.error('Error in GET /api/campaigns:', error);
     return NextResponse.json({ ok: false, campaigns: [], error: error.message }, { status: 500 });
@@ -41,26 +57,50 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, status, filters, fromNumbers, sendWindow, steps, stats } = body;
+    const { name, flowId, tags } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Campaign name is required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    // Start with minimal required fields
+    const insertData: any = {
+      user_id: user.id,
+      name: name.trim(),
+    };
+
+    // Try to add flow_id if provided
+    if (flowId) {
+      insertData.flow_id = flowId;
+    }
+
+    // Add tags if provided
+    if (tags && Array.isArray(tags)) {
+      insertData.tags = tags;
+    }
+
+    // First try with flow_id
+    let { data, error } = await supabase
       .from('campaigns')
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        status: status || 'Draft',
-        filters: filters || {},
-        from_numbers: fromNumbers || [],
-        send_window: sendWindow || null,
-        steps: steps || [],
-        stats: stats || { sent: 0, replied: 0, failed: 0 }
-      })
+      .insert(insertData)
       .select()
       .single();
+
+    // If flow_id column doesn't exist, try without it
+    if (error && error.message.includes('flow_id')) {
+      console.log('flow_id column not found, retrying without it');
+      const { data: retryData, error: retryError } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          name: name.trim(),
+        })
+        .select()
+        .single();
+
+      data = retryData;
+      error = retryError;
+    }
 
     if (error) {
       console.error('Error creating campaign:', error);
@@ -84,7 +124,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats } = body;
+    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Campaign ID is required' }, { status: 400 });
@@ -98,6 +138,8 @@ export async function PUT(req: NextRequest) {
     if (sendWindow !== undefined) updateData.send_window = sendWindow;
     if (steps !== undefined) updateData.steps = steps;
     if (stats !== undefined) updateData.stats = stats;
+    if (flow_id !== undefined) updateData.flow_id = flow_id;
+    if (tags !== undefined) updateData.tags = tags;
 
     const { data, error } = await supabase
       .from('campaigns')

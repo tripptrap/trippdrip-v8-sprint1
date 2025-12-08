@@ -43,23 +43,27 @@ export async function generateSmartReplies(
     .map(msg => `${msg.direction === 'inbound' ? 'Lead' : 'You'}: ${msg.content}`)
     .join('\n');
 
-  const prompt = `You are a helpful sales assistant. Generate 3 short, professional SMS reply suggestions for this conversation.
+  const leadFirstName = leadContext.firstName || 'there';
+  const lastLeadMessage = conversationHistory.filter(m => m.direction === 'inbound').pop()?.content || '';
 
-Lead Info:
-- Name: ${leadContext.firstName} ${leadContext.lastName}
-- Company: ${leadContext.company || 'N/A'}
-- Status: ${leadContext.status || 'new'}
-- Disposition: ${leadContext.disposition || 'neutral'}
+  const prompt = `Generate 3 natural SMS reply options for a sales conversation.
 
-${userContext ? `Your Info:
-- Business: ${userContext.businessName || 'N/A'}
-- Agent: ${userContext.agentName || 'Agent'}
-` : ''}
+CONTEXT:
+Lead: ${leadContext.firstName} ${leadContext.lastName}
+Status: ${leadContext.status || 'new'}
+Last message from lead: "${lastLeadMessage}"
 
-Recent Conversation:
+Recent messages:
 ${historyText}
 
-Generate 3 varied reply options (short, under 160 characters each). Return ONLY the replies, one per line, no numbering or labels.`;
+RULES:
+- Each reply must be under 160 characters
+- Sound like a real person texting, not a bot
+- Be helpful and move the conversation forward
+- No emojis, no excessive punctuation
+- Include variety: one direct answer, one question, one value offer
+
+Return ONLY 3 replies, one per line. No numbers, bullets, or labels.`;
 
   try {
     const response = await getOpenAIClient().chat.completions.create({
@@ -67,20 +71,22 @@ Generate 3 varied reply options (short, under 160 characters each). Return ONLY 
       messages: [
         {
           role: 'system',
-          content: 'You are a professional sales communication assistant. Generate concise, friendly SMS replies.',
+          content: `You write short, natural SMS messages for insurance/real estate agents. Keep it human and conversational - never robotic or salesy. Use the lead's first name (${leadFirstName}) sparingly and naturally.`,
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      temperature: 0.8,
       max_tokens: 300,
+      presence_penalty: 0.4,
     });
 
     const suggestions = response.choices[0]?.message?.content
       ?.split('\n')
-      .filter(line => line.trim().length > 0)
+      .map(line => line.replace(/^[\d\-\.\)\*]+\s*/, '').trim()) // Remove any numbering
+      .filter(line => line.length > 0 && line.length <= 160)
       .slice(0, 3) || [];
 
     return suggestions;

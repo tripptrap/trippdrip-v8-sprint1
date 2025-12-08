@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getTemperatureDisplay } from "@/lib/leadScoring";
 import CustomModal from "@/components/CustomModal";
 
@@ -69,6 +70,7 @@ type ModalState = {
   title: string;
   message: string;
   onConfirm?: () => void;
+  confirmText?: string;
 };
 
 const CANON_FIELDS = ["first_name","last_name","phone","email","state","zip_code","tags","status"] as const;
@@ -82,6 +84,7 @@ function normalizeTags(v: any): string[] {
 function cap(s: string){ return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [toast, setToast] = useState<string>("");
   const [modal, setModal] = useState<ModalState>({
     isOpen: false,
@@ -97,11 +100,12 @@ export default function LeadsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [recalculatingScores, setRecalculatingScores] = useState(false);
 
   /* Campaigns/Tags sources for dropdowns */
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [tagsList, setTagsList] = useState<{ tag: string; count: number }[]>([]);
+  const [tagsList, setTagsList] = useState<{ id?: string; name: string; color?: string; count: number }[]>([]);
 
   /* Dropdown UI */
   const [campaignMenuOpen, setCampaignMenuOpen] = useState(false);
@@ -118,6 +122,7 @@ export default function LeadsPage() {
   const [selectedLeadDetails, setSelectedLeadDetails] = useState<string | null>(null);
   const [leadSessions, setLeadSessions] = useState<ConversationSession[]>([]);
   const [leadActivities, setLeadActivities] = useState<LeadActivity[]>([]);
+  const [leadMessages, setLeadMessages] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   /* Bulk actions */
@@ -127,12 +132,39 @@ export default function LeadsPage() {
   const [bulkDisposition, setBulkDisposition] = useState("");
   const [bulkAddTags, setBulkAddTags] = useState("");
   const [bulkRemoveTags, setBulkRemoveTags] = useState("");
+  const [bulkAddTagsDropdownOpen, setBulkAddTagsDropdownOpen] = useState(false);
+  const [bulkNewTagInput, setBulkNewTagInput] = useState("");
+  const [bulkNewTagColor, setBulkNewTagColor] = useState("#f59e0b");
+  const [bulkRemoveTagsDropdownOpen, setBulkRemoveTagsDropdownOpen] = useState(false);
+  const [bulkReplaceTagInput, setBulkReplaceTagInput] = useState("");
+  const [bulkReplaceTagColor, setBulkReplaceTagColor] = useState("#f59e0b");
+  const [bulkReplaceTags, setBulkReplaceTags] = useState<string[]>([]);
   const [bulkFollowUpTitle, setBulkFollowUpTitle] = useState("");
   const [bulkFollowUpNotes, setBulkFollowUpNotes] = useState("");
   const [bulkFollowUpDueDate, setBulkFollowUpDueDate] = useState("");
   const [bulkFollowUpPriority, setBulkFollowUpPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [reDripCampaignId, setReDripCampaignId] = useState("");
   const [reDripResetProgress, setReDripResetProgress] = useState(true);
+
+  /* Add Lead Modal */
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [newLead, setNewLead] = useState({
+    first_name: "",
+    last_name: "",
+    phone: "",
+    email: "",
+    state: "",
+    zip_code: "",
+    tags: "",
+    status: "new"
+  });
+  const [addingLead, setAddingLead] = useState(false);
+
+  /* Edit Lead Modal */
+  const [editLeadOpen, setEditLeadOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState<any>(null);
+  const [savingLead, setSavingLead] = useState(false);
+  const [editTagsDropdownOpen, setEditTagsDropdownOpen] = useState(false);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -179,6 +211,122 @@ export default function LeadsPage() {
       const j = await r.json();
       setTagsList(Array.isArray(j?.items) ? j.items : []);
     } catch { setTagsList([]); }
+  }
+
+  async function handleAddLead() {
+    if (!newLead.first_name && !newLead.last_name) {
+      setModal({ isOpen: true, type: 'error', title: 'Missing Name', message: 'Please enter at least a first or last name.' });
+      return;
+    }
+    if (!newLead.phone.trim()) {
+      setModal({ isOpen: true, type: 'error', title: 'Missing Phone', message: 'Phone number is required.' });
+      return;
+    }
+
+    setAddingLead(true);
+    try {
+      const leadData = {
+        ...newLead,
+        tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(Boolean) : []
+      };
+
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadData)
+      });
+      const data = await res.json();
+
+      if (data.ok || data.id) {
+        setToast('Lead added successfully!');
+        setTimeout(() => setToast(''), 2500);
+        setAddLeadOpen(false);
+        setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" });
+        await fetchLeads();
+      } else if (data.error === 'duplicate' && data.existingLead) {
+        const lead = data.existingLead;
+        const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unknown';
+        const tags = Array.isArray(lead.tags) ? lead.tags.join(', ') : '';
+        setModal({
+          isOpen: true,
+          type: 'confirm',
+          title: 'Duplicate Lead',
+          message: `A lead with this phone number already exists:\n\nName: ${name}\nPhone: ${lead.phone}\nEmail: ${lead.email || '—'}\nState: ${lead.state || '—'}${tags ? `\nTags: ${tags}` : ''}`,
+          confirmText: 'View Lead',
+          onConfirm: () => {
+            setAddLeadOpen(false);
+            setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" });
+            viewLeadDetails(lead.id);
+          }
+        });
+      } else {
+        setModal({ isOpen: true, type: 'error', title: 'Error', message: data.error || 'Failed to add lead' });
+      }
+    } catch (err: any) {
+      setModal({ isOpen: true, type: 'error', title: 'Error', message: err.message || 'Failed to add lead' });
+    } finally {
+      setAddingLead(false);
+    }
+  }
+
+  function openEditLead(lead: any) {
+    setEditingLead({
+      id: lead.id,
+      first_name: lead.first_name || '',
+      last_name: lead.last_name || '',
+      phone: lead.phone || '',
+      email: lead.email || '',
+      state: lead.state || '',
+      zip_code: lead.zip_code || '',
+      tags: Array.isArray(lead.tags) ? lead.tags.join(', ') : '',
+      status: lead.status || 'new',
+      disposition: lead.disposition || ''
+    });
+    setEditLeadOpen(true);
+  }
+
+  async function handleSaveLead() {
+    if (!editingLead) return;
+
+    setSavingLead(true);
+    try {
+      const leadData = {
+        first_name: editingLead.first_name?.trim() || null,
+        last_name: editingLead.last_name?.trim() || null,
+        phone: editingLead.phone?.trim() || null,
+        email: editingLead.email?.trim() || null,
+        state: editingLead.state?.trim() || null,
+        zip_code: editingLead.zip_code?.trim() || null,
+        tags: editingLead.tags ? editingLead.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+        status: editingLead.status,
+        disposition: editingLead.disposition || null
+      };
+
+      const res = await fetch(`/api/leads/${editingLead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadData)
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        setToast('Lead updated successfully!');
+        setTimeout(() => setToast(''), 2500);
+        const savedLeadId = editingLead.id;
+        setEditLeadOpen(false);
+        setEditingLead(null);
+        setEditTagsDropdownOpen(false);
+        await fetchLeads();
+        // Reopen lead details with updated data
+        viewLeadDetails(savedLeadId);
+      } else {
+        setModal({ isOpen: true, type: 'error', title: 'Error', message: data.error || 'Failed to update lead' });
+      }
+    } catch (err: any) {
+      setModal({ isOpen: true, type: 'error', title: 'Error', message: err.message || 'Failed to update lead' });
+    } finally {
+      setSavingLead(false);
+    }
   }
 
   async function deleteLead(id: string, name: string) {
@@ -468,6 +616,11 @@ export default function LeadsPage() {
     setLoadingDetails(true);
     setLeadSessions([]);
     setLeadActivities([]);
+    setLeadMessages([]);
+
+    // Get the lead to find their phone number
+    const lead = leads.find(l => String(l.id) === leadId);
+    const phone = lead?.phone;
 
     try {
       // Fetch sessions for this lead
@@ -483,6 +636,15 @@ export default function LeadsPage() {
       if (activitiesData.ok) {
         setLeadActivities(activitiesData.activities || []);
       }
+
+      // Fetch messages for this lead (by phone number)
+      if (phone) {
+        const messagesRes = await fetch(`/api/messages/by-phone?phone=${encodeURIComponent(phone)}`);
+        const messagesData = await messagesRes.json();
+        if (messagesData.ok) {
+          setLeadMessages(messagesData.messages || []);
+        }
+      }
     } catch (error) {
       console.error('Error fetching lead details:', error);
     } finally {
@@ -493,15 +655,43 @@ export default function LeadsPage() {
   useEffect(() => { fetchLeads(); fetchCampaigns(); fetchTags(); }, []);
   useEffect(() => { fetchLeads(); }, [q, selectedTags]);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      // If click is not inside a disposition menu, close all
+      if (!target.closest('[data-disposition-menu]')) {
+        setDispositionMenuOpen({});
+      }
+      // Also close campaign and tags menus
+      if (!target.closest('[data-campaign-menu]')) {
+        setCampaignMenuOpen(false);
+      }
+      if (!target.closest('[data-tags-menu]')) {
+        setTagsMenuOpen(false);
+      }
+      if (!target.closest('[data-bulk-actions-menu]')) {
+        setBulkActionsOpen(false);
+      }
+    }
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   /* Derived: apply page-level campaign/tag filters + auto-sort by score + hot leads filter */
   const filtered = useMemo(() => {
     let arr = [...leads];
 
-    // Apply campaign filter
-    if (activeCampaignId && campaigns.length) {
-      const camp = campaigns.find(c => c.id === activeCampaignId);
-      const setIds = new Set((camp?.lead_ids || []).map(String));
-      arr = arr.filter(l => setIds.has(String(l.id ?? "")));
+    // Filter archived leads - show only archived when showArchived is true, hide them otherwise
+    if (showArchived) {
+      arr = arr.filter(l => l.status === 'archived');
+    } else {
+      arr = arr.filter(l => l.status !== 'archived');
+    }
+
+    // Apply campaign filter - filter by lead's campaign_id
+    if (activeCampaignId) {
+      arr = arr.filter(l => l.campaign_id === activeCampaignId);
     }
 
     // Apply tag filter
@@ -522,7 +712,7 @@ export default function LeadsPage() {
     });
 
     return arr;
-  }, [leads, activeCampaignId, activeTagFilter, campaigns, hotLeadsOnly]);
+  }, [leads, activeCampaignId, activeTagFilter, campaigns, hotLeadsOnly, showArchived]);
 
   const allVisibleSelected = useMemo(() => {
     if (!filtered.length) return false;
@@ -548,6 +738,24 @@ export default function LeadsPage() {
       setSelectedIds(n);
     }
   }
+
+  // Select ALL visible leads (respects archive filter)
+  const allLeadsSelected = useMemo(() => {
+    if (!filtered.length) return false;
+    for (const l of filtered) { if (!selectedIds.has(String(l.id ?? ""))) return false; }
+    return true;
+  }, [filtered, selectedIds]);
+
+  function selectAllLeads() {
+    const n = new Set<string>();
+    for (const l of filtered) n.add(String(l.id ?? ""));
+    setSelectedIds(n);
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
   function toggleTagChip(tag: string) {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t=>t!==tag) : [...prev, tag]);
   }
@@ -560,6 +768,11 @@ export default function LeadsPage() {
 
   const [campaignName, setCampaignName] = useState("");
   const [bulkTags, setBulkTags] = useState("");
+  const [uploadTagsDropdownOpen, setUploadTagsDropdownOpen] = useState(false);
+  const [newTagInput, setNewTagInput] = useState("");
+  const [uploadCampaignDropdownOpen, setUploadCampaignDropdownOpen] = useState(false);
+  const [newCampaignInput, setNewCampaignInput] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#f59e0b");
 
   const detectedColumns = useMemo<string[]>(() => {
     const first = raw?.preview?.[0] || {};
@@ -708,16 +921,20 @@ export default function LeadsPage() {
   async function onImport() {
     if (!canImport) return;
     try {
+      const payload = {
+        items: mappedAll.length ? mappedAll : [],
+        campaignName: campaignName.trim() || undefined,
+        addTags: normalizeTags(bulkTags)
+      };
+      console.log("[Import Frontend] Sending payload:", payload);
+      console.log("[Import Frontend] campaignName value:", campaignName);
       const res = await fetch("/api/leads/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: mappedAll.length ? mappedAll : [],
-          campaignName: campaignName.trim() || undefined,
-          addTags: normalizeTags(bulkTags)
-        })
+        body: JSON.stringify(payload)
       });
       const json = await res.json();
+      console.log("[Import Frontend] Response:", json);
       setOpen(false);
       if (json?.ok) {
         setLastSummary({
@@ -750,36 +967,40 @@ export default function LeadsPage() {
   /* RUN CAMPAIGN: select ONLY from saved campaigns */
   const [runOpen, setRunOpen] = useState(false);
   const [runCampaignId, setRunCampaignId] = useState<string>(""); // must pick from saved
-  const [runTags, setRunTags] = useState("");
+  const [runTags, setRunTags] = useState<string[]>([]);
+  const [runTagsDropdownOpen, setRunTagsDropdownOpen] = useState(false);
+  const [runNewTagInput, setRunNewTagInput] = useState("");
+  const [runNewTagColor, setRunNewTagColor] = useState("#f59e0b");
   const [runScope, setRunScope] = useState<"selected"|"filtered">("selected");
   const [runZipCodes, setRunZipCodes] = useState(""); // comma-separated zip codes to filter by
+  const [runStates, setRunStates] = useState<string[]>([]); // states to filter by
+  const [runStatesDropdownOpen, setRunStatesDropdownOpen] = useState(false);
   const [running, setRunning] = useState(false);
 
   async function runCampaign() {
-    let ids = runScope === "selected"
-      ? Array.from(selectedIds)
-      : filtered.map(l => String(l.id ?? ""));
+    let leadsToRun = runScope === "selected"
+      ? leads.filter(l => selectedIds.has(String(l.id ?? "")))
+      : filtered;
+
+    // Filter by states if provided
+    if (runStates.length > 0) {
+      leadsToRun = leadsToRun.filter(l => l.state && runStates.includes(l.state));
+    }
 
     // Filter by zip codes if provided
     if (runZipCodes.trim()) {
       const zipCodesArray = runZipCodes.split(',').map(z => z.trim()).filter(Boolean);
       if (zipCodesArray.length > 0) {
-        const leadsToRun = runScope === "selected"
-          ? leads.filter(l => ids.includes(String(l.id ?? "")))
-          : filtered;
-
-        const filteredByZip = leadsToRun.filter(l =>
-          l.zip_code && zipCodesArray.includes(l.zip_code)
-        );
-
-        ids = filteredByZip.map(l => String(l.id ?? ""));
-
-        if (ids.length === 0) {
-          setToast(`No leads found with zip codes: ${runZipCodes}`);
-          setTimeout(()=>setToast(""), 3500);
-          return;
-        }
+        leadsToRun = leadsToRun.filter(l => l.zip_code && zipCodesArray.includes(l.zip_code));
       }
+    }
+
+    let ids = leadsToRun.map(l => String(l.id ?? ""));
+
+    if (ids.length === 0 && (runStates.length > 0 || runZipCodes.trim())) {
+      setToast(`No leads found with the selected filters`);
+      setTimeout(()=>setToast(""), 3500);
+      return;
     }
 
     if (!ids.length) {
@@ -807,15 +1028,18 @@ export default function LeadsPage() {
         body: JSON.stringify({
           leadIds: ids,
           campaignName: campaignNameOnly,            // ONLY saved campaigns allowed
-          addTags: normalizeTags(runTags)
+          addTags: runTags
         })
       });
       const j = await res.json();
       if (j?.ok) {
         setRunOpen(false);
         setRunCampaignId("");
-        setRunTags("");
+        setRunTags([]);
+        setRunTagsDropdownOpen(false);
         setRunZipCodes("");
+        setRunStates([]);
+        setRunStatesDropdownOpen(false);
         setSelectedIds(new Set());
         setToast("campaign started");
         setTimeout(()=>setToast(""), 2500);
@@ -870,13 +1094,327 @@ export default function LeadsPage() {
         type={modal.type}
         title={modal.title}
         message={modal.message}
-        confirmText={modal.type === 'confirm' ? 'Confirm' : 'OK'}
+        confirmText={modal.confirmText || (modal.type === 'confirm' ? 'Confirm' : 'OK')}
         cancelText="Cancel"
       />
 
+      {/* Add Lead Modal */}
+      {addLeadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1722] p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Add New Lead</h3>
+              <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }} className="text-white/60 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={newLead.first_name}
+                    onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={newLead.last_name}
+                    onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Phone *</label>
+                <input
+                  type="tel"
+                  value={newLead.phone}
+                  onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={newLead.email}
+                  onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">State</label>
+                  <input
+                    type="text"
+                    value={newLead.state}
+                    onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="CA"
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Zip Code</label>
+                  <input
+                    type="text"
+                    value={newLead.zip_code}
+                    onChange={(e) => setNewLead({ ...newLead, zip_code: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="90210"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Tags (comma-separated)</label>
+                <input
+                  type="text"
+                  value={newLead.tags}
+                  onChange={(e) => setNewLead({ ...newLead, tags: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="facebook, interested, warm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Status</label>
+                <select
+                  value={newLead.status}
+                  onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                >
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="qualified">Qualified</option>
+                  <option value="converted">Converted</option>
+                  <option value="lost">Lost</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }}
+                className="px-4 py-2 text-sm text-white/60 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddLead}
+                disabled={addingLead}
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {addingLead ? 'Adding...' : 'Add Lead'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Lead Modal */}
+      {editLeadOpen && editingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1722] p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Lead</h3>
+              <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-white/60 hover:text-white text-xl">&times;</button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={editingLead.first_name}
+                    onChange={(e) => setEditingLead({ ...editingLead, first_name: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={editingLead.last_name}
+                    onChange={(e) => setEditingLead({ ...editingLead, last_name: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Phone *</label>
+                <input
+                  type="tel"
+                  value={editingLead.phone}
+                  onChange={(e) => setEditingLead({ ...editingLead, phone: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editingLead.email}
+                  onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">State</label>
+                  <input
+                    type="text"
+                    value={editingLead.state}
+                    onChange={(e) => setEditingLead({ ...editingLead, state: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="CA"
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Zip Code</label>
+                  <input
+                    type="text"
+                    value={editingLead.zip_code}
+                    onChange={(e) => setEditingLead({ ...editingLead, zip_code: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="90210"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/60 mb-1">Tags</label>
+                <div className="relative">
+                  <div
+                    className="w-full min-h-[38px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
+                    onClick={() => setEditTagsDropdownOpen(!editTagsDropdownOpen)}
+                  >
+                    {editingLead.tags && editingLead.tags.split(',').filter((t: string) => t.trim()).length > 0 ? (
+                      editingLead.tags.split(',').filter((t: string) => t.trim()).map((tag: string, idx: number) => (
+                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                          {tag.trim()}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const currentTags = editingLead.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+                              const newTags = currentTags.filter((t: string) => t !== tag.trim());
+                              setEditingLead({ ...editingLead, tags: newTags.join(', ') });
+                            }}
+                            className="hover:text-white"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-white/40">Select tags...</span>
+                    )}
+                    <span className="ml-auto text-white/40">▼</span>
+                  </div>
+                  {editTagsDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
+                      {tagsList.length === 0 && allTags.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-white/40">No saved tags yet. Create tags on the Tags page.</div>
+                      ) : (
+                        [...new Set([...tagsList.map(t => t.name), ...allTags])].sort().map((tagName) => {
+                          const currentTags = editingLead.tags ? editingLead.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [];
+                          const isSelected = currentTags.includes(tagName);
+                          const tagInfo = tagsList.find(t => t.name === tagName);
+                          return (
+                            <div
+                              key={tagName}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isSelected) {
+                                  const newTags = currentTags.filter((tag: string) => tag !== tagName);
+                                  setEditingLead({ ...editingLead, tags: newTags.join(', ') });
+                                } else {
+                                  const newTags = [...currentTags, tagName];
+                                  setEditingLead({ ...editingLead, tags: newTags.join(', ') });
+                                }
+                                setEditTagsDropdownOpen(false);
+                              }}
+                              className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                {tagInfo?.color && (
+                                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tagInfo.color }} />
+                                )}
+                                {tagName}
+                              </span>
+                              {isSelected && <span className="text-emerald-400">✓</span>}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Status</label>
+                  <select
+                    value={editingLead.status}
+                    onChange={(e) => setEditingLead({ ...editingLead, status: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  >
+                    <option value="new">New</option>
+                    <option value="active">Active</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="converted">Converted</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-white/60 mb-1">Disposition</label>
+                  <select
+                    value={editingLead.disposition}
+                    onChange={(e) => setEditingLead({ ...editingLead, disposition: e.target.value })}
+                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  >
+                    <option value="">None</option>
+                    <option value="sold">Sold</option>
+                    <option value="not_interested">Not Interested</option>
+                    <option value="callback">Callback</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="nurture">Nurture</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }}
+                className="px-4 py-2 text-sm text-white/60 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveLead}
+                disabled={savingLead}
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+              >
+                {savingLead ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="m-0 text-xl font-semibold">Leads</h2>
+          <h2 className="m-0 text-xl font-semibold">{showArchived ? 'Archived Leads' : 'Leads'}</h2>
           <div className="flex flex-wrap gap-2 relative">
             <input
               value={q}
@@ -885,115 +1423,160 @@ export default function LeadsPage() {
               className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm outline-none w-[260px]"
             />
 
-            {/* Campaigns dropdown (page filter) */}
-            <div className="relative">
-              <button
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a] min-w-[140px] text-left"
-                onClick={()=>{ setCampaignMenuOpen(v=>!v); setTagsMenuOpen(false); }}
-              >
-                {activeCampaignId
-                  ? `Campaigns: ${campaigns.find(c=>c.id===activeCampaignId)?.name || "Selected"}`
-                  : "Campaigns"}
-              </button>
-              {campaignMenuOpen && (
-                <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                    onClick={()=>{ setActiveCampaignId(null); setCampaignMenuOpen(false); }}
-                  >
-                    All campaigns
-                  </button>
-                  <div className="max-h-[260px] overflow-auto">
-                    {campaigns.length===0 && (
-                      <div className="px-3 py-2 text-[#9fb0c3] text-sm">No campaigns yet</div>
-                    )}
-                    {campaigns.map(c=>(
-                      <button
-                        key={c.id}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                        onClick={()=>{ setActiveCampaignId(c.id); setCampaignMenuOpen(false); }}
-                      >
-                        {c.name} <span className="text-[#9fb0c3]">({c.lead_count ?? (c.lead_ids?.length || 0)})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Tags dropdown (page filter) */}
-            <div className="relative">
-              <button
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a] min-w-[120px] text-left"
-                onClick={()=>{ setTagsMenuOpen(v=>!v); setCampaignMenuOpen(false); }}
-              >
-                {activeTagFilter ? `Tags: ${activeTagFilter}` : "Tags"}
-              </button>
-              {tagsMenuOpen && (
-                <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
-                  <button
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                    onClick={()=>{ setActiveTagFilter(null); setTagsMenuOpen(false); }}
-                  >
-                    All tags
-                  </button>
-                  <div className="max-h-[260px] overflow-auto">
-                    {tagsList.length===0 && (
-                      <div className="px-3 py-2 text-[#9fb0c3] text-sm">No tags yet</div>
-                    )}
-                    {tagsList.map(t=>(
-                      <button
-                        key={t.tag}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                        onClick={()=>{ setActiveTagFilter(t.tag); setTagsMenuOpen(false); }}
-                      >
-                        {t.tag} <span className="text-[#9fb0c3]">({t.count})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
+            {/* Action Buttons Group - prominent styling */}
             <button
-              className={`rounded-md border px-3 py-2 text-sm transition ${hotLeadsOnly ? 'border-[#ff6347] bg-[#ff6347]/20 text-[#ff6b6b]' : 'border-[#223246] bg-[#0c1420] hover:bg-[#101b2a]'}`}
-              onClick={() => setHotLeadsOnly(v => !v)}
-              title="Filter for hot leads (score >= 70)"
+              className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+              onClick={() => setAddLeadOpen(true)}
             >
-              🔥 Hot Leads {hotLeadsOnly ? 'ON' : ''}
+              + Add Lead
             </button>
             <button
-              className="rounded-md border border-[#3b82f6] bg-[#1e3a8a]/20 px-3 py-2 text-sm text-[#60a5fa] hover:bg-[#1e3a8a]/30 disabled:opacity-50"
-              onClick={recalculateLeadScores}
-              disabled={recalculatingScores}
-              title="Recalculate lead scores based on engagement"
-            >
-              {recalculatingScores ? '⏳ Calculating...' : '🎯 Recalculate Scores'}
-            </button>
-            <button
-              className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a]"
-              onClick={() => { setOpen(true); setRaw(null); setCampaignName(""); setBulkTags(""); }}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition shadow-sm"
+              onClick={() => { setOpen(true); setRaw(null); setCampaignName(""); setBulkTags(""); setUploadTagsDropdownOpen(false); setNewTagInput(""); setNewTagColor("#f59e0b"); setUploadCampaignDropdownOpen(false); setNewCampaignInput(""); }}
             >
               Upload Leads
             </button>
-            <label className="rounded-md border border-[#3b2f66] bg-[#1a0f33] px-3 py-2 text-sm text-[#b794f6] hover:bg-[#2a1650] cursor-pointer">
-              AI Parse Document
-              <input
-                type="file"
-                className="hidden"
-                accept=".csv,.txt,.json,.pdf,.doc,.docx"
-                onChange={handleAIParse}
-              />
-            </label>
             <button
-              className="rounded-md border border-[#22472c] bg-[#0e1f17] px-3 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f]"
+              className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition shadow-sm"
               onClick={() => setRunOpen(true)}
             >
               Run Campaign
             </button>
+
+            {/* Divider */}
+            <div className="h-8 w-px bg-[#223246]"></div>
+
+            {/* Filter Buttons Group - muted styling */}
+            <div className="flex items-center gap-1 rounded-lg bg-[#0a0f16] border border-[#1a2535] p-1">
+              {/* Campaigns dropdown (page filter) */}
+              <div className="relative" data-campaign-menu>
+                <button
+                  className={`rounded-md px-3 py-1.5 text-sm min-w-[120px] text-left transition ${activeCampaignId ? 'bg-[#1a2535] text-white' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                  onClick={()=>{ setCampaignMenuOpen(v=>!v); setTagsMenuOpen(false); }}
+                >
+                  {activeCampaignId
+                    ? campaigns.find(c=>c.id===activeCampaignId)?.name || "Selected"
+                    : "Campaigns"}
+                </button>
+                {campaignMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                      onClick={()=>{ setActiveCampaignId(null); setCampaignMenuOpen(false); }}
+                    >
+                      All campaigns
+                    </button>
+                    <div className="max-h-[260px] overflow-auto">
+                      {campaigns.length===0 && (
+                        <div className="px-3 py-2 text-[#9fb0c3] text-sm">No campaigns yet</div>
+                      )}
+                      {campaigns.map(c=>{
+                        const leadCount = leads.filter(l => l.campaign_id === c.id).length;
+                        return (
+                          <button
+                            key={c.id}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                            onClick={()=>{ setActiveCampaignId(c.id); setCampaignMenuOpen(false); }}
+                          >
+                            {c.name} <span className="text-[#9fb0c3]">({leadCount})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Tags dropdown (page filter) */}
+              <div className="relative" data-tags-menu>
+                <button
+                  className={`rounded-md px-3 py-1.5 text-sm min-w-[100px] text-left transition ${activeTagFilter ? 'bg-[#1a2535] text-white' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                  onClick={()=>{ setTagsMenuOpen(v=>!v); setCampaignMenuOpen(false); }}
+                >
+                  {activeTagFilter ? activeTagFilter : "Tags"}
+                </button>
+                {tagsMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                    <button
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                      onClick={()=>{ setActiveTagFilter(null); setTagsMenuOpen(false); }}
+                    >
+                      All tags
+                    </button>
+                    <div className="max-h-[260px] overflow-auto">
+                      {tagsList.length===0 && (
+                        <div className="px-3 py-2 text-[#9fb0c3] text-sm">No tags yet</div>
+                      )}
+                      {tagsList.map(t=>(
+                        <button
+                          key={t.name}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] flex items-center gap-2"
+                          onClick={()=>{ setActiveTagFilter(t.name); setTagsMenuOpen(false); }}
+                        >
+                          {t.color && <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />}
+                          {t.name} <span className="text-[#9fb0c3]">({t.count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                className={`rounded-md px-3 py-1.5 text-sm transition ${hotLeadsOnly ? 'bg-[#ff6347]/20 text-[#ff6b6b]' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                onClick={() => { setHotLeadsOnly(v => !v); if (!hotLeadsOnly) setShowArchived(false); }}
+                title="Filter for hot leads (score >= 70)"
+              >
+                Hot Leads
+              </button>
+
+              <label className={`rounded-md px-3 py-1.5 text-sm cursor-pointer transition text-[#8899aa] hover:text-white hover:bg-[#151d28]`}>
+                AI Parse
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".csv,.txt,.json,.pdf,.doc,.docx"
+                  onChange={handleAIParse}
+                />
+              </label>
+
+              <button
+                className="rounded-md px-3 py-1.5 text-sm text-[#8899aa] hover:text-white hover:bg-[#151d28] disabled:opacity-50 transition"
+                onClick={recalculateLeadScores}
+                disabled={recalculatingScores}
+                title="Recalculate lead scores based on engagement"
+              >
+                {recalculatingScores ? '...' : 'Scores'}
+              </button>
+
+              <button
+                className={`rounded-md px-3 py-1.5 text-sm transition ${showArchived ? 'bg-[#5a6b7f]/20 text-[#9fb0c3]' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                onClick={() => { setShowArchived(v => !v); if (!showArchived) setHotLeadsOnly(false); }}
+                title="Show archived leads"
+              >
+                Archived
+              </button>
+
+              {/* Select All / Clear Selection buttons */}
+              <button
+                className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a] transition"
+                onClick={selectAllLeads}
+                disabled={filtered.length === 0 || allLeadsSelected}
+              >
+                {allLeadsSelected ? '✓ All Selected' : `Select All (${filtered.length})`}
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  className="rounded-md border border-red-600/30 bg-red-600/10 px-3 py-2 text-sm text-red-400 hover:bg-red-600/20 transition"
+                  onClick={clearSelection}
+                >
+                  Clear ({selectedIds.size})
+                </button>
+              )}
+            </div>
             {selectedIds.size > 0 && (
               <>
-                <div className="relative">
+                <div className="relative" data-bulk-actions-menu>
                   <button
                     className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a]"
                     onClick={() => setBulkActionsOpen(v => !v)}
@@ -1034,7 +1617,7 @@ export default function LeadsPage() {
                         Create Follow-ups
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-purple-400"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-emerald-400"
                         onClick={() => { setBulkActionModal('reDrip'); setBulkActionsOpen(false); }}
                       >
                         🔄 Re-Drip to Campaign
@@ -1053,6 +1636,21 @@ export default function LeadsPage() {
                         Export to JSON
                       </button>
                       <div className="border-t border-[#1a2637] my-1" />
+                      {showArchived ? (
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm text-emerald-400 hover:bg-[#0f2a1a]"
+                          onClick={() => { bulkUpdate({ status: 'new' }); setBulkActionsOpen(false); }}
+                        >
+                          📤 Unarchive Selected
+                        </button>
+                      ) : (
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm text-[#9ca3af] hover:bg-[#1a1a1a]"
+                          onClick={() => { bulkUpdate({ status: 'archived' }); setBulkActionsOpen(false); }}
+                        >
+                          📦 Archive Selected
+                        </button>
+                      )}
                       <button
                         className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a0f0f]"
                         onClick={() => { setBulkActionModal('delete'); setBulkActionsOpen(false); }}
@@ -1111,10 +1709,10 @@ export default function LeadsPage() {
                 <strong>Create Campaigns & Tags:</strong> During upload, assign a campaign name. <span className="text-[#9fb0c3]">Tags are used for disposition or to mark where the lead is at in the prospecting process (e.g., "contacted", "interested", "cold").</span>
               </li>
               <li>
-                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-blue-400 hover:underline">Flow</a> page to create a flow. <span className="text-[#9fb0c3]">This teaches the AI how to talk to selected campaigns with specific messaging strategies.</span>
+                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-emerald-400 hover:underline">Flow</a> page to create a flow. <span className="text-[#9fb0c3]">This teaches the AI how to talk to selected campaigns with specific messaging strategies.</span>
               </li>
               <li>
-                <strong>Start Bulk SMS:</strong> Once you have leads and a flow configured, go to <a href="/bulk-sms" className="text-blue-400 hover:underline">Bulk SMS</a> to send messages to your leads at scale.
+                <strong>Start Bulk SMS:</strong> Once you have leads and a flow configured, go to <a href="/bulk-sms" className="text-emerald-400 hover:underline">Bulk SMS</a> to send messages to your leads at scale.
               </li>
             </ol>
           </div>
@@ -1128,17 +1726,17 @@ export default function LeadsPage() {
                 <th className="border-b border-[#1a2637] px-3 py-2">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
-                {["Score","Name","Email","Phone","State","Tags","Status","Disposition","Actions"].map(h => (
+                {["Score","Name","Campaign","Email","Phone","State","Tags","Status","Disposition","Actions"].map(h => (
                   <th key={h} className="border-b border-[#1a2637] px-3 py-2">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={10}>Loading…</td></tr>
+                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={11}>Loading…</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={10}>No leads found.</td></tr>
+                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={11}>No leads found.</td></tr>
               )}
               {!loading && filtered.map((l, i) => {
                 const name = [l.first_name, l.last_name].filter(Boolean).join(" ") || "—";
@@ -1151,8 +1749,8 @@ export default function LeadsPage() {
                 const tempDisplay = temperature ? getTemperatureDisplay(temperature) : null;
 
                 return (
-                  <tr key={id} className="border-t border-[#1a2637]">
-                    <td className="px-3 py-2">
+                  <tr key={id} className="border-t border-[#1a2637] hover:bg-[#0c1420] cursor-pointer transition" onClick={() => viewLeadDetails(id)}>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={checked} onChange={()=>toggleRow(id)} />
                     </td>
                     <td className="px-3 py-2">
@@ -1168,15 +1766,27 @@ export default function LeadsPage() {
                       )}
                     </td>
                     <td className="px-3 py-2">{name}</td>
+                    <td className="px-3 py-2">
+                      {l.campaign_id ? (
+                        <span className="inline-block px-2 py-0.5 bg-[#1a2637] text-[#9fb0c3] rounded text-xs truncate max-w-[120px]">
+                          {campaigns.find(c => c.id === l.campaign_id)?.name || "—"}
+                        </span>
+                      ) : (
+                        <span className="text-[#9fb0c3]">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{l.email || "—"}</td>
                     <td className="px-3 py-2">{l.phone || "—"}</td>
                     <td className="px-3 py-2">{l.state || "—"}</td>
                     <td className="px-3 py-2">{Array.isArray(l.tags) && l.tags.length ? l.tags.join(", ") : "—"}</td>
                     <td className="px-3 py-2">{l.status || "—"}</td>
-                    <td className="px-3 py-2 relative">
+                    <td className="px-3 py-2 relative" onClick={(e) => e.stopPropagation()} data-disposition-menu>
                       <button
                         className="text-sm text-[#9fb0c3] hover:text-[#e7eef9] underline"
-                        onClick={() => setDispositionMenuOpen(prev => ({ ...prev, [id]: !prev[id] }))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDispositionMenuOpen(prev => ({ ...prev, [id]: !prev[id] }));
+                        }}
                       >
                         {disposition === "—" ? "Set" : disposition.replace(/_/g, ' ')}
                       </button>
@@ -1186,9 +1796,10 @@ export default function LeadsPage() {
                             <button
                               key={disp}
                               className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 updateDisposition(id, disp);
-                                setDispositionMenuOpen(prev => ({ ...prev, [id]: false }));
+                                setDispositionMenuOpen({});
                               }}
                             >
                               {disp.replace(/_/g, ' ')}
@@ -1197,21 +1808,13 @@ export default function LeadsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => viewLeadDetails(id)}
-                          className="text-sm text-blue-400 hover:text-blue-300"
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => deleteLead(id, name)}
-                          className="text-sm text-red-400 hover:text-red-300"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => deleteLead(id, name)}
+                        className="text-sm text-red-400 hover:text-red-300"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 );
@@ -1251,18 +1854,218 @@ export default function LeadsPage() {
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <input
-                    value={campaignName}
-                    onChange={(e)=>setCampaignName(e.target.value)}
-                    placeholder="Campaign name (optional)"
-                    className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm outline-none"
-                  />
-                  <input
-                    value={bulkTags}
-                    onChange={(e)=>setBulkTags(e.target.value)}
-                    placeholder="Tags to apply (comma-separated)"
-                    className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <div
+                      className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm cursor-pointer flex items-center justify-between"
+                      onClick={() => setUploadCampaignDropdownOpen(!uploadCampaignDropdownOpen)}
+                    >
+                      {campaignName ? (
+                        <span className="text-[#e7eef9]">{campaignName}</span>
+                      ) : (
+                        <span className="text-white/40">Select or create campaign...</span>
+                      )}
+                      <span className="text-white/40">▼</span>
+                    </div>
+                    {uploadCampaignDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
+                        {/* Create new campaign input */}
+                        <div className="p-2 border-b border-white/10">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={newCampaignInput}
+                              onChange={(e) => setNewCampaignInput(e.target.value)}
+                              placeholder="Create new campaign..."
+                              className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm outline-none focus:border-emerald-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (newCampaignInput.trim()) {
+                                  const campName = newCampaignInput.trim();
+                                  // Save to database
+                                  try {
+                                    await fetch('/api/campaigns', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ name: campName })
+                                    });
+                                    await fetchCampaigns(); // Refresh campaigns list
+                                  } catch (err) {
+                                    console.error('Error creating campaign:', err);
+                                  }
+                                  setCampaignName(campName);
+                                  setNewCampaignInput('');
+                                  setUploadCampaignDropdownOpen(false);
+                                }
+                              }}
+                              className="px-2 py-1 rounded-md bg-emerald-500 text-white text-xs hover:bg-emerald-600"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                        {/* No campaign option */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCampaignName('');
+                            setUploadCampaignDropdownOpen(false);
+                          }}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 ${!campaignName ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/60'}`}
+                        >
+                          No Campaign
+                        </div>
+                        {/* Saved campaigns list */}
+                        {campaigns.length > 0 && (
+                          <>
+                            <div className="px-3 py-1 text-xs text-white/40 uppercase border-t border-white/10">Saved Campaigns</div>
+                            {campaigns.map((camp) => (
+                              <div
+                                key={camp.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCampaignName(camp.name);
+                                  setUploadCampaignDropdownOpen(false);
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${campaignName === camp.name ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                              >
+                                <span>{camp.name}</span>
+                                {campaignName === camp.name && <span className="text-emerald-400">✓</span>}
+                              </div>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative flex-1">
+                    <div
+                      className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
+                      onClick={() => setUploadTagsDropdownOpen(!uploadTagsDropdownOpen)}
+                    >
+                      {bulkTags && bulkTags.split(',').filter((t: string) => t.trim()).length > 0 ? (
+                        bulkTags.split(',').filter((t: string) => t.trim()).map((tag: string, idx: number) => (
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                            {tag.trim()}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentTags = bulkTags.split(',').map((t: string) => t.trim()).filter(Boolean);
+                                const newTags = currentTags.filter((t: string) => t !== tag.trim());
+                                setBulkTags(newTags.join(', '));
+                              }}
+                              className="hover:text-white"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-white/40">Select or create tags...</span>
+                      )}
+                      <span className="ml-auto text-white/40">▼</span>
+                    </div>
+                    {uploadTagsDropdownOpen && (
+                      <div className="absolute top-full right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg min-w-[320px]">
+                        {/* Create new tag input */}
+                        <div className="p-2 border-b border-white/10">
+                          <div className="flex gap-2 items-center mb-2">
+                            <input
+                              type="text"
+                              value={newTagInput}
+                              onChange={(e) => setNewTagInput(e.target.value)}
+                              placeholder="Create new tag..."
+                              className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (newTagInput.trim()) {
+                                  const tagName = newTagInput.trim();
+                                  try {
+                                    await fetch('/api/tags', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ name: tagName, color: newTagColor })
+                                    });
+                                    await fetchTags();
+                                  } catch (err) {
+                                    console.error('Error creating tag:', err);
+                                  }
+                                  const currentTags = bulkTags ? bulkTags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+                                  if (!currentTags.includes(tagName)) {
+                                    setBulkTags([...currentTags, tagName].join(', '));
+                                  }
+                                  setNewTagInput('');
+                                  setNewTagColor('#f59e0b');
+                                  setUploadTagsDropdownOpen(false);
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-md bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 whitespace-nowrap"
+                            >
+                              Add
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-white/50">Color:</span>
+                            <div className="flex gap-1.5">
+                              {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setNewTagColor(color); }}
+                                  className={`w-5 h-5 rounded-full ${newTagColor === color ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a2332]' : ''}`}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Saved tags list */}
+                        {tagsList.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-white/40">No saved tags yet</div>
+                        ) : (
+                          <>
+                            <div className="px-3 py-1 text-xs text-white/40 uppercase">Saved Tags</div>
+                            {tagsList.map((t) => {
+                              const currentTags = bulkTags ? bulkTags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [];
+                              const isSelected = currentTags.includes(t.name);
+                              return (
+                                <div
+                                  key={t.name}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSelected) {
+                                      const newTags = currentTags.filter((tag: string) => tag !== t.name);
+                                      setBulkTags(newTags.join(', '));
+                                    } else {
+                                      const newTags = [...currentTags, t.name];
+                                      setBulkTags(newTags.join(', '));
+                                    }
+                                  }}
+                                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    {t.color && (
+                                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                                    )}
+                                    {t.name}
+                                  </span>
+                                  {isSelected && <span className="text-emerald-400">✓</span>}
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1366,12 +2169,14 @@ export default function LeadsPage() {
       )}
 
       {/* Run Campaign modal — campaign must be chosen from saved list */}
-      {runOpen && (
+      {runOpen && (() => {
+        const presetColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+        return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
           <div className="w-full max-w-xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Run Campaign</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={()=>setRunOpen(false)}>Close</button>
+              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={()=>{ setRunOpen(false); setRunTagsDropdownOpen(false); }}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <div className="grid gap-3">
@@ -1385,18 +2190,225 @@ export default function LeadsPage() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <input
-                  value={runTags}
-                  onChange={(e)=>setRunTags(e.target.value)}
-                  placeholder="Tags to apply (comma-separated)"
-                  className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
-                />
-                <input
-                  value={runZipCodes}
-                  onChange={(e)=>setRunZipCodes(e.target.value)}
-                  placeholder="Filter by ZIP codes (comma-separated, optional)"
-                  className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
-                />
+
+                {/* Tags dropdown with saved tags and create new */}
+                <div className="relative">
+                  <label className="block text-xs text-[#9fb0c3] mb-1">Tags to apply (optional)</label>
+
+                  {/* Selected tags display */}
+                  {runTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {runTags.map(tag => {
+                        const tagInfo = tagsList.find(t => t.name === tag);
+                        return (
+                          <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                            {tagInfo?.color && (
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />
+                            )}
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => setRunTags(runTags.filter(t => t !== tag))}
+                              className="hover:text-white"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setRunTagsDropdownOpen(!runTagsDropdownOpen)}
+                    className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                  >
+                    <span className="text-[#9fb0c3]">{runTags.length > 0 ? `${runTags.length} tag(s) selected` : 'Select or create tags...'}</span>
+                    <span className="text-[#9fb0c3]">{runTagsDropdownOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {runTagsDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                      {/* Create new tag */}
+                      <div className="p-2 border-b border-[#223246]">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={runNewTagInput}
+                            onChange={(e) => setRunNewTagInput(e.target.value)}
+                            placeholder="Create new tag..."
+                            className="flex-1 rounded border border-[#223246] bg-[#1a2332] px-2 py-1 text-xs outline-none"
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && runNewTagInput.trim()) {
+                                const tagName = runNewTagInput.trim();
+                                try {
+                                  await fetch('/api/tags', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: tagName, color: runNewTagColor })
+                                  });
+                                  const res = await fetch('/api/tags');
+                                  const data = await res.json();
+                                  if (data.ok) setTagsList(data.tags || []);
+                                } catch (err) {
+                                  console.error('Error saving tag:', err);
+                                }
+                                if (!runTags.includes(tagName)) {
+                                  setRunTags([...runTags, tagName]);
+                                }
+                                setRunNewTagInput('');
+                                setRunTagsDropdownOpen(false);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (runNewTagInput.trim()) {
+                                const tagName = runNewTagInput.trim();
+                                try {
+                                  await fetch('/api/tags', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: tagName, color: runNewTagColor })
+                                  });
+                                  const res = await fetch('/api/tags');
+                                  const data = await res.json();
+                                  if (data.ok) setTagsList(data.tags || []);
+                                } catch (err) {
+                                  console.error('Error saving tag:', err);
+                                }
+                                if (!runTags.includes(tagName)) {
+                                  setRunTags([...runTags, tagName]);
+                                }
+                                setRunNewTagInput('');
+                                setRunTagsDropdownOpen(false);
+                              }
+                            }}
+                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs hover:bg-emerald-500/30"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-[#9fb0c3]">Color:</span>
+                          <div className="flex gap-1">
+                            {presetColors.map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setRunNewTagColor(color)}
+                                className={`w-5 h-5 rounded-full ${runNewTagColor === color ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a2332]' : ''}`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Saved tags */}
+                      {tagsList.length === 0 ? (
+                        <div className="p-2 text-xs text-[#9fb0c3]">No saved tags yet</div>
+                      ) : (
+                        <>
+                          <div className="px-2 py-1 text-xs text-[#9fb0c3] bg-[#18273a]">Saved Tags</div>
+                          {tagsList.map(t => {
+                            const isSelected = runTags.includes(t.name);
+                            return (
+                              <div
+                                key={t.name}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setRunTags(runTags.filter(tag => tag !== t.name));
+                                  } else {
+                                    setRunTags([...runTags, t.name]);
+                                  }
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-emerald-500/10' : 'hover:bg-[#101b2a]'}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
+                                  {t.name}
+                                </div>
+                                {isSelected && <span className="text-emerald-400">✓</span>}
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Filters row */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* State filter dropdown */}
+                  <div className="relative">
+                    <label className="block text-xs text-[#9fb0c3] mb-1">Filter by State</label>
+                    <button
+                      type="button"
+                      onClick={() => setRunStatesDropdownOpen(!runStatesDropdownOpen)}
+                      className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                    >
+                      <span className="text-[#9fb0c3] truncate">
+                        {runStates.length > 0 ? runStates.join(', ') : 'All states'}
+                      </span>
+                      <span className="text-[#9fb0c3]">{runStatesDropdownOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {runStatesDropdownOpen && (() => {
+                      // Get unique states from leads
+                      const uniqueStates = [...new Set(leads.map(l => l.state).filter(Boolean))].sort();
+                      return (
+                        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                          <button
+                            type="button"
+                            onClick={() => { setRunStates([]); setRunStatesDropdownOpen(false); }}
+                            className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] ${runStates.length === 0 ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                          >
+                            All states
+                          </button>
+                          {uniqueStates.map(state => {
+                            const isSelected = runStates.includes(state as string);
+                            const count = leads.filter(l => l.state === state).length;
+                            return (
+                              <button
+                                key={state}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setRunStates(runStates.filter(s => s !== state));
+                                  } else {
+                                    setRunStates([...runStates, state as string]);
+                                  }
+                                }}
+                                className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] flex items-center justify-between ${isSelected ? 'bg-emerald-500/10' : ''}`}
+                              >
+                                <span>{state}</span>
+                                <span className="flex items-center gap-2">
+                                  <span className="text-[#9fb0c3]">({count})</span>
+                                  {isSelected && <span className="text-emerald-400">✓</span>}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* ZIP codes filter */}
+                  <div>
+                    <label className="block text-xs text-[#9fb0c3] mb-1">Filter by ZIP</label>
+                    <input
+                      value={runZipCodes}
+                      onChange={(e)=>setRunZipCodes(e.target.value)}
+                      placeholder="ZIP codes (comma-separated)"
+                      className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2">
                     <input type="radio" name="scope" checked={runScope==="selected"} onChange={()=>setRunScope("selected")} />
@@ -1407,6 +2419,59 @@ export default function LeadsPage() {
                     <span>All filtered ({filtered.length})</span>
                   </label>
                 </div>
+
+                {/* Preview leads that will be included */}
+                {(() => {
+                  let previewLeads = runScope === "selected"
+                    ? leads.filter(l => selectedIds.has(String(l.id ?? "")))
+                    : filtered;
+
+                  // Apply state filter
+                  if (runStates.length > 0) {
+                    previewLeads = previewLeads.filter(l => l.state && runStates.includes(l.state));
+                  }
+
+                  // Apply ZIP filter
+                  if (runZipCodes.trim()) {
+                    const zips = runZipCodes.split(',').map(z => z.trim()).filter(Boolean);
+                    previewLeads = previewLeads.filter(l => l.zip_code && zips.includes(l.zip_code));
+                  }
+
+                  const displayLeads = previewLeads.slice(0, 10);
+                  const remainingCount = previewLeads.length - displayLeads.length;
+
+                  return (
+                    <div className="mt-2 border border-[#223246] rounded-lg overflow-hidden">
+                      <div className="bg-[#18273a] px-3 py-2 text-xs text-[#9fb0c3] flex justify-between">
+                        <span>Leads to include ({previewLeads.length})</span>
+                        {previewLeads.length === 0 && <span className="text-amber-400">No leads selected</span>}
+                      </div>
+                      {previewLeads.length > 0 && (
+                        <div className="max-h-[200px] overflow-y-auto">
+                          {displayLeads.map(l => (
+                            <div key={l.id} className="px-3 py-2 border-b border-[#223246] last:border-b-0 flex items-center justify-between text-sm hover:bg-[#101b2a]">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[#223246] flex items-center justify-center text-xs font-medium">
+                                  {(l.first_name?.[0] || '?').toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="font-medium">{l.first_name} {l.last_name}</div>
+                                  <div className="text-xs text-[#9fb0c3]">{l.phone || l.email || 'No contact'}</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-[#9fb0c3]">{l.state || ''}</div>
+                            </div>
+                          ))}
+                          {remainingCount > 0 && (
+                            <div className="px-3 py-2 text-xs text-[#9fb0c3] text-center bg-[#0a0f16]">
+                              + {remainingCount} more lead{remainingCount !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             <div className="border-t border-[#18273a] px-4 py-3 flex justify-end">
@@ -1421,7 +2486,8 @@ export default function LeadsPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Bulk Action Modals */}
       {bulkActionModal === 'status' && (
@@ -1502,31 +2568,182 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {bulkActionModal === 'addTags' && (
-        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
+      {bulkActionModal === 'addTags' && (() => {
+        // Get current tags from selected leads
+        const selectedLeadsList = leads.filter(l => selectedIds.has(String(l.id)));
+        const currentTagsOnLeads = new Set<string>();
+        selectedLeadsList.forEach(l => {
+          if (Array.isArray(l.tags)) l.tags.forEach(t => currentTagsOnLeads.add(t));
+        });
+        return (
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[10vh]" onClick={() => setBulkActionModal(null)}>
+          <div className="w-full max-w-lg rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[600px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Add Tags</div>
               <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
-              <input
-                value={bulkAddTags}
-                onChange={(e) => setBulkAddTags(e.target.value)}
-                placeholder="Enter tags (comma-separated)"
-                className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
-              />
-              <p className="text-xs text-[#9fb0c3]">Example: hot-lead, high-priority, follow-up</p>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+              {/* Current tags on selected leads */}
+              {currentTagsOnLeads.size > 0 && (
+                <div>
+                  <p className="text-xs text-[#9fb0c3] mb-2">Current tags on selected leads:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {[...currentTagsOnLeads].map(tag => {
+                      const tagInfo = tagsList.find(t => t.name === tag);
+                      return (
+                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 text-xs">
+                          {tagInfo?.color && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />}
+                          {tag}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tags to add */}
+              <div>
+                <p className="text-xs text-[#9fb0c3] mb-2">Tags to add:</p>
+                <div className="relative">
+                  <div
+                    className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 cursor-pointer flex flex-wrap gap-1 items-center"
+                    onClick={() => setBulkAddTagsDropdownOpen(!bulkAddTagsDropdownOpen)}
+                  >
+                    {bulkAddTags && bulkAddTags.split(',').filter(t => t.trim()).length > 0 ? (
+                      bulkAddTags.split(',').filter(t => t.trim()).map((tag, idx) => {
+                        const tagInfo = tagsList.find(t => t.name === tag.trim());
+                        return (
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                            {tagInfo?.color && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />}
+                            {tag.trim()}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const currentTags = bulkAddTags.split(',').map(t => t.trim()).filter(Boolean);
+                                setBulkAddTags(currentTags.filter(t => t !== tag.trim()).join(', '));
+                              }}
+                              className="hover:text-white"
+                            >×</button>
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-white/40">Select or create tags...</span>
+                    )}
+                    <span className="ml-auto text-white/40">▼</span>
+                  </div>
+                  {bulkAddTagsDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
+                      {/* Create new tag */}
+                      <div className="p-2 border-b border-white/10">
+                        <div className="flex gap-2 items-center mb-2">
+                          <input
+                            type="text"
+                            value={bulkNewTagInput}
+                            onChange={(e) => setBulkNewTagInput(e.target.value)}
+                            placeholder="Create new tag..."
+                            className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <button
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (bulkNewTagInput.trim()) {
+                                const tagName = bulkNewTagInput.trim();
+                                try {
+                                  await fetch('/api/tags', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: tagName, color: bulkNewTagColor })
+                                  });
+                                  await fetchTags();
+                                } catch (err) { console.error('Error creating tag:', err); }
+                                const currentTags = bulkAddTags ? bulkAddTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+                                if (!currentTags.includes(tagName)) {
+                                  setBulkAddTags([...currentTags, tagName].join(', '));
+                                }
+                                setBulkNewTagInput('');
+                                setBulkNewTagColor('#f59e0b');
+                                setBulkAddTagsDropdownOpen(false);
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-md bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600"
+                          >Add</button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-white/50">Color:</span>
+                          <div className="flex gap-1.5">
+                            {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setBulkNewTagColor(color); }}
+                                className={`w-5 h-5 rounded-full ${bulkNewTagColor === color ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a2332]' : ''}`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Saved tags */}
+                      {tagsList.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-white/40">No saved tags yet</div>
+                      ) : (
+                        <>
+                          <div className="px-3 py-1 text-xs text-white/40 uppercase">Saved Tags</div>
+                          {tagsList.map(t => {
+                            const currentTags = bulkAddTags ? bulkAddTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
+                            const isSelected = currentTags.includes(t.name);
+                            return (
+                              <div
+                                key={t.name}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isSelected) {
+                                    setBulkAddTags(currentTags.filter(tag => tag !== t.name).join(', '));
+                                  } else {
+                                    setBulkAddTags([...currentTags, t.name].join(', '));
+                                  }
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
+                                  {t.name}
+                                </span>
+                                {isSelected && <span className="text-emerald-400">✓</span>}
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Clear all tags option */}
+              <div className="pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => bulkUpdate({ clearTags: true })}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  Remove all tags from selected leads
+                </button>
+              </div>
             </div>
             <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
               <button
-                onClick={() => setBulkActionModal(null)}
+                onClick={() => { setBulkActionModal(null); setBulkAddTagsDropdownOpen(false); }}
                 className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
-                onClick={() => bulkUpdate({ addTags: bulkAddTags.split(',').map(t => t.trim()).filter(Boolean) })}
+                onClick={() => { bulkUpdate({ addTags: bulkAddTags.split(',').map(t => t.trim()).filter(Boolean) }); setBulkAddTagsDropdownOpen(false); }}
                 disabled={!bulkAddTags.trim()}
                 className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
               >
@@ -1535,42 +2752,280 @@ export default function LeadsPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
-      {bulkActionModal === 'removeTags' && (
-        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
+      {bulkActionModal === 'removeTags' && (() => {
+        // Get all unique tags from selected leads
+        const selectedLeadsList = leads.filter(l => selectedIds.has(l.id));
+        const currentTagsOnSelected = [...new Set(selectedLeadsList.flatMap(l => Array.isArray(l.tags) ? l.tags : []))];
+        const tagsToRemove = bulkRemoveTags.split(',').map(t => t.trim()).filter(Boolean);
+        const presetColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+
+        return (
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>
+          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[600px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Remove Tags</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Manage Tags</div>
+              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>Close</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
-              <input
-                value={bulkRemoveTags}
-                onChange={(e) => setBulkRemoveTags(e.target.value)}
-                placeholder="Enter tags to remove (comma-separated)"
-                className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
-              />
-              <p className="text-xs text-[#9fb0c3]">Example: old-lead, archived, inactive</p>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+              {/* Current tags on selected leads */}
+              <div>
+                <label className="block text-xs text-[#9fb0c3] mb-2">Current tags on selected leads (click to remove):</label>
+                {currentTagsOnSelected.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {currentTagsOnSelected.map(tag => {
+                      const tagInfo = tagsList.find(t => t.name === tag);
+                      const isSelected = tagsToRemove.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setBulkRemoveTags(tagsToRemove.filter(t => t !== tag).join(', '));
+                            } else {
+                              setBulkRemoveTags([...tagsToRemove, tag].join(', '));
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs flex items-center gap-1.5 transition-all ${
+                            isSelected
+                              ? 'bg-red-500/30 border border-red-500/50 text-red-300 line-through'
+                              : 'bg-[#18273a] border border-[#223246] hover:border-red-500/50 hover:bg-red-500/10'
+                          }`}
+                        >
+                          {tagInfo?.color && (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />
+                          )}
+                          {tag}
+                          {isSelected && <span className="ml-1">✕</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#9fb0c3] italic">No tags on selected leads</p>
+                )}
+              </div>
+
+              {/* Replace with new tags section */}
+              <div className="pt-3 border-t border-white/10">
+                <label className="block text-xs text-[#9fb0c3] mb-2">Replace with tags (optional):</label>
+
+                {/* Selected replacement tags */}
+                {bulkReplaceTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {bulkReplaceTags.map(tag => {
+                      const tagInfo = tagsList.find(t => t.name === tag);
+                      return (
+                        <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                          {tagInfo?.color && (
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />
+                          )}
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => setBulkReplaceTags(bulkReplaceTags.filter(t => t !== tag))}
+                            className="hover:text-white"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Dropdown for selecting/creating tags */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setBulkRemoveTagsDropdownOpen(!bulkRemoveTagsDropdownOpen)}
+                    className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                  >
+                    <span className="text-[#9fb0c3]">Select or create tags...</span>
+                    <span className="text-[#9fb0c3]">{bulkRemoveTagsDropdownOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {bulkRemoveTagsDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto min-w-[320px]">
+                      {/* Create new tag */}
+                      <div className="p-2 border-b border-[#223246]">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={bulkReplaceTagInput}
+                            onChange={(e) => setBulkReplaceTagInput(e.target.value)}
+                            placeholder="Create new tag..."
+                            className="flex-1 rounded border border-[#223246] bg-[#1a2332] px-2 py-1 text-xs outline-none"
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && bulkReplaceTagInput.trim()) {
+                                const tagName = bulkReplaceTagInput.trim();
+                                // Save to database
+                                try {
+                                  await fetch('/api/tags', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: tagName, color: bulkReplaceTagColor })
+                                  });
+                                  // Refresh tags list
+                                  const res = await fetch('/api/tags');
+                                  const data = await res.json();
+                                  if (data.ok) setTagsList(data.tags || []);
+                                } catch (err) {
+                                  console.error('Error saving tag:', err);
+                                }
+                                if (!bulkReplaceTags.includes(tagName)) {
+                                  setBulkReplaceTags([...bulkReplaceTags, tagName]);
+                                }
+                                setBulkReplaceTagInput('');
+                                setBulkRemoveTagsDropdownOpen(false);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (bulkReplaceTagInput.trim()) {
+                                const tagName = bulkReplaceTagInput.trim();
+                                try {
+                                  await fetch('/api/tags', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: tagName, color: bulkReplaceTagColor })
+                                  });
+                                  const res = await fetch('/api/tags');
+                                  const data = await res.json();
+                                  if (data.ok) setTagsList(data.tags || []);
+                                } catch (err) {
+                                  console.error('Error saving tag:', err);
+                                }
+                                if (!bulkReplaceTags.includes(tagName)) {
+                                  setBulkReplaceTags([...bulkReplaceTags, tagName]);
+                                }
+                                setBulkReplaceTagInput('');
+                                setBulkRemoveTagsDropdownOpen(false);
+                              }
+                            }}
+                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs hover:bg-emerald-500/30"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-[#9fb0c3]">Color:</span>
+                          <div className="flex gap-1">
+                            {presetColors.map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setBulkReplaceTagColor(color)}
+                                className={`w-5 h-5 rounded-full ${bulkReplaceTagColor === color ? 'ring-2 ring-white ring-offset-1 ring-offset-[#1a2332]' : ''}`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Saved tags */}
+                      {tagsList.length === 0 ? (
+                        <div className="p-2 text-xs text-[#9fb0c3]">No saved tags yet</div>
+                      ) : (
+                        <>
+                          <div className="px-2 py-1 text-xs text-[#9fb0c3] bg-[#18273a]">Saved Tags</div>
+                          {tagsList.map(t => {
+                            const isSelected = bulkReplaceTags.includes(t.name);
+                            return (
+                              <div
+                                key={t.name}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setBulkReplaceTags(bulkReplaceTags.filter(tag => tag !== t.name));
+                                  } else {
+                                    setBulkReplaceTags([...bulkReplaceTags, t.name]);
+                                  }
+                                }}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-emerald-500/10' : 'hover:bg-[#101b2a]'}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
+                                  {t.name}
+                                </div>
+                                {isSelected && <span className="text-emerald-400">✓</span>}
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="p-3 bg-[#18273a] rounded-lg text-xs">
+                {tagsToRemove.length > 0 && (
+                  <p className="text-red-300 mb-1">
+                    Removing: {tagsToRemove.join(', ')}
+                  </p>
+                )}
+                {bulkReplaceTags.length > 0 && (
+                  <p className="text-emerald-300">
+                    Adding: {bulkReplaceTags.join(', ')}
+                  </p>
+                )}
+                {tagsToRemove.length === 0 && bulkReplaceTags.length === 0 && (
+                  <p className="text-[#9fb0c3]">Select tags to remove or add replacement tags</p>
+                )}
+              </div>
+
+              {/* Quick actions */}
+              <div className="flex gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => { bulkUpdate({ clearTags: true }); setBulkRemoveTagsDropdownOpen(false); }}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  Remove ALL tags
+                </button>
+                <span className="text-[#9fb0c3]">|</span>
+                <button
+                  type="button"
+                  onClick={() => { setBulkRemoveTags(''); setBulkReplaceTags([]); }}
+                  className="text-xs text-[#9fb0c3] hover:text-white"
+                >
+                  Clear selection
+                </button>
+              </div>
             </div>
             <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
               <button
-                onClick={() => setBulkActionModal(null)}
+                onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); setBulkReplaceTags([]); }}
                 className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
-                onClick={() => bulkUpdate({ removeTags: bulkRemoveTags.split(',').map(t => t.trim()).filter(Boolean) })}
-                disabled={!bulkRemoveTags.trim()}
+                onClick={() => {
+                  bulkUpdate({
+                    removeTags: tagsToRemove.length > 0 ? tagsToRemove : undefined,
+                    addTags: bulkReplaceTags.length > 0 ? bulkReplaceTags : undefined
+                  });
+                  setBulkRemoveTagsDropdownOpen(false);
+                  setBulkReplaceTags([]);
+                }}
+                disabled={tagsToRemove.length === 0 && bulkReplaceTags.length === 0}
                 className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
               >
-                Remove Tags
+                Apply Changes
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {bulkActionModal === 'createFollowUps' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
@@ -1671,7 +3126,7 @@ export default function LeadsPage() {
                   Re-enroll selected leads in this drip campaign
                 </p>
               </div>
-              <div className="p-3 bg-purple-600/10 border border-purple-500/30 rounded-lg">
+              <div className="p-3 bg-emerald-400/10 border border-emerald-400/30 rounded-lg">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1679,11 +3134,11 @@ export default function LeadsPage() {
                     onChange={(e) => setReDripResetProgress(e.target.checked)}
                     className="rounded"
                   />
-                  <span className="text-sm text-purple-300">
+                  <span className="text-sm text-emerald-300">
                     Reset progress and start from beginning
                   </span>
                 </label>
-                <p className="text-xs text-purple-300/60 mt-1 ml-6">
+                <p className="text-xs text-emerald-300/60 mt-1 ml-6">
                   Leads will restart the campaign from step 1, even if they've completed it before
                 </p>
               </div>
@@ -1728,7 +3183,7 @@ export default function LeadsPage() {
                   }
                 }}
                 disabled={!reDripCampaignId}
-                className="rounded-md border border-purple-500/30 bg-purple-600/20 px-4 py-2 text-sm text-purple-300 hover:bg-purple-600/30 disabled:opacity-50"
+                className="rounded-md border border-emerald-400/30 bg-emerald-400/20 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-400/30 disabled:opacity-50"
               >
                 Re-Enroll Leads
               </button>
@@ -1771,112 +3226,179 @@ export default function LeadsPage() {
       )}
 
       {/* Lead Details Modal */}
-      {selectedLeadDetails && (
+      {selectedLeadDetails && (() => {
+        const selectedLead = leads.find(l => String(l.id) === selectedLeadDetails);
+        const leadName = selectedLead ? [selectedLead.first_name, selectedLead.last_name].filter(Boolean).join(' ') || 'Unknown' : 'Unknown';
+        return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={() => setSelectedLeadDetails(null)}>
-          <div className="w-full max-w-4xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
+          <div className="w-full max-w-5xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Lead Details</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setSelectedLeadDetails(null)}>Close</button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-semibold">
+                  {leadName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-white">{leadName}</div>
+                  <div className="text-sm text-[#9fb0c3]">{selectedLead?.phone || 'No phone'}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { openEditLead(selectedLead); setSelectedLeadDetails(null); }}
+                  className="px-3 py-1.5 rounded-md bg-[#1a2535] text-white text-sm hover:bg-[#243447] transition border border-[#2a3a4d]"
+                >
+                  Edit Lead
+                </button>
+                {selectedLead?.phone && (
+                  <button
+                    onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
+                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                  >
+                    Send Message
+                  </button>
+                )}
+                <button className="text-[#9fb0c3] hover:text-[#e7eef9] text-xl px-2" onClick={() => setSelectedLeadDetails(null)}>×</button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4">
               {loadingDetails ? (
                 <div className="text-center py-8 text-[#9fb0c3]">Loading details...</div>
               ) : (
-                <>
-                  {/* Conversation Sessions */}
-                  <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
-                    <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      Conversation Sessions
-                    </h3>
-                    {leadSessions.length === 0 ? (
-                      <p className="text-sm text-[#9fb0c3]">No conversation sessions yet</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {leadSessions.map((session) => (
-                          <div key={session.id} className="border border-[#1a2637] bg-[#0c1420] rounded-lg p-3">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  session.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                  session.status === 'active' ? 'bg-blue-500/20 text-blue-400' :
-                                  session.status === 'recovered' ? 'bg-purple-500/20 text-purple-400' :
-                                  'bg-orange-500/20 text-orange-400'
-                                }`}>
-                                  {session.status}
-                                </span>
-                                {session.appointment_booked && (
-                                  <span className="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400">
-                                    Appointment Booked
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-[#9fb0c3]">
-                                {new Date(session.started_at).toLocaleString()}
-                              </div>
-                            </div>
-                            <div className="text-sm space-y-1">
-                              <div className="text-[#9fb0c3]">
-                                Last Activity: {new Date(session.last_activity_at).toLocaleString()}
-                              </div>
-                              {session.appointment_time && (
-                                <div className="text-green-400">
-                                  Appointment: {new Date(session.appointment_time).toLocaleString()}
-                                </div>
-                              )}
-                              {session.conversation_history && session.conversation_history.length > 0 && (
-                                <div className="text-blue-400">
-                                  Messages: {session.conversation_history.length}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Left Column - Lead Info & Activity */}
+                  <div className="space-y-4">
+                    {/* Contact Information */}
+                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
+                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Contact Information
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Name</div>
+                          <div className="text-white">{leadName}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Phone</div>
+                          <div className="text-white">{selectedLead?.phone || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Email</div>
+                          <div className="text-white break-all">{selectedLead?.email || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">State</div>
+                          <div className="text-white">{selectedLead?.state || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Status</div>
+                          <div className="text-white capitalize">{selectedLead?.status || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Disposition</div>
+                          <div className="text-white capitalize">{(selectedLead as any)?.disposition?.replace(/_/g, ' ') || '—'}</div>
+                        </div>
                       </div>
-                    )}
+                      {selectedLead?.tags && selectedLead.tags.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-[#9fb0c3] text-xs uppercase mb-2">Tags</div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedLead.tags.map((tag, i) => (
+                              <span key={i} className="px-2 py-1 rounded-full text-xs bg-[#1a2637] text-[#e7eef9]">{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Activity Timeline */}
+                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
+                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Activity Timeline
+                      </h3>
+                      {leadActivities.length === 0 ? (
+                        <p className="text-sm text-[#9fb0c3]">No activities recorded yet</p>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                          {leadActivities.map((activity) => (
+                            <div key={activity.id} className="border-l-2 border-emerald-500 pl-3 py-2">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="text-sm font-semibold text-white capitalize">
+                                    {activity.activity_type.replace(/_/g, ' ')}
+                                  </div>
+                                  <div className="text-sm text-[#9fb0c3] mt-1">
+                                    {activity.description}
+                                  </div>
+                                </div>
+                                <div className="text-xs text-[#9fb0c3] ml-3">
+                                  {new Date(activity.created_at).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Lead Activities */}
-                  <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
-                    <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      Activity Timeline
-                    </h3>
-                    {leadActivities.length === 0 ? (
-                      <p className="text-sm text-[#9fb0c3]">No activities recorded yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {leadActivities.map((activity) => (
-                          <div key={activity.id} className="border-l-2 border-blue-500 pl-3 py-2">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="text-sm font-semibold text-white capitalize">
-                                  {activity.activity_type.replace(/_/g, ' ')}
+                  {/* Right Column - Messages */}
+                  <div className="space-y-4">
+                    {/* SMS Messages */}
+                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4 h-full">
+                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        Messages ({leadMessages.length})
+                      </h3>
+                      {leadMessages.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-sm text-[#9fb0c3] mb-3">No messages yet</p>
+                          {selectedLead?.phone && (
+                            <button
+                              onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
+                              className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                            >
+                              Start Conversation
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                          {leadMessages.map((msg, i) => (
+                            <div key={msg.id || i} className={`flex ${msg.direction === 'out' || msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                                msg.direction === 'out' || msg.sender === 'agent'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-[#1a2637] text-[#e7eef9]'
+                              }`}>
+                                <div className="text-sm whitespace-pre-wrap">{msg.body}</div>
+                                <div className={`text-xs mt-1 ${
+                                  msg.direction === 'out' || msg.sender === 'agent' ? 'text-blue-200' : 'text-[#9fb0c3]'
+                                }`}>
+                                  {new Date(msg.created_at).toLocaleString()}
                                 </div>
-                                <div className="text-sm text-[#9fb0c3] mt-1">
-                                  {activity.description}
-                                </div>
-                              </div>
-                              <div className="text-xs text-[#9fb0c3] ml-3">
-                                {new Date(activity.created_at).toLocaleString()}
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

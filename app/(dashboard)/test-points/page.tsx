@@ -94,7 +94,7 @@ export default function TestPointsPage() {
       </div>
 
       {/* Current Balance Card */}
-      <div className="card bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-blue-500/30">
+      <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-400/20 border-emerald-500/30">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm text-white/60 mb-1">Current Balance</div>
@@ -103,7 +103,7 @@ export default function TestPointsPage() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
           >
             Refresh
           </button>
@@ -162,9 +162,9 @@ export default function TestPointsPage() {
           <button
             onClick={testAddPoints}
             disabled={loading}
-            className="p-4 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-lg text-left transition disabled:opacity-50"
           >
-            <div className="font-semibold text-green-400">Add 100 Points (Test)</div>
+            <div className="font-semibold text-emerald-400">Add 100 Points (Test)</div>
             <div className="text-sm text-white/60">Test point addition</div>
           </button>
         </div>
@@ -188,7 +188,7 @@ export default function TestPointsPage() {
                     {new Date(txn.created_at).toLocaleString()}
                   </div>
                 </div>
-                <div className={`font-bold ${txn.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`font-bold ${txn.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {txn.amount > 0 ? '+' : ''}{txn.amount} pts
                 </div>
               </div>
@@ -217,10 +217,10 @@ export default function TestPointsPage() {
       </div>
 
       {/* Database Check */}
-      <div className="card bg-blue-500/10 border-blue-500/30">
+      <div className="card bg-emerald-500/10 border-emerald-500/30">
         <h3 className="font-semibold mb-2">🗄️ Verify in Supabase:</h3>
         <div className="text-sm space-y-2 text-white/80">
-          <p>1. Go to your Supabase dashboard: <a href="https://supabase.com/dashboard/project/ljibsszhcvhwnoegweat" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Open Dashboard</a></p>
+          <p>1. Go to your Supabase dashboard: <a href="https://supabase.com/dashboard/project/ljibsszhcvhwnoegweat" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Open Dashboard</a></p>
           <p>2. Navigate to Table Editor</p>
           <p>3. Check these tables:</p>
           <ul className="ml-6 space-y-1 list-disc list-inside">

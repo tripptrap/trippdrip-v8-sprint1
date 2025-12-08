@@ -272,8 +272,8 @@ export default function FollowUpsPage() {
   function getPriorityColor(priority: string) {
     switch (priority) {
       case 'urgent': return 'bg-red-900/30 text-red-300 border-red-700';
-      case 'high': return 'bg-orange-900/30 text-orange-300 border-orange-700';
-      case 'medium': return 'bg-blue-900/30 text-blue-300 border-blue-700';
+      case 'high': return 'bg-orange-900/30 text-emerald-300 border-orange-700';
+      case 'medium': return 'bg-blue-900/30 text-blue-300 border-emerald-700';
       case 'low': return 'bg-gray-800/50 text-gray-400 border-gray-700';
       default: return 'bg-gray-800/50 text-gray-400 border-gray-700';
     }
@@ -310,13 +310,13 @@ export default function FollowUpsPage() {
           <button
             onClick={loadSuggestions}
             disabled={loadingSuggestions}
-            className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 disabled:opacity-50"
+            className="bg-emerald-400 text-white px-4 py-2 rounded-lg hover:bg-emerald-400 disabled:opacity-50"
           >
             {loadingSuggestions ? 'Loading...' : 'Smart Suggestions'}
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
+            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600"
           >
             Create Follow-up
           </button>
@@ -327,7 +327,7 @@ export default function FollowUpsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card">
           <div className="text-sm text-[#9fb0c3] mb-1">Pending</div>
-          <div className="text-3xl font-bold text-blue-400">{pendingCount}</div>
+          <div className="text-3xl font-bold text-emerald-400">{pendingCount}</div>
         </div>
         <div className="card">
           <div className="text-sm text-[#9fb0c3] mb-1">Overdue</div>
@@ -335,7 +335,7 @@ export default function FollowUpsPage() {
         </div>
         <div className="card">
           <div className="text-sm text-[#9fb0c3] mb-1">Completed</div>
-          <div className="text-3xl font-bold text-green-400">{completedCount}</div>
+          <div className="text-3xl font-bold text-emerald-400">{completedCount}</div>
         </div>
         <div className="card">
           <div className="text-sm text-[#9fb0c3] mb-1">Total</div>
@@ -348,19 +348,19 @@ export default function FollowUpsPage() {
         <div className="flex gap-2 border-b border-[#223246] pb-2">
           <button
             onClick={() => setStatusFilter('pending')}
-            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             Pending ({pendingCount})
           </button>
           <button
             onClick={() => setStatusFilter('completed')}
-            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             Completed ({completedCount})
           </button>
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
           >
             All ({followUps.length})
           </button>
@@ -393,7 +393,7 @@ export default function FollowUpsPage() {
                         </span>
                       )}
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        followUp.status === 'completed' ? 'bg-green-900/30 text-green-300 border border-green-700' :
+                        followUp.status === 'completed' ? 'bg-emerald-900/30 text-emerald-300 border border-emerald-700' :
                         followUp.status === 'cancelled' ? 'bg-gray-800/50 text-gray-400 border border-gray-700' :
                         'bg-yellow-900/30 text-yellow-300 border border-yellow-700'
                       }`}>
@@ -419,14 +419,14 @@ export default function FollowUpsPage() {
                       <>
                         <button
                           onClick={() => updateFollowUp(followUp.id, { status: 'completed' })}
-                          className="px-3 py-1 text-sm bg-green-900/30 text-green-300 rounded hover:bg-green-900/50 border border-green-700"
+                          className="px-3 py-1 text-sm bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 border border-emerald-700"
                         >
                           Complete
                         </button>
                         {followUp.leads && (
                           <Link
                             href={`/texts?leadId=${followUp.lead_id}`}
-                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-blue-700"
+                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-emerald-700"
                           >
                             Message
                           </Link>
@@ -493,7 +493,7 @@ export default function FollowUpsPage() {
                         </div>
                         <button
                           onClick={() => createFromSuggestion(suggestion)}
-                          className="ml-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                          className="ml-4 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
                         >
                           Create
                         </button>
@@ -527,7 +527,7 @@ export default function FollowUpsPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-900/20 border-blue-700/50">
+      <div className="card bg-blue-900/20 border-emerald-700/50">
         <h3 className="font-semibold mb-2 text-[#e7eef9]">Smart Follow-up System</h3>
         <ul className="text-sm text-[#9fb0c3] space-y-1">
           <li>• Click "Smart Suggestions" to see AI-powered follow-up recommendations</li>

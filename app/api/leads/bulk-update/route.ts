@@ -11,6 +11,7 @@ interface BulkUpdateRequest {
     disposition?: string;
     addTags?: string[];
     removeTags?: string[];
+    clearTags?: boolean;
     temperature?: string;
   };
 }
@@ -80,14 +81,19 @@ export async function POST(req: NextRequest) {
       // Handle tags
       let newTags = Array.isArray(lead.tags) ? [...lead.tags] : [];
 
-      // Add tags
-      if (Array.isArray(updates.addTags) && updates.addTags.length > 0) {
-        newTags = [...new Set([...newTags, ...updates.addTags])];
-      }
+      // Clear all tags if requested
+      if (updates.clearTags) {
+        newTags = [];
+      } else {
+        // Add tags
+        if (Array.isArray(updates.addTags) && updates.addTags.length > 0) {
+          newTags = [...new Set([...newTags, ...updates.addTags])];
+        }
 
-      // Remove tags
-      if (Array.isArray(updates.removeTags) && updates.removeTags.length > 0) {
-        newTags = newTags.filter(tag => !updates.removeTags!.includes(tag));
+        // Remove tags
+        if (Array.isArray(updates.removeTags) && updates.removeTags.length > 0) {
+          newTags = newTags.filter(tag => !updates.removeTags!.includes(tag));
+        }
       }
 
       updateData.tags = newTags;

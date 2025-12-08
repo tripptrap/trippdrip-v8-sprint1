@@ -1,7 +1,73 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw, Clock } from 'lucide-react';
+
+// Helper function to guess timezone from phone number area code
+function getTimezoneFromPhone(phone: string | undefined): { abbr: string; name: string } | null {
+  if (!phone) return null;
+
+  const cleaned = phone.replace(/\D/g, '');
+  const areaCode = cleaned.length >= 10 ? cleaned.substring(cleaned.length - 10, cleaned.length - 7) : '';
+
+  const timezoneMap: { [key: string]: { abbr: string; name: string } } = {
+    // Eastern Time
+    '212': { abbr: 'ET', name: 'America/New_York' }, '646': { abbr: 'ET', name: 'America/New_York' },
+    '917': { abbr: 'ET', name: 'America/New_York' }, '347': { abbr: 'ET', name: 'America/New_York' },
+    '305': { abbr: 'ET', name: 'America/New_York' }, '786': { abbr: 'ET', name: 'America/New_York' },
+    '954': { abbr: 'ET', name: 'America/New_York' }, '404': { abbr: 'ET', name: 'America/New_York' },
+    '678': { abbr: 'ET', name: 'America/New_York' }, '770': { abbr: 'ET', name: 'America/New_York' },
+    '617': { abbr: 'ET', name: 'America/New_York' }, '857': { abbr: 'ET', name: 'America/New_York' },
+    '202': { abbr: 'ET', name: 'America/New_York' }, '215': { abbr: 'ET', name: 'America/New_York' },
+    '267': { abbr: 'ET', name: 'America/New_York' }, '407': { abbr: 'ET', name: 'America/New_York' },
+    '321': { abbr: 'ET', name: 'America/New_York' }, '704': { abbr: 'ET', name: 'America/New_York' },
+    '980': { abbr: 'ET', name: 'America/New_York' }, '757': { abbr: 'ET', name: 'America/New_York' },
+    '804': { abbr: 'ET', name: 'America/New_York' }, '813': { abbr: 'ET', name: 'America/New_York' },
+    '727': { abbr: 'ET', name: 'America/New_York' }, '561': { abbr: 'ET', name: 'America/New_York' },
+    // Central Time
+    '312': { abbr: 'CT', name: 'America/Chicago' }, '773': { abbr: 'CT', name: 'America/Chicago' },
+    '872': { abbr: 'CT', name: 'America/Chicago' }, '713': { abbr: 'CT', name: 'America/Chicago' },
+    '281': { abbr: 'CT', name: 'America/Chicago' }, '832': { abbr: 'CT', name: 'America/Chicago' },
+    '214': { abbr: 'CT', name: 'America/Chicago' }, '469': { abbr: 'CT', name: 'America/Chicago' },
+    '972': { abbr: 'CT', name: 'America/Chicago' }, '210': { abbr: 'CT', name: 'America/Chicago' },
+    '726': { abbr: 'CT', name: 'America/Chicago' }, '512': { abbr: 'CT', name: 'America/Chicago' },
+    '737': { abbr: 'CT', name: 'America/Chicago' }, '314': { abbr: 'CT', name: 'America/Chicago' },
+    '504': { abbr: 'CT', name: 'America/Chicago' }, '615': { abbr: 'CT', name: 'America/Chicago' },
+    '629': { abbr: 'CT', name: 'America/Chicago' }, '901': { abbr: 'CT', name: 'America/Chicago' },
+    // Mountain Time
+    '303': { abbr: 'MT', name: 'America/Denver' }, '720': { abbr: 'MT', name: 'America/Denver' },
+    '602': { abbr: 'MT', name: 'America/Phoenix' }, '623': { abbr: 'MT', name: 'America/Phoenix' },
+    '480': { abbr: 'MT', name: 'America/Phoenix' }, '505': { abbr: 'MT', name: 'America/Denver' },
+    '801': { abbr: 'MT', name: 'America/Denver' }, '385': { abbr: 'MT', name: 'America/Denver' },
+    // Pacific Time
+    '213': { abbr: 'PT', name: 'America/Los_Angeles' }, '310': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '323': { abbr: 'PT', name: 'America/Los_Angeles' }, '424': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '818': { abbr: 'PT', name: 'America/Los_Angeles' }, '415': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '628': { abbr: 'PT', name: 'America/Los_Angeles' }, '619': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '858': { abbr: 'PT', name: 'America/Los_Angeles' }, '206': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '253': { abbr: 'PT', name: 'America/Los_Angeles' }, '503': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '971': { abbr: 'PT', name: 'America/Los_Angeles' }, '702': { abbr: 'PT', name: 'America/Los_Angeles' },
+    '916': { abbr: 'PT', name: 'America/Los_Angeles' }, '925': { abbr: 'PT', name: 'America/Los_Angeles' },
+  };
+
+  return timezoneMap[areaCode] || null;
+}
+
+function getLocalTime(timezone: { abbr: string; name: string } | null): string {
+  if (!timezone) return '';
+  try {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', {
+      timeZone: timezone.name,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${timeString} ${timezone.abbr}`;
+  } catch (e) {
+    return '';
+  }
+}
 
 interface SendSMSModalProps {
   isOpen: boolean;
@@ -34,15 +100,13 @@ export default function SendSMSModal({
   useEffect(() => {
     if (isOpen) {
       loadTwilioNumbers();
-      // Reset form when modal opens
-      if (!leadPhone) {
-        setToPhone('');
-      }
+      // Set or reset toPhone based on leadPhone prop
+      setToPhone(leadPhone || '');
       setMessage('');
       setError('');
       setSuccess(false);
     }
-  }, [isOpen]);
+  }, [isOpen, leadPhone]);
 
   const loadTwilioNumbers = async () => {
     try {
@@ -174,6 +238,9 @@ export default function SendSMSModal({
   const characterCount = message.length;
   const smsCount = Math.ceil(characterCount / 160) || 1;
 
+  const timezone = getTimezoneFromPhone(toPhone);
+  const localTime = getLocalTime(timezone);
+
   if (!isOpen) return null;
 
   return (
@@ -183,8 +250,14 @@ export default function SendSMSModal({
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div>
             <h2 className="text-xl font-semibold text-white">
-              Send Message
+              {leadName ? `Message to ${leadName}` : 'Send Message'}
             </h2>
+            {localTime && (
+              <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-400">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Local time: {localTime}</span>
+              </div>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -203,7 +276,7 @@ export default function SendSMSModal({
           )}
 
           {success && (
-            <div className="bg-green-900/20 border border-green-500/50 text-green-300 px-4 py-3 rounded">
+            <div className="bg-emerald-900/20 border border-emerald-500/50 text-emerald-300 px-4 py-3 rounded">
               Message sent successfully!
             </div>
           )}
@@ -216,7 +289,7 @@ export default function SendSMSModal({
             <select
               value={fromNumber}
               onChange={(e) => setFromNumber(e.target.value)}
-              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white"
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-white"
               disabled={sending || success || loadingNumbers}
             >
               <option value="">
@@ -264,7 +337,7 @@ export default function SendSMSModal({
               value={toPhone}
               onChange={(e) => setToPhone(e.target.value)}
               placeholder="+1234567890 or 1234567890"
-              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white placeholder-gray-500"
+              className="w-full px-3 py-2.5 bg-[#0c1420] border border-white/20 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm text-white placeholder-gray-500"
               disabled={sending || success}
             />
           </div>
@@ -280,19 +353,19 @@ export default function SendSMSModal({
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Type your message here..."
                 rows={6}
-                className={`w-full px-3 py-2.5 bg-[#0c1420] border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm text-white placeholder-gray-500 transition-all ${
+                className={`w-full px-3 py-2.5 bg-[#0c1420] border rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none text-sm text-white placeholder-gray-500 transition-all ${
                   rephrasing
-                    ? 'border-purple-500/50 ring-2 ring-purple-500/30 animate-pulse'
+                    ? 'border-emerald-400/50 ring-2 ring-emerald-400/30 animate-pulse'
                     : 'border-white/20'
                 }`}
                 disabled={sending || success || rephrasing}
               />
               {rephrasing && (
-                <div className="absolute inset-0 bg-purple-500/10 rounded-md flex items-center justify-center backdrop-blur-[1px]">
-                  <div className="bg-purple-600/90 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
+                <div className="absolute inset-0 bg-emerald-400/10 rounded-md flex items-center justify-center backdrop-blur-[1px]">
+                  <div className="bg-emerald-400/90 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-200 animate-pulse" />
                     <span className="text-sm font-medium text-white">AI is rephrasing...</span>
-                    <RefreshCw className="w-4 h-4 text-purple-200 animate-spin" />
+                    <RefreshCw className="w-4 h-4 text-emerald-200 animate-spin" />
                   </div>
                 </div>
               )}
@@ -303,7 +376,7 @@ export default function SendSMSModal({
               <button
                 onClick={() => handleRephrase('shorter')}
                 disabled={!message.trim() || rephrasing || sending || success}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/30 text-emerald-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 title="Make message shorter"
               >
                 <Minimize2 className="w-3 h-3" />
@@ -312,7 +385,7 @@ export default function SendSMSModal({
               <button
                 onClick={() => handleRephrase('longer')}
                 disabled={!message.trim() || rephrasing || sending || success}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/30 text-emerald-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 title="Make message longer"
               >
                 <Maximize2 className="w-3 h-3" />
@@ -321,7 +394,7 @@ export default function SendSMSModal({
               <button
                 onClick={() => handleRephrase('professional')}
                 disabled={!message.trim() || rephrasing || sending || success}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/30 text-emerald-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 title="Make message more professional"
               >
                 <Briefcase className="w-3 h-3" />
@@ -330,14 +403,14 @@ export default function SendSMSModal({
               <button
                 onClick={() => handleRephrase('rewrite')}
                 disabled={!message.trim() || rephrasing || sending || success}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-400/20 hover:bg-emerald-400/30 border border-emerald-400/30 text-emerald-300 text-xs rounded-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 title="Rewrite message"
               >
                 <RefreshCw className={`w-3 h-3 ${rephrasing ? 'animate-spin' : ''}`} />
                 Rewrite
               </button>
               <div className={`flex items-center gap-1 text-xs ml-auto transition-all ${
-                rephrasing ? 'text-purple-300' : 'text-purple-400/60'
+                rephrasing ? 'text-emerald-300' : 'text-emerald-400/60'
               }`}>
                 <Sparkles className={`w-3 h-3 ${rephrasing ? 'animate-pulse' : ''}`} />
                 <span>{rephrasing ? 'Processing...' : 'AI'}</span>
@@ -363,7 +436,7 @@ export default function SendSMSModal({
           <button
             onClick={handleSend}
             disabled={sending || !message.trim() || success}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {sending ? (
               <>

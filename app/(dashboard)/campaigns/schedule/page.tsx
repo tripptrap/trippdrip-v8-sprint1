@@ -207,7 +207,7 @@ export default function ScheduleCampaignPage() {
         </div>
         <button
           onClick={() => setShowScheduler(!showScheduler)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
         >
           {showScheduler ? 'Hide Scheduler' : 'New Scheduled Campaign'}
         </button>
@@ -249,7 +249,7 @@ export default function ScheduleCampaignPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={selectAll}
-                  className="text-xs text-blue-400 hover:text-blue-300"
+                  className="text-xs text-emerald-400 hover:text-blue-300"
                 >
                   Select All ({filteredLeads.length})
                 </button>
@@ -383,7 +383,7 @@ export default function ScheduleCampaignPage() {
             <button
               onClick={scheduleCampaign}
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
             >
               {loading ? 'Scheduling...' : 'Schedule Campaign'}
             </button>
@@ -415,8 +415,8 @@ export default function ScheduleCampaignPage() {
             const progress = (campaign.leads_sent / campaign.total_leads) * 100;
             const getStatusColor = (status: string) => {
               switch (status) {
-                case 'scheduled': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-                case 'running': return 'text-green-400 bg-green-500/10 border-green-500/20';
+                case 'scheduled': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                case 'running': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
                 case 'paused': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
                 case 'completed': return 'text-[#5a6b7f] bg-gray-500/10 border-gray-500/20';
                 case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
@@ -445,7 +445,7 @@ export default function ScheduleCampaignPage() {
                   </div>
                   <div className="w-full bg-white/10 rounded-full h-2">
                     <div
-                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      className="bg-emerald-500 h-2 rounded-full transition-all"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -482,7 +482,7 @@ export default function ScheduleCampaignPage() {
                       {campaign.status === 'paused' && (
                         <button
                           onClick={() => updateCampaignStatus(campaign.id, 'resume')}
-                          className="px-4 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 rounded-lg text-sm transition-colors"
+                          className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-sm transition-colors"
                         >
                           Resume
                         </button>

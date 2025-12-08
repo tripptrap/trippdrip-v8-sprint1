@@ -4,27 +4,44 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { loadStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { findLead as seedFindLead } from "@/lib/db";
+import { motion } from "framer-motion";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/messages",  label: "Messages" },
+type NavItem = {
+  href: string;
+  label: string;
+  children?: { href: string; label: string }[];
+};
+
+const navItems: NavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    children: [
+      { href: "/analytics", label: "Analytics" },
+      { href: "/follow-ups", label: "Follow-ups" },
+    ]
+  },
+  {
+    href: "/messages",
+    label: "Messages",
+    children: [
+      { href: "/bulk-sms", label: "Bulk SMS" },
+      { href: "/scheduled", label: "Scheduled" },
+    ]
+  },
+  {
+    href: "/email",
+    label: "Calendar",
+    children: [
+      { href: "/appointments", label: "Appointments" },
+    ]
+  },
   { href: "/leads",     label: "Leads" },
-  { href: "/bulk-sms",  label: "Bulk SMS" },
-  { href: "/texts",     label: "Texts" },
-  { href: "/scheduled", label: "Scheduled" },
-  { href: "/follow-ups", label: "Follow-ups" },
-  { href: "/email",     label: "Calendar" },
   { href: "/campaigns", label: "Campaigns" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/templates", label: "Flows" },
-  { href: "/integrations", label: "Integrations" },
-  { href: "/phone-numbers", label: "Phone Numbers" },
-  { href: "/points",    label: "Points" },
-  { href: "/referrals", label: "Referrals" },
-  { href: "/dnc",       label: "DNC List" },
   { href: "/tags",      label: "Tags" },
+  { href: "/templates", label: "Flows" },
+  { href: "/points",    label: "Points" },
   { href: "/roadmap",   label: "Roadmap" },
-  { href: "/contact",   label: "Contact" },
   { href: "/settings",  label: "Settings" },
 ];
 
@@ -34,6 +51,7 @@ export default function Sidebar(){
   const path = usePathname();
   const [store, setStore] = useState<any>({ leads:[], threads:[] });
   const [userPlan, setUserPlan] = useState<string>('basic');
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
 
   useEffect(()=>{
     const sync = () => { const s = loadStore(); if (s) setStore(s); };
@@ -97,48 +115,200 @@ export default function Sidebar(){
 
   return (
     <aside className="w-64 shrink-0 p-3 border-r border-white/10">
-      <div className="text-lg font-semibold mb-6 flex items-center gap-3 px-2">
-        <img src={logoSrc} alt="HyveWyre™" className="h-12 w-12 rounded-2xl" />
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-lg font-semibold mb-6 flex items-center gap-3 px-2"
+      >
+        <motion.div
+          className="relative"
+          animate={{
+            boxShadow: [
+              "0 0 20px rgba(52, 211, 153, 0.5)",
+              "0 0 40px rgba(45, 212, 191, 0.6)",
+              "0 0 20px rgba(52, 211, 153, 0.5)",
+            ],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          style={{
+            borderRadius: "1rem",
+          }}
+        >
+          <motion.img
+            src={logoSrc}
+            alt="HyveWyre™"
+            className="h-12 w-12 rounded-2xl"
+            animate={{
+              scale: [1, 1.05, 1],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            whileHover={{ scale: 1.1, rotate: 5 }}
+          />
+        </motion.div>
         <span className="text-xl">HyveWyre™</span>
-      </div>
+      </motion.div>
 
       <nav className="space-y-1 mb-4">
-        {navItems.map(it => {
+        {navItems.map((it, index) => {
           const active = path?.startsWith(it.href);
+          const hasChildren = it.children && it.children.length > 0;
+          const isExpanded = expandedMenus.has(it.href);
+          const childActive = hasChildren && it.children?.some(child => path?.startsWith(child.href));
+
+          const toggleExpand = (e: React.MouseEvent) => {
+            if (hasChildren) {
+              e.preventDefault();
+              setExpandedMenus(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(it.href)) {
+                  newSet.delete(it.href);
+                } else {
+                  newSet.add(it.href);
+                }
+                return newSet;
+              });
+            }
+          };
+
           return (
-            <Link key={it.href} href={it.href}
-              className={`block px-3 py-2 rounded-xl transition-all duration-200 ${
-                active
-                  ? "bg-blue-600/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)] border border-blue-500/30"
-                  : "hover:bg-white/5"
-              }`}>
-              {it.label}
-            </Link>
+            <motion.div
+              key={it.href}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.03 }}
+              onMouseEnter={() => hasChildren && setExpandedMenus(prev => new Set(prev).add(it.href))}
+              onMouseLeave={() => hasChildren && !childActive && setExpandedMenus(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(it.href);
+                return newSet;
+              })}
+            >
+              {hasChildren ? (
+                <div
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 ${
+                    active || childActive
+                      ? "bg-emerald-400/20 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  <Link href={it.href} className="flex-1">
+                    <motion.span
+                      whileHover={{ x: 4 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      {it.label}
+                    </motion.span>
+                  </Link>
+                  <motion.span
+                    onClick={toggleExpand}
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-xs opacity-50 cursor-pointer px-2 py-1 hover:opacity-100"
+                  >
+                    ▼
+                  </motion.span>
+                </div>
+              ) : (
+                <Link href={it.href}
+                  className={`block px-3 py-2 rounded-xl transition-all duration-200 ${
+                    active
+                      ? "bg-emerald-400/20 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30"
+                      : "hover:bg-white/5"
+                  }`}>
+                  <motion.span
+                    whileHover={{ x: 4 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    {it.label}
+                  </motion.span>
+                </Link>
+              )}
+
+              {/* Children submenu */}
+              {hasChildren && (
+                <motion.div
+                  initial={false}
+                  animate={{
+                    height: isExpanded ? "auto" : 0,
+                    opacity: isExpanded ? 1 : 0
+                  }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pl-4 mt-1 space-y-1">
+                    {it.children?.map((child) => {
+                      const childIsActive = path?.startsWith(child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`block px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                            childIsActive
+                              ? "bg-emerald-400/15 text-emerald-400 border border-emerald-400/20"
+                              : "text-white/70 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
           );
         })}
       </nav>
 
       {showTextList && (
-        <div className="space-y-2">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="space-y-2"
+        >
           <div className="text-xs uppercase tracking-wide text-[var(--muted)] px-1">Recent Texts</div>
           <div className="space-y-1">
-            {recent.map((t:any)=>{
+            {recent.map((t:any, index:number)=>{
               const L = findLead(t.lead_id, store.leads||[]);
               return (
-                <Link key={t.id} href={`/texts?open=${t.id}`} className={`block px-3 py-2 rounded-xl hover:bg-white/5 ${t.unread ? "border border-white/15" : ""}`} title={t.last_message_snippet}>
-                  <div className="flex items-center justify-between">
-                    <div className="truncate">{L?.first_name} {L?.last_name}</div>
-                    {t.unread && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-[var(--accent)]" />}
-                  </div>
-                  <div className="text-xs text-[var(--muted)] truncate">{t.last_message_snippet}</div>
-                </Link>
+                <motion.div
+                  key={t.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  whileHover={{ scale: 1.02, x: 4 }}
+                >
+                  <Link href={`/texts?open=${t.id}`} className={`block px-3 py-2 rounded-xl hover:bg-white/5 ${t.unread ? "border border-white/15" : ""}`} title={t.last_message_snippet}>
+                    <div className="flex items-center justify-between">
+                      <div className="truncate">{L?.first_name} {L?.last_name}</div>
+                      {t.unread && (
+                        <motion.span
+                          className="ml-2 inline-block w-2 h-2 rounded-full bg-[var(--accent)]"
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      )}
+                    </div>
+                    <div className="text-xs text-[var(--muted)] truncate">{t.last_message_snippet}</div>
+                  </Link>
+                </motion.div>
               );
             })}
             {(recent||[]).length === 0 && (
               <div className="px-3 py-2 text-sm text-[var(--muted)]">No SMS threads yet.</div>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
     </aside>
   );

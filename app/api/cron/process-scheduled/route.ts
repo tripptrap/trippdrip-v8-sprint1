@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { timingSafeEqual } from 'crypto';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60; // Max execution time in seconds
+
+/**
+ * Timing-safe comparison for secrets to prevent timing attacks
+ */
+function secureCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * CRON JOB ENDPOINT - Process Scheduled Messages & Campaigns
@@ -13,15 +31,21 @@ export const maxDuration = 60; // Max execution time in seconds
  * - External cron service (cron-job.org, EasyCron, etc.)
  * - Supabase Edge Function with pg_cron
  *
- * Security: Add CRON_SECRET to .env.local and verify it here
+ * Security: CRON_SECRET is REQUIRED for all requests
  */
 
 export async function GET(req: NextRequest) {
-  // Security: Verify cron secret (optional in development)
-  const cronSecret = req.headers.get('x-cron-secret');
+  // SECURITY: Mandatory cron secret validation
+  const cronSecret = req.headers.get('x-cron-secret') || '';
   const expectedSecret = process.env.CRON_SECRET;
 
-  if (expectedSecret && cronSecret !== expectedSecret) {
+  if (!expectedSecret) {
+    console.error('❌ CRON_SECRET not configured - rejecting request');
+    return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
+  }
+
+  if (!secureCompare(cronSecret, expectedSecret)) {
+    console.error('❌ Invalid or missing cron secret - unauthorized request');
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 

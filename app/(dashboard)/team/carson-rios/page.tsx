@@ -9,19 +9,22 @@ export default function CarsonRiosPage() {
       <div className="card">
         <div className="flex items-start gap-6">
           {/* Profile Image Placeholder */}
-          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center flex-shrink-0">
             <span className="text-5xl font-bold text-white">CR</span>
           </div>
 
           {/* Info */}
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-[#e7eef9] mb-2">Carson Rios</h1>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="px-3 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded-full text-sm font-medium">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <div className="px-3 py-1 bg-blue-900/30 border border-emerald-700 text-emerald-400 rounded-full text-sm font-medium">
                 Operations
               </div>
-              <div className="px-3 py-1 bg-purple-900/30 border border-purple-700 text-purple-400 rounded-full text-sm font-medium">
+              <div className="px-3 py-1 bg-teal-800/60 border border-teal-600 text-emerald-400 rounded-full text-sm font-medium">
                 Authorized Representative
+              </div>
+              <div className="px-3 py-1 bg-amber-900/30 border border-amber-600 text-amber-400 rounded-full text-sm font-medium">
+                CEO
               </div>
             </div>
             <p className="text-lg text-[#9fb0c3] mb-4">
@@ -37,7 +40,7 @@ export default function CarsonRiosPage() {
         <div className="card">
           <div className="flex items-start gap-4 mb-4">
             <div className="w-12 h-12 rounded-lg bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-              <Briefcase className="h-6 w-6 text-blue-400" />
+              <Briefcase className="h-6 w-6 text-emerald-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Role</h3>
@@ -50,15 +53,15 @@ export default function CarsonRiosPage() {
             <h4 className="text-sm font-medium text-[#e7eef9] mb-2">Responsibilities</h4>
             <ul className="space-y-2 text-sm text-[#9fb0c3]">
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
+                <span className="text-emerald-400 mt-1">•</span>
                 <span>Operational oversight and management</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
+                <span className="text-emerald-400 mt-1">•</span>
                 <span>Authorized representative for company operations</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-blue-400 mt-1">•</span>
+                <span className="text-emerald-400 mt-1">•</span>
                 <span>Compliance and regulatory affairs</span>
               </li>
             </ul>
@@ -68,16 +71,16 @@ export default function CarsonRiosPage() {
         {/* Authorization */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-green-900/20 flex items-center justify-center flex-shrink-0">
-              <Shield className="h-6 w-6 text-green-400" />
+            <div className="w-12 h-12 rounded-lg bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
+              <Shield className="h-6 w-6 text-emerald-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Authorization</h3>
               <p className="text-[#9fb0c3] mb-4">
                 Carson Rios is an authorized representative of HyveWyre with the authority to act on behalf of the company in operational matters.
               </p>
-              <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-3">
-                <p className="text-sm text-green-400 font-medium">
+              <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3">
+                <p className="text-sm text-emerald-400 font-medium">
                   ✓ Verified Authorized Representative
                 </p>
               </div>
@@ -88,8 +91,8 @@ export default function CarsonRiosPage() {
         {/* Contact Information */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-900/20 flex items-center justify-center flex-shrink-0">
-              <Mail className="h-6 w-6 text-purple-400" />
+            <div className="w-12 h-12 rounded-lg bg-teal-800/50 flex items-center justify-center flex-shrink-0">
+              <Mail className="h-6 w-6 text-emerald-400" />
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Contact</h3>
@@ -98,7 +101,7 @@ export default function CarsonRiosPage() {
               </p>
               <a
                 href="mailto:operations@hyvewyre.com"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 <Mail className="h-4 w-4" />
                 operations@hyvewyre.com
@@ -111,7 +114,7 @@ export default function CarsonRiosPage() {
         <div className="card">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-orange-900/20 flex items-center justify-center flex-shrink-0">
-              <MapPin className="h-6 w-6 text-orange-400" />
+              <MapPin className="h-6 w-6 text-emerald-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Company</h3>
@@ -126,7 +129,7 @@ export default function CarsonRiosPage() {
       </div>
 
       {/* Back to Contact */}
-      <div className="card bg-blue-900/20 border-blue-700/50">
+      <div className="card bg-blue-900/20 border-emerald-700/50">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-[#e7eef9] mb-1">Need to get in touch?</h3>
@@ -136,7 +139,7 @@ export default function CarsonRiosPage() {
           </div>
           <a
             href="/contact"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
           >
             Contact Us
           </a>

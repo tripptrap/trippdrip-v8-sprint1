@@ -115,7 +115,7 @@ export default function SMSAnalyticsPage() {
     }
     if (deliveredAt || status === 'delivered') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">
           <CheckCircle className="w-3 h-3" />
           Delivered
         </span>
@@ -123,7 +123,7 @@ export default function SMSAnalyticsPage() {
     }
     if (status === 'sent') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-emerald-700">
           <CheckCircle className="w-3 h-3" />
           Sent
         </span>
@@ -173,7 +173,7 @@ export default function SMSAnalyticsPage() {
         <button
           onClick={exportToCSV}
           disabled={messages.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Download className="w-4 h-4" />
           Export CSV
@@ -185,7 +185,7 @@ export default function SMSAnalyticsPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <MessageSquare className="w-5 h-5 text-blue-600" />
+              <MessageSquare className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Sent</p>
@@ -196,8 +196,8 @@ export default function SMSAnalyticsPage() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Delivered</p>
@@ -220,8 +220,8 @@ export default function SMSAnalyticsPage() {
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-purple-600" />
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
             <div>
               <p className="text-sm text-gray-600">Delivery Rate</p>
@@ -254,7 +254,7 @@ export default function SMSAnalyticsPage() {
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
@@ -265,7 +265,7 @@ export default function SMSAnalyticsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
           >
             <option value="all">All Statuses</option>
             <option value="delivered">Delivered</option>
@@ -279,7 +279,7 @@ export default function SMSAnalyticsPage() {
                 setDateFilter('all');
                 setStatusFilter('all');
               }}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
             >
               Clear Filters
             </button>

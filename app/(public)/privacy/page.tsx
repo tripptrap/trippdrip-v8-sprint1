@@ -119,8 +119,8 @@ export default function PrivacyPolicyPage() {
             If you have questions about this Privacy Policy or wish to exercise your rights, contact us at:
           </p>
           <div className="mt-3 p-4 bg-white/5 rounded-lg">
-            <p className="text-white/80">Email: privacy@hyvewyre.com</p>
-            <p className="text-white/80">Address: [Your Company Address]</p>
+            <p className="text-white/80">Email: support@hyvewyre.com</p>
+            <p className="text-white/80">Address: 12325 Magnolia Street, San Antonio, FL 33576</p>
           </div>
         </section>
       </div>

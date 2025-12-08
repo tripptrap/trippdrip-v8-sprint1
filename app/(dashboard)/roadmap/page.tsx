@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Search } from 'lucide-react';
+import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Search, Gift, Lock } from 'lucide-react';
 
 type RoadmapStatus = 'completed' | 'in-progress' | 'planned';
 
@@ -134,32 +134,32 @@ export default function RoadmapPage() {
   const statusConfig = {
     completed: {
       label: 'Completed',
-      color: 'text-green-400',
-      bgColor: 'bg-green-900/20',
-      borderColor: 'border-green-500/30',
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-900/20',
+      borderColor: 'border-emerald-500/30',
       icon: CheckCircle
     },
     'in-progress': {
       label: 'In Progress',
-      color: 'text-blue-400',
+      color: 'text-emerald-400',
       bgColor: 'bg-blue-900/20',
-      borderColor: 'border-blue-500/30',
+      borderColor: 'border-emerald-500/30',
       icon: Clock
     },
     planned: {
       label: 'Planned',
-      color: 'text-purple-400',
-      bgColor: 'bg-purple-900/20',
-      borderColor: 'border-purple-500/30',
+      color: 'text-emerald-400',
+      bgColor: 'bg-teal-800/50',
+      borderColor: 'border-emerald-400/30',
       icon: Rocket
     }
   };
 
   const categoryConfig = {
-    features: { label: 'Features', color: 'text-blue-400' },
-    integrations: { label: 'Integrations', color: 'text-purple-400' },
-    compliance: { label: 'Compliance', color: 'text-green-400' },
-    analytics: { label: 'Analytics', color: 'text-orange-400' }
+    features: { label: 'Features', color: 'text-emerald-400' },
+    integrations: { label: 'Integrations', color: 'text-emerald-400' },
+    compliance: { label: 'Compliance', color: 'text-emerald-400' },
+    analytics: { label: 'Analytics', color: 'text-emerald-400' }
   };
 
   const groupedItems = {
@@ -178,12 +178,55 @@ export default function RoadmapPage() {
         </p>
       </div>
 
+      {/* Referral Program Section */}
+      <div className="card bg-gradient-to-br from-teal-800/50 to-teal-800/50 border-teal-600/50">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-teal-800/60 flex items-center justify-center">
+              <Lock className="h-8 w-8 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#e7eef9] mb-1">Referral Program</h2>
+              <p className="text-[#9fb0c3]">
+                Earn 1 month of free premium for each successful referral
+              </p>
+              <div className="flex items-center gap-2 text-sm text-emerald-400 mt-2">
+                <Gift className="h-4 w-4" />
+                <span className="font-medium">Coming Soon!</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-center md:text-right">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-emerald-400">1</span>
+                </div>
+                <p className="text-xs text-[#9fb0c3]">Share Link</p>
+              </div>
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-emerald-400">2</span>
+                </div>
+                <p className="text-xs text-[#9fb0c3]">They Sign Up</p>
+              </div>
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-emerald-400">3</span>
+                </div>
+                <p className="text-xs text-[#9fb0c3]">Get Reward</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-900/20 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-green-400" />
+            <div className="w-10 h-10 rounded-lg bg-emerald-900/20 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems.completed.length}</div>
@@ -194,7 +237,7 @@ export default function RoadmapPage() {
         <div className="card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-blue-400" />
+              <Clock className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems['in-progress'].length}</div>
@@ -204,8 +247,8 @@ export default function RoadmapPage() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-900/20 flex items-center justify-center">
-              <Rocket className="h-5 w-5 text-purple-400" />
+            <div className="w-10 h-10 rounded-lg bg-teal-800/50 flex items-center justify-center">
+              <Rocket className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems.planned.length}</div>
@@ -271,9 +314,9 @@ export default function RoadmapPage() {
       })}
 
       {/* Feedback Section */}
-      <div className="card bg-blue-900/20 border-blue-700/50">
+      <div className="card bg-blue-900/20 border-emerald-700/50">
         <h3 className="font-semibold mb-2 text-[#e7eef9] flex items-center gap-2">
-          <Zap className="h-5 w-5 text-blue-400" />
+          <Zap className="h-5 w-5 text-emerald-400" />
           Have a Feature Request?
         </h3>
         <p className="text-sm text-[#9fb0c3] mb-4">
@@ -281,7 +324,7 @@ export default function RoadmapPage() {
         </p>
         <a
           href="mailto:support@hyvewyre.com?subject=Feature Request"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm"
         >
           <Mail className="h-4 w-4" />
           Send Feedback

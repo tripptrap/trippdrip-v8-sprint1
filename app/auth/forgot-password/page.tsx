@@ -9,11 +9,13 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
-  const supabase = createClient()
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    // Create Supabase client inside the event handler to avoid SSR issues
+    const supabase = createClient()
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -42,8 +44,8 @@ export default function ForgotPasswordPage() {
           border: '1px solid rgba(255,255,255,0.08)'
         }}>
           <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-green-600 bg-opacity-20 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mx-auto w-16 h-16 bg-emerald-600 bg-opacity-20 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
@@ -55,7 +57,7 @@ export default function ForgotPasswordPage() {
 
           <Link
             href="/auth/login"
-            className="inline-block text-blue-500 hover:text-blue-400 font-semibold"
+            className="inline-block text-emerald-500 hover:text-emerald-400 font-semibold"
           >
             Back to login
           </Link>
@@ -86,7 +88,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               style={{
                 background: 'rgba(255,255,255,0.06)',
                 border: '1px solid rgba(255,255,255,0.1)',
@@ -99,14 +101,14 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? 'Sending...' : 'Send Reset Link'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <Link href="/auth/login" className="text-blue-500 hover:text-blue-400 font-semibold">
+          <Link href="/auth/login" className="text-emerald-500 hover:text-emerald-400 font-semibold">
             Back to login
           </Link>
         </div>

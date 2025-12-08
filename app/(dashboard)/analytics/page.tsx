@@ -89,7 +89,7 @@ interface FlowPerformance {
   conversion_events: number;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#34d399', '#3b82f6', '#f59e0b', '#ef4444', '#14b8a6', '#ec4899'];
 
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'automation'>('overview');
@@ -161,10 +161,10 @@ export default function AnalyticsPage() {
   };
 
   const sourceColors: Record<string, string> = {
-    flow: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
-    drip_campaign: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
-    bulk_campaign: 'text-green-400 bg-green-900/20 border-green-500/30',
-    scheduled: 'text-orange-400 bg-orange-900/20 border-orange-500/30',
+    flow: 'text-emerald-400 bg-blue-900/20 border-emerald-500/30',
+    drip_campaign: 'text-emerald-400 bg-teal-800/50 border-emerald-400/30',
+    bulk_campaign: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    scheduled: 'text-emerald-400 bg-orange-900/20 border-emerald-400/30',
     manual: 'text-gray-400 bg-gray-900/20 border-gray-500/30',
   };
 
@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
             <select
               value={daysBack}
               onChange={(e) => setDaysBack(parseInt(e.target.value))}
-              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e7eef9] focus:outline-none focus:border-blue-500/50"
+              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#e7eef9] focus:outline-none focus:border-emerald-500/50"
             >
               <option value={7}>Last 7 days</option>
               <option value={30}>Last 30 days</option>
@@ -200,7 +200,7 @@ export default function AnalyticsPage() {
             onClick={() => setActiveTab('overview')}
             className={`px-6 py-3 font-medium transition-all ${
               activeTab === 'overview'
-                ? 'text-blue-400 border-b-2 border-blue-400'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
                 : 'text-gray-400 hover:text-gray-300'
             }`}
           >
@@ -210,7 +210,7 @@ export default function AnalyticsPage() {
             onClick={() => setActiveTab('automation')}
             className={`px-6 py-3 font-medium transition-all ${
               activeTab === 'automation'
-                ? 'text-blue-400 border-b-2 border-blue-400'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
                 : 'text-gray-400 hover:text-gray-300'
             }`}
           >
@@ -231,7 +231,7 @@ export default function AnalyticsPage() {
                 <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                   <div className="text-gray-400 text-sm mb-1">Total Leads</div>
                   <div className="text-3xl font-bold text-white">{overview.totalLeads}</div>
-                  <div className="text-green-500 text-sm mt-1">{overview.soldLeads} sold</div>
+                  <div className="text-emerald-500 text-sm mt-1">{overview.soldLeads} sold</div>
                 </div>
 
                 <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
@@ -278,7 +278,7 @@ export default function AnalyticsPage() {
                   />
                   <Legend />
                   <Line type="monotone" dataKey="sent" stroke="#3b82f6" name="Sent" strokeWidth={2} />
-                  <Line type="monotone" dataKey="received" stroke="#10b981" name="Received" strokeWidth={2} />
+                  <Line type="monotone" dataKey="received" stroke="#34d399" name="Received" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -302,7 +302,7 @@ export default function AnalyticsPage() {
                     />
                     <Legend />
                     <Bar dataKey="responseRate" fill="#3b82f6" name="Response Rate (%)" />
-                    <Bar dataKey="conversionRate" fill="#10b981" name="Conversion Rate (%)" />
+                    <Bar dataKey="conversionRate" fill="#34d399" name="Conversion Rate (%)" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -383,10 +383,10 @@ export default function AnalyticsPage() {
                           <tr key={campaign.id} className="text-gray-300">
                             <td className="py-2">{campaign.name}</td>
                             <td className="py-2 text-right">
-                              <span className="text-blue-400">{campaign.responseRate}%</span>
+                              <span className="text-emerald-400">{campaign.responseRate}%</span>
                             </td>
                             <td className="py-2 text-right">
-                              <span className="text-green-400">{campaign.conversionRate}%</span>
+                              <span className="text-emerald-400">{campaign.conversionRate}%</span>
                             </td>
                           </tr>
                         ))}
@@ -409,7 +409,7 @@ export default function AnalyticsPage() {
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-                        <MessageSquare className="h-5 w-5 text-blue-400" />
+                        <MessageSquare className="h-5 w-5 text-emerald-400" />
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-[#e7eef9]">{automationStats.total_messages || 0}</div>
@@ -420,8 +420,8 @@ export default function AnalyticsPage() {
 
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-purple-900/20 flex items-center justify-center">
-                        <Zap className="h-5 w-5 text-purple-400" />
+                      <div className="w-10 h-10 rounded-lg bg-teal-800/50 flex items-center justify-center">
+                        <Zap className="h-5 w-5 text-emerald-400" />
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-[#e7eef9]">{automationStats.automated_messages || 0}</div>
@@ -432,8 +432,8 @@ export default function AnalyticsPage() {
 
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-900/20 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-green-400" />
+                      <div className="w-10 h-10 rounded-lg bg-emerald-900/20 flex items-center justify-center">
+                        <Users className="h-5 w-5 text-emerald-400" />
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-[#e7eef9]">{automationStats.manual_messages || 0}</div>
@@ -445,7 +445,7 @@ export default function AnalyticsPage() {
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-orange-900/20 flex items-center justify-center">
-                        <TrendingUp className="h-5 w-5 text-orange-400" />
+                        <TrendingUp className="h-5 w-5 text-emerald-400" />
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-[#e7eef9]">{automationStats.automation_rate || 0}%</div>
@@ -458,7 +458,7 @@ export default function AnalyticsPage() {
                 {/* Messages by Source */}
                 <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                   <h2 className="text-lg font-semibold text-[#e7eef9] mb-4 flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-blue-400" />
+                    <Activity className="h-5 w-5 text-emerald-400" />
                     Messages by Source
                   </h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -480,7 +480,7 @@ export default function AnalyticsPage() {
                 {flowPerformance.length > 0 && (
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-[#e7eef9] mb-4 flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-purple-400" />
+                      <Zap className="h-5 w-5 text-emerald-400" />
                       Flow Performance
                     </h2>
                     <div className="overflow-x-auto">
@@ -504,8 +504,8 @@ export default function AnalyticsPage() {
                               <td className="py-3 px-4 text-right text-[#e7eef9]">{flow.responses_received}</td>
                               <td className="py-3 px-4 text-right">
                                 <span className={`px-2 py-1 rounded text-sm ${
-                                  flow.response_rate >= 50 ? 'bg-green-900/20 text-green-400' :
-                                  flow.response_rate >= 25 ? 'bg-orange-900/20 text-orange-400' :
+                                  flow.response_rate >= 50 ? 'bg-emerald-900/20 text-emerald-400' :
+                                  flow.response_rate >= 25 ? 'bg-orange-900/20 text-emerald-400' :
                                   'bg-red-900/20 text-red-400'
                                 }`}>
                                   {flow.response_rate}%
@@ -533,7 +533,7 @@ export default function AnalyticsPage() {
                 {automationStats.daily_breakdown && automationStats.daily_breakdown.length > 0 && (
                   <div className="bg-[#0d121a] border border-[#1a2637] rounded-lg p-6">
                     <h2 className="text-lg font-semibold text-[#e7eef9] mb-4 flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-blue-400" />
+                      <TrendingUp className="h-5 w-5 text-emerald-400" />
                       Daily Breakdown
                     </h2>
                     <div className="space-y-2">
@@ -557,7 +557,7 @@ export default function AnalyticsPage() {
                             <div className="h-8 bg-white/5 rounded-lg overflow-hidden flex">
                               {day.automated > 0 && (
                                 <div
-                                  className="bg-purple-500/50 flex items-center justify-center text-xs text-white"
+                                  className="bg-emerald-400/50 flex items-center justify-center text-xs text-white"
                                   style={{ width: `${automatedPercent}%` }}
                                   title={`${day.automated} automated (${automatedPercent.toFixed(1)}%)`}
                                 >
@@ -566,7 +566,7 @@ export default function AnalyticsPage() {
                               )}
                               {day.manual > 0 && (
                                 <div
-                                  className="bg-green-500/50 flex items-center justify-center text-xs text-white"
+                                  className="bg-emerald-500/50 flex items-center justify-center text-xs text-white"
                                   style={{ width: `${manualPercent}%` }}
                                   title={`${day.manual} manual (${manualPercent.toFixed(1)}%)`}
                                 >
@@ -580,11 +580,11 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="mt-4 flex items-center gap-6 text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-purple-500/50 rounded"></div>
+                        <div className="w-4 h-4 bg-emerald-400/50 rounded"></div>
                         <span className="text-[#9fb0c3]">Automated</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-green-500/50 rounded"></div>
+                        <div className="w-4 h-4 bg-emerald-500/50 rounded"></div>
                         <span className="text-[#9fb0c3]">Manual</span>
                       </div>
                     </div>
@@ -593,9 +593,9 @@ export default function AnalyticsPage() {
 
                 {/* No Flow Data Message */}
                 {flowPerformance.length === 0 && (
-                  <div className="bg-[#0d121a] border border-blue-700/50 rounded-lg p-6 bg-blue-900/20">
+                  <div className="bg-[#0d121a] border border-emerald-700/50 rounded-lg p-6 bg-blue-900/20">
                     <div className="flex items-start gap-3">
-                      <Zap className="h-5 w-5 text-blue-400 mt-1" />
+                      <Zap className="h-5 w-5 text-emerald-400 mt-1" />
                       <div>
                         <h3 className="font-semibold text-[#e7eef9] mb-2">No Flow Data Yet</h3>
                         <p className="text-sm text-[#9fb0c3]">

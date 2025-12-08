@@ -109,7 +109,7 @@ export default function CompliancePage() {
           <p className="text-white/80 mb-3">
             As a HyveWyre™ user, you are responsible for:
           </p>
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 space-y-2">
+          <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-lg p-4 space-y-2">
             <p className="text-white/80">✓ Obtaining proper consent before messaging contacts</p>
             <p className="text-white/80">✓ Maintaining accurate consent records</p>
             <p className="text-white/80">✓ Honoring opt-out requests immediately</p>
@@ -166,7 +166,7 @@ export default function CompliancePage() {
 
         <section>
           <h2 className="text-xl font-semibold mb-3">Best Practices Checklist</h2>
-          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 space-y-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 space-y-2">
             <p className="text-white/80 font-semibold mb-2">Before sending messages:</p>
             <p className="text-white/80">☑ Verify you have documented consent from recipients</p>
             <p className="text-white/80">☑ Include clear opt-out instructions in your message</p>
@@ -183,9 +183,9 @@ export default function CompliancePage() {
             Stay informed about compliance through:
           </p>
           <ul className="list-disc list-inside space-y-2 text-white/80 ml-4">
-            <li>FCC TCPA guidelines: <a href="https://www.fcc.gov/TCPA" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">fcc.gov/TCPA</a></li>
-            <li>CTIA Messaging Principles: <a href="https://www.ctia.org" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">ctia.org</a></li>
-            <li>National Do Not Call Registry: <a href="https://www.donotcall.gov" className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">donotcall.gov</a></li>
+            <li>FCC TCPA guidelines: <a href="https://www.fcc.gov/TCPA" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">fcc.gov/TCPA</a></li>
+            <li>CTIA Messaging Principles: <a href="https://www.ctia.org" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">ctia.org</a></li>
+            <li>National Do Not Call Registry: <a href="https://www.donotcall.gov" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">donotcall.gov</a></li>
             <li>HyveWyre™ Compliance Center: Coming soon in your dashboard</li>
           </ul>
         </section>

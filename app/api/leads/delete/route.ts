@@ -19,8 +19,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Parse IDs
-    const idsToDelete = ids ? ids.split(',').map(id => parseInt(id)) : [parseInt(id!)];
+    // Parse IDs (UUIDs are strings, not integers)
+    const idsToDelete = ids ? ids.split(',').map(id => id.trim()) : [id!];
 
     // Delete leads (only those belonging to the current user)
     const { error, count } = await supabase

@@ -255,7 +255,7 @@ export default function DNCPage() {
               <p className="text-3xl font-bold text-[#e7eef9]">{stats?.total_global_dnc || 0}</p>
             </div>
             <div className="w-12 h-12 rounded-lg bg-orange-900/20 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-orange-400" />
+              <AlertTriangle className="h-6 w-6 text-emerald-400" />
             </div>
           </div>
         </div>
@@ -264,10 +264,10 @@ export default function DNCPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-[#9fb0c3] mb-1">Checks (30 days)</p>
-              <p className="text-3xl font-bold text-blue-400">{stats?.checks_last_30_days || 0}</p>
+              <p className="text-3xl font-bold text-emerald-400">{stats?.checks_last_30_days || 0}</p>
             </div>
             <div className="w-12 h-12 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Search className="h-6 w-6 text-blue-400" />
+              <Search className="h-6 w-6 text-emerald-400" />
             </div>
           </div>
         </div>
@@ -276,10 +276,10 @@ export default function DNCPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-[#9fb0c3] mb-1">Blocked (30 days)</p>
-              <p className="text-3xl font-bold text-purple-400">{stats?.blocked_last_30_days || 0}</p>
+              <p className="text-3xl font-bold text-emerald-400">{stats?.blocked_last_30_days || 0}</p>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-purple-900/20 flex items-center justify-between">
-              <Shield className="h-6 w-6 text-purple-400" />
+            <div className="w-12 h-12 rounded-lg bg-teal-800/50 flex items-center justify-between">
+              <Shield className="h-6 w-6 text-emerald-400" />
             </div>
           </div>
         </div>
@@ -303,21 +303,21 @@ export default function DNCPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setShowAddDialog(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
               Add Number
             </button>
             <button
               onClick={() => setShowBulkDialog(true)}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
               Bulk Add
             </button>
             <button
               onClick={handleExportCSV}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Export
@@ -357,9 +357,9 @@ export default function DNCPage() {
                     <td className="py-3 px-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         entry.reason === 'opt_out' ? 'bg-red-900/30 text-red-400' :
-                        entry.reason === 'complaint' ? 'bg-orange-900/30 text-orange-400' :
-                        entry.reason === 'legal' ? 'bg-purple-900/30 text-purple-400' :
-                        'bg-blue-900/30 text-blue-400'
+                        entry.reason === 'complaint' ? 'bg-orange-900/30 text-emerald-400' :
+                        entry.reason === 'legal' ? 'bg-teal-800/60 text-emerald-400' :
+                        'bg-blue-900/30 text-emerald-400'
                       }`}>
                         {entry.reason}
                       </span>
@@ -433,7 +433,7 @@ export default function DNCPage() {
                 <button
                   onClick={handleAddNumber}
                   disabled={adding}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 text-white rounded-lg transition-colors"
                 >
                   {adding ? 'Adding...' : 'Add to DNC'}
                 </button>
@@ -484,7 +484,7 @@ export default function DNCPage() {
                 <button
                   onClick={handleBulkAdd}
                   disabled={bulkAdding}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 disabled:bg-emerald-400/50 text-white rounded-lg transition-colors"
                 >
                   {bulkAdding ? 'Adding...' : 'Bulk Add to DNC'}
                 </button>

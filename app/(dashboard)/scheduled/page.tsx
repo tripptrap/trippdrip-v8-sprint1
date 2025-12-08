@@ -98,8 +98,8 @@ export default function ScheduledMessagesPage() {
 
   function getStatusColor(status: string) {
     switch (status) {
-      case 'pending': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'sent': return 'text-green-400 bg-green-500/10 border-green-500/20';
+      case 'pending': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      case 'sent': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
       case 'failed': return 'text-red-400 bg-red-500/10 border-red-500/20';
       case 'cancelled': return 'text-[#5a6b7f] bg-gray-500/10 border-gray-500/20';
       default: return 'text-white/60 bg-white/5 border-white/10';

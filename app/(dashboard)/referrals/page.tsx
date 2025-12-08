@@ -14,16 +14,16 @@ export default function ReferralsPage() {
       </div>
 
       {/* Coming Soon Banner */}
-      <div className="card bg-gradient-to-br from-purple-900/20 to-blue-900/20 border-purple-700/50">
+      <div className="card bg-gradient-to-br from-teal-800/50 to-teal-800/50 border-teal-600/50">
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-purple-900/30 flex items-center justify-center mb-6">
-            <Lock className="h-10 w-10 text-purple-400" />
+          <div className="w-20 h-20 rounded-full bg-teal-800/60 flex items-center justify-center mb-6">
+            <Lock className="h-10 w-10 text-emerald-400" />
           </div>
           <h2 className="text-3xl font-bold text-[#e7eef9] mb-3">Coming Soon!</h2>
           <p className="text-lg text-[#9fb0c3] mb-6 max-w-2xl">
             Our referral program is currently under development. Soon you'll be able to earn 1 month of free premium for each friend you refer to HyveWyre.
           </p>
-          <div className="flex items-center gap-2 text-sm text-purple-400">
+          <div className="flex items-center gap-2 text-sm text-emerald-400">
             <Gift className="h-5 w-5" />
             <span className="font-medium">Get rewarded for spreading the word</span>
           </div>
@@ -31,12 +31,12 @@ export default function ReferralsPage() {
       </div>
 
       {/* Preview: How it Will Work */}
-      <div className="card bg-blue-900/10 border-blue-700/30">
+      <div className="card bg-blue-900/10 border-emerald-700/30">
         <h3 className="text-lg font-semibold text-[#e7eef9] mb-4">How It Will Work</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <div className="w-10 h-10 rounded-lg bg-blue-900/30 flex items-center justify-center mb-3">
-              <span className="text-xl font-bold text-blue-400">1</span>
+              <span className="text-xl font-bold text-emerald-400">1</span>
             </div>
             <h4 className="font-medium text-[#e7eef9] mb-2">Share Your Link</h4>
             <p className="text-sm text-[#9fb0c3]">
@@ -45,7 +45,7 @@ export default function ReferralsPage() {
           </div>
           <div>
             <div className="w-10 h-10 rounded-lg bg-blue-900/30 flex items-center justify-center mb-3">
-              <span className="text-xl font-bold text-blue-400">2</span>
+              <span className="text-xl font-bold text-emerald-400">2</span>
             </div>
             <h4 className="font-medium text-[#e7eef9] mb-2">They Sign Up</h4>
             <p className="text-sm text-[#9fb0c3]">
@@ -54,7 +54,7 @@ export default function ReferralsPage() {
           </div>
           <div>
             <div className="w-10 h-10 rounded-lg bg-blue-900/30 flex items-center justify-center mb-3">
-              <span className="text-xl font-bold text-blue-400">3</span>
+              <span className="text-xl font-bold text-emerald-400">3</span>
             </div>
             <h4 className="font-medium text-[#e7eef9] mb-2">Get Your Reward</h4>
             <p className="text-sm text-[#9fb0c3]">
@@ -65,10 +65,10 @@ export default function ReferralsPage() {
       </div>
 
       {/* Stay Tuned */}
-      <div className="card bg-green-900/10 border-green-700/30">
+      <div className="card bg-emerald-900/10 border-emerald-700/30">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-lg bg-green-900/30 flex items-center justify-center flex-shrink-0">
-            <Users className="h-6 w-6 text-green-400" />
+          <div className="w-12 h-12 rounded-lg bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+            <Users className="h-6 w-6 text-emerald-400" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Stay Tuned</h3>

@@ -9,7 +9,6 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'premium' | null>(null)
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const handleSelectPlan = async () => {
     if (!selectedPlan) {
@@ -18,6 +17,9 @@ export default function OnboardingPage() {
     }
 
     setLoading(true)
+
+    // Create Supabase client inside the event handler to avoid SSR issues
+    const supabase = createClient()
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -83,7 +85,7 @@ export default function OnboardingPage() {
             onClick={() => setSelectedPlan('basic')}
             className={`rounded-2xl p-8 cursor-pointer transition-all duration-200 ${
               selectedPlan === 'basic'
-                ? 'shadow-[0_0_30px_rgba(59,130,246,0.4)] border-2 border-blue-500'
+                ? 'shadow-[0_0_30px_rgba(59,130,246,0.4)] border-2 border-emerald-500'
                 : 'border border-white/10 hover:border-white/20'
             }`}
             style={{
@@ -102,7 +104,7 @@ export default function OnboardingPage() {
 
             <div className="space-y-4">
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -112,7 +114,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -122,7 +124,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -132,21 +134,21 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Lead Management & Scoring</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Conversation Flows</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Bulk Messaging</div>
@@ -159,14 +161,14 @@ export default function OnboardingPage() {
             onClick={() => setSelectedPlan('premium')}
             className={`rounded-2xl p-8 cursor-pointer transition-all duration-200 relative ${
               selectedPlan === 'premium'
-                ? 'shadow-[0_0_30px_rgba(168,85,247,0.4)] border-2 border-purple-500'
+                ? 'shadow-[0_0_30px_rgba(168,85,247,0.4)] border-2 border-emerald-400'
                 : 'border border-white/10 hover:border-white/20'
             }`}
             style={{
               background: selectedPlan === 'premium' ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.06)',
             }}
           >
-            <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+            <div className="absolute top-4 right-4 bg-emerald-400 text-white px-3 py-1 rounded-full text-sm font-semibold">
               POPULAR
             </div>
 
@@ -182,7 +184,7 @@ export default function OnboardingPage() {
 
             <div className="space-y-4">
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -192,7 +194,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -202,7 +204,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div>
@@ -212,35 +214,35 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Priority Support</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Advanced Analytics</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Google Calendar Integration</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>Custom Workflows & Automation</div>
               </div>
 
               <div className="flex items-start">
-                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 mr-3 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <div className="font-semibold" style={{ color: '#e6e9f0' }}>All Basic Features</div>

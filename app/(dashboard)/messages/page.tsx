@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MessageSquare, Send, Phone, User, Clock, Search, Plus } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X } from 'lucide-react';
 import SendSMSModal from '@/components/SendSMSModal';
 
 // Helper function to guess timezone from phone number area code
@@ -64,7 +65,16 @@ interface Message {
   num_media?: number;
 }
 
+interface Lead {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  email?: string;
+}
+
 export default function MessagesPage() {
+  const searchParams = useSearchParams();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,6 +83,24 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendModalPhone, setSendModalPhone] = useState('');
+  const [sendModalName, setSendModalName] = useState('');
+
+  // Lead selector state
+  const [showLeadSelector, setShowLeadSelector] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+
+  // Check URL params and auto-open send modal if phone is provided
+  useEffect(() => {
+    const phone = searchParams.get('phone');
+    const name = searchParams.get('name');
+    if (phone) {
+      setSendModalPhone(phone);
+      setSendModalName(name || '');
+      setShowSendModal(true);
+    }
+  }, [searchParams]);
 
   // Load threads
   useEffect(() => {
@@ -175,8 +203,40 @@ export default function MessagesPage() {
     }
   };
 
-  const handleNewMessage = () => {
+  const handleNewMessage = async () => {
+    setShowLeadSelector(true);
+    setLeadSearchQuery('');
+    await loadLeads();
+  };
+
+  const loadLeads = async () => {
+    try {
+      setLoadingLeads(true);
+      const res = await fetch('/api/leads');
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.items)) {
+        // Filter to only leads with phone numbers
+        setLeads(data.items.filter((l: Lead) => l.phone));
+      }
+    } catch (err) {
+      console.error('Failed to load leads:', err);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  const handleSelectLead = (lead: Lead) => {
+    const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ');
+    setSendModalPhone(lead.phone || '');
+    setSendModalName(name);
+    setShowLeadSelector(false);
+    setShowSendModal(true);
+  };
+
+  const handleEnterManually = () => {
     setSendModalPhone('');
+    setSendModalName('');
+    setShowLeadSelector(false);
     setShowSendModal(true);
   };
 
@@ -227,12 +287,12 @@ export default function MessagesPage() {
       <div className="bg-[#1a1f2e] border-b border-white/10 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <MessageSquare className="h-6 w-6 text-blue-500" />
+            <MessageSquare className="h-6 w-6 text-emerald-500" />
             <h1 className="text-2xl font-bold text-white">Messages</h1>
           </div>
           <button
             onClick={handleNewMessage}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Message
@@ -252,7 +312,7 @@ export default function MessagesPage() {
                 placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[#0c1420] border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 bg-[#0c1420] border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -279,8 +339,8 @@ export default function MessagesPage() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center flex-shrink-0">
-                      <User className="h-5 w-5 text-blue-400" />
+                    <div className="w-10 h-10 rounded-full bg-emerald-600/20 flex items-center justify-center flex-shrink-0">
+                      <User className="h-5 w-5 text-emerald-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
@@ -296,8 +356,8 @@ export default function MessagesPage() {
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          thread.channel === 'sms' ? 'bg-green-900/20 text-green-400' :
-                          thread.channel === 'mms' ? 'bg-purple-900/20 text-purple-400' :
+                          thread.channel === 'sms' ? 'bg-emerald-900/20 text-emerald-400' :
+                          thread.channel === 'mms' ? 'bg-teal-800/50 text-emerald-400' :
                           'bg-gray-700/50 text-gray-400'
                         }`}>
                           {thread.channel.toUpperCase()}
@@ -324,8 +384,8 @@ export default function MessagesPage() {
               <div className="bg-[#1a1f2e] border-b border-white/10 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center">
-                      <User className="h-5 w-5 text-blue-400" />
+                    <div className="w-10 h-10 rounded-full bg-emerald-600/20 flex items-center justify-center">
+                      <User className="h-5 w-5 text-emerald-400" />
                     </div>
                     <div>
                       <h2 className="font-semibold text-white">
@@ -339,7 +399,7 @@ export default function MessagesPage() {
                           return currentTime ? (
                             <>
                               <span>•</span>
-                              <span className="text-blue-400" title="Lead's local time">🕐 {currentTime}</span>
+                              <span className="text-emerald-400" title="Lead's local time">🕐 {currentTime}</span>
                             </>
                           ) : null;
                         })()}
@@ -355,7 +415,7 @@ export default function MessagesPage() {
                     </button>
                     <button
                       onClick={handleSendToThread}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
                     >
                       <Send className="h-4 w-4" />
                       Send Message
@@ -386,7 +446,7 @@ export default function MessagesPage() {
                       <div
                         className={`max-w-md rounded-lg p-3 ${
                           message.direction === 'outbound'
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-emerald-600 text-white'
                             : 'bg-[#1a1f2e] text-gray-200 border border-white/10'
                         }`}
                       >
@@ -451,11 +511,92 @@ export default function MessagesPage() {
         </div>
       </div>
 
+      {/* Lead Selector Modal */}
+      {showLeadSelector && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1f2e] rounded-lg shadow-xl max-w-md w-full border border-white/10 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-lg font-semibold text-white">Select Recipient</h2>
+              <button
+                onClick={() => setShowLeadSelector(false)}
+                className="text-gray-400 hover:text-gray-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="p-4 border-b border-white/10">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search leads..."
+                  value={leadSearchQuery}
+                  onChange={(e) => setLeadSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Lead List */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {loadingLeads ? (
+                <div className="text-center py-8 text-gray-400">Loading leads...</div>
+              ) : leads.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">No leads with phone numbers found</div>
+              ) : (
+                <>
+                  {leads
+                    .filter(lead => {
+                      if (!leadSearchQuery) return true;
+                      const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ').toLowerCase();
+                      const phone = lead.phone?.toLowerCase() || '';
+                      const query = leadSearchQuery.toLowerCase();
+                      return name.includes(query) || phone.includes(query);
+                    })
+                    .map(lead => {
+                      const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Unknown';
+                      return (
+                        <button
+                          key={lead.id}
+                          onClick={() => handleSelectLead(lead)}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors text-left"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-semibold">
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white font-medium truncate">{name}</div>
+                            <div className="text-sm text-gray-400 truncate">{lead.phone}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10">
+              <button
+                onClick={handleEnterManually}
+                className="w-full py-2.5 text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                Or enter phone number manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Send SMS Modal */}
       <SendSMSModal
         isOpen={showSendModal}
-        onClose={() => setShowSendModal(false)}
+        onClose={() => { setShowSendModal(false); setSendModalPhone(''); setSendModalName(''); }}
         leadPhone={sendModalPhone}
+        leadName={sendModalName}
         onSuccess={() => {
           loadThreads();
           if (selectedThread) {

@@ -206,7 +206,7 @@ export default function LeadScraperPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     );
   }
@@ -218,11 +218,11 @@ export default function LeadScraperPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg">
+              <div className="p-2 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-lg">
                 <Globe className="h-6 w-6 text-white" />
               </div>
               <h1 className="text-3xl font-bold text-white">Lead Scraper</h1>
-              <span className="px-3 py-1 bg-purple-600/20 border border-purple-500/30 rounded-full text-purple-400 text-xs font-bold uppercase">
+              <span className="px-3 py-1 bg-emerald-400/20 border border-emerald-400/30 rounded-full text-emerald-400 text-xs font-bold uppercase">
                 Beta
               </span>
             </div>
@@ -235,7 +235,7 @@ export default function LeadScraperPage() {
               </p>
             </div>
           </div>
-          <div className="px-6 py-4 bg-blue-600/20 border border-blue-500/30 rounded-lg text-center">
+          <div className="px-6 py-4 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-center">
             <div className="text-sm text-blue-300 mb-1">Cost per scrape</div>
             <div className="text-3xl font-bold text-white">50 <span className="text-lg text-white/60">points</span></div>
           </div>
@@ -246,7 +246,7 @@ export default function LeadScraperPage() {
       {message && (
         <div className={`mb-6 p-4 rounded-lg border ${
           message.type === 'success'
-            ? 'bg-green-500/10 border-green-500/30 text-green-400'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
             : 'bg-red-500/10 border-red-500/30 text-red-400'
         }`}>
           <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function LeadScraperPage() {
                   className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isComingSoon
                       ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   }`}
                 >
                   {isComingSoon ? 'Coming Soon' : 'Use Template'}
@@ -317,13 +317,13 @@ export default function LeadScraperPage() {
                         value={editUrl}
                         onChange={(e) => setEditUrl(e.target.value)}
                         placeholder="https://example.com"
-                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => saveUrl(scraper.id)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 transition-colors"
                       >
                         <Save className="h-4 w-4" />
                         Save URL
@@ -357,7 +357,7 @@ export default function LeadScraperPage() {
                       <button
                         onClick={() => runScraper(scraper.id)}
                         disabled={running === scraper.id}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
                       >
                         {running === scraper.id ? (
                           <>
@@ -388,7 +388,7 @@ export default function LeadScraperPage() {
             <button
               onClick={convertToLeads}
               disabled={converting}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+              className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
             >
               {converting ? (
                 <>

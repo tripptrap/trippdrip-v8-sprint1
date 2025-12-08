@@ -1,28 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getModelConfig, buildSystemPrompt, AIModelVersion } from "@/lib/ai/models";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, leadName, leadInfo, userPoints, flowContext } = await req.json();
+    const {
+      messages,
+      leadName,
+      leadInfo,
+      flowContext,
+      modelVersion = 'v1',  // Default to V1 for backwards compatibility
+      customPrompt,         // Custom prompt for V2
+      modelSettings         // Custom settings for V2 (temperature, etc.)
+    } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { error: "Messages array is required" },
         { status: 400 }
-      );
-    }
-
-    // Check if user has enough points (2 points for AI response)
-    const pointCost = 2;
-    const currentPoints = typeof userPoints === 'number' ? userPoints : 0;
-
-    if (currentPoints < pointCost) {
-      return NextResponse.json(
-        {
-          error: "Insufficient points. You need 2 points to generate an AI response. Please purchase more points.",
-          pointsNeeded: pointCost,
-          pointsAvailable: currentPoints
-        },
-        { status: 402 }
       );
     }
 
@@ -32,40 +26,63 @@ export async function POST(req: NextRequest) {
       content: msg.body,
     }));
 
+    // Get the last message from the lead to understand context
+    const lastLeadMessage = messages.filter((m: any) => m.direction === "in").pop();
+    const conversationLength = messages.length;
+
     // Build flow guidance if available
     let flowGuidance = "";
     if (flowContext && flowContext.steps && Array.isArray(flowContext.steps)) {
       flowGuidance = `\n\nConversation Flow Guidance:
-You should follow this conversation flow as a general guide (not a strict script). Use it as the backbone to structure your conversation naturally:
+Follow this flow as a general guide, adapting naturally to the conversation:
 
 ${flowContext.steps.map((step: any, index: number) => {
   let stepText = `Step ${index + 1}: ${step.yourMessage || ''}`;
   if (step.responses && Array.isArray(step.responses)) {
-    stepText += '\n  Expected response types and how to handle them:';
+    stepText += '\n  Handle responses:';
     step.responses.forEach((resp: any) => {
       stepText += `\n  - ${resp.label || 'Response'}: ${resp.followUpMessage || ''}`;
     });
   }
   return stepText;
-}).join('\n\n')}
-
-Use this flow as a guide to keep the conversation on track, but adapt naturally to what the lead is saying. Don't force the flow - let it guide you while staying conversational and responsive to their needs.`;
+}).join('\n\n')}`;
     }
 
-    // Create system prompt with context
-    const systemPrompt = `You are a helpful sales representative responding to a lead named ${leadName}.
+    // Determine conversation stage and tone
+    const isNewConversation = conversationLength <= 2;
+    const leadFirstName = leadName?.split(' ')[0] || '';
 
-Lead Information:
-- Name: ${leadName}
-- Phone: ${leadInfo?.phone || "Unknown"}
-- Email: ${leadInfo?.email || "Unknown"}
-- State: ${leadInfo?.state || "Unknown"}
+    // Get model configuration
+    const modelConfig = getModelConfig(modelVersion as AIModelVersion);
 
-Your goal is to be friendly, professional, and helpful. Keep responses concise and conversational (1-3 sentences typically).
-Respond naturally to their most recent message based on the conversation history.${flowGuidance}`;
+    // Build the system prompt based on model version
+    const systemPrompt = buildSystemPrompt(modelConfig, {
+      leadName: leadName || 'Potential Client',
+      leadFirstName: leadFirstName || 'there',
+      leadLocation: leadInfo?.state || 'Unknown',
+      leadStatus: leadInfo?.status || 'New lead',
+      leadTags: leadInfo?.tags,
+      flowGuidance,
+      isNewConversation,
+      customPrompt: modelVersion === 'v2' ? customPrompt : undefined
+    });
 
     // Call OpenAI API directly using fetch
     const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      console.error("OpenAI API key not configured");
+      return NextResponse.json(
+        { error: "AI service not configured" },
+        { status: 500 }
+      );
+    }
+
+    // Use model settings if provided (for V2), otherwise use defaults from config
+    const temperature = modelSettings?.temperature ?? modelConfig.temperature;
+    const maxTokens = modelSettings?.maxTokens ?? modelConfig.maxTokens;
+    const presencePenalty = modelSettings?.presencePenalty ?? modelConfig.presencePenalty;
+    const frequencyPenalty = modelSettings?.frequencyPenalty ?? modelConfig.frequencyPenalty;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -74,23 +91,26 @@ Respond naturally to their most recent message based on the conversation history
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: modelConfig.model,
         messages: [
           { role: "system", content: systemPrompt },
           ...conversationHistory,
         ],
-        temperature: 0.7,
-        max_tokens: 150,
+        temperature,
+        max_tokens: maxTokens,
+        presence_penalty: presencePenalty,
+        frequency_penalty: frequencyPenalty,
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const completion = await response.json();
-    const aiResponse = completion.choices[0]?.message?.content?.trim();
+    let aiResponse = completion.choices[0]?.message?.content?.trim();
 
     if (!aiResponse) {
       return NextResponse.json(
@@ -99,14 +119,29 @@ Respond naturally to their most recent message based on the conversation history
       );
     }
 
+    // Clean up the response - remove any quotation marks that GPT might add
+    aiResponse = aiResponse.replace(/^["']|["']$/g, '').trim();
+
+    // Ensure response isn't too long for SMS (160 chars ideal, 320 max)
+    if (aiResponse.length > 320) {
+      // Find a good break point
+      const breakPoint = aiResponse.lastIndexOf('.', 300);
+      if (breakPoint > 100) {
+        aiResponse = aiResponse.substring(0, breakPoint + 1);
+      } else {
+        aiResponse = aiResponse.substring(0, 317) + '...';
+      }
+    }
+
     return NextResponse.json({
       response: aiResponse,
-      pointsUsed: 2  // Return points used so client can deduct
+      pointsUsed: 1,
+      modelVersion: modelVersion  // Return which model was used
     });
   } catch (error: any) {
     console.error("Error generating AI response:", error);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: error.message || "Failed to generate AI response. Please try again." },
       { status: 500 }
     );
   }

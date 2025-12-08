@@ -20,6 +20,9 @@ import PrivacyPolicyPage from '../../(public)/privacy/page';
 import TermsOfServicePage from '../../(public)/terms/page';
 import CompliancePage from '../../(public)/compliance/page';
 import RefundPolicyPage from '../../(public)/refund/page';
+import ContactPage from '../contact/page';
+import IntegrationsPage from '../integrations/page';
+import DNCPage from '../dnc/page';
 import CustomModal from '@/components/CustomModal';
 
 type AvailableNumber = {
@@ -32,7 +35,7 @@ type AvailableNumber = {
 
 export default function Page() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'account'>('sms');
+  const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account'>('sms');
   const [saveMessage, setSaveMessage] = useState('');
 
   // Twilio account creation
@@ -475,7 +478,7 @@ export default function Page() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Settings</h1>
         {saveMessage && (
-          <div className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg border border-green-500/30">
+          <div className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/30">
             {saveMessage}
           </div>
         )}
@@ -524,6 +527,26 @@ export default function Page() {
           Auto-Refill
         </button>
         <button
+          onClick={() => setActiveTab('integrations')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'integrations'
+              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+              : 'text-white/60 hover:text-white'
+          }`}
+        >
+          Integrations
+        </button>
+        <button
+          onClick={() => setActiveTab('dnc')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'dnc'
+              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+              : 'text-white/60 hover:text-white'
+          }`}
+        >
+          DNC List
+        </button>
+        <button
           onClick={() => setActiveTab('privacy')}
           className={`px-4 py-2 font-medium ${
             activeTab === 'privacy'
@@ -564,6 +587,16 @@ export default function Page() {
           Refund Policy
         </button>
         <button
+          onClick={() => setActiveTab('contact')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'contact'
+              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
+              : 'text-white/60 hover:text-white'
+          }`}
+        >
+          Contact
+        </button>
+        <button
           onClick={() => setActiveTab('account')}
           className={`px-4 py-2 font-medium ${
             activeTab === 'account'
@@ -587,8 +620,8 @@ export default function Page() {
 
           {!hasTwilioAccount ? (
             <div className="space-y-4">
-              <div className="p-6 bg-blue-500/10 rounded-lg border-2 border-blue-500/30">
-                <h3 className="text-lg font-semibold mb-2 text-blue-400">SMS Account Not Active</h3>
+              <div className="p-6 bg-emerald-500/10 rounded-lg border-2 border-emerald-500/30">
+                <h3 className="text-lg font-semibold mb-2 text-emerald-400">SMS Account Not Active</h3>
                 <p className="text-white/80 mb-4">
                   Purchase any point pack to automatically activate your SMS account and start sending messages!
                 </p>
@@ -626,8 +659,8 @@ export default function Page() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                <h3 className="font-semibold text-green-400 mb-2">SMS Account Active</h3>
+              <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                <h3 className="font-semibold text-emerald-400 mb-2">SMS Account Active</h3>
                 <div className="text-sm text-white/80 space-y-1">
                   <p><strong>Account SID:</strong> {settings.twilio?.accountSid}</p>
                   <p><strong>Status:</strong> Active & Ready</p>
@@ -749,7 +782,7 @@ export default function Page() {
                           <button
                             onClick={() => handlePurchaseNumber(number.phoneNumber)}
                             disabled={purchasingNumber === number.phoneNumber}
-                            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 text-sm font-medium"
+                            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 text-sm font-medium"
                           >
                             {purchasingNumber === number.phoneNumber ? 'Purchasing...' : 'Purchase (~$1/mo)'}
                           </button>
@@ -940,15 +973,24 @@ export default function Page() {
       {/* Refund Policy Tab */}
       {activeTab === 'refund' && <RefundPolicyPage />}
 
+      {/* Integrations Tab */}
+      {activeTab === 'integrations' && <IntegrationsPage />}
+
+      {/* DNC List Tab */}
+      {activeTab === 'dnc' && <DNCPage />}
+
+      {/* Contact Tab */}
+      {activeTab === 'contact' && <ContactPage />}
+
       {/* Account Management Tab */}
       {activeTab === 'account' && (
         <div className="space-y-6">
           {/* Demo Mode */}
-          <div className="card border-purple-500/30 bg-purple-500/5">
-            <h2 className="text-xl font-semibold text-purple-400 mb-4">🎭 Demo Mode</h2>
+          <div className="card border-emerald-400/30 bg-emerald-400/5">
+            <h2 className="text-xl font-semibold text-emerald-400 mb-4">🎭 Demo Mode</h2>
 
             <div className="space-y-4">
-              <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+              <div className="p-4 bg-emerald-400/10 rounded-lg border border-emerald-400/30">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-white mb-1">Enable Demo Mode</h3>
@@ -971,19 +1013,19 @@ export default function Page() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-400/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-400"></div>
                   </label>
                 </div>
 
-                <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-3 mt-3">
-                  <h4 className="font-medium text-purple-200 text-sm mb-2">Demo mode includes:</h4>
-                  <ul className="text-sm text-purple-300/80 space-y-1 ml-4 list-disc">
+                <div className="bg-emerald-400/20 border border-emerald-400/30 rounded-lg p-3 mt-3">
+                  <h4 className="font-medium text-emerald-200 text-sm mb-2">Demo mode includes:</h4>
+                  <ul className="text-sm text-emerald-300/80 space-y-1 ml-4 list-disc">
                     <li>8 sample leads with various statuses and priorities</li>
                     <li>Realistic conversation threads with messages</li>
                     <li>Active and completed campaigns with statistics</li>
                     <li>Pre-configured conversation flows</li>
                   </ul>
-                  <p className="text-xs text-purple-300/60 mt-3">
+                  <p className="text-xs text-emerald-300/60 mt-3">
                     💡 Perfect for exploring features, taking screenshots, or demonstrating the platform to clients.
                   </p>
                 </div>
@@ -992,11 +1034,11 @@ export default function Page() {
           </div>
 
           {/* Quiet Hours */}
-          <div className="card border-blue-500/30 bg-blue-500/5">
-            <h2 className="text-xl font-semibold text-blue-400 mb-4">🌙 Quiet Hours</h2>
+          <div className="card border-emerald-500/30 bg-emerald-500/5">
+            <h2 className="text-xl font-semibold text-emerald-400 mb-4">🌙 Quiet Hours</h2>
 
             <div className="space-y-4">
-              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+              <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-white mb-1">Enable Quiet Hours</h3>
@@ -1011,7 +1053,7 @@ export default function Page() {
                       onChange={(e) => setQuietHoursEnabled(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                   </label>
                 </div>
 
@@ -1060,7 +1102,7 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-3">
+                    <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-lg p-3">
                       <h4 className="font-medium text-blue-200 text-sm mb-2">How it works:</h4>
                       <ul className="text-sm text-blue-300/80 space-y-1 ml-4 list-disc">
                         <li>Messages scheduled outside quiet hours will be delayed until the next allowed window</li>
@@ -1074,7 +1116,7 @@ export default function Page() {
 
                 <button
                   onClick={handleSaveQuietHours}
-                  className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                  className="mt-4 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
                 >
                   Save Quiet Hours
                 </button>

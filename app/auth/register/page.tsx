@@ -13,7 +13,6 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const [showSuccess, setShowSuccess] = useState(false)
 
@@ -31,6 +30,9 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
+
+    // Create Supabase client inside the event handler to avoid SSR issues
+    const supabase = createClient()
 
     try {
       // Production domain for email verification
@@ -82,7 +84,7 @@ export default function RegisterPage() {
 
         <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 text-center relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
           <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -97,8 +99,8 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-start text-left p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start text-left p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-emerald-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-sm text-white/60">
@@ -106,8 +108,8 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="flex items-start text-left p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start text-left p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 text-emerald-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div className="text-sm text-white/60">
@@ -117,7 +119,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="mt-6">
-            <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+            <Link href="/auth/login" className="text-emerald-400 hover:text-blue-300 font-semibold transition-colors">
               Back to login
             </Link>
           </div>
@@ -139,7 +141,9 @@ export default function RegisterPage() {
       <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img src="/logo-premium.png" alt="HyveWyre™" className="h-24 w-24 rounded-2xl shadow-lg" />
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <span className="text-white font-bold text-2xl">HW</span>
+            </div>
           </div>
           <h1 className="text-3xl font-bold mb-2 text-white">HyveWyre™</h1>
           <p className="text-white/60">Create your account</p>
@@ -156,7 +160,7 @@ export default function RegisterPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="John Doe"
             />
           </div>
@@ -171,7 +175,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="you@example.com"
             />
           </div>
@@ -187,7 +191,7 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="At least 8 characters"
             />
           </div>
@@ -203,7 +207,7 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="Confirm your password"
             />
           </div>
@@ -211,7 +215,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20"
+            className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
@@ -220,7 +224,7 @@ export default function RegisterPage() {
         <div className="mt-6 text-center">
           <p className="text-white/60">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+            <Link href="/auth/login" className="text-emerald-400 hover:text-blue-300 font-semibold transition-colors">
               Sign in
             </Link>
           </p>

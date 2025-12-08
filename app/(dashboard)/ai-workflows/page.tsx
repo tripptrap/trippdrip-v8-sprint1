@@ -30,7 +30,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Collect essential information for auto, home, or life insurance quotes with automated follow-up.',
     icon: Briefcase,
-    color: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
+    color: 'text-emerald-400 bg-blue-900/20 border-emerald-500/30',
     useCase: 'Perfect for capturing leads interested in insurance quotes and scheduling policy review calls.',
     questions: [
       { fieldName: 'insurance_type', question: 'What type of insurance are you interested in? (Auto, Home, Life, or Other)', type: 'text' },
@@ -50,7 +50,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Proactively reach out to existing clients before their policy expires to discuss renewal options.',
     icon: Calendar,
-    color: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
+    color: 'text-emerald-400 bg-teal-800/50 border-emerald-400/30',
     useCase: 'Automate policy renewal outreach to maintain customer retention and upsell opportunities.',
     questions: [
       { fieldName: 'renewal_interest', question: 'Your policy expires soon. Would you like to review your coverage and renewal options? (Yes/No)', type: 'text' },
@@ -69,7 +69,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Keep clients informed about their claim status and collect additional information if needed.',
     icon: TrendingUp,
-    color: 'text-green-400 bg-green-900/20 border-green-500/30',
+    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
     useCase: 'Improve customer satisfaction by proactively communicating claim progress.',
     questions: [
       { fieldName: 'claim_questions', question: 'Do you have any questions about your claim?', type: 'text' },
@@ -86,7 +86,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Qualify potential home buyers by understanding their needs, budget, and timeline.',
     icon: Home,
-    color: 'text-orange-400 bg-orange-900/20 border-orange-500/30',
+    color: 'text-emerald-400 bg-orange-900/20 border-emerald-400/30',
     useCase: 'Quickly identify serious buyers and gather information to match them with perfect properties.',
     questions: [
       { fieldName: 'home_type', question: 'What type of property are you looking for? (Single Family, Condo, Townhouse, etc.)', type: 'text' },
@@ -107,7 +107,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Engage potential home sellers and gather property details for a listing consultation.',
     icon: Users,
-    color: 'text-cyan-400 bg-cyan-900/20 border-cyan-500/30',
+    color: 'text-teal-400 bg-cyan-900/20 border-teal-500/30',
     useCase: 'Convert seller leads into listing appointments by understanding their motivation and property.',
     questions: [
       { fieldName: 'property_address', question: 'What\'s the address of the property you\'re thinking about selling?', type: 'text' },
@@ -127,7 +127,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Automatically follow up with open house attendees to gauge interest and schedule private showings.',
     icon: Calendar,
-    color: 'text-pink-400 bg-pink-900/20 border-pink-500/30',
+    color: 'text-teal-400 bg-teal-900/20 border-teal-500/30',
     useCase: 'Turn open house visitors into qualified buyers with timely, personalized follow-up.',
     questions: [
       { fieldName: 'property_interest', question: 'Thanks for visiting [Property Address]! What did you think of the property? (Loved it, It was nice, Not for me)', type: 'text' },
@@ -155,6 +155,127 @@ const workflowTemplates: WorkflowTemplate[] = [
     tags: ['Real Estate', 'Market Updates', 'Retention']
   },
 
+  // Additional Insurance Workflows
+  {
+    id: 'insurance-cross-sell',
+    name: 'Cross-Sell Opportunity',
+    industry: 'insurance',
+    description: 'Identify and convert cross-sell opportunities with existing clients.',
+    icon: Users,
+    color: 'text-emerald-400 bg-teal-900/20 border-emerald-400/30',
+    useCase: 'Maximize customer lifetime value by offering complementary insurance products.',
+    questions: [
+      { fieldName: 'current_policies', question: 'Which insurance policies do you currently have with us? (Auto, Home, Life, etc.)', type: 'text' },
+      { fieldName: 'family_coverage', question: 'Are all family members adequately covered?', type: 'text' },
+      { fieldName: 'bundle_interest', question: 'Would you be interested in bundling for additional savings?', type: 'text' },
+    ],
+    initialMessage: 'Hi [Name]! As a valued client, I wanted to reach out about ways we could potentially save you money and provide better protection for your family.',
+    followUpSequence: [
+      'Did you know you could save up to 25% by bundling your policies? Let me show you how.',
+      'I\'ve prepared a custom quote that could save you $[Amount] annually. Want to see the details?'
+    ],
+    tags: ['Insurance', 'Cross-Sell', 'Retention']
+  },
+  {
+    id: 'insurance-referral-request',
+    name: 'Referral Request Campaign',
+    industry: 'insurance',
+    description: 'Encourage satisfied clients to refer friends and family with incentive offers.',
+    icon: MessageSquare,
+    color: 'text-amber-400 bg-amber-900/20 border-amber-500/30',
+    useCase: 'Generate new leads through your existing happy customer base.',
+    questions: [
+      { fieldName: 'referral_names', question: 'Do you know anyone who might benefit from better insurance coverage?', type: 'text' },
+      { fieldName: 'referral_contact', question: 'Would you like me to reach out to them, or would you prefer to introduce us?', type: 'text' },
+    ],
+    initialMessage: 'Hi [Name]! I hope you\'re enjoying your coverage with us. As a thank you, we\'re offering [Incentive] for every friend or family member you refer who gets a quote.',
+    tags: ['Insurance', 'Referrals', 'Growth']
+  },
+
+  // Additional Real Estate Workflows
+  {
+    id: 'real-estate-first-time-buyer',
+    name: 'First-Time Home Buyer Guide',
+    industry: 'real-estate',
+    description: 'Guide first-time buyers through the home buying process with educational follow-ups.',
+    icon: Users,
+    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    useCase: 'Build trust with first-time buyers by providing value and education throughout their journey.',
+    questions: [
+      { fieldName: 'buyer_experience', question: 'Is this your first time buying a home? (Yes/No)', type: 'text' },
+      { fieldName: 'pre_approval_status', question: 'Have you spoken with a lender yet? (Yes/No/Need Recommendation)', type: 'text' },
+      { fieldName: 'preferred_area', question: 'Which neighborhoods or areas are you interested in?', type: 'text' },
+      { fieldName: 'move_in_timeline', question: 'What\'s your ideal move-in timeframe?', type: 'text' },
+    ],
+    initialMessage: 'Hi! Congrats on taking the first step toward homeownership! I specialize in helping first-time buyers navigate the process. Let me ask you a few questions to get started.',
+    followUpSequence: [
+      'Here\'s a helpful guide I put together on the home buying process. Would you like me to walk you through it?',
+      'I can connect you with trusted lenders who offer great rates for first-time buyers. Interested?',
+      'I found some properties in [Area] within your budget. Want to schedule a showing this weekend?'
+    ],
+    tags: ['Real Estate', 'First-Time Buyers', 'Education']
+  },
+  {
+    id: 'real-estate-investor-outreach',
+    name: 'Investment Property Outreach',
+    industry: 'real-estate',
+    description: 'Connect with real estate investors looking for rental properties or fix-and-flip opportunities.',
+    icon: TrendingUp,
+    color: 'text-violet-400 bg-violet-900/20 border-violet-500/30',
+    useCase: 'Attract investor clients and build long-term relationships in the investment property market.',
+    questions: [
+      { fieldName: 'investment_type', question: 'What type of investment property interests you? (Rental, Fix-and-Flip, Commercial, Multi-Family)', type: 'text' },
+      { fieldName: 'cash_flow_goal', question: 'What\'s your target cash flow or ROI?', type: 'text' },
+      { fieldName: 'market_area', question: 'Are you looking in any specific neighborhoods or cities?', type: 'text' },
+    ],
+    initialMessage: 'Hi! I help investors find profitable real estate opportunities in [Market]. Let me ask a few questions to understand your investment goals.',
+    followUpSequence: [
+      'I have an off-market property that could generate [X]% ROI. Want the details?',
+      'Just ran the numbers on a multi-family property in [Area]. The cash flow looks strong. Interested?'
+    ],
+    tags: ['Real Estate', 'Investors', 'Lead Generation']
+  },
+  {
+    id: 'real-estate-expired-listing',
+    name: 'Expired Listing Outreach',
+    industry: 'real-estate',
+    description: 'Convert expired listings by offering a fresh marketing strategy and pricing analysis.',
+    icon: Briefcase,
+    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    useCase: 'Win new listings by demonstrating your superior marketing approach to frustrated sellers.',
+    questions: [
+      { fieldName: 'previous_listing_experience', question: 'I noticed your listing expired. What was the biggest challenge you faced?', type: 'text' },
+      { fieldName: 'still_interested', question: 'Are you still interested in selling, or have your plans changed?', type: 'text' },
+      { fieldName: 'listing_concerns', question: 'What would need to be different for you to list again?', type: 'text' },
+    ],
+    initialMessage: 'Hi [Name], I noticed your property at [Address] didn\'t sell. I specialize in selling homes that didn\'t sell the first time - often for more than the original listing price.',
+    followUpSequence: [
+      'I\'ve sold [X] homes in your neighborhood this year. My average days on market is [Y] days. Want to see my marketing plan?',
+      'I\'d love to offer you a free updated market analysis. No obligation - just want to show you what\'s changed since you listed.'
+    ],
+    tags: ['Real Estate', 'Expired Listings', 'Listing Acquisition']
+  },
+  {
+    id: 'real-estate-fsbo-conversion',
+    name: 'FSBO Conversion',
+    industry: 'real-estate',
+    description: 'Convert For Sale By Owner listings by offering professional expertise and marketing.',
+    icon: Home,
+    color: 'text-emerald-400 bg-sky-900/20 border-emerald-400/30',
+    useCase: 'Help FSBO sellers understand the value of professional representation.',
+    questions: [
+      { fieldName: 'fsbo_duration', question: 'How long have you been selling on your own?', type: 'text' },
+      { fieldName: 'showing_count', question: 'How many showings have you had so far?', type: 'text' },
+      { fieldName: 'biggest_challenge', question: 'What\'s been the most challenging part of selling on your own?', type: 'text' },
+    ],
+    initialMessage: 'Hi! I saw you\'re selling your home at [Address] on your own. Kudos for taking that on! I wanted to reach out and offer some free advice from my [X] years of experience.',
+    followUpSequence: [
+      'Did you know that agent-represented homes sell for an average of [X]% more than FSBO? I can show you the data for your neighborhood.',
+      'I have several qualified buyers looking in your area. Would you be open to me bringing them by?'
+    ],
+    tags: ['Real Estate', 'FSBO', 'Lead Conversion']
+  },
+
   // General Purpose
   {
     id: 'appointment-scheduler',
@@ -162,13 +283,33 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'general',
     description: 'Universal appointment scheduling flow that integrates with your calendar.',
     icon: Calendar,
-    color: 'text-indigo-400 bg-indigo-900/20 border-indigo-500/30',
+    color: 'text-emerald-400 bg-indigo-900/20 border-emerald-400/30',
     useCase: 'Schedule calls, consultations, or meetings with automated calendar integration.',
     questions: [
       { fieldName: 'meeting_purpose', question: 'What would you like to discuss on our call?', type: 'text' },
     ],
     initialMessage: 'Hi! I\'d love to schedule a time to chat. What works best for your schedule?',
     tags: ['General', 'Scheduling', 'Calendar']
+  },
+  {
+    id: 'general-feedback-collection',
+    name: 'Customer Feedback Collection',
+    industry: 'general',
+    description: 'Gather valuable customer feedback to improve your services and identify opportunities.',
+    icon: MessageSquare,
+    color: 'text-lime-400 bg-lime-900/20 border-lime-500/30',
+    useCase: 'Collect testimonials, reviews, and improvement suggestions from clients.',
+    questions: [
+      { fieldName: 'satisfaction_rating', question: 'On a scale of 1-10, how satisfied are you with our service?', type: 'text' },
+      { fieldName: 'improvement_suggestions', question: 'What could we do to improve your experience?', type: 'text' },
+      { fieldName: 'review_willingness', question: 'Would you be willing to leave us a quick review? It really helps our business!', type: 'text' },
+    ],
+    initialMessage: 'Hi [Name]! Thank you for choosing us. We\'d love to hear about your experience to help us serve you better.',
+    followUpSequence: [
+      'Thank you for the feedback! Your input helps us improve every day.',
+      'We\'d be grateful if you could share your experience on Google/Yelp. Here\'s the link: [Review Link]'
+    ],
+    tags: ['General', 'Feedback', 'Reviews']
   },
 ];
 
@@ -224,7 +365,7 @@ export default function AIWorkflowsPage() {
               onClick={() => setSelectedIndustry(industry.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
                 selectedIndustry === industry.id
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
                   : 'bg-white/5 text-[#9fb0c3] hover:bg-white/10'
               }`}
             >
@@ -240,7 +381,7 @@ export default function AIWorkflowsPage() {
         <div className="card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-blue-400" />
+              <Briefcase className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">
@@ -253,7 +394,7 @@ export default function AIWorkflowsPage() {
         <div className="card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-orange-900/20 flex items-center justify-center">
-              <Home className="h-5 w-5 text-orange-400" />
+              <Home className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">
@@ -265,8 +406,8 @@ export default function AIWorkflowsPage() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-900/20 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-purple-400" />
+            <div className="w-10 h-10 rounded-lg bg-teal-800/50 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-2xl font-bold text-[#e7eef9]">{workflowTemplates.length}</div>
@@ -318,11 +459,11 @@ export default function AIWorkflowsPage() {
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm text-[#9fb0c3] bg-white/5 rounded p-2">
-                        <span className="text-blue-400">Initial:</span> {template.initialMessage.substring(0, 100)}...
+                        <span className="text-emerald-400">Initial:</span> {template.initialMessage.substring(0, 100)}...
                       </div>
                       {template.questions.slice(0, 2).map((q, idx) => (
                         <div key={idx} className="text-sm text-[#9fb0c3] bg-white/5 rounded p-2">
-                          <span className="text-green-400">Q{idx + 1}:</span> {q.question}
+                          <span className="text-emerald-400">Q{idx + 1}:</span> {q.question}
                         </div>
                       ))}
                       {template.questions.length > 2 && (
@@ -335,7 +476,7 @@ export default function AIWorkflowsPage() {
 
                   <button
                     onClick={() => handleUseTemplate(template)}
-                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
                   >
                     {copiedId === template.id ? (
                       <>

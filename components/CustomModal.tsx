@@ -33,11 +33,11 @@ export default function CustomModal({
     switch (type) {
       case 'success':
         return {
-          gradient: 'from-green-900/20 to-emerald-900/20',
-          border: 'border-green-500/30',
-          bg: 'bg-green-500/10',
-          text: 'text-green-400',
-          button: 'bg-green-600 hover:bg-green-700 border-green-500/50'
+          gradient: 'from-emerald-900/20 to-emerald-900/20',
+          border: 'border-emerald-500/30',
+          bg: 'bg-emerald-500/10',
+          text: 'text-emerald-400',
+          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
         };
       case 'error':
         return {
@@ -58,18 +58,18 @@ export default function CustomModal({
       case 'confirm':
         return {
           gradient: 'from-blue-900/20 to-cyan-900/20',
-          border: 'border-blue-500/30',
-          bg: 'bg-blue-500/10',
-          text: 'text-blue-400',
-          button: 'bg-blue-600 hover:bg-blue-700 border-blue-500/50'
+          border: 'border-emerald-500/30',
+          bg: 'bg-emerald-500/10',
+          text: 'text-emerald-400',
+          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
         };
       default:
         return {
-          gradient: 'from-gray-900/20 to-slate-900/20',
+          gradient: 'from-gray-900/20 to-teal-900/20',
           border: 'border-white/30',
           bg: 'bg-white/10',
           text: 'text-white',
-          button: 'bg-blue-600 hover:bg-blue-700 border-blue-500/50'
+          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
         };
     }
   };

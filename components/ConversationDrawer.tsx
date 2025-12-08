@@ -37,7 +37,7 @@ export default function ConversationDrawer({ open, onClose, leadName, messages, 
             const statusInfo = m.status ? getMessageStatusIcon(m.status) : null;
             return (
               <div key={m.id} className={`max-w-[80%] ${m.direction === 'out' ? 'ml-auto' : ''}`}>
-                <div className={`px-3 py-2 rounded-xl ${m.direction === 'out' ? 'bg-blue-500 text-white' : 'bg-white/10'}`}>
+                <div className={`px-3 py-2 rounded-xl ${m.direction === 'out' ? 'bg-emerald-500 text-white' : 'bg-white/10'}`}>
                   <div className="text-xs opacity-60 mb-1">
                     {new Date(m.created_at).toLocaleString()}
                   </div>

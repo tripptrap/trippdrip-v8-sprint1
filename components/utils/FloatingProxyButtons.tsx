@@ -60,7 +60,7 @@ export default function FloatingProxyButtons({
       {hasConfirm && (
         <button
           onClick={() => click(confirmSelector)}
-          className="px-4 py-2 rounded-xl bg-green-600 text-white shadow"
+          className="px-4 py-2 rounded-xl bg-emerald-600 text-white shadow"
         >
           Confirm Import
         </button>

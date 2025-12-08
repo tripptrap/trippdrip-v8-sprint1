@@ -27,7 +27,7 @@ export default function DemoModeBanner() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-emerald-400 to-teal-400 text-white px-4 py-2 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎭</span>

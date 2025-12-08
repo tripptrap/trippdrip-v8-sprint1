@@ -75,7 +75,7 @@ export default function OnboardingPage() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
       </div>
     );
   }
@@ -94,11 +94,11 @@ export default function OnboardingPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-center gap-4 mb-4">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-white/10'} text-white font-bold`}>
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 1 ? 'bg-emerald-600' : 'bg-white/10'} text-white font-bold`}>
               {step > 1 ? '✓' : '1'}
             </div>
-            <div className={`h-1 w-20 ${step >= 2 ? 'bg-blue-600' : 'bg-white/10'}`} />
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-white/10'} text-white font-bold`}>
+            <div className={`h-1 w-20 ${step >= 2 ? 'bg-emerald-600' : 'bg-white/10'}`} />
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full ${step >= 2 ? 'bg-emerald-600' : 'bg-white/10'} text-white font-bold`}>
               2
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function OnboardingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-8">
               {/* Starter Plan */}
-              <div className="p-8 bg-white/5 border-2 border-white/10 rounded-2xl hover:border-blue-500/50 transition-all cursor-pointer"
+              <div className="p-8 bg-white/5 border-2 border-white/10 rounded-2xl hover:border-emerald-500/50 transition-all cursor-pointer"
                 onClick={() => handleSelectPlan('starter')}>
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-bold text-white mb-2">Starter</h3>
@@ -130,42 +130,42 @@ export default function OnboardingPage() {
                 </div>
                 <div className="space-y-3 mb-8">
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>{SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()} credits/month</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Up to {SUBSCRIPTION_FEATURES.starter.maxContacts.toLocaleString()} contacts</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>{SUBSCRIPTION_FEATURES.starter.maxCampaigns} campaigns</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>AI responses & generation</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Bulk messaging</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Email integration</span>
                   </div>
                 </div>
                 <button
                   onClick={() => handleSelectPlan('starter')}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-all"
                 >
                   Select Starter
                 </button>
               </div>
 
               {/* Professional Plan */}
-              <div className="relative p-8 bg-gradient-to-br from-purple-500/10 to-blue-500/10 border-2 border-purple-500 rounded-2xl cursor-pointer"
+              <div className="relative p-8 bg-gradient-to-br from-emerald-400/10 to-emerald-500/10 border-2 border-emerald-400 rounded-2xl cursor-pointer"
                 onClick={() => handleSelectPlan('professional')}>
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-bold px-4 py-1 rounded-full">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-400 to-teal-400 text-white text-sm font-bold px-4 py-1 rounded-full">
                   MOST POPULAR
                 </div>
                 <div className="text-center mb-6">
@@ -175,37 +175,37 @@ export default function OnboardingPage() {
                 </div>
                 <div className="space-y-3 mb-8">
                   <div className="flex items-center gap-3 text-white font-semibold">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>{SUBSCRIPTION_FEATURES.professional.monthlyCredits.toLocaleString()} credits/month</span>
                   </div>
                   <div className="flex items-center gap-3 text-white font-semibold">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Unlimited contacts</span>
                   </div>
                   <div className="flex items-center gap-3 text-white font-semibold">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Unlimited campaigns</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Advanced AI (GPT-4)</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Advanced analytics</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>API & Webhooks</span>
                   </div>
                   <div className="flex items-center gap-3 text-white">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-emerald-400">✓</span>
                     <span>Priority support</span>
                   </div>
                 </div>
                 <button
                   onClick={() => handleSelectPlan('professional')}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg transition-all"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-teal-600 hover:to-teal-600 text-white font-semibold rounded-lg transition-all"
                 >
                   Select Professional
                 </button>
@@ -248,7 +248,7 @@ export default function OnboardingPage() {
               </div>
               <div className="space-y-2 text-white/80 text-sm mb-6">
                 <div className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span>
+                  <span className="text-emerald-400">✓</span>
                   <span>
                     {selectedPlan === 'starter'
                       ? SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()
@@ -257,11 +257,11 @@ export default function OnboardingPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span>
+                  <span className="text-emerald-400">✓</span>
                   <span>Credits renew automatically on your billing date</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span>
+                  <span className="text-emerald-400">✓</span>
                   <span>Cancel anytime</span>
                 </div>
               </div>
@@ -269,7 +269,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleStartPayment}
                 disabled={loading}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                className="w-full py-4 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-4"
               >
                 {loading ? 'Processing...' : 'Continue to Payment'}
               </button>

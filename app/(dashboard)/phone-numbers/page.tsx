@@ -240,7 +240,7 @@ export default function PhoneNumbersPage() {
         <div
           className={`mb-4 p-4 rounded-lg ${
             message.type === 'success'
-              ? 'bg-green-900/20 border border-green-700 text-green-400'
+              ? 'bg-emerald-900/20 border border-emerald-700 text-emerald-400'
               : 'bg-red-900/20 border border-red-700 text-red-400'
           }`}
         >
@@ -257,16 +257,16 @@ export default function PhoneNumbersPage() {
 
       {/* Instant Access Pool Banner */}
       {poolNumbers.length > 0 && (
-        <div className="mb-6 p-6 bg-gradient-to-r from-green-900/20 to-blue-900/20 border-2 border-green-500/50 rounded-lg">
+        <div className="mb-6 p-6 bg-gradient-to-r from-emerald-900/20 to-teal-800/50 border-2 border-emerald-500/50 rounded-lg">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <div className="px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full uppercase">
+                <div className="px-3 py-1 bg-emerald-600 text-white text-xs font-bold rounded-full uppercase">
                   Instant Access
                 </div>
                 <h2 className="text-2xl font-bold text-white">Start Sending Messages Now!</h2>
               </div>
-              <p className="text-green-200 mb-4">
+              <p className="text-emerald-200 mb-4">
                 Claim a pre-verified number from our shared pool and send messages immediately - no waiting for verification!
               </p>
               <div className="flex flex-wrap gap-4">
@@ -281,14 +281,14 @@ export default function PhoneNumbersPage() {
                           {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • ${poolNum.monthly_cost}/mo
                         </div>
                       </div>
-                      <div className="text-green-400 text-xs font-semibold">
+                      <div className="text-emerald-400 text-xs font-semibold">
                         ✓ Verified
                       </div>
                     </div>
                     <button
                       onClick={() => claimPoolNumber(poolNum.id)}
                       disabled={claimingPool}
-                      className="w-full mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                      className="w-full mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center justify-center gap-2"
                     >
                       {claimingPool ? (
                         <>
@@ -356,7 +356,7 @@ export default function PhoneNumbersPage() {
                             {number.phone_number}
                           </span>
                           {number.is_primary && (
-                            <span className="flex items-center gap-1 px-2 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded text-xs">
+                            <span className="flex items-center gap-1 px-2 py-1 bg-blue-900/30 border border-emerald-700 text-emerald-400 rounded text-xs">
                               <Star className="h-3 w-3" />
                               Primary
                             </span>
@@ -376,22 +376,22 @@ export default function PhoneNumbersPage() {
 
                     <div className="flex flex-wrap gap-2">
                       {number.capabilities.sms && number.capabilities.voice && (
-                        <span className="px-3 py-1 bg-green-900/30 border border-green-700 text-green-400 rounded text-xs font-medium">
+                        <span className="px-3 py-1 bg-emerald-900/30 border border-emerald-700 text-emerald-400 rounded text-xs font-medium">
                           📱 Unified: SMS + Voice
                         </span>
                       )}
                       {number.capabilities.sms && !number.capabilities.voice && (
-                        <span className="px-2 py-1 bg-blue-900/30 border border-blue-700 text-blue-400 rounded text-xs">
+                        <span className="px-2 py-1 bg-blue-900/30 border border-emerald-700 text-emerald-400 rounded text-xs">
                           SMS
                         </span>
                       )}
                       {number.capabilities.mms && (
-                        <span className="px-2 py-1 bg-purple-900/30 border border-purple-700 text-purple-400 rounded text-xs">
+                        <span className="px-2 py-1 bg-teal-800/60 border border-teal-600 text-emerald-400 rounded text-xs">
                           MMS
                         </span>
                       )}
                       {number.capabilities.voice && !number.capabilities.sms && (
-                        <span className="px-2 py-1 bg-orange-900/30 border border-orange-700 text-orange-400 rounded text-xs">
+                        <span className="px-2 py-1 bg-orange-900/30 border border-orange-700 text-emerald-400 rounded text-xs">
                           Voice
                         </span>
                       )}
@@ -425,7 +425,7 @@ export default function PhoneNumbersPage() {
                   }}
                   className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                     numberType === 'tollfree'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -438,7 +438,7 @@ export default function PhoneNumbersPage() {
                   }}
                   className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                     numberType === 'local'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -448,11 +448,11 @@ export default function PhoneNumbersPage() {
 
               {/* Info Banner */}
               {numberType === 'tollfree' && (
-                <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                <div className="p-4 bg-emerald-900/20 border border-emerald-700 rounded-lg">
                   <div className="flex gap-2">
-                    <div className="text-green-400 font-semibold text-sm">✓ Works Immediately</div>
+                    <div className="text-emerald-400 font-semibold text-sm">✓ Works Immediately</div>
                   </div>
-                  <p className="text-xs text-green-300 mt-1">
+                  <p className="text-xs text-emerald-300 mt-1">
                     Toll-free numbers (1-800, 1-888, etc.) work instantly. No A2P registration required!
                   </p>
                   <p className="text-xs text-gray-400 mt-1">Cost: ~$2/month</p>
@@ -507,7 +507,7 @@ export default function PhoneNumbersPage() {
                 <button
                   onClick={searchNumbers}
                   disabled={searching || (numberType === 'local' && !areaCode && !searchQuery)}
-                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   {searching ? (
                     <>
@@ -538,7 +538,7 @@ export default function PhoneNumbersPage() {
                             <span className="font-mono font-semibold">
                               {number.phoneNumber}
                             </span>
-                            <span className="text-xs text-green-400 font-semibold">
+                            <span className="text-xs text-emerald-400 font-semibold">
                               $1.00/mo
                             </span>
                           </div>
@@ -549,7 +549,7 @@ export default function PhoneNumbersPage() {
                         <button
                           onClick={() => purchaseNumber(number.phoneNumber)}
                           disabled={purchasing !== null}
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center gap-1"
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center gap-1"
                         >
                           {purchasing === number.phoneNumber ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

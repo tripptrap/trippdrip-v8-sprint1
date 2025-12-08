@@ -22,6 +22,7 @@ export async function GET(req: Request) {
   const q = (url.searchParams.get("q") || "").trim();
   const tags = (url.searchParams.get("tags") || "").split(",").map(s=>s.trim()).filter(Boolean);
   const campaign = (url.searchParams.get("campaign") || "").trim();
+  const campaignId = url.searchParams.get("campaign_id");
 
   // Advanced filters
   const status = url.searchParams.get("status");
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
 
     // Apply search filter (searches across multiple fields)
     if (q) {
-      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,company.ilike.%${q}%`);
+      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,state.ilike.%${q}%`);
     }
 
     // Apply status filter
@@ -73,8 +74,10 @@ export async function GET(req: Request) {
       query = query.eq('source', source);
     }
 
-    // Apply campaign filter
-    if (campaign) {
+    // Apply campaign filter (by name or by ID)
+    if (campaignId) {
+      query = query.eq('campaign_id', campaignId);
+    } else if (campaign) {
       query = query.eq('campaign', campaign);
     }
 
@@ -111,5 +114,70 @@ export async function GET(req: Request) {
   } catch (error: any) {
     console.error('Error in GET /api/leads:', error);
     return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const body = await req.json();
+
+    // Validate required phone field
+    const phone = body.phone?.trim();
+    if (!phone) {
+      return NextResponse.json({ ok: false, error: 'Phone number is required' }, { status: 400 });
+    }
+
+    // Check for existing lead with same phone number
+    const { data: existingLead } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('phone', phone)
+      .single();
+
+    if (existingLead) {
+      return NextResponse.json({
+        ok: false,
+        error: 'duplicate',
+        message: 'A lead with this phone number already exists',
+        existingLead
+      }, { status: 409 });
+    }
+
+    // Prepare lead data - only core columns that definitely exist
+    const leadData: Lead = {
+      user_id: user.id,
+      first_name: body.first_name?.trim() || null,
+      last_name: body.last_name?.trim() || null,
+      phone: phone,
+      email: body.email?.trim() || null,
+      state: body.state?.trim() || null,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+    };
+
+    // Insert lead
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .insert(leadData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating lead:', error);
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, lead });
+  } catch (error: any) {
+    console.error('Error in POST /api/leads:', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

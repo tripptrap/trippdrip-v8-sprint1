@@ -321,7 +321,7 @@ export default function PointsPage() {
       <h1 className="text-xl font-semibold">Points & Billing</h1>
 
       {/* Current Balance Card */}
-      <div className="card bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-blue-500/30">
+      <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-400/20 border-emerald-500/30">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm text-white/60 mb-1">Current Balance</div>
@@ -336,7 +336,7 @@ export default function PointsPage() {
               {currentPlan === 'basic' && (
                 <button
                   onClick={() => handlePlanSwitch('premium')}
-                  className="ml-2 text-xs bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-full hover:opacity-80 transition-opacity font-semibold"
+                  className="ml-2 text-xs bg-gradient-to-r from-emerald-400 to-teal-400 text-white px-3 py-1 rounded-full hover:opacity-80 transition-opacity font-semibold"
                 >
                   Upgrade to Premium
                 </button>
@@ -376,9 +376,9 @@ export default function PointsPage() {
           <div className="text-xs text-white/60">until refill needed</div>
         </div>
 
-        <div className="card bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+        <div className="card bg-gradient-to-br from-emerald-500/10 to-emerald-500/10 border-emerald-500/20">
           <div className="text-xs text-white/60 mb-1">Next Renewal</div>
-          <div className="text-2xl font-bold text-green-400">
+          <div className="text-2xl font-bold text-emerald-400">
             {daysUntilRenewal !== null ? (daysUntilRenewal <= 0 ? 'Today!' : `${daysUntilRenewal}d`) : '---'}
           </div>
           <div className="text-xs text-white/60">
@@ -389,10 +389,10 @@ export default function PointsPage() {
 
       {/* Low Balance Alert */}
       {balance <= 200 && (
-        <div className="card bg-orange-500/10 border-orange-500/30">
+        <div className="card bg-emerald-400/10 border-emerald-400/30">
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <div className="font-bold text-orange-400">Low Balance Alert</div>
+              <div className="font-bold text-emerald-400">Low Balance Alert</div>
               <div className="text-sm text-white/70">You have {balance} points remaining. Top up to keep your AI responses flowing!</div>
             </div>
           </div>
@@ -423,7 +423,7 @@ export default function PointsPage() {
                   {pack.points.toLocaleString()}
                 </div>
                 {discount && (
-                  <div className="text-xs text-green-400 font-medium">{discount}</div>
+                  <div className="text-xs text-emerald-400 font-medium">{discount}</div>
                 )}
               </div>
 
@@ -476,7 +476,7 @@ export default function PointsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm">{tx.description}</td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${
-                        tx.action_type === 'spend' ? 'text-red-400' : 'text-green-400'
+                        tx.action_type === 'spend' ? 'text-red-400' : 'text-emerald-400'
                       }`}>
                         {tx.action_type === 'spend' ? '-' : '+'}{Math.abs(tx.points_amount).toLocaleString()}
                       </td>
@@ -494,9 +494,9 @@ export default function PointsPage() {
         <h2 className="text-lg font-semibold mb-4">Choose Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {/* Starter Plan */}
-          <div className={`card relative ${currentPlan === 'basic' ? 'ring-2 ring-blue-500 bg-blue-500/10' : 'bg-white/5'}`}>
+          <div className={`card relative ${currentPlan === 'basic' ? 'ring-2 ring-emerald-500 bg-emerald-500/10' : 'bg-white/5'}`}>
             {currentPlan === 'basic' && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">
                 CURRENT PLAN
               </div>
             )}
@@ -507,39 +507,39 @@ export default function PointsPage() {
             </div>
             <div className="space-y-3 text-sm mb-6">
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
-                <span className="font-semibold text-green-400">{SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()} credits/month</span>
+                <span className="text-emerald-400">✓</span>
+                <span className="font-semibold text-emerald-400">{SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()} credits/month</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Up to {SUBSCRIPTION_FEATURES.starter.maxContacts.toLocaleString()} contacts</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>{SUBSCRIPTION_FEATURES.starter.maxCampaigns} campaigns</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>{SUBSCRIPTION_FEATURES.starter.maxFlows} AI flows</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>AI responses & generation</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Bulk messaging</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Email integration</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>{SUBSCRIPTION_FEATURES.starter.pointPackDiscount}% off point packs</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Individual account</span>
               </div>
               <div className="flex items-center gap-2">
@@ -550,7 +550,7 @@ export default function PointsPage() {
             {currentPlan !== 'basic' && (
               <button
                 onClick={() => handlePlanSwitch('basic')}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded transition-colors"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded transition-colors"
               >
                 {currentPlan === 'premium' ? 'Downgrade' : 'Select Plan'}
               </button>
@@ -558,14 +558,14 @@ export default function PointsPage() {
           </div>
 
           {/* Professional Plan */}
-          <div className={`card relative ${currentPlan === 'premium' ? 'ring-2 ring-purple-500 bg-purple-500/10' : 'bg-gradient-to-br from-purple-500/10 to-blue-500/10'}`}>
+          <div className={`card relative ${currentPlan === 'premium' ? 'ring-2 ring-emerald-400 bg-emerald-400/10' : 'bg-gradient-to-br from-emerald-400/10 to-emerald-500/10'}`}>
             {currentPlan === 'premium' && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-400 to-teal-400 text-white text-xs font-bold px-3 py-1 rounded-full">
                 CURRENT PLAN
               </div>
             )}
             {currentPlan !== 'premium' && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-400 to-teal-400 text-white text-xs font-bold px-3 py-1 rounded-full">
                 BEST VALUE
               </div>
             )}
@@ -576,51 +576,51 @@ export default function PointsPage() {
             </div>
             <div className="space-y-3 text-sm mb-6">
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
-                <span className="font-semibold text-green-400">{SUBSCRIPTION_FEATURES.professional.monthlyCredits.toLocaleString()} credits/month</span>
+                <span className="text-emerald-400">✓</span>
+                <span className="font-semibold text-emerald-400">{SUBSCRIPTION_FEATURES.professional.monthlyCredits.toLocaleString()} credits/month</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span className="font-semibold">Unlimited contacts</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span className="font-semibold">Unlimited campaigns</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span className="font-semibold">Unlimited AI flows</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Advanced AI (GPT-4)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Advanced analytics</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Custom branding</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>API & Webhooks</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>{SUBSCRIPTION_FEATURES.professional.pointPackDiscount}% off point packs</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Unlimited team members</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Priority delivery</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-emerald-400">✓</span>
                 <span>Dedicated phone number</span>
               </div>
               <div className="flex items-center gap-2">
@@ -631,7 +631,7 @@ export default function PointsPage() {
             {currentPlan !== 'premium' && (
               <button
                 onClick={() => handlePlanSwitch('premium')}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium py-2 rounded transition-colors"
+                className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-teal-600 hover:to-teal-600 text-white font-medium py-2 rounded transition-colors"
               >
                 Upgrade to Professional
               </button>
@@ -658,7 +658,7 @@ export default function PointsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-white/60">Points rollover:</span>
-            <span className="font-medium text-green-400">Enabled</span>
+            <span className="font-medium text-emerald-400">Enabled</span>
           </div>
         </div>
       </div>
@@ -666,7 +666,7 @@ export default function PointsPage() {
       {/* Celebration Popup */}
       {showCelebration && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-gradient-to-br from-purple-600 to-pink-600 p-8 rounded-2xl shadow-2xl max-w-md text-center">
+          <div className="relative bg-gradient-to-br from-emerald-400 to-teal-400 p-8 rounded-2xl shadow-2xl max-w-md text-center">
             {/* Fireworks Animation */}
             <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
               {[...Array(20)].map((_, i) => (

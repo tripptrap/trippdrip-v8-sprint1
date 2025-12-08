@@ -11,11 +11,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    // Create Supabase client inside the event handler to avoid SSR issues
+    const supabase = createClient()
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -70,7 +72,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="h-20 w-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="h-20 w-20 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-2xl">HW</span>
             </div>
           </div>
@@ -89,7 +91,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="you@example.com"
             />
           </div>
@@ -104,7 +106,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
               placeholder="Enter your password"
             />
           </div>
@@ -112,7 +114,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20"
+            className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -121,14 +123,14 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-white/60">
             Don't have an account?{' '}
-            <Link href="/auth/register" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors">
+            <Link href="/auth/register" className="text-emerald-400 hover:text-blue-300 font-semibold transition-colors">
               Sign up
             </Link>
           </p>
         </div>
 
         <div className="mt-4 text-center">
-          <Link href="/auth/forgot-password" className="text-sm text-white/60 hover:text-blue-400 transition-colors">
+          <Link href="/auth/forgot-password" className="text-sm text-white/60 hover:text-emerald-400 transition-colors">
             Forgot your password?
           </Link>
         </div>

@@ -137,7 +137,7 @@ export default function TermsOfServicePage() {
         <section>
           <h2 className="text-xl font-semibold mb-3">11. Limitation of Liability</h2>
           <p className="text-white/80">
-            TO THE MAXIMUM EXTENT PERMITTED BY LAW, FLUXENI SHALL NOT BE LIABLE FOR ANY INDIRECT,
+            TO THE MAXIMUM EXTENT PERMITTED BY LAW, HYVEWYRE LLC SHALL NOT BE LIABLE FOR ANY INDIRECT,
             INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS, DATA LOSS,
             OR BUSINESS INTERRUPTION. OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID IN THE
             PAST 12 MONTHS.
@@ -177,8 +177,8 @@ export default function TermsOfServicePage() {
             For questions about these Terms, contact us at:
           </p>
           <div className="mt-3 p-4 bg-white/5 rounded-lg">
-            <p className="text-white/80">Email: legal@hyvewyre.com</p>
-            <p className="text-white/80">Address: [Your Company Address]</p>
+            <p className="text-white/80">Email: support@hyvewyre.com</p>
+            <p className="text-white/80">Address: 12325 Magnolia Street, San Antonio, FL 33576</p>
           </div>
         </section>
       </div>

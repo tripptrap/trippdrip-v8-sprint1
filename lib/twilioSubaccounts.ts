@@ -1,6 +1,7 @@
 // Twilio Subaccount Management for Multi-Tenant Architecture
 import twilio from 'twilio';
 import { createClient } from '@/lib/supabase/server';
+import { encrypt, safeDecrypt } from '@/lib/encryption';
 
 // Initialize Twilio client with master account credentials
 const masterAccountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -74,17 +75,18 @@ export async function createTwilioSubaccount(
     // Get the auth token for the subaccount
     const authToken = subaccount.authToken;
 
-    // Store credentials in database
+    // Store credentials in database with encryption
     const supabase = await createClient();
 
-    // Note: In production, you should encrypt the auth token before storing
-    // For now, storing as-is but the column is named _encrypted for future implementation
+    // Encrypt the auth token before storing
+    const encryptedAuthToken = encrypt(authToken);
+
     const { error: updateError } = await supabase
       .from('user_preferences')
       .upsert({
         user_id: userId,
         twilio_subaccount_sid: subaccount.sid,
-        twilio_subaccount_auth_token_encrypted: authToken,
+        twilio_subaccount_auth_token_encrypted: encryptedAuthToken,
         twilio_subaccount_status: 'active',
         twilio_subaccount_created_at: new Date().toISOString(),
         twilio_subaccount_friendly_name: friendlyName,
@@ -243,10 +245,13 @@ export async function getUserTwilioCredentials(
       };
     }
 
+    // Decrypt the auth token (safeDecrypt handles both encrypted and legacy unencrypted values)
+    const decryptedAuthToken = safeDecrypt(data.twilio_subaccount_auth_token_encrypted);
+
     return {
       success: true,
       accountSid: data.twilio_subaccount_sid,
-      authToken: data.twilio_subaccount_auth_token_encrypted,
+      authToken: decryptedAuthToken,
       status: data.twilio_subaccount_status,
     };
   } catch (error: any) {

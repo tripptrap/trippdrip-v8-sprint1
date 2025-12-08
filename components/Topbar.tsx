@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { checkAndRenewCredits } from "@/lib/renewalSystem";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Topbar(){
   const router = useRouter();
@@ -60,79 +61,142 @@ export default function Topbar(){
   // Determine dot color based on points
   const getDotColor = () => {
     if (points < 10) return 'bg-red-500';
-    if (points < 500) return 'bg-orange-500';
-    return 'bg-green-500';
+    if (points < 500) return 'bg-emerald-400';
+    return 'bg-emerald-500';
   };
 
   return (
-    <div className="flex items-center justify-between p-3 border-b border-white/10">
-      <div className="text-sm text-[var(--muted)]">Welcome back, {user?.name || user?.email?.split('@')[0] || 'User'}</div>
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="flex items-center justify-between p-3 border-b border-white/10"
+    >
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="text-sm text-[var(--muted)]"
+      >
+        Welcome back, {user?.name || user?.email?.split('@')[0] || 'User'}
+      </motion.div>
 
       <div className="flex items-center gap-4">
         {/* Points Balance */}
-        <Link href="/points" className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">
-          <div className={`w-2 h-2 rounded-full ${getDotColor()}`} />
-          <div className="text-right">
-            <div className="font-bold text-white">
-              {points.toLocaleString()}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Link href="/points" className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors">
+            <motion.div
+              className={`w-2 h-2 rounded-full ${getDotColor()}`}
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            <div className="text-right">
+              <div className="font-bold text-white">
+                {points.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-[var(--muted)]">points</div>
             </div>
-            <div className="text-[10px] text-[var(--muted)]">points</div>
-          </div>
-        </Link>
+          </Link>
+        </motion.div>
 
         {/* User Menu */}
         <div className="relative">
-          <button
+          <motion.button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2 hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
+            <motion.div
+              className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white font-semibold"
+              whileHover={{ rotate: 5 }}
+            >
               {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-            </div>
-            <svg className={`w-4 h-4 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            </motion.div>
+            <motion.svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              animate={{ rotate: showUserMenu ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            </motion.svg>
+          </motion.button>
 
-          {showUserMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)} />
-              <div className="absolute right-0 mt-2 w-64 bg-[#1a1f2e] border border-white/10 rounded-lg shadow-xl z-20 overflow-hidden">
-                <div className="p-3 border-b border-white/10">
-                  <div className="font-medium text-white truncate">{user?.name || 'User'}</div>
-                  <div className="text-sm text-[var(--muted)] truncate break-all" title={user?.email || ''}>{user?.email || ''}</div>
-                </div>
-                <div className="py-1">
-                  <Link href="/settings" className="block px-4 py-2 hover:bg-white/5 transition-colors" onClick={() => setShowUserMenu(false)}>
-                    Settings
-                  </Link>
-                  <Link href="/points" className="block px-4 py-2 hover:bg-white/5 transition-colors" onClick={() => setShowUserMenu(false)}>
-                    Buy Points
-                  </Link>
-                  <div className="border-t border-white/10 my-1" />
-                  <button
-                    onClick={async () => {
-                      const { error } = await supabase.auth.signOut();
-                      if (error) {
-                        toast.error('Failed to sign out');
-                      } else {
-                        toast.success('Signed out successfully');
-                        router.push('/auth/login');
-                        router.refresh();
-                      }
-                    }}
-                    className="w-full text-left px-4 py-2 hover:bg-white/5 transition-colors text-red-400"
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          <AnimatePresence>
+            {showUserMenu && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowUserMenu(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute right-0 mt-2 w-64 bg-[#1a1f2e] border border-white/10 rounded-lg shadow-xl z-20 overflow-hidden"
+                >
+                  <div className="p-3 border-b border-white/10">
+                    <div className="font-medium text-white truncate">{user?.name || 'User'}</div>
+                    <div className="text-sm text-[var(--muted)] truncate break-all" title={user?.email || ''}>{user?.email || ''}</div>
+                  </div>
+                  <div className="py-1">
+                    <motion.div whileHover={{ x: 4, backgroundColor: "rgba(255, 255, 255, 0.05)" }} transition={{ duration: 0.2 }}>
+                      <Link href="/settings" className="block px-4 py-2 transition-colors" onClick={() => setShowUserMenu(false)}>
+                        Settings
+                      </Link>
+                    </motion.div>
+                    <motion.div whileHover={{ x: 4, backgroundColor: "rgba(255, 255, 255, 0.05)" }} transition={{ duration: 0.2 }}>
+                      <Link href="/points" className="block px-4 py-2 transition-colors" onClick={() => setShowUserMenu(false)}>
+                        Buy Points
+                      </Link>
+                    </motion.div>
+                    <div className="border-t border-white/10 my-1" />
+                    <motion.button
+                      onClick={async () => {
+                        const { error } = await supabase.auth.signOut();
+                        if (error) {
+                          toast.error('Failed to sign out');
+                        } else {
+                          toast.success('Signed out successfully');
+                          router.push('/auth/login');
+                          router.refresh();
+                        }
+                      }}
+                      className="w-full text-left px-4 py-2 transition-colors text-red-400"
+                      whileHover={{ x: 4, backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      Sign Out
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="text-sm text-[var(--muted)] border-l border-white/10 pl-4">v8.0</div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="text-sm text-[var(--muted)] border-l border-white/10 pl-4"
+        >
+          v8.0
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

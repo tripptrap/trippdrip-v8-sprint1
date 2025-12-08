@@ -4,18 +4,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createTwilioSubaccount } from '@/lib/twilioSubaccounts';
+import { timingSafeEqual } from 'crypto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+/**
+ * Timing-safe comparison for secrets to prevent timing attacks
+ */
+function secureCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    // If lengths differ, still perform comparison to avoid timing leak
+    if (bufA.length !== bufB.length) {
+      // Compare bufA with itself to maintain constant time
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Verify admin secret
+    // Verify admin secret using timing-safe comparison
     const authHeader = req.headers.get('authorization');
     const adminSecret = process.env.ADMIN_SECRET || process.env.CRON_SECRET;
 
-    if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+    if (!adminSecret) {
+      console.error('❌ Admin secret not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const providedToken = authHeader?.replace('Bearer ', '') || '';
+
+    if (!secureCompare(providedToken, adminSecret)) {
       console.error('❌ Unauthorized admin request');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     console.log('🔍 DEBUG - All questions answered?', allQuestionsAnswered, `(${collectedFieldsCount} >= ${requiredQuestionsCount})`);
     console.log('🔍 DEBUG - Collected info keys:', Object.keys(collectedInfo));
     console.log('🔍 DEBUG - Collected info:', JSON.stringify(collectedInfo));
+    console.log('🔍 DEBUG - requiresCall:', requiresCall);
 
     // OPTIMIZATION: Fetch user calendar data once if calendar is required
     // This avoids duplicate database queries for calendar slots AND booking
@@ -439,167 +440,108 @@ export async function POST(req: NextRequest) {
     }
 
     // Build the AI prompt to determine the best response
-    const collectedInfoText = Object.keys(collectedInfo).length > 0
-      ? `\n\nINFORMATION ALREADY COLLECTED:\n${Object.entries(collectedInfo).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
-      : '';
+
+    // Build collected info section prominently at the top
+    const collectedInfoKeys = Object.keys(collectedInfo);
+    const hasCollectedInfo = collectedInfoKeys.length > 0;
+
+    // Determine what questions are still unanswered
+    const answeredQuestionKeywords = collectedInfoKeys.map(k => k.toLowerCase());
+    const unansweredQuestions = requiredQuestions.filter((q: any) => {
+      const questionLower = q.question.toLowerCase();
+      // Check if any collected key might match this question
+      return !answeredQuestionKeywords.some(key =>
+        questionLower.includes(key) ||
+        key.includes(questionLower.split(' ')[0]) ||
+        // Check for common mappings
+        (key === 'income' && questionLower.includes('income')) ||
+        (key === 'householdincome' && questionLower.includes('income')) ||
+        (key === 'householdmembers' && (questionLower.includes('household') || questionLower.includes('people') || questionLower.includes('members'))) ||
+        (key === 'name' && questionLower.includes('name')) ||
+        (key === 'email' && questionLower.includes('email')) ||
+        (key === 'phone' && questionLower.includes('phone')) ||
+        (key === 'zipcode' && (questionLower.includes('zip') || questionLower.includes('location')))
+      );
+    });
 
     // If calendar is enabled and all questions are answered, prepare calendar times info
     const showCalendarTimes = requiresCall && allQuestionsAnswered && !appointmentBooked && calendarSlots.length > 0;
-    const calendarTimesText = showCalendarTimes
-      ? `\n\n📅 CALENDAR TIMES AVAILABLE:\nThe following times are available: ${calendarSlots.slice(0, 3).map(s => {
-          const timeMatch = s.formatted.match(/at (.+)$/);
-          return timeMatch ? timeMatch[1] : s.formatted;
-        }).join(', ')}\nYou MUST include these times in your response and ask which one works best.`
-      : '';
 
-    const requiredQuestionsText = requiredQuestions.length > 0
-      ? `\n\nREQUIRED QUESTIONS THAT MUST BE ANSWERED:\n${requiredQuestions.map((q: any) => `- ${q.question}`).join('\n')}\n\n${
-          allQuestionsAnswered
-            ? `ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED!${showCalendarTimes ? ' Since calendar is enabled, you MUST show the available times listed above in your response.' : ' You can now proceed to the next step in the conversation flow.'}`
-            : `⚠️ CRITICAL: You have collected ${collectedFieldsCount} out of ${requiredQuestionsCount} required answers. You MUST ask the NEXT unanswered question immediately. DO NOT mention calendar availability, DO NOT say you'll get back to them, DO NOT ask if they have other questions. Your ONLY job right now is to ask the next required question from the list above. Ask it NOW in your response.`
-        }`
+    console.log('📅 CALENDAR DEBUG:', {
+      requiresCall,
+      allQuestionsAnswered,
+      appointmentBooked,
+      calendarSlotsCount: calendarSlots.length,
+      showCalendarTimes,
+      unansweredQuestionsCount: unansweredQuestions.length
+    });
+
+    const calendarTimesText = showCalendarTimes
+      ? `\n\n📅 CALENDAR TIMES AVAILABLE - YOU MUST SHOW THESE:\n${calendarSlots.slice(0, 3).map(s => s.formatted).join(', ')}\n\nINCLUDE THESE EXACT TIMES in your response and ask which one works best!`
       : '';
 
     const appointmentBookedText = appointmentBooked
-      ? `\n\nAPPOINTMENT SUCCESSFULLY BOOKED!\nThe client selected a time and the appointment has been booked for: ${bookedAppointmentInfo.time}\nYou MUST confirm this booking in your response and thank them for scheduling.`
+      ? `\n\n✅ APPOINTMENT BOOKED for ${bookedAppointmentInfo.time}! Confirm the booking and thank them.`
       : '';
 
-    const prompt = `You are a sales agent in a text message conversation. You need to respond naturally to the client's message while following your conversation flow.
+    // Build a much simpler, more focused prompt
+    const prompt = `You are a sales agent texting a client. Read carefully and respond appropriately.
 
-CONVERSATION CONTEXT:
-${conversationHistory || 'This is the start of the conversation'}${collectedInfoText}${calendarTimesText}${requiredQuestionsText}${appointmentBookedText}
+${hasCollectedInfo ? `
+═══════════════════════════════════════════════════════════════
+🚨 STOP! READ THIS FIRST - INFORMATION YOU ALREADY HAVE:
+═══════════════════════════════════════════════════════════════
+${Object.entries(collectedInfo).map(([k, v]) => `✓ ${k}: ${v}`).join('\n')}
 
-YOUR LAST MESSAGE:
-"${currentStep.yourMessage}"
-
-${Object.keys(collectedInfo).length > 0 ? `
-⚠️ CRITICAL WARNING: Your last message above may ask for information you ALREADY HAVE.
-IGNORE that part of the message if you already collected that information!
-Instead, acknowledge their answer and ask for something you DON'T have yet.
-For example:
-- If you asked "What's your income?" and they answered, and you already have "income" in collected info, DON'T ask for income again!
-- Instead say: "Thanks for that info! Now, could you tell me [something you DON'T have yet]?"
+⛔ DO NOT ASK FOR ANY OF THE ABOVE INFORMATION AGAIN!
+═══════════════════════════════════════════════════════════════
 ` : ''}
+${requiredQuestions.length > 0 ? `
+QUESTIONS STILL NEEDED (ask these one at a time):
+${unansweredQuestions.length > 0
+  ? unansweredQuestions.map((q: any, i: number) => `${i + 1}. ${q.question}`).join('\n')
+  : '✅ ALL QUESTIONS ANSWERED - proceed to scheduling/next step'}
+` : ''}${calendarTimesText}${appointmentBookedText}
 
-CLIENT'S RESPONSE:
-"${userMessage}"
+CONVERSATION SO FAR:
+${conversationHistory || 'Starting conversation'}
+
+CLIENT JUST SAID: "${userMessage}"
 
 YOUR AVAILABLE RESPONSES:
 ${currentStep.responses.map((r: any, i: number) => `${i}. ${r.label}: "${r.followUpMessage}"`).join('\n')}
 
-YOUR TASK:
-Analyze the client's response and determine the best way to respond:
+RULES:
+1. ${hasCollectedInfo ? 'NEVER ask for info you already have (see list above)' : 'Collect required information naturally'}
+2. Acknowledge what the client said before asking the next question
+3. Keep responses short (1-2 sentences max for SMS)
+4. If all questions answered${showCalendarTimes ? ', SHOW THE CALENDAR TIMES LISTED ABOVE' : ', move to next step'}
+5. Extract any new information from their response
 
-1. What are they actually saying? (interested, hesitant, asking for info, objecting, not interested, asking to follow up later, etc.)
-2. Does one of your available responses DIRECTLY and APPROPRIATELY address what they said?
-   - If YES and it makes conversational sense, use that response
-   - If NO or if it would sound awkward/off-topic, generate a custom response instead
-
-IMPORTANT: Only use a preset response if it ACTUALLY addresses what the client said.
-- If they ask "who are you?" and you have a "Need more info" response, DON'T use it - generate a custom intro instead
-- If they say "yes" to your question, use the "Yes/Interested" response to continue
-- If they ask a specific question none of your responses cover, generate a helpful custom answer
-- If they say "not at the moment" or "can you text me later?", DON'T repeat your question - acknowledge their request and ask when would be good
-
-CRITICAL RULE: ALWAYS ACKNOWLEDGE what the client just said before moving forward.
-- Bad: Client says "not now, text me later" → You respond "Thanks! Could you share the ages..."
-- Good: Client says "not now, text me later" → You respond "Of course! When would be a good time to follow up?"
-- Bad: Client asks "who are you?" → You respond "Sure! What would you like to know?"
-- Good: Client asks "who are you?" → You respond "I'm [name] helping you find health insurance. Are you currently looking for coverage?"
-
-CRITICAL: ACTUALLY ANSWER THEIR QUESTIONS
-- If they ask "what can you help me find?", DON'T say "What would you like to know?" - that's avoiding the question
-- Instead, tell them WHAT you help with: "I help you find health insurance coverage that fits your needs and budget"
-- If they ask a specific question, give a specific answer - don't deflect with another question
-- Bad: "what can you help me find?" → "What specifically would you like to know?"
-- Good: "what can you help me find?" → "I help you find health insurance coverage! Are you looking for yourself or your family?"
-
-🚨 CRITICAL: NEVER ASK FOR INFORMATION YOU ALREADY HAVE 🚨
-**BEFORE YOU GENERATE YOUR RESPONSE:**
-1. LOOK at the "INFORMATION ALREADY COLLECTED" section above
-2. CHECK what information is already there
-3. DO NOT ask for anything that's already collected - asking again is a CRITICAL ERROR
-
-EXAMPLES OF WHAT NOT TO DO:
-- ❌ BAD: "householdIncome: 24k" is collected → You ask "What's your household income?"
-- ❌ BAD: "householdMembers: 3" is collected → You ask "How many people are in your household?"
-- ❌ BAD: "name: John" is collected → You ask "What's your name?"
-
-WHAT TO DO INSTEAD:
-- ✅ GOOD: Check collected info first, then ask for MISSING information only
-- ✅ GOOD: If you have income and members, ask for something NEW like zip code, coverage type, etc.
-- ✅ GOOD: Use what you already know to sound natural: "Thanks John! Since you mentioned 3 people..."
-
-**MANDATORY PRE-RESPONSE CHECKLIST:**
-Before generating your response, ask yourself:
-1. "What information do I ALREADY have?" (Check INFORMATION ALREADY COLLECTED section)
-2. "What information am I STILL MISSING?" (Check REQUIRED QUESTIONS section)
-3. "Am I about to ask for something I already know?" (If YES, STOP and ask something else!)
-
-CONVERSATION FLOW RULES:
-- Once you have an answer to a question, NEVER ask it again - move on to the next question
-- If you already asked about household income and they answered, ask about something else (like zip code, coverage needs, etc.)
-- Keep the conversation progressing forward, don't get stuck in loops
-- Review the collected information before deciding what to ask next
-- NEVER repeat your previous message - each response should be unique and move the conversation forward
-- If you just asked something and they answered, acknowledge their answer and ask something NEW
-- ASKING A DUPLICATE QUESTION IS THE WORST MISTAKE YOU CAN MAKE - Always check collected info first!
-
-CRITICAL: IF ALL REQUIRED QUESTIONS HAVE BEEN ANSWERED:
-- DO NOT keep asking for more information
-- DO NOT loop back to ask questions again
-- You MUST use one of your preset responses that advances the conversation to the next step
-- Choose the response that best acknowledges you have all the information needed
-- Example: Use "Interested" or "Yes" response to move forward in the flow
-
-EXTRACT KEY INFORMATION from the client's responses:
 ${requiredQuestions.length > 0 ? `
-REQUIRED QUESTIONS TO TRACK:
-${requiredQuestions.map((q: any, i: number) => `${i + 1}. "${q.question}"`).join('\n')}
-
-When you extract information that answers one of these questions, create a clear camelCase field name that describes what you're collecting.
+EXTRACTION INSTRUCTIONS:
+When you extract information, use these exact field names:
+- Name/first name → "name"
+- Email → "email"
+- Phone → "phone"
+- Income/household income → "householdIncome"
+- Number of people/household members → "householdMembers"
+- Zip code/location → "zipCode"
 ` : ''}
-- Extract any relevant information from the client's response
-- All values in extractedInfo MUST be strings, never objects or arrays
-- Return extracted info in the "extractedInfo" field
-
-When generating custom responses:
-- FIRST: Acknowledge what they said (show you heard them)
-- THEN: Respond appropriately to their specific situation
-- Don't just blindly follow the script if it doesn't make sense
-- Keep it conversational and natural - don't sound robotic
-
-Think like a real person having a conversation, not a script reader.
 
 Return ONLY valid JSON (no markdown):
 {
-  "matchedResponseIndex": <number 0 to ${currentStep.responses.length - 1}, OR null if generating custom>,
-  "customResponse": "<your custom response text, only if matchedResponseIndex is null>",
-  "customDrips": [
-    {
-      "message": "First follow-up if no response after 3-4 hours",
-      "delayHours": 3
-    },
-    {
-      "message": "Second follow-up if still no response",
-      "delayHours": 27
-    }
-  ],
-  "extractedInfo": {
-    "key": "value as string only"
-  },
-  "reasoning": "<1-2 sentences explaining your choice>"
-}
-
-CRITICAL: You MUST ALWAYS provide customDrips array with 2-3 contextual follow-up messages.
-- Whether you use a preset response OR generate a custom one, ALWAYS include drips
-- The drips should be contextual to what was just said and help re-engage if the client doesn't reply
-- Make drips natural and conversational, not pushy`;
+  "matchedResponseIndex": <0-${currentStep.responses.length - 1} or null for custom>,
+  "customResponse": "<only if matchedResponseIndex is null>",
+  "customDrips": [{"message": "follow-up message", "delayHours": 3}],
+  "extractedInfo": {"fieldName": "value"},
+  "reasoning": "<brief explanation>"
+}`;
 
     const apiKey = process.env.OPENAI_API_KEY;
 
-    // Build system message
-    const systemMessage = "You are a sales agent who reads conversations carefully and responds appropriately. Think about what the client is really saying and what makes sense to say next. Return only valid JSON, no markdown.";
+    // Build system message - emphasize not repeating questions
+    const systemMessage = `You are a sales agent via SMS. CRITICAL: ${hasCollectedInfo ? 'Check the INFORMATION YOU ALREADY HAVE section - NEVER ask for anything listed there!' : 'Collect info naturally.'} Keep responses short. Return only valid JSON.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

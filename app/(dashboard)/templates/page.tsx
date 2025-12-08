@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import CustomModal from "@/components/CustomModal";
-import { TrendingUp, MessageSquare, Users, Clock } from 'lucide-react';
+import { TrendingUp, MessageSquare, Users, Clock, Settings, Cpu, Sparkles } from 'lucide-react';
+import { AIModelVersion, UserAISettings, DEFAULT_USER_AI_SETTINGS } from '@/lib/ai/models';
 
 type DripMessage = {
   message: string;
@@ -256,11 +257,36 @@ export default function FlowsPage() {
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // AI Model Settings
+  const [showAISettings, setShowAISettings] = useState(false);
+  const [aiSettings, setAiSettings] = useState<UserAISettings>(DEFAULT_USER_AI_SETTINGS);
+  const [savingAISettings, setSavingAISettings] = useState(false);
+  const [loadingAISettings, setLoadingAISettings] = useState(true);
+
+  // Load flows
   useEffect(() => {
     loadFlows().then(setFlows).catch(e => {
       console.error("Error loading flows:", e);
       setFlows([]);
     });
+  }, []);
+
+  // Load AI settings
+  useEffect(() => {
+    async function loadAISettings() {
+      try {
+        const response = await fetch('/api/ai-settings');
+        const data = await response.json();
+        if (data.ok && data.settings) {
+          setAiSettings(data.settings);
+        }
+      } catch (error) {
+        console.error('Error loading AI settings:', error);
+      } finally {
+        setLoadingAISettings(false);
+      }
+    }
+    loadAISettings();
   }, []);
 
   // Automatically enable calendar appointments when flow requires a call
@@ -277,6 +303,14 @@ export default function FlowsPage() {
         setFlowStats(null);
         return;
       }
+
+      // Debug log for calendar issues
+      console.log('📋 Selected flow details:', {
+        id: selectedFlow.id,
+        name: selectedFlow.name,
+        requiresCall: selectedFlow.requiresCall,
+        requiredQuestions: selectedFlow.requiredQuestions?.length || 0
+      });
 
       setLoadingStats(true);
       try {
@@ -299,6 +333,39 @@ export default function FlowsPage() {
 
     loadFlowStats();
   }, [selectedFlow?.id]);
+
+  // Save AI settings
+  async function saveAISettings() {
+    setSavingAISettings(true);
+    try {
+      const response = await fetch('/api/ai-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: aiSettings })
+      });
+      const data = await response.json();
+      if (data.ok) {
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Settings Saved',
+          message: 'AI model settings have been saved successfully.'
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error saving AI settings:', error);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save AI settings. Please try again.'
+      });
+    } finally {
+      setSavingAISettings(false);
+    }
+  }
 
   function assignStepColors(steps: FlowStep[]): FlowStep[] {
     // Color progression: Blue -> Purple -> Orange -> Green (last step)
@@ -884,7 +951,7 @@ export default function FlowsPage() {
         conversationHistory,
         collectedInfo,
         requiredQuestions: selectedFlow.requiredQuestions || [],
-        requiresCall: (selectedFlow.requiredQuestions || []).length > 0,
+        requiresCall: selectedFlow.requiresCall || false,
         availableSlots: availableSlots
       };
 
@@ -1090,26 +1157,257 @@ export default function FlowsPage() {
           <p className="text-sm text-[var(--muted)] mt-1">Create AI-powered conversation flows for your campaigns</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowAISettings(true)}
+            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+          >
+            <Cpu className="w-4 h-4" />
+            AI Model: {aiSettings.selectedModel.toUpperCase()}
+          </button>
           <a
             href="/ai-workflows"
-            className="bg-green-600 hover:bg-green-700 border border-green-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+            className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
           >
             📚 Browse Templates
           </a>
           <button
             onClick={() => setShowNewFlowDialog(true)}
-            className="bg-blue-600 hover:bg-blue-700 border border-blue-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + AI Flow
           </button>
           <button
             onClick={() => setShowManualFlowDialog(true)}
-            className="bg-purple-600 hover:bg-purple-700 border border-purple-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-emerald-400 hover:bg-emerald-500 border border-emerald-400/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + Manual Flow
           </button>
         </div>
       </div>
+
+      {/* AI Model Settings Modal */}
+      {showAISettings && (
+        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={() => setShowAISettings(false)}>
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border-b border-white/10 px-6 py-4 sticky top-0 bg-[#1a1a1a] z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <Cpu className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">AI Model Settings</h3>
+                    <p className="text-sm text-white/60">Choose and configure your AI reply model</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAISettings(false)} className="text-white/60 hover:text-white">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-6 space-y-6">
+              {/* Model Selection */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-white">Select AI Model</label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Model V1 */}
+                  <button
+                    onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v1' })}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      aiSettings.selectedModel === 'v1'
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-5 h-5 text-emerald-400" />
+                      <span className="font-semibold text-white">Model V1</span>
+                      {aiSettings.selectedModel === 'v1' && (
+                        <span className="ml-auto text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Active</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60">Original HyveWyre AI - optimized for insurance & real estate conversations</p>
+                  </button>
+
+                  {/* Model V2 */}
+                  <button
+                    onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v2' })}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      aiSettings.selectedModel === 'v2'
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Settings className="w-5 h-5 text-teal-400" />
+                      <span className="font-semibold text-white">Model V2</span>
+                      {aiSettings.selectedModel === 'v2' && (
+                        <span className="ml-auto text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Active</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60">Custom AI - build your own prompts from scratch</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* V2 Configuration (only show when V2 is selected) */}
+              {aiSettings.selectedModel === 'v2' && (
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <Settings className="w-4 h-4" />
+                    <span className="text-sm font-medium">Model V2 Configuration</span>
+                  </div>
+
+                  {/* System Prompt */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-white">System Prompt</label>
+                    <p className="text-xs text-white/50">Define how the AI should behave. Leave empty for minimal default.</p>
+                    <textarea
+                      value={aiSettings.v2Config.systemPrompt}
+                      onChange={(e) => setAiSettings({
+                        ...aiSettings,
+                        v2Config: { ...aiSettings.v2Config, systemPrompt: e.target.value }
+                      })}
+                      placeholder="Enter your custom system prompt...
+
+Example:
+You are a helpful sales assistant for [Your Company]. Be friendly and professional. Keep responses short and conversational.
+
+Available variables:
+{{leadName}} - Lead's full name
+{{leadFirstName}} - Lead's first name
+{{leadLocation}} - Lead's state/location
+{{leadStatus}} - Lead's current status
+{{leadTags}} - Lead's tags
+{{flowGuidance}} - Flow step instructions"
+                      className="w-full h-48 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm font-mono"
+                    />
+                  </div>
+
+                  {/* Advanced Settings */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-white">Advanced Settings</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Temperature */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-white/60">Temperature: {aiSettings.v2Config.temperature}</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={aiSettings.v2Config.temperature}
+                          onChange={(e) => setAiSettings({
+                            ...aiSettings,
+                            v2Config: { ...aiSettings.v2Config, temperature: parseFloat(e.target.value) }
+                          })}
+                          className="w-full accent-emerald-500"
+                        />
+                        <p className="text-xs text-white/40">Higher = more creative, Lower = more focused</p>
+                      </div>
+
+                      {/* Max Tokens */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-white/60">Max Tokens: {aiSettings.v2Config.maxTokens}</label>
+                        <input
+                          type="range"
+                          min="50"
+                          max="300"
+                          step="10"
+                          value={aiSettings.v2Config.maxTokens}
+                          onChange={(e) => setAiSettings({
+                            ...aiSettings,
+                            v2Config: { ...aiSettings.v2Config, maxTokens: parseInt(e.target.value) }
+                          })}
+                          className="w-full accent-emerald-500"
+                        />
+                        <p className="text-xs text-white/40">Response length limit</p>
+                      </div>
+
+                      {/* Presence Penalty */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-white/60">Presence Penalty: {aiSettings.v2Config.presencePenalty}</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={aiSettings.v2Config.presencePenalty}
+                          onChange={(e) => setAiSettings({
+                            ...aiSettings,
+                            v2Config: { ...aiSettings.v2Config, presencePenalty: parseFloat(e.target.value) }
+                          })}
+                          className="w-full accent-emerald-500"
+                        />
+                        <p className="text-xs text-white/40">Encourage new topics</p>
+                      </div>
+
+                      {/* Frequency Penalty */}
+                      <div className="space-y-2">
+                        <label className="text-xs text-white/60">Frequency Penalty: {aiSettings.v2Config.frequencyPenalty}</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          value={aiSettings.v2Config.frequencyPenalty}
+                          onChange={(e) => setAiSettings({
+                            ...aiSettings,
+                            v2Config: { ...aiSettings.v2Config, frequencyPenalty: parseFloat(e.target.value) }
+                          })}
+                          className="w-full accent-emerald-500"
+                        />
+                        <p className="text-xs text-white/40">Reduce repetition</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* V1 Info (only show when V1 is selected) */}
+              {aiSettings.selectedModel === 'v1' && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-emerald-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-400">Model V1 is Pre-configured</p>
+                      <p className="text-sm text-white/60 mt-1">
+                        This model uses optimized prompts for insurance and real estate conversations.
+                        It's trained to be warm, professional, and never pushy.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex gap-3 justify-end sticky bottom-0">
+              <button
+                onClick={() => setShowAISettings(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAISettings}
+                disabled={savingAISettings}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 transition-colors disabled:opacity-50"
+              >
+                {savingAISettings ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && flowToDelete && (
@@ -1200,7 +1498,7 @@ export default function FlowsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={generateAndInsertStep}
-                  className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isGenerating || !stepPurpose.trim()}
                 >
                   {isGenerating ? "Generating Step..." : "Generate Step (1 pt)"}
@@ -1304,7 +1602,7 @@ export default function FlowsPage() {
                 <button
                   type="button"
                   onClick={() => setRequiredQuestions([...requiredQuestions, { question: '', fieldName: '' }])}
-                  className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                  className="text-emerald-400 hover:text-blue-300 text-sm flex items-center gap-1"
                 >
                   <span className="text-lg leading-none">+</span> Add Question
                 </button>
@@ -1355,7 +1653,7 @@ export default function FlowsPage() {
                 id="requiresCall"
                 checked={requiresCall}
                 onChange={(e) => setRequiresCall(e.target.checked)}
-                className="w-5 h-5 rounded border-2 border-white/30 bg-white/10 checked:bg-blue-500 checked:border-blue-500 cursor-pointer"
+                className="w-5 h-5 rounded border-2 border-white/30 bg-white/10 checked:bg-emerald-500 checked:border-emerald-500 cursor-pointer"
               />
               <label htmlFor="requiresCall" className="text-sm font-medium text-white cursor-pointer flex-1">
                 This flow requires a phone call or Zoom meeting with the client
@@ -1377,7 +1675,7 @@ export default function FlowsPage() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={createNewFlow}
-                className="bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting}
               >
                 {isGenerating ? "Generating Flow..." : "Generate Flow with AI"}
@@ -1420,8 +1718,8 @@ export default function FlowsPage() {
                     selectedFlow?.id === flow.id ? 'bg-white/20' : ''
                   } ${
                     flow.isAIGenerated !== false
-                      ? 'border-l-4 border-blue-400'
-                      : 'border-l-4 border-purple-400'
+                      ? 'border-l-4 border-emerald-400'
+                      : 'border-l-4 border-emerald-300'
                   }`}
                   onClick={() => setSelectedFlow(flow)}
                 >
@@ -1449,7 +1747,7 @@ export default function FlowsPage() {
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="font-medium text-sm text-white bg-white/20 border border-white/30 rounded px-2 py-1 w-full focus:outline-none focus:border-blue-400"
+                      className="font-medium text-sm text-white bg-white/20 border border-white/30 rounded px-2 py-1 w-full focus:outline-none focus:border-emerald-400"
                       autoFocus
                     />
                   ) : (
@@ -1507,7 +1805,7 @@ export default function FlowsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={startTestFlow}
-                    className="bg-green-600 hover:bg-green-700 border border-green-500/50 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
+                    className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
                   >
                     Test Flow
                   </button>
@@ -1516,9 +1814,9 @@ export default function FlowsPage() {
 
               {/* Flow Statistics */}
               {flowStats && !loadingStats && (
-                <div className="card bg-blue-900/10 border-blue-700/30">
+                <div className="card bg-blue-900/10 border-emerald-700/30">
                   <h3 className="text-sm font-semibold text-[#e7eef9] mb-3 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-400" />
+                    <TrendingUp className="h-4 w-4 text-emerald-400" />
                     Flow Performance (Last 30 Days)
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1542,8 +1840,8 @@ export default function FlowsPage() {
                         <span>Response Rate</span>
                       </div>
                       <div className={`text-2xl font-bold ${
-                        flowStats.response_rate >= 50 ? 'text-green-400' :
-                        flowStats.response_rate >= 25 ? 'text-orange-400' :
+                        flowStats.response_rate >= 50 ? 'text-emerald-400' :
+                        flowStats.response_rate >= 25 ? 'text-emerald-400' :
                         'text-red-400'
                       }`}>
                         {flowStats.response_rate || 0}%
@@ -1563,16 +1861,16 @@ export default function FlowsPage() {
               )}
 
               {loadingStats && (
-                <div className="card bg-blue-900/10 border-blue-700/30">
+                <div className="card bg-blue-900/10 border-emerald-700/30">
                   <div className="text-sm text-[#9fb0c3]">Loading flow statistics...</div>
                 </div>
               )}
 
               {/* Required Questions (Prominent Display) */}
               {selectedFlow.requiredQuestions && selectedFlow.requiredQuestions.length > 0 && (
-                <div className="border border-blue-500/30 rounded-xl p-4 bg-blue-500/10">
+                <div className="border border-emerald-500/30 rounded-xl p-4 bg-emerald-500/10">
                   <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <div className="text-sm font-semibold text-blue-300">Required Questions</div>
@@ -1580,7 +1878,7 @@ export default function FlowsPage() {
                   <div className="space-y-2">
                     {selectedFlow.requiredQuestions.map((q, idx) => (
                       <div key={idx} className="flex items-start gap-2">
-                        <div className="text-blue-400 font-bold text-sm mt-0.5">{idx + 1}.</div>
+                        <div className="text-emerald-400 font-bold text-sm mt-0.5">{idx + 1}.</div>
                         <div className="flex-1">
                           <div className="text-sm text-white">{q.question}</div>
                           <div className="text-xs text-blue-300/70 mt-0.5">Field: {q.fieldName}</div>
@@ -1589,7 +1887,7 @@ export default function FlowsPage() {
                     ))}
                   </div>
                   {selectedFlow.requiresCall && (
-                    <div className="mt-3 pt-3 border-t border-blue-500/30 flex items-center gap-2 text-sm text-blue-300">
+                    <div className="mt-3 pt-3 border-t border-emerald-500/30 flex items-center gap-2 text-sm text-blue-300">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
@@ -1606,7 +1904,7 @@ export default function FlowsPage() {
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/10 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
@@ -1664,11 +1962,11 @@ export default function FlowsPage() {
                                               ⚠️ Ends
                                             </div>
                                           ) : nextStepIndex >= 0 ? (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-green-500/20 text-green-400 whitespace-nowrap">
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap">
                                               → Step {nextStepIndex + 1}
                                             </div>
                                           ) : (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 whitespace-nowrap">
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap">
                                               ↻ Loop
                                             </div>
                                           )}
@@ -1731,7 +2029,7 @@ export default function FlowsPage() {
 
                       {/* Your Message */}
                       <div className="mb-4">
-                        <div className="text-sm font-medium mb-2 text-green-400">Your Message:</div>
+                        <div className="text-sm font-medium mb-2 text-emerald-400">Your Message:</div>
                         <textarea
                           value={step.yourMessage}
                           onChange={e => updateStep(step.id, { yourMessage: e.target.value })}
@@ -1744,7 +2042,7 @@ export default function FlowsPage() {
                       <div className="border-t border-white/10 pt-4">
                         <button
                           onClick={() => toggleStepExpansion(step.id)}
-                          className="w-full flex items-center justify-between text-sm font-medium mb-3 text-purple-400 hover:text-purple-300 transition-colors"
+                          className="w-full flex items-center justify-between text-sm font-medium mb-3 text-emerald-400 hover:text-emerald-300 transition-colors"
                         >
                           <span>Advanced Options</span>
                           <svg
@@ -1793,11 +2091,11 @@ export default function FlowsPage() {
                             </div>
 
                             {/* Response Options */}
-                            <div className="p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                            <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
                               <div className="text-xs font-medium text-blue-300 mb-3">Client Response Options ({step.responses.length})</div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {step.responses.map((response, responseIndex) => (
-                                  <div key={responseIndex} className="border border-blue-500/30 rounded-lg p-3 bg-blue-500/10">
+                                  <div key={responseIndex} className="border border-emerald-500/30 rounded-lg p-3 bg-emerald-500/10">
                                     <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
 
                                     <input
@@ -1828,7 +2126,7 @@ export default function FlowsPage() {
                     <div className="flex justify-center my-2">
                       <button
                         onClick={() => insertStepAfter(stepIndex)}
-                        className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 text-green-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                        className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1855,7 +2153,7 @@ export default function FlowsPage() {
                   You are the client - respond naturally to test your flow
                 </div>
                 {(selectedFlow?.requiredQuestions || []).length > 0 && (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-green-400">
+                  <div className="mt-2 flex items-center gap-2 text-sm text-emerald-400">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
@@ -1881,10 +2179,10 @@ export default function FlowsPage() {
                   <div
                     className={`max-w-[75%] px-4 py-3 rounded-lg ${
                       message.role === 'user'
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-emerald-500 text-white'
                         : message.role === 'system'
                         ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-100'
-                        : 'bg-green-500/20 border border-green-500/50 text-green-100'
+                        : 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-100'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 opacity-70 flex items-center justify-between">
@@ -1897,7 +2195,7 @@ export default function FlowsPage() {
               ))}
               {isTestingAI && (
                 <div className="flex justify-start">
-                  <div className="bg-green-500/20 border border-green-500/50 text-green-100 px-4 py-3 rounded-lg">
+                  <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-100 px-4 py-3 rounded-lg">
                     <div className="text-xs font-semibold mb-1 opacity-70">Agent</div>
                     <div className="text-sm">Thinking...</div>
                   </div>
@@ -1923,7 +2221,7 @@ export default function FlowsPage() {
               <button
                 onClick={sendTestMessage}
                 disabled={isTestingAI || !testInput.trim()}
-                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium text-sm"
+                className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium text-sm"
               >
                 {isTestingAI ? 'Sending...' : 'Send'}
               </button>
@@ -1939,19 +2237,19 @@ export default function FlowsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => advanceTime(3)}
-                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +3 hours
                   </button>
                   <button
                     onClick={() => advanceTime(24)}
-                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +1 day
                   </button>
                   <button
                     onClick={() => advanceTime(48)}
-                    className="bg-purple-500/20 border border-purple-500/50 text-purple-200 hover:bg-purple-500/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +2 days
                   </button>
@@ -1960,11 +2258,11 @@ export default function FlowsPage() {
 
               {/* Pending Drips Display */}
               {pendingDrips.length > 0 && (
-                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-orange-200 mb-2">📬 Scheduled Follow-ups ({pendingDrips.length})</div>
+                <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-emerald-200 mb-2">📬 Scheduled Follow-ups ({pendingDrips.length})</div>
                   <div className="space-y-1">
                     {pendingDrips.map((drip, idx) => (
-                      <div key={idx} className="text-xs text-orange-100/70">
+                      <div key={idx} className="text-xs text-emerald-100/70">
                         • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
                       </div>
                     ))}
@@ -1974,12 +2272,12 @@ export default function FlowsPage() {
 
               {/* Calendar Appointments */}
               {enableCalendarAppointments && createdAppointments.length > 0 && (
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-purple-200 mb-2">📅 Calendar Appointments Created ({createdAppointments.length})</div>
+                <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-emerald-200 mb-2">📅 Calendar Appointments Created ({createdAppointments.length})</div>
                   <div className="space-y-1">
                     {createdAppointments.map((appt, idx) => (
-                      <div key={idx} className="text-xs text-purple-100/70">
-                        • <span className="font-medium text-purple-200">{appt.title}</span> - {appt.date} at {appt.time}
+                      <div key={idx} className="text-xs text-emerald-100/70">
+                        • <span className="font-medium text-emerald-200">{appt.title}</span> - {appt.date} at {appt.time}
                       </div>
                     ))}
                   </div>
@@ -1988,7 +2286,7 @@ export default function FlowsPage() {
 
               {/* Collected Client Information */}
               {Object.keys(collectedInfo).length > 0 && (
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
                   <div className="text-xs font-semibold text-blue-200 mb-2">📋 Collected Client Information</div>
                   <div className="space-y-1">
                     {Object.entries(collectedInfo).map(([key, value]) => (
@@ -2118,7 +2416,7 @@ export default function FlowsPage() {
                     setManualFlowSteps([...manualFlowSteps, manualFlowMessage]);
                     setManualFlowMessage("");
                   }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50"
                   disabled={!manualFlowMessage.trim()}
                 >
                   + Add Another Step
@@ -2180,7 +2478,7 @@ export default function FlowsPage() {
                     setManualFlowMessage("");
                     setManualFlowSteps([]);
                   }}
-                  className="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50"
+                  className="bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-400 disabled:opacity-50"
                   disabled={!manualFlowName.trim() || (manualFlowSteps.length === 0 && !manualFlowMessage.trim())}
                 >
                   Create Flow
@@ -2247,7 +2545,7 @@ export default function FlowsPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={saveManualStep}
-                  className="bg-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50"
+                  className="bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-400 disabled:opacity-50"
                   disabled={!manualStep.yourMessage.trim()}
                 >
                   {editingStepIndex >= 0 ? 'Update Step' : 'Add Step'}
@@ -2272,11 +2570,11 @@ export default function FlowsPage() {
       {/* AI Flow Generation Loading Modal */}
       {isGenerating && (
         <div className="fixed inset-0 md:left-64 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[99999]">
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-purple-500/20">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-emerald-400/20">
             <div className="text-center">
               {/* Animated AI Icon */}
               <div className="mb-6 relative">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-purple-500/50">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-emerald-400/50">
                   <svg className="w-10 h-10 text-white animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -2285,10 +2583,10 @@ export default function FlowsPage() {
                 {/* Orbiting dots */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-32 h-32 animate-spin-slow">
-                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-purple-400 rounded-full"></div>
-                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-blue-400 rounded-full"></div>
-                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-pink-400 rounded-full"></div>
-                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-teal-400 rounded-full"></div>
+                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-emerald-400 rounded-full"></div>
+                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-teal-400 rounded-full"></div>
+                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-teal-400 rounded-full"></div>
                   </div>
                 </div>
               </div>
@@ -2304,22 +2602,22 @@ export default function FlowsPage() {
               {/* Progress indicators */}
               <div className="space-y-2 text-left">
                 <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
                   <span>Analyzing your business context</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
                   <span>Building conversation steps</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
                   <span>Optimizing response paths</span>
                 </div>
               </div>
 
               {/* Loading bar */}
               <div className="mt-6 bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 animate-shimmer bg-[length:200%_100%]"></div>
+                <div className="h-full bg-gradient-to-r from-teal-500 via-teal-500 to-teal-500 animate-shimmer bg-[length:200%_100%]"></div>
               </div>
 
               <p className="text-xs text-gray-500 mt-4">

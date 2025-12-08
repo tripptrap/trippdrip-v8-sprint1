@@ -1,5 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
+
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,11 +10,13 @@ export function createClient() {
     {
       cookies: {
         get(name: string) {
+          if (!isBrowser) return null
           const cookies = document.cookie.split('; ')
           const cookie = cookies.find(c => c.startsWith(name + '='))
           return cookie ? decodeURIComponent(cookie.split('=')[1]) : null
         },
         set(name: string, value: string, options: any) {
+          if (!isBrowser) return
           let cookieString = `${name}=${encodeURIComponent(value)}`
 
           if (options?.maxAge) {
@@ -35,6 +40,7 @@ export function createClient() {
           document.cookie = cookieString
         },
         remove(name: string, options: any) {
+          if (!isBrowser) return
           document.cookie = `${name}=; path=/; max-age=0`
         },
       },

@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HyveWyre for VanillaSoft</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 420px;
+      min-height: 550px;
+      max-height: 600px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #0c1420 0%, #1a1f2e 100%);
+      color: #fff;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .tagline {
+      font-size: 11px;
+      opacity: 0.9;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .header-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .header-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .header-btn.active {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .tab:hover {
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab.active {
+      color: #fff;
+      border-bottom-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    /* Tab Content */
+    .tab-content {
+      display: none;
+      height: calc(100% - 180px);
+      overflow-y: auto;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .content {
+      padding: 16px;
+      height: 100%;
+    }
+
+    /* Status Section */
+    .status {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.disconnected {
+      background: #ef4444;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .status-text {
+      font-size: 13px;
+      flex: 1;
+    }
+
+    .api-key-section {
+      margin-top: 12px;
+    }
+
+    .input-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      margin-bottom: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    select {
+      cursor: pointer;
+    }
+
+    select option {
+      background: #1a1f2e;
+      color: #fff;
+    }
+
+    /* Buttons */
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      color: #fff;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: #fff;
+      width: 100%;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+      width: auto;
+    }
+
+    /* Lead Preview */
+    .lead-preview {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .lead-preview h3 {
+      font-size: 13px;
+      margin-bottom: 10px;
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .lead-field {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 12px;
+    }
+
+    .lead-field:last-child {
+      border-bottom: none;
+    }
+
+    .lead-field-label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .lead-field-value {
+      font-weight: 500;
+      text-align: right;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Messages */
+    .message {
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+
+    .message.success {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+
+    .message.error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .message.info {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+    }
+
+    /* Chat Section */
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      min-height: 200px;
+      max-height: 280px;
+    }
+
+    .chat-message {
+      margin-bottom: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-message.user {
+      text-align: right;
+    }
+
+    .chat-message.assistant {
+      text-align: left;
+    }
+
+    .chat-bubble {
+      display: inline-block;
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .chat-message.user .chat-bubble {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-message.assistant .chat-bubble {
+      background: rgba(255, 255, 255, 0.1);
+      border-bottom-left-radius: 4px;
+    }
+
+    .chat-time {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 4px;
+    }
+
+    .chat-input-area {
+      display: flex;
+      gap: 8px;
+    }
+
+    .chat-input-area textarea {
+      flex: 1;
+      resize: none;
+      height: 40px;
+      padding: 10px;
+    }
+
+    .chat-send-btn {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+
+    .chat-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .chat-action-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .chat-action-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Token Usage */
+    .token-usage {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .token-usage span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Filters Section */
+    .filters-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .filter-group {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .filter-group h4 {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .filter-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .filter-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .filter-option input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    /* Reply Suggestions */
+    .suggestions-container {
+      margin-top: 12px;
+    }
+
+    .suggestions-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .suggestions-header h4 {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .suggestion-options {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .suggestion-options select {
+      flex: 1;
+      padding: 6px;
+      font-size: 11px;
+    }
+
+    .suggestions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .suggestion-item {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .suggestion-item:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .suggestion-item.selected {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: #3b82f6;
+    }
+
+    /* Export Section */
+    .export-section {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+    }
+
+    .export-section h4 {
+      font-size: 12px;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .export-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .export-buttons button {
+      flex: 1;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 12px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .link {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    .link:hover {
+      text-decoration: underline;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-left: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-4px); }
+    }
+
+    /* Keyboard shortcuts hint */
+    .shortcuts-hint {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: center;
+      padding: 8px;
+    }
+
+    kbd {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      padding: 2px 5px;
+      font-family: monospace;
+      font-size: 10px;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div>
+        <div class="logo">HyveWyre</div>
+        <div class="tagline">VanillaSoft Integration</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="header-btn" id="settingsBtn" title="Settings">⚙️</button>
+      <button class="header-btn" id="helpBtn" title="Keyboard Shortcuts">⌨️</button>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tabs">
+    <div class="tab active" data-tab="leads">📋 Leads</div>
+    <div class="tab" data-tab="chat">💬 AI Chat</div>
+    <div class="tab" data-tab="filters">🔍 Filters</div>
+  </div>
+
+  <!-- Leads Tab -->
+  <div class="tab-content active" id="leadsTab">
+    <div class="content">
+      <!-- Connection Status -->
+      <div class="status">
+        <div class="status-indicator">
+          <div class="status-dot" id="statusDot"></div>
+          <div class="status-text" id="statusText">Checking connection...</div>
+        </div>
+        <div class="api-key-section hidden" id="apiKeySection">
+          <div class="input-group">
+            <label for="apiKey">HyveWyre API Key</label>
+            <input type="password" id="apiKey" placeholder="Enter your API key">
+          </div>
+          <button class="btn-primary" id="saveApiKey">Save API Key</button>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="messageContainer"></div>
+
+      <!-- Lead Preview -->
+      <div class="lead-preview hidden" id="leadPreview">
+        <h3>
+          <span>Current Lead</span>
+          <button class="btn-small btn-secondary" id="copyLeadBtn" title="Copy lead data">📋</button>
+        </h3>
+        <div id="leadFields"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="btn-success hidden" id="importLead">
+          <span id="importText">Import Lead to HyveWyre</span>
+        </button>
+        <button class="btn-secondary" id="openHyveWyre">Open HyveWyre Dashboard</button>
+        <button class="btn-secondary hidden" id="refreshPage">Refresh VanillaSoft Page</button>
+      </div>
+
+      <!-- Reply Suggestions -->
+      <div class="suggestions-container hidden" id="suggestionsContainer">
+        <div class="suggestions-header">
+          <h4>✨ AI Reply Suggestions</h4>
+          <button class="btn-small btn-secondary" id="refreshSuggestions">🔄</button>
+        </div>
+        <div class="suggestion-options">
+          <select id="suggestionTone">
+            <option value="professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="casual">Casual</option>
+            <option value="urgent">Urgent</option>
+          </select>
+          <select id="suggestionLength">
+            <option value="short">Short</option>
+            <option value="medium" selected>Medium</option>
+            <option value="long">Long</option>
+          </select>
+        </div>
+        <div class="suggestions-list" id="suggestionsList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Tab -->
+  <div class="tab-content" id="chatTab">
+    <div class="content">
+      <div class="chat-container">
+        <div class="chat-actions">
+          <button class="chat-action-btn" id="clearChat">🗑️ Clear</button>
+          <button class="chat-action-btn" id="exportChat">📤 Export</button>
+          <button class="chat-action-btn" id="collapseChat">📁 Collapse</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-message assistant">
+            <div class="chat-bubble">
+              Hi! I'm your HyveWyre AI assistant. I can help you with lead management, SMS templates, and campaign strategies. How can I help you today?
+            </div>
+            <div class="chat-time">Just now</div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <textarea id="chatInput" placeholder="Ask me anything..." rows="1"></textarea>
+          <button class="chat-send-btn" id="chatSend">Send</button>
+        </div>
+        <div class="token-usage" id="tokenUsage">
+          <span>🎯 Tokens: <span id="tokenCount">0</span></span>
+          <span>💰 Cost: $<span id="tokenCost">0.00</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Tab -->
+  <div class="tab-content" id="filtersTab">
+    <div class="content">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <h4>📊 Status</h4>
+          <div class="filter-options">
+            <label class="filter-option">
+              <input type="checkbox" name="status" value="new" checked> New
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="status" value="contacted" checked> Contacted
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="status" value="qualified" checked> Qualified
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="status" value="converted"> Converted
+            </label>
+          </div>
+        </div>
+        <div class="filter-group">
+          <h4>⚡ Priority</h4>
+          <div class="filter-options">
+            <label class="filter-option">
+              <input type="checkbox" name="priority" value="high" checked> High
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="priority" value="medium" checked> Medium
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="priority" value="low" checked> Low
+            </label>
+          </div>
+        </div>
+        <div class="filter-group">
+          <h4>📅 Activity</h4>
+          <div class="filter-options">
+            <label class="filter-option">
+              <input type="checkbox" name="activity" value="today"> Today
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="activity" value="week" checked> This Week
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="activity" value="month"> This Month
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="activity" value="all" checked> All Time
+            </label>
+          </div>
+        </div>
+        <div class="filter-group">
+          <h4>✅ Profile</h4>
+          <div class="filter-options">
+            <label class="filter-option">
+              <input type="checkbox" name="profile" value="complete" checked> Complete
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="profile" value="partial" checked> Partial
+            </label>
+            <label class="filter-option">
+              <input type="checkbox" name="profile" value="minimal"> Minimal
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="applyFilters">Apply Filters</button>
+      <button class="btn-secondary" id="resetFilters">Reset to Default</button>
+
+      <!-- Export Section -->
+      <div class="export-section">
+        <h4>📤 Export Leads</h4>
+        <div class="export-buttons">
+          <button class="btn-secondary btn-small" id="exportCSV">CSV</button>
+          <button class="btn-secondary btn-small" id="exportJSON">JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-links">
+      <a href="https://hyvewyre.com" target="_blank" class="link">HyveWyre.com</a>
+      <a href="#" id="getApiKey" class="link">Get API Key</a>
+    </div>
+    <div class="shortcuts-hint">
+      Press <kbd>Esc</kbd> to close | <kbd>Alt+Shift+L</kbd> to add lead
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

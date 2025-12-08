@@ -24,23 +24,36 @@ export async function POST(req: NextRequest) {
       paramsObj[key] = value;
     });
 
-    // Validate webhook signature for security
+    // SECURITY: Mandatory webhook signature validation
     const signature = req.headers.get('x-twilio-signature');
-    if (signature) {
-      const url = req.url;
-      const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-      if (authToken) {
-        const isValid = twilio.validateRequest(authToken, signature, url, paramsObj);
+    // Require both signature and auth token in production
+    if (!authToken) {
+      console.error('❌ TWILIO_AUTH_TOKEN not configured - cannot validate webhook');
+      return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        status: 500,
+        headers: { 'Content-Type': 'text/xml' }
+      });
+    }
 
-        if (!isValid) {
-          console.error('⚠️ Invalid Twilio signature on SMS webhook - potential spoofed request');
-          return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
-            status: 403,
-            headers: { 'Content-Type': 'text/xml' }
-          });
-        }
-      }
+    if (!signature) {
+      console.error('❌ Missing x-twilio-signature header - rejecting unsigned request');
+      return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        status: 403,
+        headers: { 'Content-Type': 'text/xml' }
+      });
+    }
+
+    const url = req.url;
+    const isValid = twilio.validateRequest(authToken, signature, url, paramsObj);
+
+    if (!isValid) {
+      console.error('⚠️ Invalid Twilio signature on SMS webhook - potential spoofed request');
+      return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+        status: 403,
+        headers: { 'Content-Type': 'text/xml' }
+      });
     }
 
     // Extract Twilio webhook parameters
