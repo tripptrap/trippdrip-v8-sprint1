@@ -2757,7 +2757,7 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'removeTags' && (() => {
         // Get all unique tags from selected leads
-        const selectedLeadsList = leads.filter(l => selectedIds.has(l.id));
+        const selectedLeadsList = leads.filter(l => l.id && selectedIds.has(String(l.id)));
         const currentTagsOnSelected = [...new Set(selectedLeadsList.flatMap(l => Array.isArray(l.tags) ? l.tags : []))];
         const tagsToRemove = bulkRemoveTags.split(',').map(t => t.trim()).filter(Boolean);
         const presetColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
