@@ -24,31 +24,5 @@
         }
       ]
     }
-  ],
-  "firewall": {
-    "rules": [
-      {
-        "name": "Allow bots for sitemap",
-        "action": "bypass",
-        "conditions": [
-          {
-            "type": "path",
-            "op": "eq",
-            "value": "/sitemap.xml"
-          }
-        ]
-      },
-      {
-        "name": "Allow bots for robots",
-        "action": "bypass",
-        "conditions": [
-          {
-            "type": "path",
-            "op": "eq",
-            "value": "/robots.txt"
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }
