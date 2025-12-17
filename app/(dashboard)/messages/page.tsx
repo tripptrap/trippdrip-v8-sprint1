@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X } from 'lucide-react';
 import SendSMSModal from '@/components/SendSMSModal';
@@ -73,8 +73,24 @@ interface Lead {
   email?: string;
 }
 
-export default function MessagesPage() {
+// Component that handles search params (must be wrapped in Suspense)
+function MessagesSearchParamsHandler({
+  onParamsLoaded
+}: {
+  onParamsLoaded: (phone: string | null, name: string | null) => void
+}) {
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const phone = searchParams.get('phone');
+    const name = searchParams.get('name');
+    onParamsLoaded(phone, name);
+  }, [searchParams, onParamsLoaded]);
+
+  return null;
+}
+
+export default function MessagesPage() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,16 +107,14 @@ export default function MessagesPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [leadSearchQuery, setLeadSearchQuery] = useState('');
 
-  // Check URL params and auto-open send modal if phone is provided
-  useEffect(() => {
-    const phone = searchParams.get('phone');
-    const name = searchParams.get('name');
+  // Handler for search params - memoized to prevent infinite loops
+  const handleSearchParams = useCallback((phone: string | null, name: string | null) => {
     if (phone) {
       setSendModalPhone(phone);
       setSendModalName(name || '');
       setShowSendModal(true);
     }
-  }, [searchParams]);
+  }, []);
 
   // Load threads
   useEffect(() => {
@@ -283,6 +297,11 @@ export default function MessagesPage() {
 
   return (
     <div className="h-screen flex flex-col bg-[#0a0f1a]">
+      {/* Search params handler wrapped in Suspense */}
+      <Suspense fallback={null}>
+        <MessagesSearchParamsHandler onParamsLoaded={handleSearchParams} />
+      </Suspense>
+
       {/* Header */}
       <div className="bg-[#1a1f2e] border-b border-white/10 p-4">
         <div className="flex items-center justify-between">
