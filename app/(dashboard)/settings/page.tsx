@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTheme } from '@/lib/ThemeContext';
 import {
   loadSettings,
   updateTwilioConfig,
@@ -34,6 +35,7 @@ type AvailableNumber = {
 };
 
 export default function Page() {
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account'>('sms');
   const [saveMessage, setSaveMessage] = useState('');
@@ -478,20 +480,20 @@ export default function Page() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Settings</h1>
         {saveMessage && (
-          <div className="bg-emerald-500/10 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/30">
+          <div className="bg-sky-500/10 text-sky-600 px-4 py-2 rounded-lg border border-sky-200">
             {saveMessage}
           </div>
         )}
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-white/10">
+      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
         <button
           onClick={() => setActiveTab('sms')}
           className={`px-4 py-2 font-medium ${
             activeTab === 'sms'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           SMS Provider
@@ -501,7 +503,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'numbers'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Phone Numbers
@@ -511,7 +513,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'spam'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Spam Protection
@@ -521,7 +523,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'autorefill'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Auto-Refill
@@ -531,7 +533,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'integrations'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Integrations
@@ -541,7 +543,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'dnc'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           DNC List
@@ -551,7 +553,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'privacy'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Privacy Policy
@@ -561,7 +563,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'terms'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Terms of Service
@@ -571,7 +573,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'compliance'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Compliance
@@ -581,7 +583,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'refund'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Refund Policy
@@ -591,7 +593,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'contact'
               ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Contact
@@ -601,7 +603,7 @@ export default function Page() {
           className={`px-4 py-2 font-medium ${
             activeTab === 'account'
               ? 'border-b-2 border-red-500 text-red-500'
-              : 'text-white/60 hover:text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
           }`}
         >
           Account
@@ -613,29 +615,29 @@ export default function Page() {
         <div className="card space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-2">SMS Account Status</h2>
-            <p className="text-white/70 mb-4">
+            <p className="text-slate-700 dark:text-slate-300 mb-4">
               Your SMS account is automatically created when you purchase your first point pack.
             </p>
           </div>
 
           {!hasTwilioAccount ? (
             <div className="space-y-4">
-              <div className="p-6 bg-emerald-500/10 rounded-lg border-2 border-emerald-500/30">
-                <h3 className="text-lg font-semibold mb-2 text-emerald-400">SMS Account Not Active</h3>
-                <p className="text-white/80 mb-4">
+              <div className="p-6 bg-sky-500/10 rounded-lg border-2 border-sky-200">
+                <h3 className="text-lg font-semibold mb-2 text-sky-600">SMS Account Not Active</h3>
+                <p className="text-slate-700 dark:text-slate-300 mb-4">
                   Purchase any point pack to automatically activate your SMS account and start sending messages!
                 </p>
                 <a
                   href="/points"
-                  className="inline-block bg-[var(--accent)] text-white px-6 py-3 rounded-lg hover:opacity-90 font-medium"
+                  className="inline-block bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:opacity-90 font-medium"
                 >
                   Buy Points & Activate SMS →
                 </a>
               </div>
 
-              <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                <h3 className="font-medium mb-2 text-white">What's included with your first purchase?</h3>
-                <ul className="text-sm text-white/70 space-y-1">
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <h3 className="font-medium mb-2 text-slate-900 dark:text-slate-100">What's included with your first purchase?</h3>
+                <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
                   <li>• Points for sending messages and using AI</li>
                   <li>• Dedicated SMS account (Twilio subaccount)</li>
                   <li>• Account SID and Auth Token (auto-configured)</li>
@@ -647,7 +649,7 @@ export default function Page() {
 
               <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
                 <h3 className="font-medium text-yellow-400 mb-2">How It Works</h3>
-                <ol className="text-sm text-white/70 space-y-1 list-decimal list-inside">
+                <ol className="text-sm text-slate-700 dark:text-slate-300 space-y-1 list-decimal list-inside">
                   <li>Choose a point pack (Starter, Pro, Business, or Enterprise)</li>
                   <li>Complete payment via Stripe</li>
                   <li>Your SMS account is created automatically</li>
@@ -659,9 +661,9 @@ export default function Page() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                <h3 className="font-semibold text-emerald-400 mb-2">SMS Account Active</h3>
-                <div className="text-sm text-white/80 space-y-1">
+              <div className="p-4 bg-sky-500/10 rounded-lg border border-sky-200">
+                <h3 className="font-semibold text-sky-600 mb-2">SMS Account Active</h3>
+                <div className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
                   <p><strong>Account SID:</strong> {settings.twilio?.accountSid}</p>
                   <p><strong>Status:</strong> Active & Ready</p>
                   <p><strong>Phone Numbers:</strong> {settings.twilio?.purchasedNumbers?.length || 0} purchased</p>
@@ -671,13 +673,13 @@ export default function Page() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab('numbers')}
-                  className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:opacity-90"
+                  className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90"
                 >
                   Manage Phone Numbers →
                 </button>
                 <a
                   href="/points"
-                  className="bg-white/10 text-white px-6 py-2 rounded-lg hover:bg-white/20 border border-white/10"
+                  className="bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:bg-white dark:bg-slate-800/20 border border-slate-200 dark:border-slate-700"
                 >
                   Buy More Points
                 </a>
@@ -693,12 +695,12 @@ export default function Page() {
           {!hasTwilioAccount ? (
             <div className="card">
               <div className="p-6 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                <p className="text-white/80">
+                <p className="text-slate-700 dark:text-slate-300">
                   Please create a Twilio account first in the SMS Provider tab.
                 </p>
                 <button
                   onClick={() => setActiveTab('sms')}
-                  className="mt-4 bg-[var(--accent)] text-white px-4 py-2 rounded-lg hover:opacity-90"
+                  className="mt-4 bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-4 py-2 rounded-lg hover:opacity-90"
                 >
                   Go to SMS Provider
                 </button>
@@ -714,11 +716,11 @@ export default function Page() {
                     {settings.twilio.purchasedNumbers.map((number) => (
                       <div
                         key={number.phoneNumber}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10"
+                        className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                       >
                         <div>
-                          <div className="font-mono font-semibold text-lg text-white">{number.phoneNumber}</div>
-                          <div className="text-sm text-white/60">
+                          <div className="font-mono font-semibold text-lg text-slate-900 dark:text-slate-100">{number.phoneNumber}</div>
+                          <div className="text-sm text-slate-600 dark:text-slate-400">
                             {number.friendlyName} • Added {new Date(number.dateCreated || '').toLocaleDateString()}
                           </div>
                         </div>
@@ -732,7 +734,7 @@ export default function Page() {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-6 bg-white/5 rounded-lg text-center text-white/60">
+                  <div className="p-6 bg-white dark:bg-slate-800 rounded-lg text-center text-slate-600 dark:text-slate-400">
                     No phone numbers yet. Search and purchase numbers below.
                   </div>
                 )}
@@ -748,13 +750,13 @@ export default function Page() {
                     value={areaCode}
                     onChange={(e) => setAreaCode(e.target.value)}
                     placeholder="Area code (optional, e.g., 415)"
-                    className="flex-1 px-4 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
+                    className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     maxLength={3}
                   />
                   <button
                     onClick={handleSearchNumbers}
                     disabled={searchingNumbers}
-                    className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+                    className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
                   >
                     {searchingNumbers ? 'Searching...' : 'Search Available Numbers'}
                   </button>
@@ -767,11 +769,11 @@ export default function Page() {
                       {availableNumbers.map((number) => (
                         <div
                           key={number.phoneNumber}
-                          className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg hover:border-[var(--accent)]"
+                          className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-[var(--accent)]"
                         >
                           <div>
                             <div className="font-mono font-semibold">{number.phoneNumber}</div>
-                            <div className="text-sm text-white/60">
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
                               {number.locality}, {number.region}
                               {' • '}
                               {number.capabilities.sms && 'SMS '}
@@ -782,7 +784,7 @@ export default function Page() {
                           <button
                             onClick={() => handlePurchaseNumber(number.phoneNumber)}
                             disabled={purchasingNumber === number.phoneNumber}
-                            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 text-sm font-medium"
+                            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 text-sm font-medium"
                           >
                             {purchasingNumber === number.phoneNumber ? 'Purchasing...' : 'Purchase (~$1/mo)'}
                           </button>
@@ -802,16 +804,16 @@ export default function Page() {
         <div className="card space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-2">Spam Protection</h2>
-            <p className="text-white/70 mb-4">
+            <p className="text-slate-700 dark:text-slate-300 mb-4">
               Configure spam detection and rate limiting to protect your sender reputation.
             </p>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               <div>
                 <h3 className="font-medium">Enable Spam Protection</h3>
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
                   Automatically detect and flag messages with spam indicators
                 </p>
               </div>
@@ -822,14 +824,14 @@ export default function Page() {
                   onChange={(e) => setSpamEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                <div className="w-11 h-6 bg-white dark:bg-slate-800/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
               </label>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               <div>
                 <h3 className="font-medium">Block High Risk Messages</h3>
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
                   Prevent sending of messages with critical spam scores
                 </p>
               </div>
@@ -840,7 +842,7 @@ export default function Page() {
                   onChange={(e) => setBlockOnHighRisk(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                <div className="w-11 h-6 bg-white dark:bg-slate-800/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
               </label>
             </div>
 
@@ -874,7 +876,7 @@ export default function Page() {
 
             <button
               onClick={saveSpamSettings}
-              className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:opacity-90"
+              className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90"
             >
               Save Spam Settings
             </button>
@@ -887,16 +889,16 @@ export default function Page() {
         <div className="card space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-2">Auto-Refill Points</h2>
-            <p className="text-white/70 mb-4">
+            <p className="text-slate-700 dark:text-slate-300 mb-4">
               Automatically purchase more points when your balance gets low.
             </p>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               <div>
                 <h3 className="font-medium">Enable Auto-Refill</h3>
-                <p className="text-sm text-white/70">
+                <p className="text-sm text-slate-700 dark:text-slate-300">
                   Automatically top up points when balance is low
                 </p>
               </div>
@@ -907,7 +909,7 @@ export default function Page() {
                   onChange={(e) => setAutoRefillEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                <div className="w-11 h-6 bg-white dark:bg-slate-800/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
               </label>
             </div>
 
@@ -921,7 +923,7 @@ export default function Page() {
                 onChange={(e) => setAutoRefillThreshold(Number(e.target.value))}
                 min="10"
                 max="1000"
-                className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               />
             </div>
 
@@ -936,23 +938,23 @@ export default function Page() {
                 min="100"
                 max="10000"
                 step="100"
-                className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               />
-              <p className="text-sm text-white/60 mt-1">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Estimated cost: ${(autoRefillAmount * 0.01).toFixed(2)}
               </p>
             </div>
 
             <button
               onClick={saveAutoRefillSettings}
-              className="bg-[var(--accent)] text-white px-6 py-2 rounded-lg hover:opacity-90"
+              className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90"
             >
               Save Auto-Refill Settings
             </button>
 
             <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
               <h3 className="font-medium text-yellow-400 mb-2">Note</h3>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
                 Auto-refill requires Stripe integration. You'll be charged automatically when
                 your balance drops below the threshold.
               </p>
@@ -985,16 +987,76 @@ export default function Page() {
       {/* Account Management Tab */}
       {activeTab === 'account' && (
         <div className="space-y-6">
-          {/* Demo Mode */}
-          <div className="card border-emerald-400/30 bg-emerald-400/5">
-            <h2 className="text-xl font-semibold text-emerald-400 mb-4">🎭 Demo Mode</h2>
+          {/* Appearance */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">🌓 Appearance</h2>
 
             <div className="space-y-4">
-              <div className="p-4 bg-emerald-400/10 rounded-lg border border-emerald-400/30">
+              <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-white mb-1">Enable Demo Mode</h3>
-                    <p className="text-sm text-white/70">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Dark Mode</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Switch between light and dark themes. Dark mode is easier on the eyes in low-light conditions.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={theme === 'dark'}
+                      onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+                  </label>
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={`flex-1 px-4 py-3 rounded-lg border transition-all ${
+                      theme === 'light'
+                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400'
+                        : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      <span className="font-medium">Light</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={`flex-1 px-4 py-3 rounded-lg border transition-all ${
+                      theme === 'dark'
+                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400'
+                        : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                      </svg>
+                      <span className="font-medium">Dark</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Demo Mode */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">🎭 Demo Mode</h2>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Enable Demo Mode</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Try out the platform with realistic sample data including leads, conversations, campaigns, and flows.
                     </p>
                   </div>
@@ -1013,19 +1075,19 @@ export default function Page() {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-400/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-400"></div>
+                    <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-400/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
                   </label>
                 </div>
 
-                <div className="bg-emerald-400/20 border border-emerald-400/30 rounded-lg p-3 mt-3">
-                  <h4 className="font-medium text-emerald-200 text-sm mb-2">Demo mode includes:</h4>
-                  <ul className="text-sm text-emerald-300/80 space-y-1 ml-4 list-disc">
+                <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-3 mt-3">
+                  <h4 className="font-medium text-sky-700 dark:text-sky-400 text-sm mb-2">Demo mode includes:</h4>
+                  <ul className="text-sm text-sky-600 dark:text-sky-300 space-y-1 ml-4 list-disc">
                     <li>8 sample leads with various statuses and priorities</li>
                     <li>Realistic conversation threads with messages</li>
                     <li>Active and completed campaigns with statistics</li>
                     <li>Pre-configured conversation flows</li>
                   </ul>
-                  <p className="text-xs text-emerald-300/60 mt-3">
+                  <p className="text-xs text-sky-500 dark:text-sky-400 mt-3">
                     💡 Perfect for exploring features, taking screenshots, or demonstrating the platform to clients.
                   </p>
                 </div>
@@ -1034,15 +1096,15 @@ export default function Page() {
           </div>
 
           {/* Quiet Hours */}
-          <div className="card border-emerald-500/30 bg-emerald-500/5">
-            <h2 className="text-xl font-semibold text-emerald-400 mb-4">🌙 Quiet Hours</h2>
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">🌙 Quiet Hours</h2>
 
             <div className="space-y-4">
-              <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+              <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-semibold text-white mb-1">Enable Quiet Hours</h3>
-                    <p className="text-sm text-white/70">
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Enable Quiet Hours</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       Prevent automated messages from being sent outside of specified hours (8am-8pm by default)
                     </p>
                   </div>
@@ -1053,7 +1115,7 @@ export default function Page() {
                       onChange={(e) => setQuietHoursEnabled(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
                   </label>
                 </div>
 
@@ -1061,35 +1123,35 @@ export default function Page() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
                           Start Time
                         </label>
                         <input
                           type="time"
                           value={quietHoursStart}
                           onChange={(e) => setQuietHoursStart(e.target.value)}
-                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
                           End Time
                         </label>
                         <input
                           type="time"
                           value={quietHoursEnd}
                           onChange={(e) => setQuietHoursEnd(e.target.value)}
-                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-white mb-2">
+                        <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
                           Your Timezone
                         </label>
                         <select
                           value={userTimezone}
                           onChange={(e) => setUserTimezone(e.target.value)}
-                          className="w-full px-3 py-2 bg-[#0c1420] border border-white/20 rounded-lg text-white"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
                         >
                           <option value="America/New_York">Eastern (ET)</option>
                           <option value="America/Chicago">Central (CT)</option>
@@ -1102,9 +1164,9 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-lg p-3">
-                      <h4 className="font-medium text-blue-200 text-sm mb-2">How it works:</h4>
-                      <ul className="text-sm text-blue-300/80 space-y-1 ml-4 list-disc">
+                    <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-3">
+                      <h4 className="font-medium text-sky-700 dark:text-sky-400 text-sm mb-2">How it works:</h4>
+                      <ul className="text-sm text-sky-600 dark:text-sky-300 space-y-1 ml-4 list-disc">
                         <li>Messages scheduled outside quiet hours will be delayed until the next allowed window</li>
                         <li>Bulk campaigns and drip sequences respect these time restrictions</li>
                         <li>Times are converted to your local timezone automatically</li>
@@ -1116,7 +1178,7 @@ export default function Page() {
 
                 <button
                   onClick={handleSaveQuietHours}
-                  className="mt-4 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                  className="mt-4 px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors"
                 >
                   Save Quiet Hours
                 </button>
@@ -1125,16 +1187,16 @@ export default function Page() {
           </div>
 
           {/* Danger Zone */}
-          <div className="card border-red-500/30 bg-red-500/5">
-            <h2 className="text-xl font-semibold text-red-400 mb-4">Danger Zone</h2>
+          <div className="card border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-900/20">
+            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Danger Zone</h2>
 
             <div className="space-y-4">
-              <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                <h3 className="font-semibold text-white mb-2">Delete Account</h3>
-                <p className="text-sm text-white/70 mb-4">
+              <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-300 dark:border-red-800">
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Delete Account</h3>
+                <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
                   Once you delete your account, there is no going back. This will permanently delete:
                 </p>
-                <ul className="text-sm text-white/70 space-y-1 mb-4 ml-4 list-disc">
+                <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1 mb-4 ml-4 list-disc">
                   <li>Your user profile and settings</li>
                   <li>All contacts and leads</li>
                   <li>All campaigns and messages</li>
@@ -1142,7 +1204,7 @@ export default function Page() {
                   <li>All templates and flows</li>
                   <li>Your authentication credentials</li>
                 </ul>
-                <p className="text-sm text-red-400 font-medium mb-4">
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-4">
                   This action cannot be undone!
                 </p>
 
@@ -1156,15 +1218,15 @@ export default function Page() {
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-white mb-2">
-                        Type <span className="font-mono bg-red-500/20 px-2 py-1 rounded">DELETE MY ACCOUNT</span> to confirm:
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+                        Type <span className="font-mono bg-red-200 dark:bg-red-800 px-2 py-1 rounded text-red-700 dark:text-red-300">DELETE MY ACCOUNT</span> to confirm:
                       </label>
                       <input
                         type="text"
                         value={deleteConfirmText}
                         onChange={(e) => setDeleteConfirmText(e.target.value)}
                         placeholder="DELETE MY ACCOUNT"
-                        className="w-full px-3 py-2 border border-red-500/30 rounded-lg bg-red-500/10 text-white placeholder-white/30"
+                        className="w-full px-3 py-2 border border-red-300 dark:border-red-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-red-400 dark:placeholder-red-500"
                         disabled={deletingAccount}
                       />
                     </div>
@@ -1182,7 +1244,7 @@ export default function Page() {
                           setDeleteConfirmText('');
                         }}
                         disabled={deletingAccount}
-                        className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white font-medium rounded-lg transition-colors"
+                        className="px-6 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-slate-100 font-medium rounded-lg transition-colors"
                       >
                         Cancel
                       </button>

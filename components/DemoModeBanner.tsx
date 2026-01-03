@@ -27,13 +27,13 @@ export default function DemoModeBanner() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-emerald-400 to-teal-400 text-white px-4 py-2 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-sky-400 to-sky-400 text-gray-900 px-4 py-2 shadow-lg">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎭</span>
           <div>
             <div className="font-semibold text-sm">Demo Mode Active</div>
-            <div className="text-xs text-white/90">
+            <div className="text-xs text-gray-900/90">
               You're viewing sample data. Go to Settings &gt; Account to disable.
             </div>
           </div>

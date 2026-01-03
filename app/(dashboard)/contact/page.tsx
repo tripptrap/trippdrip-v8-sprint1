@@ -7,8 +7,8 @@ export default function ContactPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[#e7eef9]">Contact Us</h1>
-        <p className="text-[#9fb0c3] mt-1">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Contact Us</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">
           Get in touch with the HyveWyre team
         </p>
       </div>
@@ -18,13 +18,13 @@ export default function ContactPage() {
         {/* Operational Address */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-              <MapPin className="h-6 w-6 text-emerald-400" />
+            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+              <MapPin className="h-6 w-6 text-sky-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Operational Address</h3>
-              <div className="text-[#9fb0c3] space-y-1">
-                <p className="font-medium text-[#e7eef9]">HyveWyre</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Operational Address</h3>
+              <div className="text-slate-600 dark:text-slate-400 space-y-1">
+                <p className="font-medium text-slate-900 dark:text-slate-100">HyveWyre</p>
                 <p>12325 Magnolia Street</p>
                 <p>San Antonio, Florida 33576</p>
               </div>
@@ -35,17 +35,17 @@ export default function ContactPage() {
         {/* Email Support */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
-              <Mail className="h-6 w-6 text-emerald-400" />
+            <div className="w-12 h-12 rounded-lg bg-sky-100 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
+              <Mail className="h-6 w-6 text-sky-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Email Support</h3>
-              <p className="text-[#9fb0c3] mb-3">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Email Support</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-3">
                 Send us an email and we'll respond within 24 hours
               </p>
               <a
                 href="mailto:support@hyvewyre.com"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 <Mail className="h-4 w-4" />
                 support@hyvewyre.com
@@ -57,17 +57,17 @@ export default function ContactPage() {
         {/* Feature Requests */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-teal-800/50 flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="h-6 w-6 text-emerald-400" />
+            <div className="w-12 h-12 rounded-lg bg-sky-100 dark:bg-sky-800/50 flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="h-6 w-6 text-sky-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Feature Requests</h3>
-              <p className="text-[#9fb0c3] mb-3">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Feature Requests</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-3">
                 Have an idea for a new feature? We'd love to hear it!
               </p>
               <a
                 href="mailto:support@hyvewyre.com?subject=Feature Request"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-500 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 <MessageSquare className="h-4 w-4" />
                 Submit Feature Request
@@ -79,17 +79,17 @@ export default function ContactPage() {
         {/* Sales & Partnerships */}
         <div className="card">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-lg bg-orange-900/20 flex items-center justify-center flex-shrink-0">
-              <Phone className="h-6 w-6 text-emerald-400" />
+            <div className="w-12 h-12 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
+              <Phone className="h-6 w-6 text-sky-600" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">Sales & Partnerships</h3>
-              <p className="text-[#9fb0c3] mb-3">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Sales & Partnerships</h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-3">
                 Interested in enterprise plans or partnerships?
               </p>
               <a
                 href="mailto:sales@hyvewyre.com"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 <Mail className="h-4 w-4" />
                 sales@hyvewyre.com
@@ -100,19 +100,19 @@ export default function ContactPage() {
       </div>
 
       {/* Quick Links */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
-        <h3 className="font-semibold text-[#e7eef9] mb-4">Quick Links</h3>
+      <div className="card bg-blue-100 dark:bg-blue-900/20 border-sky-700/50">
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">Quick Links</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <a
             href="/roadmap"
-            className="flex items-center gap-2 text-[#9fb0c3] hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-sky-600 transition-colors"
           >
             <span>→</span>
             <span>View Product Roadmap</span>
           </a>
           <a
             href="/settings"
-            className="flex items-center gap-2 text-[#9fb0c3] hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-sky-600 transition-colors"
           >
             <span>→</span>
             <span>Account Settings</span>
@@ -121,7 +121,7 @@ export default function ContactPage() {
             href="https://docs.hyvewyre.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[#9fb0c3] hover:text-emerald-400 transition-colors"
+            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-sky-600 transition-colors"
           >
             <span>→</span>
             <span>Documentation</span>

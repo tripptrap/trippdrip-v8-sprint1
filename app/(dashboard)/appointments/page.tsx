@@ -155,15 +155,15 @@ export default function AppointmentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Appointments</h1>
-          <p className="text-sm text-white/60 mt-1">
+          <h1 className="text-2xl font-semibold text-gray-900">Appointments</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             View and manage your scheduled appointments
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={loadAppointments}
-            className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
+            className="p-2 bg-white hover:bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -171,7 +171,7 @@ export default function AppointmentsPage() {
           {!checkingCalendar && !calendarConnected && (
             <Link
               href="/email"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+              className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
             >
               <Calendar className="w-4 h-4" />
               Connect Google Calendar
@@ -187,7 +187,7 @@ export default function AppointmentsPage() {
             <Calendar className="w-5 h-5 text-yellow-400 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-yellow-400">Google Calendar Not Connected</p>
-              <p className="text-sm text-white/60 mt-1">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 Connect your Google Calendar to sync appointments and let the AI schedule calls with leads.
               </p>
               <Link
@@ -209,8 +209,8 @@ export default function AppointmentsPage() {
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === f
-                ? 'bg-emerald-600 text-white'
-                : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                ? 'bg-sky-600 text-white'
+                : 'bg-white text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:bg-slate-800'
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -221,13 +221,13 @@ export default function AppointmentsPage() {
       {/* Appointments List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+          <RefreshCw className="w-8 h-8 text-sky-600 animate-spin" />
         </div>
       ) : appointments.length === 0 ? (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-12 text-center">
-          <Calendar className="w-12 h-12 text-white/20 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">No {filter} appointments</h3>
-          <p className="text-white/60 text-sm max-w-md mx-auto">
+        <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center">
+          <Calendar className="w-12 h-12 text-gray-900/20 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No {filter} appointments</h3>
+          <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mx-auto">
             {filter === 'upcoming'
               ? "You don't have any upcoming appointments scheduled."
               : filter === 'past'
@@ -243,10 +243,10 @@ export default function AppointmentsPage() {
               <div className="flex items-center gap-3 mb-3">
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                   isToday(dayAppointments[0].start_time)
-                    ? 'bg-emerald-500/20 text-emerald-400'
+                    ? 'bg-sky-500/20 text-sky-600'
                     : isTomorrow(dayAppointments[0].start_time)
                     ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-white/10 text-white/60'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                 }`}>
                   {isToday(dayAppointments[0].start_time)
                     ? 'Today'
@@ -254,8 +254,8 @@ export default function AppointmentsPage() {
                     ? 'Tomorrow'
                     : formatDate(dayAppointments[0].start_time)}
                 </div>
-                <div className="flex-1 h-px bg-white/10"></div>
-                <span className="text-sm text-white/40">
+                <div className="flex-1 h-px bg-slate-50 dark:bg-slate-800"></div>
+                <span className="text-sm text-slate-400 dark:text-slate-500">
                   {dayAppointments.length} appointment{dayAppointments.length > 1 ? 's' : ''}
                 </span>
               </div>
@@ -265,13 +265,13 @@ export default function AppointmentsPage() {
                 {dayAppointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-emerald-500/30 transition-colors"
+                    className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:border-sky-500/30 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         {/* Time and Title */}
                         <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center gap-2 text-emerald-400">
+                          <div className="flex items-center gap-2 text-sky-600">
                             <Clock className="w-4 h-4" />
                             <span className="font-medium">
                               {formatTime(apt.start_time)}
@@ -279,18 +279,18 @@ export default function AppointmentsPage() {
                             </span>
                           </div>
                           {filter === 'upcoming' && (
-                            <span className="text-xs text-white/40">
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
                               {getTimeUntil(apt.start_time)}
                             </span>
                           )}
                         </div>
 
                         {/* Summary */}
-                        <h3 className="text-white font-medium mb-2">{apt.summary}</h3>
+                        <h3 className="text-slate-900 dark:text-slate-100 font-medium mb-2">{apt.summary}</h3>
 
                         {/* Lead Info */}
                         {(apt.leads || apt.attendee_name) && (
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                             {(apt.leads?.first_name || apt.attendee_name) && (
                               <div className="flex items-center gap-1.5">
                                 <User className="w-4 h-4" />
@@ -318,7 +318,7 @@ export default function AppointmentsPage() {
 
                         {/* Description */}
                         {apt.description && (
-                          <p className="text-sm text-white/40 mt-2 line-clamp-2">
+                          <p className="text-sm text-slate-400 dark:text-slate-500 mt-2 line-clamp-2">
                             {apt.description}
                           </p>
                         )}
@@ -329,7 +329,7 @@ export default function AppointmentsPage() {
                         {apt.leads?.id && (
                           <Link
                             href={`/leads?selected=${apt.leads.id}`}
-                            className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
+                            className="p-2 bg-white hover:bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors"
                             title="View Lead"
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -350,17 +350,17 @@ export default function AppointmentsPage() {
 
                     {/* Lead Status Badge */}
                     {apt.leads?.status && (
-                      <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
+                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          apt.leads.disposition === 'qualified' ? 'bg-emerald-500/20 text-emerald-400' :
+                          apt.leads.disposition === 'qualified' ? 'bg-sky-500/20 text-sky-600' :
                           apt.leads.disposition === 'callback' ? 'bg-blue-500/20 text-blue-400' :
                           apt.leads.disposition === 'not_interested' ? 'bg-red-500/20 text-red-400' :
-                          'bg-white/10 text-white/60'
+                          'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                         }`}>
                           {apt.leads.status}
                         </span>
                         {apt.leads.disposition && (
-                          <span className="text-xs text-white/40">
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
                             {apt.leads.disposition.replace('_', ' ')}
                           </span>
                         )}
@@ -377,21 +377,21 @@ export default function AppointmentsPage() {
       {/* Summary Stats */}
       {appointments.length > 0 && (
         <div className="grid grid-cols-3 gap-4 mt-8">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-white">{appointments.length}</div>
-            <div className="text-sm text-white/60">Total {filter}</div>
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Total {filter}</div>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-emerald-400">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-sky-600">
               {appointments.filter(a => isToday(a.start_time)).length}
             </div>
-            <div className="text-sm text-white/60">Today</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Today</div>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-blue-400">
               {appointments.filter(a => isTomorrow(a.start_time)).length}
             </div>
-            <div className="text-sm text-white/60">Tomorrow</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Tomorrow</div>
           </div>
         </div>
       )}

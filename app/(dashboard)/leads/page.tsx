@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getTemperatureDisplay } from "@/lib/leadScoring";
 import CustomModal from "@/components/CustomModal";
@@ -172,12 +172,24 @@ export default function LeadsPage() {
     return Array.from(set).sort((a,b)=>a.localeCompare(b));
   }, [leads]);
 
+  // Memoize combined tags for dropdowns (prevents O(n²) on every render)
+  const availableTags = useMemo(() => {
+    const combined = new Set<string>();
+    tagsList.forEach(t => combined.add(t.name));
+    allTags.forEach(t => combined.add(t));
+    return Array.from(combined).sort();
+  }, [tagsList, allTags]);
+
+  // Cache demo mode check (avoid localStorage reads in render path)
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  useEffect(() => {
+    setIsDemoMode(typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true');
+  }, []);
+
   async function fetchLeads() {
     setLoading(true);
     try {
-      // Check if demo mode is active
-      const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
-
+      // Use cached demo mode state (avoids localStorage read on every call)
       if (isDemoMode) {
         // Use demo data
         const { getDemoLeads } = await import('@/lib/demoData');
@@ -720,24 +732,29 @@ export default function LeadsPage() {
     return true;
   }, [filtered, selectedIds]);
 
-  function toggleRow(id: string) {
+  const toggleRow = useCallback((id: string) => {
     setSelectedIds(prev => {
       const n = new Set(prev);
       if (n.has(id)) n.delete(id); else n.add(id);
       return n;
     });
-  }
-  function toggleAllVisible() {
+  }, []);
+
+  const toggleAllVisible = useCallback(() => {
     if (allVisibleSelected) {
-      const n = new Set(selectedIds);
-      for (const l of filtered) n.delete(String(l.id ?? ""));
-      setSelectedIds(n);
+      setSelectedIds(prev => {
+        const n = new Set(prev);
+        for (const l of filtered) n.delete(String(l.id ?? ""));
+        return n;
+      });
     } else {
-      const n = new Set(selectedIds);
-      for (const l of filtered) n.add(String(l.id ?? ""));
-      setSelectedIds(n);
+      setSelectedIds(prev => {
+        const n = new Set(prev);
+        for (const l of filtered) n.add(String(l.id ?? ""));
+        return n;
+      });
     }
-  }
+  }, [allVisibleSelected, filtered]);
 
   // Select ALL visible leads (respects archive filter)
   const allLeadsSelected = useMemo(() => {
@@ -746,19 +763,19 @@ export default function LeadsPage() {
     return true;
   }, [filtered, selectedIds]);
 
-  function selectAllLeads() {
+  const selectAllLeads = useCallback(() => {
     const n = new Set<string>();
     for (const l of filtered) n.add(String(l.id ?? ""));
     setSelectedIds(n);
-  }
+  }, [filtered]);
 
-  function clearSelection() {
+  const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
-  }
+  }, []);
 
-  function toggleTagChip(tag: string) {
+  const toggleTagChip = useCallback((tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t=>t!==tag) : [...prev, tag]);
-  }
+  }, []);
 
   /* Upload modal + import */
   const [open, setOpen] = useState(false);
@@ -1080,9 +1097,9 @@ export default function LeadsPage() {
   function stop(e: React.MouseEvent) { e.stopPropagation(); }
 
   return (
-    <div className="text-[#e7eef9]">
+    <div className="text-slate-900 dark:text-slate-100">
       {toast && (
-        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-md border border-[#1f3a2a] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] shadow">
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-600 shadow">
           {toast}
         </div>
       )}
@@ -1101,93 +1118,93 @@ export default function LeadsPage() {
       {/* Add Lead Modal */}
       {addLeadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1722] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Add New Lead</h3>
-              <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }} className="text-white/60 hover:text-white text-xl">&times;</button>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add New Lead</h3>
+              <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">First Name</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">First Name</label>
                   <input
                     type="text"
                     value={newLead.first_name}
                     onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                     placeholder="John"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Last Name</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={newLead.last_name}
                     onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                     placeholder="Doe"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Phone *</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Phone *</label>
                 <input
                   type="tel"
                   value={newLead.phone}
                   onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Email</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Email</label>
                 <input
                   type="email"
                   value={newLead.email}
                   onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                   placeholder="john@example.com"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">State</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">State</label>
                   <input
                     type="text"
                     value={newLead.state}
                     onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                     placeholder="CA"
                     maxLength={2}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Zip Code</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Zip Code</label>
                   <input
                     type="text"
                     value={newLead.zip_code}
                     onChange={(e) => setNewLead({ ...newLead, zip_code: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                     placeholder="90210"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Tags (comma-separated)</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Tags (comma-separated)</label>
                 <input
                   type="text"
                   value={newLead.tags}
                   onChange={(e) => setNewLead({ ...newLead, tags: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
                   placeholder="facebook, interested, warm"
                 />
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Status</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Status</label>
                 <select
                   value={newLead.status}
                   onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                 >
                   <option value="new">New</option>
                   <option value="contacted">Contacted</option>
@@ -1200,14 +1217,14 @@ export default function LeadsPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }}
-                className="px-4 py-2 text-sm text-white/60 hover:text-white"
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddLead}
                 disabled={addingLead}
-                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
               >
                 {addingLead ? 'Adding...' : 'Add Lead'}
               </button>
@@ -1219,87 +1236,87 @@ export default function LeadsPage() {
       {/* Edit Lead Modal */}
       {editLeadOpen && editingLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1722] p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Edit Lead</h3>
-              <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-white/60 hover:text-white text-xl">&times;</button>
+              <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-xl">&times;</button>
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">First Name</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">First Name</label>
                   <input
                     type="text"
                     value={editingLead.first_name}
                     onChange={(e) => setEditingLead({ ...editingLead, first_name: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                     placeholder="John"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Last Name</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={editingLead.last_name}
                     onChange={(e) => setEditingLead({ ...editingLead, last_name: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                     placeholder="Doe"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Phone *</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Phone *</label>
                 <input
                   type="tel"
                   value={editingLead.phone}
                   onChange={(e) => setEditingLead({ ...editingLead, phone: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Email</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Email</label>
                 <input
                   type="email"
                   value={editingLead.email}
                   onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
-                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                   placeholder="john@example.com"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">State</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">State</label>
                   <input
                     type="text"
                     value={editingLead.state}
                     onChange={(e) => setEditingLead({ ...editingLead, state: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                     placeholder="CA"
                     maxLength={2}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Zip Code</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Zip Code</label>
                   <input
                     type="text"
                     value={editingLead.zip_code}
                     onChange={(e) => setEditingLead({ ...editingLead, zip_code: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                     placeholder="90210"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/60 mb-1">Tags</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Tags</label>
                 <div className="relative">
                   <div
-                    className="w-full min-h-[38px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
+                    className="w-full min-h-[38px] rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
                     onClick={() => setEditTagsDropdownOpen(!editTagsDropdownOpen)}
                   >
                     {editingLead.tags && editingLead.tags.split(',').filter((t: string) => t.trim()).length > 0 ? (
                       editingLead.tags.split(',').filter((t: string) => t.trim()).map((tag: string, idx: number) => (
-                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 text-xs">
                           {tag.trim()}
                           <button
                             type="button"
@@ -1309,23 +1326,23 @@ export default function LeadsPage() {
                               const newTags = currentTags.filter((t: string) => t !== tag.trim());
                               setEditingLead({ ...editingLead, tags: newTags.join(', ') });
                             }}
-                            className="hover:text-white"
+                            className="hover:text-gray-900"
                           >
                             ×
                           </button>
                         </span>
                       ))
                     ) : (
-                      <span className="text-white/40">Select tags...</span>
+                      <span className="text-slate-400 dark:text-slate-500">Select tags...</span>
                     )}
-                    <span className="ml-auto text-white/40">▼</span>
+                    <span className="ml-auto text-slate-400 dark:text-slate-500">▼</span>
                   </div>
                   {editTagsDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
-                      {tagsList.length === 0 && allTags.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-white/40">No saved tags yet. Create tags on the Tags page.</div>
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-[#1a2332] z-50 shadow-lg">
+                      {availableTags.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">No saved tags yet. Create tags on the Tags page.</div>
                       ) : (
-                        [...new Set([...tagsList.map(t => t.name), ...allTags])].sort().map((tagName) => {
+                        availableTags.map((tagName) => {
                           const currentTags = editingLead.tags ? editingLead.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [];
                           const isSelected = currentTags.includes(tagName);
                           const tagInfo = tagsList.find(t => t.name === tagName);
@@ -1343,7 +1360,7 @@ export default function LeadsPage() {
                                 }
                                 setEditTagsDropdownOpen(false);
                               }}
-                              className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                              className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 flex items-center justify-between ${isSelected ? 'bg-sky-500/10 text-sky-600' : ''}`}
                             >
                               <span className="flex items-center gap-2">
                                 {tagInfo?.color && (
@@ -1351,7 +1368,7 @@ export default function LeadsPage() {
                                 )}
                                 {tagName}
                               </span>
-                              {isSelected && <span className="text-emerald-400">✓</span>}
+                              {isSelected && <span className="text-sky-600">✓</span>}
                             </div>
                           );
                         })
@@ -1362,11 +1379,11 @@ export default function LeadsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Status</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Status</label>
                   <select
                     value={editingLead.status}
                     onChange={(e) => setEditingLead({ ...editingLead, status: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                   >
                     <option value="new">New</option>
                     <option value="active">Active</option>
@@ -1377,11 +1394,11 @@ export default function LeadsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-white/60 mb-1">Disposition</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Disposition</label>
                   <select
                     value={editingLead.disposition}
                     onChange={(e) => setEditingLead({ ...editingLead, disposition: e.target.value })}
-                    className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                   >
                     <option value="">None</option>
                     <option value="sold">Sold</option>
@@ -1396,14 +1413,14 @@ export default function LeadsPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }}
-                className="px-4 py-2 text-sm text-white/60 hover:text-white"
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-gray-900"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveLead}
                 disabled={savingLead}
-                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
               >
                 {savingLead ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1420,24 +1437,24 @@ export default function LeadsPage() {
               value={q}
               onChange={(e)=>setQ(e.target.value)}
               placeholder="Search name, email, phone, state, tag…"
-              className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm outline-none w-[260px]"
+              className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none w-[260px]"
             />
 
             {/* Action Buttons Group - prominent styling */}
             <button
-              className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+              className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 transition shadow-sm"
               onClick={() => setAddLeadOpen(true)}
             >
               + Add Lead
             </button>
             <button
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition shadow-sm"
+              className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 transition shadow-sm"
               onClick={() => { setOpen(true); setRaw(null); setCampaignName(""); setBulkTags(""); setUploadTagsDropdownOpen(false); setNewTagInput(""); setNewTagColor("#f59e0b"); setUploadCampaignDropdownOpen(false); setNewCampaignInput(""); }}
             >
               Upload Leads
             </button>
             <button
-              className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition shadow-sm"
+              className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 transition shadow-sm"
               onClick={() => setRunOpen(true)}
             >
               Run Campaign
@@ -1447,11 +1464,11 @@ export default function LeadsPage() {
             <div className="h-8 w-px bg-[#223246]"></div>
 
             {/* Filter Buttons Group - muted styling */}
-            <div className="flex items-center gap-1 rounded-lg bg-[#0a0f16] border border-[#1a2535] p-1">
+            <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-1">
               {/* Campaigns dropdown (page filter) */}
               <div className="relative" data-campaign-menu>
                 <button
-                  className={`rounded-md px-3 py-1.5 text-sm min-w-[120px] text-left transition ${activeCampaignId ? 'bg-[#1a2535] text-white' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                  className={`rounded-md px-3 py-1.5 text-sm min-w-[120px] text-left transition ${activeCampaignId ? 'bg-slate-100 dark:bg-slate-700 text-gray-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                   onClick={()=>{ setCampaignMenuOpen(v=>!v); setTagsMenuOpen(false); }}
                 >
                   {activeCampaignId
@@ -1459,7 +1476,7 @@ export default function LeadsPage() {
                     : "Campaigns"}
                 </button>
                 {campaignMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                  <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                       onClick={()=>{ setActiveCampaignId(null); setCampaignMenuOpen(false); }}
@@ -1468,7 +1485,7 @@ export default function LeadsPage() {
                     </button>
                     <div className="max-h-[260px] overflow-auto">
                       {campaigns.length===0 && (
-                        <div className="px-3 py-2 text-[#9fb0c3] text-sm">No campaigns yet</div>
+                        <div className="px-3 py-2 text-slate-600 dark:text-slate-400 text-sm">No campaigns yet</div>
                       )}
                       {campaigns.map(c=>{
                         const leadCount = leads.filter(l => l.campaign_id === c.id).length;
@@ -1478,7 +1495,7 @@ export default function LeadsPage() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                             onClick={()=>{ setActiveCampaignId(c.id); setCampaignMenuOpen(false); }}
                           >
-                            {c.name} <span className="text-[#9fb0c3]">({leadCount})</span>
+                            {c.name} <span className="text-slate-600 dark:text-slate-400">({leadCount})</span>
                           </button>
                         );
                       })}
@@ -1490,13 +1507,13 @@ export default function LeadsPage() {
               {/* Tags dropdown (page filter) */}
               <div className="relative" data-tags-menu>
                 <button
-                  className={`rounded-md px-3 py-1.5 text-sm min-w-[100px] text-left transition ${activeTagFilter ? 'bg-[#1a2535] text-white' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                  className={`rounded-md px-3 py-1.5 text-sm min-w-[100px] text-left transition ${activeTagFilter ? 'bg-slate-100 dark:bg-slate-700 text-gray-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                   onClick={()=>{ setTagsMenuOpen(v=>!v); setCampaignMenuOpen(false); }}
                 >
                   {activeTagFilter ? activeTagFilter : "Tags"}
                 </button>
                 {tagsMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                  <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                       onClick={()=>{ setActiveTagFilter(null); setTagsMenuOpen(false); }}
@@ -1505,7 +1522,7 @@ export default function LeadsPage() {
                     </button>
                     <div className="max-h-[260px] overflow-auto">
                       {tagsList.length===0 && (
-                        <div className="px-3 py-2 text-[#9fb0c3] text-sm">No tags yet</div>
+                        <div className="px-3 py-2 text-slate-600 dark:text-slate-400 text-sm">No tags yet</div>
                       )}
                       {tagsList.map(t=>(
                         <button
@@ -1514,7 +1531,7 @@ export default function LeadsPage() {
                           onClick={()=>{ setActiveTagFilter(t.name); setTagsMenuOpen(false); }}
                         >
                           {t.color && <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />}
-                          {t.name} <span className="text-[#9fb0c3]">({t.count})</span>
+                          {t.name} <span className="text-slate-600 dark:text-slate-400">({t.count})</span>
                         </button>
                       ))}
                     </div>
@@ -1523,14 +1540,14 @@ export default function LeadsPage() {
               </div>
 
               <button
-                className={`rounded-md px-3 py-1.5 text-sm transition ${hotLeadsOnly ? 'bg-[#ff6347]/20 text-[#ff6b6b]' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                className={`rounded-md px-3 py-1.5 text-sm transition ${hotLeadsOnly ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                 onClick={() => { setHotLeadsOnly(v => !v); if (!hotLeadsOnly) setShowArchived(false); }}
                 title="Filter for hot leads (score >= 70)"
               >
                 Hot Leads
               </button>
 
-              <label className={`rounded-md px-3 py-1.5 text-sm cursor-pointer transition text-[#8899aa] hover:text-white hover:bg-[#151d28]`}>
+              <label className={`rounded-md px-3 py-1.5 text-sm cursor-pointer transition text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700`}>
                 AI Parse
                 <input
                   type="file"
@@ -1541,7 +1558,7 @@ export default function LeadsPage() {
               </label>
 
               <button
-                className="rounded-md px-3 py-1.5 text-sm text-[#8899aa] hover:text-white hover:bg-[#151d28] disabled:opacity-50 transition"
+                className="rounded-md px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition"
                 onClick={recalculateLeadScores}
                 disabled={recalculatingScores}
                 title="Recalculate lead scores based on engagement"
@@ -1550,7 +1567,7 @@ export default function LeadsPage() {
               </button>
 
               <button
-                className={`rounded-md px-3 py-1.5 text-sm transition ${showArchived ? 'bg-[#5a6b7f]/20 text-[#9fb0c3]' : 'text-[#8899aa] hover:text-white hover:bg-[#151d28]'}`}
+                className={`rounded-md px-3 py-1.5 text-sm transition ${showArchived ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                 onClick={() => { setShowArchived(v => !v); if (!showArchived) setHotLeadsOnly(false); }}
                 title="Show archived leads"
               >
@@ -1559,7 +1576,7 @@ export default function LeadsPage() {
 
               {/* Select All / Clear Selection buttons */}
               <button
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a] transition"
+                className="rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition disabled:opacity-50"
                 onClick={selectAllLeads}
                 disabled={filtered.length === 0 || allLeadsSelected}
               >
@@ -1578,13 +1595,13 @@ export default function LeadsPage() {
               <>
                 <div className="relative" data-bulk-actions-menu>
                   <button
-                    className="rounded-md border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm hover:bg-[#101b2a]"
+                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm hover:bg-[#101b2a]"
                     onClick={() => setBulkActionsOpen(v => !v)}
                   >
                     Bulk Actions ({selectedIds.size})
                   </button>
                   {bulkActionsOpen && (
-                    <div className="absolute right-0 mt-1 w-[220px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                    <div className="absolute right-0 mt-1 w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white shadow-lg z-10">
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                         onClick={() => { setBulkActionModal('status'); setBulkActionsOpen(false); }}
@@ -1609,7 +1626,7 @@ export default function LeadsPage() {
                       >
                         Remove Tags
                       </button>
-                      <div className="border-t border-[#1a2637] my-1" />
+                      <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                         onClick={() => { setBulkActionModal('createFollowUps'); setBulkActionsOpen(false); }}
@@ -1617,12 +1634,12 @@ export default function LeadsPage() {
                         Create Follow-ups
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-emerald-400"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-sky-600"
                         onClick={() => { setBulkActionModal('reDrip'); setBulkActionsOpen(false); }}
                       >
                         🔄 Re-Drip to Campaign
                       </button>
-                      <div className="border-t border-[#1a2637] my-1" />
+                      <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
                         onClick={() => { exportLeads('csv'); setBulkActionsOpen(false); }}
@@ -1635,24 +1652,24 @@ export default function LeadsPage() {
                       >
                         Export to JSON
                       </button>
-                      <div className="border-t border-[#1a2637] my-1" />
+                      <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       {showArchived ? (
                         <button
-                          className="w-full text-left px-3 py-2 text-sm text-emerald-400 hover:bg-[#0f2a1a]"
+                          className="w-full text-left px-3 py-2 text-sm text-sky-600 hover:bg-sky-50"
                           onClick={() => { bulkUpdate({ status: 'new' }); setBulkActionsOpen(false); }}
                         >
                           📤 Unarchive Selected
                         </button>
                       ) : (
                         <button
-                          className="w-full text-left px-3 py-2 text-sm text-[#9ca3af] hover:bg-[#1a1a1a]"
+                          className="w-full text-left px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
                           onClick={() => { bulkUpdate({ status: 'archived' }); setBulkActionsOpen(false); }}
                         >
                           📦 Archive Selected
                         </button>
                       )}
                       <button
-                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-[#2a0f0f]"
+                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-50 dark:bg-red-900/30"
                         onClick={() => { setBulkActionModal('delete'); setBulkActionsOpen(false); }}
                       >
                         Delete Selected
@@ -1661,7 +1678,7 @@ export default function LeadsPage() {
                   )}
                 </div>
                 <button
-                  className="rounded-md border border-[#5a2424] bg-[#2a0f0f] px-3 py-2 text-sm text-[#ff6b6b] hover:bg-[#3a1515]"
+                  className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-500 hover:bg-red-100 dark:bg-red-900/40"
                   onClick={deleteSelectedLeads}
                 >
                   Delete Selected ({selectedIds.size})
@@ -1680,7 +1697,7 @@ export default function LeadsPage() {
                 <button
                   key={tag}
                   onClick={()=>toggleTagChip(tag)}
-                  className={`px-2 py-1 rounded-full text-xs border ${active ? "bg-[#1a2f52] border-[#4876ff]" : "bg-[#0c1420] border-[#223246] hover:bg-[#101b2a]"}`}
+                  className={`px-2 py-1 rounded-full text-xs border ${active ? "bg-[#1a2f52] border-[#4876ff]" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-[#101b2a]"}`}
                 >
                   {tag}
                 </button>
@@ -1689,7 +1706,7 @@ export default function LeadsPage() {
             {selectedTags.length > 0 && (
               <button
                 onClick={()=>setSelectedTags([])}
-                className="px-2 py-1 rounded-full text-xs border bg-[#0c1420] border-[#223246] hover:bg-[#101b2a]"
+                className="px-2 py-1 rounded-full text-xs border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-[#101b2a]"
               >
                 Clear chips
               </button>
@@ -1699,44 +1716,44 @@ export default function LeadsPage() {
 
         {/* Getting Started Tips */}
         {filtered.length === 0 && !q && !activeCampaignId && !activeTagFilter && (
-          <div className="rounded-lg border border-[#1a4d7a] bg-[#0a1929] p-6">
-            <h3 className="text-lg font-semibold mb-3 text-[#60a5fa]">💡 Getting Started</h3>
-            <ol className="text-sm text-[#e7eef9] space-y-2 list-decimal list-inside">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white p-6">
+            <h3 className="text-lg font-semibold mb-3 text-sky-500 dark:text-sky-400">💡 Getting Started</h3>
+            <ol className="text-sm text-slate-900 dark:text-slate-100 space-y-2 list-decimal list-inside">
               <li>
-                <strong>Upload Leads:</strong> Click "Upload Leads" to import your contact list. <span className="text-[#9fb0c3]">Campaigns represent where you got the leads from (e.g., "Facebook Ads", "Trade Show 2024").</span>
+                <strong>Upload Leads:</strong> Click "Upload Leads" to import your contact list. <span className="text-slate-600 dark:text-slate-400">Campaigns represent where you got the leads from (e.g., "Facebook Ads", "Trade Show 2024").</span>
               </li>
               <li>
-                <strong>Create Campaigns & Tags:</strong> During upload, assign a campaign name. <span className="text-[#9fb0c3]">Tags are used for disposition or to mark where the lead is at in the prospecting process (e.g., "contacted", "interested", "cold").</span>
+                <strong>Create Campaigns & Tags:</strong> During upload, assign a campaign name. <span className="text-slate-600 dark:text-slate-400">Tags are used for disposition or to mark where the lead is at in the prospecting process (e.g., "contacted", "interested", "cold").</span>
               </li>
               <li>
-                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-emerald-400 hover:underline">Flow</a> page to create a flow. <span className="text-[#9fb0c3]">This teaches the AI how to talk to selected campaigns with specific messaging strategies.</span>
+                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-sky-600 hover:underline">Flow</a> page to create a flow. <span className="text-slate-600 dark:text-slate-400">This teaches the AI how to talk to selected campaigns with specific messaging strategies.</span>
               </li>
               <li>
-                <strong>Start Bulk SMS:</strong> Once you have leads and a flow configured, go to <a href="/bulk-sms" className="text-emerald-400 hover:underline">Bulk SMS</a> to send messages to your leads at scale.
+                <strong>Start Bulk SMS:</strong> Once you have leads and a flow configured, go to <a href="/bulk-sms" className="text-sky-600 hover:underline">Bulk SMS</a> to send messages to your leads at scale.
               </li>
             </ol>
           </div>
         )}
 
         {/* Leads table */}
-        <div className="overflow-x-auto rounded-md border border-[#1a2637]">
+        <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700">
           <table className="w-full border-collapse text-sm min-w-max">
             <thead>
-              <tr className="bg-[#0f1722] text-left">
-                <th className="border-b border-[#1a2637] px-3 py-2">
+              <tr className="bg-slate-50 dark:bg-slate-800 text-left text-slate-700 dark:text-slate-200">
+                <th className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
                 {["Score","Name","Campaign","Email","Phone","State","Tags","Status","Disposition","Actions"].map(h => (
-                  <th key={h} className="border-b border-[#1a2637] px-3 py-2">{h}</th>
+                  <th key={h} className="border-b border-slate-200 dark:border-slate-700 px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={11}>Loading…</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={11}>Loading…</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td className="px-3 py-4 text-[#9fb0c3]" colSpan={11}>No leads found.</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={11}>No leads found.</td></tr>
               )}
               {!loading && filtered.map((l, i) => {
                 const name = [l.first_name, l.last_name].filter(Boolean).join(" ") || "—";
@@ -1749,7 +1766,7 @@ export default function LeadsPage() {
                 const tempDisplay = temperature ? getTemperatureDisplay(temperature) : null;
 
                 return (
-                  <tr key={id} className="border-t border-[#1a2637] hover:bg-[#0c1420] cursor-pointer transition" onClick={() => viewLeadDetails(id)}>
+                  <tr key={id} className="border-t border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800 cursor-pointer transition" onClick={() => viewLeadDetails(id)}>
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={checked} onChange={()=>toggleRow(id)} />
                     </td>
@@ -1762,17 +1779,17 @@ export default function LeadsPage() {
                           </span>
                         </div>
                       ) : (
-                        <span className="text-[#9fb0c3] text-xs">—</span>
+                        <span className="text-slate-600 dark:text-slate-400 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">{name}</td>
                     <td className="px-3 py-2">
                       {l.campaign_id ? (
-                        <span className="inline-block px-2 py-0.5 bg-[#1a2637] text-[#9fb0c3] rounded text-xs truncate max-w-[120px]">
+                        <span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded text-xs truncate max-w-[120px]">
                           {campaigns.find(c => c.id === l.campaign_id)?.name || "—"}
                         </span>
                       ) : (
-                        <span className="text-[#9fb0c3]">—</span>
+                        <span className="text-slate-600 dark:text-slate-400">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">{l.email || "—"}</td>
@@ -1782,7 +1799,7 @@ export default function LeadsPage() {
                     <td className="px-3 py-2">{l.status || "—"}</td>
                     <td className="px-3 py-2 relative" onClick={(e) => e.stopPropagation()} data-disposition-menu>
                       <button
-                        className="text-sm text-[#9fb0c3] hover:text-[#e7eef9] underline"
+                        className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 underline"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDispositionMenuOpen(prev => ({ ...prev, [id]: !prev[id] }));
@@ -1791,7 +1808,7 @@ export default function LeadsPage() {
                         {disposition === "—" ? "Set" : disposition.replace(/_/g, ' ')}
                       </button>
                       {isMenuOpen && (
-                        <div className="absolute left-0 mt-1 w-[160px] rounded-md border border-[#1a2637] bg-[#0f1722] shadow-lg z-10">
+                        <div className="absolute left-0 mt-1 w-[160px] rounded-md border border-slate-200 dark:border-slate-700 bg-white shadow-lg z-10">
                           {['sold', 'not_interested', 'callback', 'qualified', 'nurture'].map(disp => (
                             <button
                               key={disp}
@@ -1824,8 +1841,8 @@ export default function LeadsPage() {
         </div>
 
         {lastSummary?.ok && (
-          <div className="rounded-md border border-[#1f3a5d] bg-[#0e1c2d] px-4 py-3 text-sm text-[#b8c9de]">
-            <div className="font-semibold text-[#e7eef9] mb-1">Last import</div>
+          <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Last import</div>
             <div className="flex flex-wrap gap-x-6">
               <div><b>Incoming:</b> {lastSummary.incoming}</div>
               <div><b>Added:</b> {lastSummary.added}</div>
@@ -1838,17 +1855,17 @@ export default function LeadsPage() {
       {/* Upload modal */}
       {open && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
-          <div className="w-full max-w-5xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Upload Leads</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={()=>setOpen(false)}>Close</button>
+          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Upload Leads</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={()=>setOpen(false)}>Close</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <p className="text-sm text-[#9fb0c3]">Drop CSV, XLSX, JSON, PDF, DOCX, or TXT. Drag bubbles to map columns.</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Drop CSV, XLSX, JSON, PDF, DOCX, or TXT. Drag bubbles to map columns.</p>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#0e1826]">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:bg-slate-700">
                   <input type="file" className="hidden" onChange={handlePick} />
                   {busy ? "Processing…" : "Choose file"}
                 </label>
@@ -1856,27 +1873,27 @@ export default function LeadsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <div
-                      className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm cursor-pointer flex items-center justify-between"
+                      className="min-h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm cursor-pointer flex items-center justify-between"
                       onClick={() => setUploadCampaignDropdownOpen(!uploadCampaignDropdownOpen)}
                     >
                       {campaignName ? (
-                        <span className="text-[#e7eef9]">{campaignName}</span>
+                        <span className="text-slate-900 dark:text-slate-100">{campaignName}</span>
                       ) : (
-                        <span className="text-white/40">Select or create campaign...</span>
+                        <span className="text-slate-400 dark:text-slate-500">Select or create campaign...</span>
                       )}
-                      <span className="text-white/40">▼</span>
+                      <span className="text-slate-400 dark:text-slate-500">▼</span>
                     </div>
                     {uploadCampaignDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-[#1a2332] z-50 shadow-lg">
                         {/* Create new campaign input */}
-                        <div className="p-2 border-b border-white/10">
+                        <div className="p-2 border-b border-slate-200 dark:border-slate-700">
                           <div className="flex gap-2">
                             <input
                               type="text"
                               value={newCampaignInput}
                               onChange={(e) => setNewCampaignInput(e.target.value)}
                               placeholder="Create new campaign..."
-                              className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm outline-none focus:border-emerald-500"
+                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1 text-sm outline-none focus:border-sky-500"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
@@ -1901,7 +1918,7 @@ export default function LeadsPage() {
                                   setUploadCampaignDropdownOpen(false);
                                 }
                               }}
-                              className="px-2 py-1 rounded-md bg-emerald-500 text-white text-xs hover:bg-emerald-600"
+                              className="px-2 py-1 rounded-md bg-sky-500 text-white text-xs hover:bg-sky-600"
                             >
                               Add
                             </button>
@@ -1914,14 +1931,14 @@ export default function LeadsPage() {
                             setCampaignName('');
                             setUploadCampaignDropdownOpen(false);
                           }}
-                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 ${!campaignName ? 'bg-emerald-500/10 text-emerald-400' : 'text-white/60'}`}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 ${!campaignName ? 'bg-sky-500/10 text-sky-600' : 'text-slate-600 dark:text-slate-400'}`}
                         >
                           No Campaign
                         </div>
                         {/* Saved campaigns list */}
                         {campaigns.length > 0 && (
                           <>
-                            <div className="px-3 py-1 text-xs text-white/40 uppercase border-t border-white/10">Saved Campaigns</div>
+                            <div className="px-3 py-1 text-xs text-slate-400 dark:text-slate-500 uppercase border-t border-slate-200 dark:border-slate-700">Saved Campaigns</div>
                             {campaigns.map((camp) => (
                               <div
                                 key={camp.id}
@@ -1930,10 +1947,10 @@ export default function LeadsPage() {
                                   setCampaignName(camp.name);
                                   setUploadCampaignDropdownOpen(false);
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${campaignName === camp.name ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 flex items-center justify-between ${campaignName === camp.name ? 'bg-sky-500/10 text-sky-600' : ''}`}
                               >
                                 <span>{camp.name}</span>
-                                {campaignName === camp.name && <span className="text-emerald-400">✓</span>}
+                                {campaignName === camp.name && <span className="text-sky-600">✓</span>}
                               </div>
                             ))}
                           </>
@@ -1943,12 +1960,12 @@ export default function LeadsPage() {
                   </div>
                   <div className="relative flex-1">
                     <div
-                      className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
+                      className="min-h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
                       onClick={() => setUploadTagsDropdownOpen(!uploadTagsDropdownOpen)}
                     >
                       {bulkTags && bulkTags.split(',').filter((t: string) => t.trim()).length > 0 ? (
                         bulkTags.split(',').filter((t: string) => t.trim()).map((tag: string, idx: number) => (
-                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 text-xs">
                             {tag.trim()}
                             <button
                               type="button"
@@ -1958,28 +1975,28 @@ export default function LeadsPage() {
                                 const newTags = currentTags.filter((t: string) => t !== tag.trim());
                                 setBulkTags(newTags.join(', '));
                               }}
-                              className="hover:text-white"
+                              className="hover:text-gray-900"
                             >
                               ×
                             </button>
                           </span>
                         ))
                       ) : (
-                        <span className="text-white/40">Select or create tags...</span>
+                        <span className="text-slate-400 dark:text-slate-500">Select or create tags...</span>
                       )}
-                      <span className="ml-auto text-white/40">▼</span>
+                      <span className="ml-auto text-slate-400 dark:text-slate-500">▼</span>
                     </div>
                     {uploadTagsDropdownOpen && (
-                      <div className="absolute top-full right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg min-w-[320px]">
+                      <div className="absolute top-full right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-[#1a2332] z-50 shadow-lg min-w-[320px]">
                         {/* Create new tag input */}
-                        <div className="p-2 border-b border-white/10">
+                        <div className="p-2 border-b border-slate-200 dark:border-slate-700">
                           <div className="flex gap-2 items-center mb-2">
                             <input
                               type="text"
                               value={newTagInput}
                               onChange={(e) => setNewTagInput(e.target.value)}
                               placeholder="Create new tag..."
-                              className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
@@ -2007,13 +2024,13 @@ export default function LeadsPage() {
                                   setUploadTagsDropdownOpen(false);
                                 }
                               }}
-                              className="px-3 py-1.5 rounded-md bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 whitespace-nowrap"
+                              className="px-3 py-1.5 rounded-md bg-sky-500 text-white text-xs font-medium hover:bg-sky-600 whitespace-nowrap"
                             >
                               Add
                             </button>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-white/50">Color:</span>
+                            <span className="text-xs text-gray-900/50">Color:</span>
                             <div className="flex gap-1.5">
                               {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map((color) => (
                                 <button
@@ -2029,10 +2046,10 @@ export default function LeadsPage() {
                         </div>
                         {/* Saved tags list */}
                         {tagsList.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-white/40">No saved tags yet</div>
+                          <div className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">No saved tags yet</div>
                         ) : (
                           <>
-                            <div className="px-3 py-1 text-xs text-white/40 uppercase">Saved Tags</div>
+                            <div className="px-3 py-1 text-xs text-slate-400 dark:text-slate-500 uppercase">Saved Tags</div>
                             {tagsList.map((t) => {
                               const currentTags = bulkTags ? bulkTags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [];
                               const isSelected = currentTags.includes(t.name);
@@ -2049,7 +2066,7 @@ export default function LeadsPage() {
                                       setBulkTags(newTags.join(', '));
                                     }
                                   }}
-                                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 flex items-center justify-between ${isSelected ? 'bg-sky-500/10 text-sky-600' : ''}`}
                                 >
                                   <span className="flex items-center gap-2">
                                     {t.color && (
@@ -2057,7 +2074,7 @@ export default function LeadsPage() {
                                     )}
                                     {t.name}
                                   </span>
-                                  {isSelected && <span className="text-emerald-400">✓</span>}
+                                  {isSelected && <span className="text-sky-600">✓</span>}
                                 </div>
                               );
                             })}
@@ -2070,45 +2087,45 @@ export default function LeadsPage() {
               </div>
 
               {raw?.ok && (
-                <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-3">
-                  <div className="mb-2 text-sm text-[#9fb0c3]">
-                    Detected: <b className="text-[#e7eef9]">{(raw.detectedType||"").toUpperCase()}</b> • Parsed rows: <b className="text-[#e7eef9]">{raw.total}</b>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3">
+                  <div className="mb-2 text-sm text-slate-600 dark:text-slate-400">
+                    Detected: <b className="text-slate-900 dark:text-slate-100">{(raw.detectedType||"").toUpperCase()}</b> • Parsed rows: <b className="text-slate-900 dark:text-slate-100">{raw.total}</b>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <div className="mb-2 text-xs uppercase tracking-widest text-[#95a9c5]">Detected columns</div>
+                      <div className="mb-2 text-xs uppercase tracking-widest text-slate-600 dark:text-slate-400">Detected columns</div>
                       <div className="flex flex-wrap gap-2">
                         {Object.keys(raw.preview?.[0] || {}).map(col=>(
                           <div
                             key={col}
                             draggable
                             onDragStart={(e)=>{ e.dataTransfer.setData("text/plain", col); }}
-                            className="cursor-grab rounded-full border border-[#1a2a40] bg-[#0e1623] px-3 py-1 text-xs"
+                            className="cursor-grab rounded-full border border-slate-200 dark:border-slate-700 bg-white px-3 py-1 text-xs"
                           >
                             {col}
                           </div>
                         ))}
-                        {!Object.keys(raw.preview?.[0] || {}).length && <div className="text-xs text-[#9fb0c3]">—</div>}
+                        {!Object.keys(raw.preview?.[0] || {}).length && <div className="text-xs text-slate-600 dark:text-slate-400">—</div>}
                       </div>
                     </div>
 
                     <div>
-                      <div className="mb-2 text-xs uppercase tracking-widest text-[#95a9c5]">Map to fields</div>
+                      <div className="mb-2 text-xs uppercase tracking-widest text-slate-600 dark:text-slate-400">Map to fields</div>
                       <div className="grid grid-cols-2 gap-2">
                         {CANON_FIELDS.map((field)=>(
                           <div key={field}
                                onDrop={(e)=>{ e.preventDefault(); const col=e.dataTransfer.getData("text/plain"); if(col) assignMapping(field,col); }}
                                onDragOver={(e)=>e.preventDefault()}
-                               className="rounded-md border border-dashed border-[#2a3e59] bg-[#0e1623] p-2">
-                            <div className="mb-1 text-[11px] uppercase tracking-widest text-[#7ea0c6]">{field}</div>
+                               className="rounded-md border border-dashed border-slate-300 dark:border-slate-600 bg-white p-2">
+                            <div className="mb-1 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">{field}</div>
                             {mapping[field] ? (
-                              <div className="flex items-center justify-between rounded border border-[#1a2a40] bg-[#0c1420] px-2 py-1 text-xs">
+                              <div className="flex items-center justify-between rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-xs">
                                 <span>{mapping[field]}</span>
-                                <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={()=>clearMapping(field)} type="button">×</button>
+                                <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={()=>clearMapping(field)} type="button">×</button>
                               </div>
                             ) : (
-                              <div className="text-xs text-[#5e7aa0]">Drop column here</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">Drop column here</div>
                             )}
                           </div>
                         ))}
@@ -2119,31 +2136,31 @@ export default function LeadsPage() {
               )}
 
               {raw?.ok && (
-                <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-3 text-sm">
-                  <div className="max-h-[40vh] overflow-auto rounded-md border border-[#1a2a40]">
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 text-sm">
+                  <div className="max-h-[40vh] overflow-auto rounded-md border border-slate-200 dark:border-slate-700">
                     <table className="min-w-full border-collapse text-left text-sm">
                       <thead>
                         <tr className="bg-[#101a29]">
                           {CANON_FIELDS.map(h=>(
-                            <th key={h} className="border-b border-[#1a2a40] px-3 py-2 font-semibold">{h}</th>
+                            <th key={h} className="border-b border-slate-200 dark:border-slate-700 px-3 py-2 font-semibold">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {mappedPreview.map((r, i)=>(
-                          <tr key={i} className="odd:bg-[#0e1623] even:bg-[#0c1420]">
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.first_name||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.last_name||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.phone||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.email||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.state||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.zip_code||""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{Array.isArray(r.tags)? r.tags.join(", "):""}</td>
-                            <td className="border-b border-[#1a2a40] px-3 py-2">{r.status||""}</td>
+                          <tr key={i} className="odd:bg-white even:bg-slate-50 dark:bg-slate-800">
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.first_name||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.last_name||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.phone||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.email||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.state||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.zip_code||""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{Array.isArray(r.tags)? r.tags.join(", "):""}</td>
+                            <td className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">{r.status||""}</td>
                           </tr>
                         ))}
                         {!mappedPreview.length && (
-                          <tr><td colSpan={8} className="px-3 py-4 text-[#9fb0c3]">No rows detected.</td></tr>
+                          <tr><td colSpan={8} className="px-3 py-4 text-slate-600 dark:text-slate-400">No rows detected.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2152,7 +2169,7 @@ export default function LeadsPage() {
               )}
             </div>
 
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end">
               {canImport && (
                 <button
                   onClick={onImport}
@@ -2173,17 +2190,17 @@ export default function LeadsPage() {
         const presetColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
-          <div className="w-full max-w-xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Run Campaign</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={()=>{ setRunOpen(false); setRunTagsDropdownOpen(false); }}>Close</button>
+          <div className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Run Campaign</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={()=>{ setRunOpen(false); setRunTagsDropdownOpen(false); }}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <div className="grid gap-3">
                 <select
                   value={runCampaignId}
                   onChange={(e)=>setRunCampaignId(e.target.value)}
-                  className="rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                 >
                   <option value="">{campaigns.length ? "Select a saved campaign…" : "No saved campaigns"}</option>
                   {campaigns.map(c => (
@@ -2193,7 +2210,7 @@ export default function LeadsPage() {
 
                 {/* Tags dropdown with saved tags and create new */}
                 <div className="relative">
-                  <label className="block text-xs text-[#9fb0c3] mb-1">Tags to apply (optional)</label>
+                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Tags to apply (optional)</label>
 
                   {/* Selected tags display */}
                   {runTags.length > 0 && (
@@ -2201,7 +2218,7 @@ export default function LeadsPage() {
                       {runTags.map(tag => {
                         const tagInfo = tagsList.find(t => t.name === tag);
                         return (
-                          <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                          <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-sky-500/20 text-sky-300 border border-sky-200 flex items-center gap-1.5">
                             {tagInfo?.color && (
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />
                             )}
@@ -2209,7 +2226,7 @@ export default function LeadsPage() {
                             <button
                               type="button"
                               onClick={() => setRunTags(runTags.filter(t => t !== tag))}
-                              className="hover:text-white"
+                              className="hover:text-gray-900"
                             >
                               ✕
                             </button>
@@ -2222,23 +2239,23 @@ export default function LeadsPage() {
                   <button
                     type="button"
                     onClick={() => setRunTagsDropdownOpen(!runTagsDropdownOpen)}
-                    className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
                   >
-                    <span className="text-[#9fb0c3]">{runTags.length > 0 ? `${runTags.length} tag(s) selected` : 'Select or create tags...'}</span>
-                    <span className="text-[#9fb0c3]">{runTagsDropdownOpen ? '▲' : '▼'}</span>
+                    <span className="text-slate-600 dark:text-slate-400">{runTags.length > 0 ? `${runTags.length} tag(s) selected` : 'Select or create tags...'}</span>
+                    <span className="text-slate-600 dark:text-slate-400">{runTagsDropdownOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {runTagsDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shadow-lg z-50 max-h-[200px] overflow-y-auto">
                       {/* Create new tag */}
-                      <div className="p-2 border-b border-[#223246]">
+                      <div className="p-2 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex gap-2">
                           <input
                             type="text"
                             value={runNewTagInput}
                             onChange={(e) => setRunNewTagInput(e.target.value)}
                             placeholder="Create new tag..."
-                            className="flex-1 rounded border border-[#223246] bg-[#1a2332] px-2 py-1 text-xs outline-none"
+                            className="flex-1 rounded border border-slate-200 dark:border-slate-700 bg-[#1a2332] px-2 py-1 text-xs outline-none"
                             onKeyDown={async (e) => {
                               if (e.key === 'Enter' && runNewTagInput.trim()) {
                                 const tagName = runNewTagInput.trim();
@@ -2286,13 +2303,13 @@ export default function LeadsPage() {
                                 setRunTagsDropdownOpen(false);
                               }
                             }}
-                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs hover:bg-emerald-500/30"
+                            className="px-2 py-1 rounded bg-sky-500/20 text-sky-600 text-xs hover:bg-sky-500/30"
                           >
                             Add
                           </button>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-[#9fb0c3]">Color:</span>
+                          <span className="text-xs text-slate-600 dark:text-slate-400">Color:</span>
                           <div className="flex gap-1">
                             {presetColors.map(color => (
                               <button
@@ -2309,10 +2326,10 @@ export default function LeadsPage() {
 
                       {/* Saved tags */}
                       {tagsList.length === 0 ? (
-                        <div className="p-2 text-xs text-[#9fb0c3]">No saved tags yet</div>
+                        <div className="p-2 text-xs text-slate-600 dark:text-slate-400">No saved tags yet</div>
                       ) : (
                         <>
-                          <div className="px-2 py-1 text-xs text-[#9fb0c3] bg-[#18273a]">Saved Tags</div>
+                          <div className="px-2 py-1 text-xs text-slate-600 dark:text-slate-400 bg-[#18273a]">Saved Tags</div>
                           {tagsList.map(t => {
                             const isSelected = runTags.includes(t.name);
                             return (
@@ -2325,13 +2342,13 @@ export default function LeadsPage() {
                                     setRunTags([...runTags, t.name]);
                                   }
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-emerald-500/10' : 'hover:bg-[#101b2a]'}`}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-[#101b2a]'}`}
                               >
                                 <div className="flex items-center gap-2">
                                   {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
                                   {t.name}
                                 </div>
-                                {isSelected && <span className="text-emerald-400">✓</span>}
+                                {isSelected && <span className="text-sky-600">✓</span>}
                               </div>
                             );
                           })}
@@ -2345,26 +2362,26 @@ export default function LeadsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {/* State filter dropdown */}
                   <div className="relative">
-                    <label className="block text-xs text-[#9fb0c3] mb-1">Filter by State</label>
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Filter by State</label>
                     <button
                       type="button"
                       onClick={() => setRunStatesDropdownOpen(!runStatesDropdownOpen)}
-                      className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
                     >
-                      <span className="text-[#9fb0c3] truncate">
+                      <span className="text-slate-600 dark:text-slate-400 truncate">
                         {runStates.length > 0 ? runStates.join(', ') : 'All states'}
                       </span>
-                      <span className="text-[#9fb0c3]">{runStatesDropdownOpen ? '▲' : '▼'}</span>
+                      <span className="text-slate-600 dark:text-slate-400">{runStatesDropdownOpen ? '▲' : '▼'}</span>
                     </button>
                     {runStatesDropdownOpen && (() => {
                       // Get unique states from leads
                       const uniqueStates = [...new Set(leads.map(l => l.state).filter(Boolean))].sort();
                       return (
-                        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto">
+                        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shadow-lg z-50 max-h-[200px] overflow-y-auto">
                           <button
                             type="button"
                             onClick={() => { setRunStates([]); setRunStatesDropdownOpen(false); }}
-                            className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] ${runStates.length === 0 ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                            className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] ${runStates.length === 0 ? 'bg-sky-500/10 text-sky-600' : ''}`}
                           >
                             All states
                           </button>
@@ -2382,12 +2399,12 @@ export default function LeadsPage() {
                                     setRunStates([...runStates, state as string]);
                                   }
                                 }}
-                                className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] flex items-center justify-between ${isSelected ? 'bg-emerald-500/10' : ''}`}
+                                className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] flex items-center justify-between ${isSelected ? 'bg-sky-500/10' : ''}`}
                               >
                                 <span>{state}</span>
                                 <span className="flex items-center gap-2">
-                                  <span className="text-[#9fb0c3]">({count})</span>
-                                  {isSelected && <span className="text-emerald-400">✓</span>}
+                                  <span className="text-slate-600 dark:text-slate-400">({count})</span>
+                                  {isSelected && <span className="text-sky-600">✓</span>}
                                 </span>
                               </button>
                             );
@@ -2399,12 +2416,12 @@ export default function LeadsPage() {
 
                   {/* ZIP codes filter */}
                   <div>
-                    <label className="block text-xs text-[#9fb0c3] mb-1">Filter by ZIP</label>
+                    <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Filter by ZIP</label>
                     <input
                       value={runZipCodes}
                       onChange={(e)=>setRunZipCodes(e.target.value)}
                       placeholder="ZIP codes (comma-separated)"
-                      className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none text-sm"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -2441,29 +2458,29 @@ export default function LeadsPage() {
                   const remainingCount = previewLeads.length - displayLeads.length;
 
                   return (
-                    <div className="mt-2 border border-[#223246] rounded-lg overflow-hidden">
-                      <div className="bg-[#18273a] px-3 py-2 text-xs text-[#9fb0c3] flex justify-between">
+                    <div className="mt-2 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                      <div className="bg-[#18273a] px-3 py-2 text-xs text-slate-600 dark:text-slate-400 flex justify-between">
                         <span>Leads to include ({previewLeads.length})</span>
                         {previewLeads.length === 0 && <span className="text-amber-400">No leads selected</span>}
                       </div>
                       {previewLeads.length > 0 && (
                         <div className="max-h-[200px] overflow-y-auto">
                           {displayLeads.map(l => (
-                            <div key={l.id} className="px-3 py-2 border-b border-[#223246] last:border-b-0 flex items-center justify-between text-sm hover:bg-[#101b2a]">
+                            <div key={l.id} className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0 flex items-center justify-between text-sm hover:bg-[#101b2a]">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-[#223246] flex items-center justify-center text-xs font-medium">
                                   {(l.first_name?.[0] || '?').toUpperCase()}
                                 </div>
                                 <div>
                                   <div className="font-medium">{l.first_name} {l.last_name}</div>
-                                  <div className="text-xs text-[#9fb0c3]">{l.phone || l.email || 'No contact'}</div>
+                                  <div className="text-xs text-slate-600 dark:text-slate-400">{l.phone || l.email || 'No contact'}</div>
                                 </div>
                               </div>
-                              <div className="text-xs text-[#9fb0c3]">{l.state || ''}</div>
+                              <div className="text-xs text-slate-600 dark:text-slate-400">{l.state || ''}</div>
                             </div>
                           ))}
                           {remainingCount > 0 && (
-                            <div className="px-3 py-2 text-xs text-[#9fb0c3] text-center bg-[#0a0f16]">
+                            <div className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 text-center bg-slate-50 dark:bg-slate-800">
                               + {remainingCount} more lead{remainingCount !== 1 ? 's' : ''}
                             </div>
                           )}
@@ -2474,11 +2491,11 @@ export default function LeadsPage() {
                 })()}
               </div>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end">
               <button
                 onClick={runCampaign}
                 disabled={running || !runCampaignId}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
                 type="button"
               >
                 {running ? "Running…" : "Run Campaign"}
@@ -2492,16 +2509,16 @@ export default function LeadsPage() {
       {/* Bulk Action Modals */}
       {bulkActionModal === 'status' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Update Status</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[400px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Update Status</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <select
                 value={bulkStatus}
                 onChange={(e) => setBulkStatus(e.target.value)}
-                className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
               >
                 <option value="">Select status...</option>
                 <option value="active">Active</option>
@@ -2509,17 +2526,17 @@ export default function LeadsPage() {
                 <option value="sold">Sold</option>
               </select>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={() => bulkUpdate({ status: bulkStatus })}
                 disabled={!bulkStatus}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
               >
                 Update
               </button>
@@ -2530,16 +2547,16 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'disposition' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[400px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Update Disposition</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[400px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Update Disposition</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <select
                 value={bulkDisposition}
                 onChange={(e) => setBulkDisposition(e.target.value)}
-                className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
               >
                 <option value="">Select disposition...</option>
                 <option value="sold">Sold</option>
@@ -2549,17 +2566,17 @@ export default function LeadsPage() {
                 <option value="nurture">Nurture</option>
               </select>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={() => bulkUpdate({ disposition: bulkDisposition })}
                 disabled={!bulkDisposition}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
               >
                 Update
               </button>
@@ -2577,21 +2594,21 @@ export default function LeadsPage() {
         });
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[10vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-lg rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[600px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Add Tags</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Add Tags</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
               {/* Current tags on selected leads */}
               {currentTagsOnLeads.size > 0 && (
                 <div>
-                  <p className="text-xs text-[#9fb0c3] mb-2">Current tags on selected leads:</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Current tags on selected leads:</p>
                   <div className="flex flex-wrap gap-1">
                     {[...currentTagsOnLeads].map(tag => {
                       const tagInfo = tagsList.find(t => t.name === tag);
                       return (
-                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 text-xs">
+                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-50 dark:bg-slate-800 text-xs">
                           {tagInfo?.color && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />}
                           {tag}
                         </span>
@@ -2603,17 +2620,17 @@ export default function LeadsPage() {
 
               {/* Tags to add */}
               <div>
-                <p className="text-xs text-[#9fb0c3] mb-2">Tags to add:</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Tags to add:</p>
                 <div className="relative">
                   <div
-                    className="min-h-[38px] rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 cursor-pointer flex flex-wrap gap-1 items-center"
+                    className="min-h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 cursor-pointer flex flex-wrap gap-1 items-center"
                     onClick={() => setBulkAddTagsDropdownOpen(!bulkAddTagsDropdownOpen)}
                   >
                     {bulkAddTags && bulkAddTags.split(',').filter(t => t.trim()).length > 0 ? (
                       bulkAddTags.split(',').filter(t => t.trim()).map((tag, idx) => {
                         const tagInfo = tagsList.find(t => t.name === tag.trim());
                         return (
-                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                          <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 text-xs">
                             {tagInfo?.color && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />}
                             {tag.trim()}
                             <button
@@ -2623,27 +2640,27 @@ export default function LeadsPage() {
                                 const currentTags = bulkAddTags.split(',').map(t => t.trim()).filter(Boolean);
                                 setBulkAddTags(currentTags.filter(t => t !== tag.trim()).join(', '));
                               }}
-                              className="hover:text-white"
+                              className="hover:text-gray-900"
                             >×</button>
                           </span>
                         );
                       })
                     ) : (
-                      <span className="text-white/40">Select or create tags...</span>
+                      <span className="text-slate-400 dark:text-slate-500">Select or create tags...</span>
                     )}
-                    <span className="ml-auto text-white/40">▼</span>
+                    <span className="ml-auto text-slate-400 dark:text-slate-500">▼</span>
                   </div>
                   {bulkAddTagsDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/10 bg-[#1a2332] z-50 shadow-lg">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-[#1a2332] z-50 shadow-lg">
                       {/* Create new tag */}
-                      <div className="p-2 border-b border-white/10">
+                      <div className="p-2 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex gap-2 items-center mb-2">
                           <input
                             type="text"
                             value={bulkNewTagInput}
                             onChange={(e) => setBulkNewTagInput(e.target.value)}
                             placeholder="Create new tag..."
-                            className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm outline-none focus:border-emerald-500"
+                            className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500"
                             onClick={(e) => e.stopPropagation()}
                           />
                           <button
@@ -2669,11 +2686,11 @@ export default function LeadsPage() {
                                 setBulkAddTagsDropdownOpen(false);
                               }
                             }}
-                            className="px-3 py-1.5 rounded-md bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600"
+                            className="px-3 py-1.5 rounded-md bg-sky-500 text-white text-xs font-medium hover:bg-sky-600"
                           >Add</button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-white/50">Color:</span>
+                          <span className="text-xs text-gray-900/50">Color:</span>
                           <div className="flex gap-1.5">
                             {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map(color => (
                               <button
@@ -2689,10 +2706,10 @@ export default function LeadsPage() {
                       </div>
                       {/* Saved tags */}
                       {tagsList.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-white/40">No saved tags yet</div>
+                        <div className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">No saved tags yet</div>
                       ) : (
                         <>
-                          <div className="px-3 py-1 text-xs text-white/40 uppercase">Saved Tags</div>
+                          <div className="px-3 py-1 text-xs text-slate-400 dark:text-slate-500 uppercase">Saved Tags</div>
                           {tagsList.map(t => {
                             const currentTags = bulkAddTags ? bulkAddTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
                             const isSelected = currentTags.includes(t.name);
@@ -2707,13 +2724,13 @@ export default function LeadsPage() {
                                     setBulkAddTags([...currentTags, t.name].join(', '));
                                   }
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-white/5 flex items-center justify-between ${isSelected ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+                                className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 flex items-center justify-between ${isSelected ? 'bg-sky-500/10 text-sky-600' : ''}`}
                               >
                                 <span className="flex items-center gap-2">
                                   {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
                                   {t.name}
                                 </span>
-                                {isSelected && <span className="text-emerald-400">✓</span>}
+                                {isSelected && <span className="text-sky-600">✓</span>}
                               </div>
                             );
                           })}
@@ -2725,7 +2742,7 @@ export default function LeadsPage() {
               </div>
 
               {/* Clear all tags option */}
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => bulkUpdate({ clearTags: true })}
@@ -2735,17 +2752,17 @@ export default function LeadsPage() {
                 </button>
               </div>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => { setBulkActionModal(null); setBulkAddTagsDropdownOpen(false); }}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { bulkUpdate({ addTags: bulkAddTags.split(',').map(t => t.trim()).filter(Boolean) }); setBulkAddTagsDropdownOpen(false); }}
                 disabled={!bulkAddTags.trim()}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
               >
                 Add Tags
               </button>
@@ -2764,15 +2781,15 @@ export default function LeadsPage() {
 
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[600px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Manage Tags</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Manage Tags</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
               {/* Current tags on selected leads */}
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-2">Current tags on selected leads (click to remove):</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-2">Current tags on selected leads (click to remove):</label>
                 {currentTagsOnSelected.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {currentTagsOnSelected.map(tag => {
@@ -2792,7 +2809,7 @@ export default function LeadsPage() {
                           className={`px-2.5 py-1 rounded-full text-xs flex items-center gap-1.5 transition-all ${
                             isSelected
                               ? 'bg-red-500/30 border border-red-500/50 text-red-300 line-through'
-                              : 'bg-[#18273a] border border-[#223246] hover:border-red-500/50 hover:bg-red-500/10'
+                              : 'bg-[#18273a] border border-slate-200 dark:border-slate-700 hover:border-red-500/50 hover:bg-red-500/10'
                           }`}
                         >
                           {tagInfo?.color && (
@@ -2805,13 +2822,13 @@ export default function LeadsPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-[#9fb0c3] italic">No tags on selected leads</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 italic">No tags on selected leads</p>
                 )}
               </div>
 
               {/* Replace with new tags section */}
-              <div className="pt-3 border-t border-white/10">
-                <label className="block text-xs text-[#9fb0c3] mb-2">Replace with tags (optional):</label>
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-2">Replace with tags (optional):</label>
 
                 {/* Selected replacement tags */}
                 {bulkReplaceTags.length > 0 && (
@@ -2819,7 +2836,7 @@ export default function LeadsPage() {
                     {bulkReplaceTags.map(tag => {
                       const tagInfo = tagsList.find(t => t.name === tag);
                       return (
-                        <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                        <span key={tag} className="px-2.5 py-1 rounded-full text-xs bg-sky-500/20 text-sky-300 border border-sky-200 flex items-center gap-1.5">
                           {tagInfo?.color && (
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo.color }} />
                           )}
@@ -2827,7 +2844,7 @@ export default function LeadsPage() {
                           <button
                             type="button"
                             onClick={() => setBulkReplaceTags(bulkReplaceTags.filter(t => t !== tag))}
-                            className="hover:text-white"
+                            className="hover:text-gray-900"
                           >
                             ✕
                           </button>
@@ -2842,23 +2859,23 @@ export default function LeadsPage() {
                   <button
                     type="button"
                     onClick={() => setBulkRemoveTagsDropdownOpen(!bulkRemoveTagsDropdownOpen)}
-                    className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
                   >
-                    <span className="text-[#9fb0c3]">Select or create tags...</span>
-                    <span className="text-[#9fb0c3]">{bulkRemoveTagsDropdownOpen ? '▲' : '▼'}</span>
+                    <span className="text-slate-600 dark:text-slate-400">Select or create tags...</span>
+                    <span className="text-slate-600 dark:text-slate-400">{bulkRemoveTagsDropdownOpen ? '▲' : '▼'}</span>
                   </button>
 
                   {bulkRemoveTagsDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-[#223246] bg-[#0c1420] shadow-lg z-50 max-h-[200px] overflow-y-auto min-w-[320px]">
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shadow-lg z-50 max-h-[200px] overflow-y-auto min-w-[320px]">
                       {/* Create new tag */}
-                      <div className="p-2 border-b border-[#223246]">
+                      <div className="p-2 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex gap-2">
                           <input
                             type="text"
                             value={bulkReplaceTagInput}
                             onChange={(e) => setBulkReplaceTagInput(e.target.value)}
                             placeholder="Create new tag..."
-                            className="flex-1 rounded border border-[#223246] bg-[#1a2332] px-2 py-1 text-xs outline-none"
+                            className="flex-1 rounded border border-slate-200 dark:border-slate-700 bg-[#1a2332] px-2 py-1 text-xs outline-none"
                             onKeyDown={async (e) => {
                               if (e.key === 'Enter' && bulkReplaceTagInput.trim()) {
                                 const tagName = bulkReplaceTagInput.trim();
@@ -2908,13 +2925,13 @@ export default function LeadsPage() {
                                 setBulkRemoveTagsDropdownOpen(false);
                               }
                             }}
-                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-xs hover:bg-emerald-500/30"
+                            className="px-2 py-1 rounded bg-sky-500/20 text-sky-600 text-xs hover:bg-sky-500/30"
                           >
                             Add
                           </button>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className="text-xs text-[#9fb0c3]">Color:</span>
+                          <span className="text-xs text-slate-600 dark:text-slate-400">Color:</span>
                           <div className="flex gap-1">
                             {presetColors.map(color => (
                               <button
@@ -2931,10 +2948,10 @@ export default function LeadsPage() {
 
                       {/* Saved tags */}
                       {tagsList.length === 0 ? (
-                        <div className="p-2 text-xs text-[#9fb0c3]">No saved tags yet</div>
+                        <div className="p-2 text-xs text-slate-600 dark:text-slate-400">No saved tags yet</div>
                       ) : (
                         <>
-                          <div className="px-2 py-1 text-xs text-[#9fb0c3] bg-[#18273a]">Saved Tags</div>
+                          <div className="px-2 py-1 text-xs text-slate-600 dark:text-slate-400 bg-[#18273a]">Saved Tags</div>
                           {tagsList.map(t => {
                             const isSelected = bulkReplaceTags.includes(t.name);
                             return (
@@ -2947,13 +2964,13 @@ export default function LeadsPage() {
                                     setBulkReplaceTags([...bulkReplaceTags, t.name]);
                                   }
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-emerald-500/10' : 'hover:bg-[#101b2a]'}`}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-[#101b2a]'}`}
                               >
                                 <div className="flex items-center gap-2">
                                   {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
                                   {t.name}
                                 </div>
-                                {isSelected && <span className="text-emerald-400">✓</span>}
+                                {isSelected && <span className="text-sky-600">✓</span>}
                               </div>
                             );
                           })}
@@ -2972,17 +2989,17 @@ export default function LeadsPage() {
                   </p>
                 )}
                 {bulkReplaceTags.length > 0 && (
-                  <p className="text-emerald-300">
+                  <p className="text-sky-300">
                     Adding: {bulkReplaceTags.join(', ')}
                   </p>
                 )}
                 {tagsToRemove.length === 0 && bulkReplaceTags.length === 0 && (
-                  <p className="text-[#9fb0c3]">Select tags to remove or add replacement tags</p>
+                  <p className="text-slate-600 dark:text-slate-400">Select tags to remove or add replacement tags</p>
                 )}
               </div>
 
               {/* Quick actions */}
-              <div className="flex gap-2 pt-2 border-t border-white/10">
+              <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => { bulkUpdate({ clearTags: true }); setBulkRemoveTagsDropdownOpen(false); }}
@@ -2990,20 +3007,20 @@ export default function LeadsPage() {
                 >
                   Remove ALL tags
                 </button>
-                <span className="text-[#9fb0c3]">|</span>
+                <span className="text-slate-600 dark:text-slate-400">|</span>
                 <button
                   type="button"
                   onClick={() => { setBulkRemoveTags(''); setBulkReplaceTags([]); }}
-                  className="text-xs text-[#9fb0c3] hover:text-white"
+                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-gray-900"
                 >
                   Clear selection
                 </button>
               </div>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); setBulkReplaceTags([]); }}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
@@ -3017,7 +3034,7 @@ export default function LeadsPage() {
                   setBulkReplaceTags([]);
                 }}
                 disabled={tagsToRemove.length === 0 && bulkReplaceTags.length === 0}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
               >
                 Apply Changes
               </button>
@@ -3029,47 +3046,47 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'createFollowUps' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[500px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#95a9c5]">Create Follow-ups</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Create Follow-ups</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-1">Title *</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Title *</label>
                 <input
                   value={bulkFollowUpTitle}
                   onChange={(e) => setBulkFollowUpTitle(e.target.value)}
                   placeholder="Follow up with {name}"
-                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                 />
-                <p className="text-xs text-[#9fb0c3] mt-1">Use {`{name}`} to insert lead first name</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Use {`{name}`} to insert lead first name</p>
               </div>
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-1">Notes</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Notes</label>
                 <textarea
                   value={bulkFollowUpNotes}
                   onChange={(e) => setBulkFollowUpNotes(e.target.value)}
                   placeholder="Additional notes about this follow-up..."
-                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                   rows={3}
                 />
               </div>
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-1">Due Date & Time *</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Due Date & Time *</label>
                 <input
                   type="datetime-local"
                   value={bulkFollowUpDueDate}
                   onChange={(e) => setBulkFollowUpDueDate(e.target.value)}
-                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-1">Priority</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Priority</label>
                 <select
                   value={bulkFollowUpPriority}
                   onChange={(e) => setBulkFollowUpPriority(e.target.value as any)}
-                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -3077,21 +3094,21 @@ export default function LeadsPage() {
                   <option value="urgent">Urgent</option>
                 </select>
               </div>
-              <p className="text-xs text-[#9fb0c3]">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 Creating {selectedIds.size} follow-up(s) for selected leads
               </p>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={bulkCreateFollowUps}
                 disabled={!bulkFollowUpTitle.trim() || !bulkFollowUpDueDate}
-                className="rounded-md border border-[#22472c] bg-[#0e1f17] px-4 py-2 text-sm text-[#8ff0a4] hover:bg-[#10301f] disabled:opacity-50"
+                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
               >
                 Create Follow-ups
               </button>
@@ -3102,18 +3119,18 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'reDrip' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[500px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#a78bfa]">🔄 Re-Drip to Campaign</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-purple-500 dark:text-purple-400">🔄 Re-Drip to Campaign</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
               <div>
-                <label className="block text-xs text-[#9fb0c3] mb-1">Select Campaign *</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Select Campaign *</label>
                 <select
                   value={reDripCampaignId}
                   onChange={(e) => setReDripCampaignId(e.target.value)}
-                  className="w-full rounded-lg border border-[#223246] bg-[#0c1420] px-3 py-2 outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
                 >
                   <option value="">Choose a campaign...</option>
                   {campaigns.map((c) => (
@@ -3122,11 +3139,11 @@ export default function LeadsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-[#9fb0c3] mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Re-enroll selected leads in this drip campaign
                 </p>
               </div>
-              <div className="p-3 bg-emerald-400/10 border border-emerald-400/30 rounded-lg">
+              <div className="p-3 bg-sky-500/10 border border-sky-200 rounded-lg">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -3134,22 +3151,22 @@ export default function LeadsPage() {
                     onChange={(e) => setReDripResetProgress(e.target.checked)}
                     className="rounded"
                   />
-                  <span className="text-sm text-emerald-300">
+                  <span className="text-sm text-sky-300">
                     Reset progress and start from beginning
                   </span>
                 </label>
-                <p className="text-xs text-emerald-300/60 mt-1 ml-6">
+                <p className="text-xs text-sky-300/60 mt-1 ml-6">
                   Leads will restart the campaign from step 1, even if they've completed it before
                 </p>
               </div>
-              <p className="text-xs text-[#9fb0c3]">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 Re-enrolling {selectedIds.size} lead(s) into the campaign
               </p>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
@@ -3183,7 +3200,7 @@ export default function LeadsPage() {
                   }
                 }}
                 disabled={!reDripCampaignId}
-                className="rounded-md border border-emerald-400/30 bg-emerald-400/20 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-400/30 disabled:opacity-50"
+                className="rounded-md border border-sky-200 bg-sky-500/20 px-4 py-2 text-sm text-sky-300 hover:bg-sky-500/30 disabled:opacity-50"
               >
                 Re-Enroll Leads
               </button>
@@ -3194,29 +3211,29 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'delete' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[300px] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-[#ff6b6b]">Delete Leads</div>
-              <button className="text-[#9fb0c3] hover:text-[#e7eef9]" onClick={() => setBulkActionModal(null)}>Close</button>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[300px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-red-500">Delete Leads</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
-              <p className="text-[#e7eef9]">
+              <p className="text-slate-900 dark:text-slate-100">
                 Are you sure you want to delete {selectedIds.size} selected lead(s)?
               </p>
-              <p className="text-[#ff6b6b]">
+              <p className="text-red-500">
                 This action cannot be undone. All associated data (threads, messages, follow-ups) will also be deleted.
               </p>
             </div>
-            <div className="border-t border-[#18273a] px-4 py-3 flex justify-end gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-[#223246] bg-[#0c1420] px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={bulkDeleteLeads}
-                className="rounded-md border border-[#5a2424] bg-[#2a0f0f] px-4 py-2 text-sm text-[#ff6b6b] hover:bg-[#3a1515]"
+                className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-4 py-2 text-sm text-red-500 hover:bg-red-100 dark:bg-red-900/40"
               >
                 Delete {selectedIds.size} Lead(s)
               </button>
@@ -3231,83 +3248,83 @@ export default function LeadsPage() {
         const leadName = selectedLead ? [selectedLead.first_name, selectedLead.last_name].filter(Boolean).join(' ') || 'Unknown' : 'Unknown';
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={() => setSelectedLeadDetails(null)}>
-          <div className="w-full max-w-5xl rounded-xl border border-[#203246] bg-[#0f1722] shadow-[0_10px_30px_rgba(0,0,0,.5)] flex max-h-[84vh] flex-col" onClick={stop}>
-            <div className="flex items-center justify-between border-b border-[#18273a] px-4 py-3">
+          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-semibold">
+                <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-600 font-semibold">
                   {leadName.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-white">{leadName}</div>
-                  <div className="text-sm text-[#9fb0c3]">{selectedLead?.phone || 'No phone'}</div>
+                  <div className="text-lg font-semibold text-gray-900">{leadName}</div>
+                  <div className="text-sm text-slate-600 dark:text-slate-400">{selectedLead?.phone || 'No phone'}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => { openEditLead(selectedLead); setSelectedLeadDetails(null); }}
-                  className="px-3 py-1.5 rounded-md bg-[#1a2535] text-white text-sm hover:bg-[#243447] transition border border-[#2a3a4d]"
+                  className="px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm hover:bg-[#243447] transition border border-[#2a3a4d]"
                 >
                   Edit Lead
                 </button>
                 {selectedLead?.phone && (
                   <button
                     onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
-                    className="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                    className="px-3 py-1.5 rounded-md bg-blue-600 text-slate-900 dark:text-slate-100 text-sm hover:bg-blue-700 transition"
                   >
                     Send Message
                   </button>
                 )}
-                <button className="text-[#9fb0c3] hover:text-[#e7eef9] text-xl px-2" onClick={() => setSelectedLeadDetails(null)}>×</button>
+                <button className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-xl px-2" onClick={() => setSelectedLeadDetails(null)}>×</button>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
               {loadingDetails ? (
-                <div className="text-center py-8 text-[#9fb0c3]">Loading details...</div>
+                <div className="text-center py-8 text-slate-600 dark:text-slate-400">Loading details...</div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Left Column - Lead Info & Activity */}
                   <div className="space-y-4">
                     {/* Contact Information */}
-                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
-                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         Contact Information
                       </h3>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Name</div>
-                          <div className="text-white">{leadName}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Name</div>
+                          <div className="text-slate-900 dark:text-slate-100">{leadName}</div>
                         </div>
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Phone</div>
-                          <div className="text-white">{selectedLead?.phone || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Phone</div>
+                          <div className="text-slate-900 dark:text-slate-100">{selectedLead?.phone || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Email</div>
-                          <div className="text-white break-all">{selectedLead?.email || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Email</div>
+                          <div className="text-slate-900 dark:text-slate-100 break-all">{selectedLead?.email || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">State</div>
-                          <div className="text-white">{selectedLead?.state || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">State</div>
+                          <div className="text-slate-900 dark:text-slate-100">{selectedLead?.state || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Status</div>
-                          <div className="text-white capitalize">{selectedLead?.status || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Status</div>
+                          <div className="text-slate-900 dark:text-slate-100 capitalize">{selectedLead?.status || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-1">Disposition</div>
-                          <div className="text-white capitalize">{(selectedLead as any)?.disposition?.replace(/_/g, ' ') || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Disposition</div>
+                          <div className="text-slate-900 dark:text-slate-100 capitalize">{(selectedLead as any)?.disposition?.replace(/_/g, ' ') || '—'}</div>
                         </div>
                       </div>
                       {selectedLead?.tags && selectedLead.tags.length > 0 && (
                         <div className="mt-3">
-                          <div className="text-[#9fb0c3] text-xs uppercase mb-2">Tags</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-2">Tags</div>
                           <div className="flex flex-wrap gap-1">
                             {selectedLead.tags.map((tag, i) => (
-                              <span key={i} className="px-2 py-1 rounded-full text-xs bg-[#1a2637] text-[#e7eef9]">{tag}</span>
+                              <span key={i} className="px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-gray-900">{tag}</span>
                             ))}
                           </div>
                         </div>
@@ -3315,29 +3332,29 @@ export default function LeadsPage() {
                     </div>
 
                     {/* Activity Timeline */}
-                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4">
-                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         Activity Timeline
                       </h3>
                       {leadActivities.length === 0 ? (
-                        <p className="text-sm text-[#9fb0c3]">No activities recorded yet</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">No activities recorded yet</p>
                       ) : (
                         <div className="space-y-2 max-h-[200px] overflow-y-auto">
                           {leadActivities.map((activity) => (
-                            <div key={activity.id} className="border-l-2 border-emerald-500 pl-3 py-2">
+                            <div key={activity.id} className="border-l-2 border-sky-500 pl-3 py-2">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                  <div className="text-sm font-semibold text-white capitalize">
+                                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 capitalize">
                                     {activity.activity_type.replace(/_/g, ' ')}
                                   </div>
-                                  <div className="text-sm text-[#9fb0c3] mt-1">
+                                  <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                                     {activity.description}
                                   </div>
                                 </div>
-                                <div className="text-xs text-[#9fb0c3] ml-3">
+                                <div className="text-xs text-slate-600 dark:text-slate-400 ml-3">
                                   {new Date(activity.created_at).toLocaleString()}
                                 </div>
                               </div>
@@ -3351,8 +3368,8 @@ export default function LeadsPage() {
                   {/* Right Column - Messages */}
                   <div className="space-y-4">
                     {/* SMS Messages */}
-                    <div className="rounded-lg border border-[#203246] bg-[#0b1622] p-4 h-full">
-                      <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4 h-full">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
                         <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
@@ -3360,11 +3377,11 @@ export default function LeadsPage() {
                       </h3>
                       {leadMessages.length === 0 ? (
                         <div className="text-center py-8">
-                          <p className="text-sm text-[#9fb0c3] mb-3">No messages yet</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">No messages yet</p>
                           {selectedLead?.phone && (
                             <button
                               onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
-                              className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                              className="px-4 py-2 rounded-md bg-blue-600 text-slate-900 dark:text-slate-100 text-sm hover:bg-blue-700 transition"
                             >
                               Start Conversation
                             </button>
@@ -3376,12 +3393,12 @@ export default function LeadsPage() {
                             <div key={msg.id || i} className={`flex ${msg.direction === 'out' || msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
                               <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
                                 msg.direction === 'out' || msg.sender === 'agent'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-[#1a2637] text-[#e7eef9]'
+                                  ? 'bg-blue-600 text-gray-900'
+                                  : 'bg-slate-100 dark:bg-slate-700 text-gray-900'
                               }`}>
                                 <div className="text-sm whitespace-pre-wrap">{msg.body}</div>
                                 <div className={`text-xs mt-1 ${
-                                  msg.direction === 'out' || msg.sender === 'agent' ? 'text-blue-200' : 'text-[#9fb0c3]'
+                                  msg.direction === 'out' || msg.sender === 'agent' ? 'text-blue-200' : 'text-slate-600 dark:text-slate-400'
                                 }`}>
                                   {new Date(msg.created_at).toLocaleString()}
                                 </div>

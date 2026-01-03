@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
   { href: "/templates", label: "Flows" },
+  { href: "/quoting",   label: "Quoting" },
   { href: "/points",    label: "Points" },
   { href: "/roadmap",   label: "Roadmap" },
   { href: "/settings",  label: "Settings" },
@@ -114,24 +115,24 @@ export default function Sidebar(){
     : '/logo-basic.png';
 
   return (
-    <aside className="w-64 shrink-0 p-3 border-r border-white/10">
+    <aside className="w-64 shrink-0 p-3 border-r border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-lg font-semibold mb-6 flex items-center gap-3 px-2"
+        className="text-lg font-semibold mb-6 flex items-center gap-3 px-2 text-slate-900 dark:text-slate-100"
       >
         <motion.div
           className="relative"
           animate={{
             boxShadow: [
-              "0 0 20px rgba(52, 211, 153, 0.5)",
-              "0 0 40px rgba(45, 212, 191, 0.6)",
-              "0 0 20px rgba(52, 211, 153, 0.5)",
+              "0 0 15px rgba(14, 165, 233, 0.3)",
+              "0 0 20px rgba(14, 165, 233, 0.4)",
+              "0 0 15px rgba(14, 165, 233, 0.3)",
             ],
           }}
           transition={{
-            duration: 2,
+            duration: 3,
             repeat: Infinity,
             ease: "easeInOut"
           }}
@@ -144,17 +145,17 @@ export default function Sidebar(){
             alt="HyveWyre™"
             className="h-12 w-12 rounded-2xl"
             animate={{
-              scale: [1, 1.05, 1],
+              scale: [1, 1.02, 1],
             }}
             transition={{
-              duration: 2,
+              duration: 3,
               repeat: Infinity,
               ease: "easeInOut"
             }}
-            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileHover={{ scale: 1.05, rotate: 3 }}
           />
         </motion.div>
-        <span className="text-xl">HyveWyre™</span>
+        <span className="text-xl text-slate-900 dark:text-slate-100">HyveWyre™</span>
       </motion.div>
 
       <nav className="space-y-1 mb-4">
@@ -194,16 +195,16 @@ export default function Sidebar(){
             >
               {hasChildren ? (
                 <div
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 ${
                     active || childActive
-                      ? "bg-emerald-400/20 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30"
-                      : "hover:bg-white/5"
+                      ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}
                 >
                   <Link href={it.href} className="flex-1">
                     <motion.span
-                      whileHover={{ x: 4 }}
-                      transition={{ type: "spring", stiffness: 300 }}
+                      whileHover={{ x: 2 }}
+                      transition={{ type: "spring", stiffness: 400 }}
                     >
                       {it.label}
                     </motion.span>
@@ -219,14 +220,14 @@ export default function Sidebar(){
                 </div>
               ) : (
                 <Link href={it.href}
-                  className={`block px-3 py-2 rounded-xl transition-all duration-200 ${
+                  className={`block px-3 py-2 rounded-lg transition-all duration-150 ${
                     active
-                      ? "bg-emerald-400/20 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-emerald-400/30"
-                      : "hover:bg-white/5"
+                      ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30"
+                      : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}>
                   <motion.span
-                    whileHover={{ x: 4 }}
-                    transition={{ type: "spring", stiffness: 300 }}
+                    whileHover={{ x: 2 }}
+                    transition={{ type: "spring", stiffness: 400 }}
                   >
                     {it.label}
                   </motion.span>
@@ -251,10 +252,10 @@ export default function Sidebar(){
                         <Link
                           key={child.href}
                           href={child.href}
-                          className={`block px-3 py-1.5 rounded-lg text-sm transition-all duration-200 ${
+                          className={`block px-3 py-1.5 rounded-md text-sm transition-all duration-150 ${
                             childIsActive
-                              ? "bg-emerald-400/15 text-emerald-400 border border-emerald-400/20"
-                              : "text-white/70 hover:bg-white/5 hover:text-white"
+                              ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30"
+                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-200"
                           }`}
                         >
                           {child.label}
@@ -276,7 +277,7 @@ export default function Sidebar(){
           transition={{ duration: 0.4, delay: 0.2 }}
           className="space-y-2"
         >
-          <div className="text-xs uppercase tracking-wide text-[var(--muted)] px-1">Recent Texts</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 px-1">Recent Texts</div>
           <div className="space-y-1">
             {recent.map((t:any, index:number)=>{
               const L = findLead(t.lead_id, store.leads||[]);
@@ -286,26 +287,26 @@ export default function Sidebar(){
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
-                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileHover={{ scale: 1.01, x: 2 }}
                 >
-                  <Link href={`/texts?open=${t.id}`} className={`block px-3 py-2 rounded-xl hover:bg-white/5 ${t.unread ? "border border-white/15" : ""}`} title={t.last_message_snippet}>
+                  <Link href={`/texts?open=${t.id}`} className={`block px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 ${t.unread ? "border border-sky-200 dark:border-sky-500/30 bg-sky-50/50 dark:bg-sky-500/10" : ""}`} title={t.last_message_snippet}>
                     <div className="flex items-center justify-between">
-                      <div className="truncate">{L?.first_name} {L?.last_name}</div>
+                      <div className="truncate text-slate-900 dark:text-slate-100">{L?.first_name} {L?.last_name}</div>
                       {t.unread && (
                         <motion.span
-                          className="ml-2 inline-block w-2 h-2 rounded-full bg-[var(--accent)]"
+                          className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-500"
                           animate={{ scale: [1, 1.2, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
                         />
                       )}
                     </div>
-                    <div className="text-xs text-[var(--muted)] truncate">{t.last_message_snippet}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{t.last_message_snippet}</div>
                   </Link>
                 </motion.div>
               );
             })}
             {(recent||[]).length === 0 && (
-              <div className="px-3 py-2 text-sm text-[var(--muted)]">No SMS threads yet.</div>
+              <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No SMS threads yet.</div>
             )}
           </div>
         </motion.div>

@@ -392,13 +392,13 @@ function TextsPageContent(){
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Texts</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Texts</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Manage your text conversations with leads</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowSendModal(true)}
-            className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 font-medium text-sm"
+            className="px-4 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center gap-2 font-medium text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -407,7 +407,7 @@ function TextsPageContent(){
           </button>
           {flows.length > 0 && (
             <div className="flex items-center gap-2">
-              <label className="text-sm text-white">Flow:</label>
+              <label className="text-sm text-gray-900">Flow:</label>
               <select
                 value={selectedFlowId || ""}
                 onChange={(e) => setSelectedFlowId(e.target.value || null)}
@@ -421,7 +421,7 @@ function TextsPageContent(){
             </div>
           )}
           <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-sm text-white">Reply with AI</span>
+            <span className="text-sm text-gray-900">Reply with AI</span>
             <div className="relative inline-flex items-center">
               <input
                 type="checkbox"
@@ -429,7 +429,7 @@ function TextsPageContent(){
                 onChange={(e) => setUseAI(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              <div className="w-11 h-6 bg-white/20 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-sky-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 dark:border-slate-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
             </div>
           </label>
         </div>
@@ -439,8 +439,8 @@ function TextsPageContent(){
       <div className="grid grid-cols-12 gap-4">
         {/* Left: list */}
         <div className="col-span-12 md:col-span-5">
-          <div className="border border-white/10 rounded-xl overflow-hidden">
-            <div className="bg-white/5 px-3 py-2 text-sm font-medium">Conversations</div>
+          <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+            <div className="bg-white px-3 py-2 text-sm font-medium">Conversations</div>
             <div className="max-h-[70vh] overflow-y-auto divide-y divide-white/10">
 {rows.map((t:any)=> {
                 const L = findLead(t.lead_id, store.leads);
@@ -451,30 +451,30 @@ function TextsPageContent(){
                 return (
                   <button
                     key={t.id}
-                    className={`w-full text-left px-3 py-3 hover:bg-white/5 transition-colors relative ${
-                      active ? "bg-emerald-500/10 border-l-2 border-emerald-500" : ""
-                    } ${isSold ? "bg-emerald-900/20 border-l-4 border-emerald-500" : ""} ${
+                    className={`w-full text-left px-3 py-3 hover:bg-slate-50 dark:bg-slate-800 transition-colors relative ${
+                      active ? "bg-sky-500/10 border-l-2 border-sky-500" : ""
+                    } ${isSold ? "bg-sky-50 border-l-4 border-sky-500" : ""} ${
                       isArchived ? "opacity-50" : ""
-                    } ${t.unread && !active ? "bg-white/5" : ""}`}
+                    } ${t.unread && !active ? "bg-white" : ""}`}
                     onClick={()=> setActiveThreadId(t.id)}
                     title={t.last_message_snippet}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 truncate flex-1">
                         {/* Avatar Circle */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0 ${
-                          isSold ? "bg-emerald-600" : "bg-gradient-to-br from-emerald-400 to-teal-400"
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-slate-900 dark:text-slate-100 font-semibold text-sm shrink-0 ${
+                          isSold ? "bg-sky-600" : "bg-gradient-to-br from-sky-400 to-sky-400"
                         }`}>
                           {L.first_name?.charAt(0)}{L.last_name?.charAt(0)}
                         </div>
 
                         <div className="truncate flex-1">
                           <div className="flex items-center gap-2">
-                            <div className={`truncate font-medium ${isSold ? "text-emerald-400" : "text-white"} ${t.unread ? "font-semibold" : ""}`}>
+                            <div className={`truncate font-medium ${isSold ? "text-sky-600" : "text-slate-900 dark:text-slate-100"} ${t.unread ? "font-semibold" : ""}`}>
                               {L.first_name} {L.last_name}
                             </div>
                             {isSold && (
-                              <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-900/40 text-emerald-400 border border-emerald-500/40">
+                              <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap bg-sky-900/40 text-sky-600 border border-sky-500/40">
                                 Sold
                               </span>
                             )}
@@ -491,14 +491,14 @@ function TextsPageContent(){
                               </span>
                             )}
                           </div>
-                          <div className={`text-xs truncate ${isSold ? "text-emerald-300/70" : "text-[var(--muted)]"} ${t.unread ? "font-medium text-white/80" : ""}`}>
+                          <div className={`text-xs truncate ${isSold ? "text-sky-300/70" : "text-[var(--muted)]"} ${t.unread ? "font-medium text-slate-700 dark:text-slate-300" : ""}`}>
                             {t.last_message_snippet}
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-                        <div className={`text-[10px] ${isSold ? "text-emerald-400/60" : "text-[var(--muted)]"}`}>
+                        <div className={`text-[10px] ${isSold ? "text-sky-600/60" : "text-[var(--muted)]"}`}>
                           {(() => {
                             const updatedAt = new Date(t.updated_at);
                             const now = new Date();
@@ -515,8 +515,8 @@ function TextsPageContent(){
                           })()}
                         </div>
                         {t.unread && (
-                          <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-white">1</span>
+                          <div className="w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-gray-900">1</span>
                           </div>
                         )}
                       </div>
@@ -555,10 +555,10 @@ function TextsPageContent(){
             </div>
           ) : (
             <div className="card p-0">
-              <div className="p-3 border-b border-white/10">
+              <div className="p-3 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-lg font-semibold text-white">{activeLead?.first_name} {activeLead?.last_name}</div>
+                    <div className="text-lg font-semibold text-gray-900">{activeLead?.first_name} {activeLead?.last_name}</div>
                     <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
                       <span>{activeLead?.phone}</span>
                       {(() => {
@@ -566,16 +566,16 @@ function TextsPageContent(){
                         const currentTime = getCurrentTimeInTimezone(timezone);
                         return currentTime ? (
                           <>
-                            <span className="text-white/20">•</span>
-                            <span className="text-emerald-400" title={`Lead's local time`}>🕐 {currentTime}</span>
+                            <span className="text-gray-900/20">•</span>
+                            <span className="text-sky-600" title={`Lead's local time`}>🕐 {currentTime}</span>
                           </>
                         ) : null;
                       })()}
                     </div>
                   </div>
                   {useAI && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-sky-500/10 border border-sky-200 rounded-lg">
+                      <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></div>
                       <span className="text-sm text-blue-300">AI Mode Active</span>
                     </div>
                   )}
@@ -592,7 +592,7 @@ function TextsPageContent(){
                       {/* Date separator */}
                       {isFirstMessageOfDay && (
                         <div className="flex items-center justify-center my-4">
-                          <div className="px-3 py-1 bg-white/5 rounded-full text-xs text-[var(--muted)]">
+                          <div className="px-3 py-1 bg-white rounded-full text-xs text-[var(--muted)]">
                             {new Date(m.created_at).toLocaleDateString('en-US', {
                               weekday: 'short',
                               month: 'short',
@@ -606,8 +606,8 @@ function TextsPageContent(){
                       <div className={`flex ${m.direction==='out' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${
                           m.direction==='out'
-                            ? 'bg-emerald-600 text-white rounded-br-md'
-                            : 'bg-white/10 rounded-bl-md'
+                            ? 'bg-sky-600 text-white rounded-br-md'
+                            : 'bg-slate-50 dark:bg-slate-800 rounded-bl-md'
                         }`}>
                           <div className="break-words whitespace-pre-wrap">{m.body}</div>
                           <div className={`text-[10px] mt-1 flex items-center gap-1 ${
@@ -633,7 +633,7 @@ function TextsPageContent(){
                 })}
                 {activeMsgs.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full text-center">
-                    <svg className="w-16 h-16 text-white/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-16 h-16 text-gray-900/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                     <p className="text-sm text-[var(--muted)]">No messages yet.</p>
@@ -771,7 +771,7 @@ function Composer({
   }
 
   return (
-    <div className={`p-3 border-t ${isSold ? "border-emerald-500/30 bg-emerald-900/10" : "border-white/10"}`}>
+    <div className={`p-3 border-t ${isSold ? "border-sky-200 bg-sky-900/10" : "border-slate-200 dark:border-slate-700"}`}>
       {/* Error & Success Messages */}
       {error && (
         <div className="mb-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
@@ -779,7 +779,7 @@ function Composer({
         </div>
       )}
       {success && (
-        <div className="mb-2 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded text-xs">
+        <div className="mb-2 bg-sky-50 border border-sky-200 text-sky-700 px-3 py-2 rounded text-xs">
           {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} sent successfully!
         </div>
       )}
@@ -788,7 +788,7 @@ function Composer({
       <div className="mb-2 flex items-center gap-4">
         {/* Channel Selector */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">Send via:</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">Send via:</span>
           <label className="flex items-center gap-1 cursor-pointer">
             <input
               type="radio"
@@ -830,14 +830,14 @@ function Composer({
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
-              className="px-2 py-1 text-xs rounded border border-white/20 bg-[#0c1420] text-gray-200 [color-scheme:dark]"
+              className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-gray-200 [color-scheme:dark]"
               style={{ colorScheme: 'dark' }}
             />
             <input
               type="time"
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
-              className="px-2 py-1 text-xs rounded border border-white/20 bg-[#0c1420] text-gray-200 [color-scheme:dark]"
+              className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-gray-200 [color-scheme:dark]"
               style={{ colorScheme: 'dark' }}
             />
           </div>
@@ -847,7 +847,7 @@ function Composer({
       {/* Credit Cost Display */}
       {text.length > 0 && (
         <div className="mb-2 text-xs">
-          <span className={`font-medium ${creditCalc.credits > 1 ? "text-yellow-400" : "text-gray-400"}`}>
+          <span className={`font-medium ${creditCalc.credits > 1 ? "text-yellow-400" : "text-slate-400 dark:text-slate-500"}`}>
             {creditCalc.credits} credit{creditCalc.credits !== 1 ? 's' : ''}
           </span>
         </div>
@@ -856,7 +856,7 @@ function Composer({
         {useAI ? (
           <>
             <input
-              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-emerald-500/50 bg-emerald-900/20 text-emerald-100 placeholder-emerald-300/50" : ""}`}
+              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-sky-500/50 bg-sky-50 text-sky-100 placeholder-sky-300/50" : ""}`}
               placeholder="AI will generate a response, or type to override..."
               value={text}
               onChange={e => setText(e.target.value)}
@@ -868,7 +868,7 @@ function Composer({
               }}
             />
             <button
-              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"}`}
+              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-sky-600 hover:bg-sky-700 text-white" : "bg-sky-500 hover:bg-sky-600 text-white"}`}
               onClick={handleSend}
               disabled={isGenerating || sending || (scheduleMode && (!scheduledDate || !scheduledTime))}
             >
@@ -878,7 +878,7 @@ function Composer({
         ) : (
           <>
             <input
-              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-emerald-500/50 bg-emerald-900/20 text-emerald-100 placeholder-emerald-300/50" : ""}`}
+              className={`flex-1 input-dark px-4 py-3 rounded-lg ${isSold ? "border-2 border-sky-500/50 bg-sky-50 text-sky-100 placeholder-sky-300/50" : ""}`}
               placeholder="Type a message…"
               value={text}
               onChange={e => setText(e.target.value)}
@@ -891,7 +891,7 @@ function Composer({
               disabled={sending}
             />
             <button
-              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"}`}
+              className={`font-medium px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${isSold ? "bg-sky-600 hover:bg-sky-700 text-white" : "bg-sky-500 hover:bg-sky-600 text-white"}`}
               onClick={handleSend}
               disabled={!text.trim() || sending || (scheduleMode && (!scheduledDate || !scheduledTime))}
             >

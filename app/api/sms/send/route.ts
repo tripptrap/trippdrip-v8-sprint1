@@ -1,10 +1,9 @@
-// API Route: Send SMS via Twilio with full tracking and analytics
+// API Route: Send SMS via Telnyx with full tracking and analytics
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
-import { sendSMS } from '@/lib/twilio';
-import { getUserTwilioCredentials } from '@/lib/twilioSubaccounts';
+import { sendTelnyxSMS } from '@/lib/telnyx';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -46,7 +45,7 @@ export async function POST(req: NextRequest) {
     // Support both old and new parameter formats
     const toPhone = body.toPhone || body.to;
     const messageBody = body.messageBody || body.message;
-    const fromPhone = body.from || process.env.TWILIO_PHONE_NUMBER;
+    const fromPhone = body.from; // Telnyx will use number from messaging profile if not provided
     const { leadId, campaignId, templateId, isAutomated = false, isBulk = false, channel = 'sms' } = body;
 
     // Validate inputs
@@ -54,13 +53,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields: toPhone/to and messageBody/message' },
         { status: 400 }
-      );
-    }
-
-    if (!fromPhone) {
-      return NextResponse.json(
-        { error: 'Twilio phone number not configured' },
-        { status: 500 }
       );
     }
 
@@ -117,30 +109,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone}...`);
+    console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone} via Telnyx...`);
 
-    // Get user's Twilio subaccount credentials
-    const userCredentials = await getUserTwilioCredentials(user.id);
-
-    let userAccountSid: string | undefined;
-    let userAuthToken: string | undefined;
-
-    if (userCredentials.success) {
-      userAccountSid = userCredentials.accountSid;
-      userAuthToken = userCredentials.authToken;
-      console.log(`🔐 Using user's Twilio subaccount for sending`);
-    } else {
-      console.log(`⚠️ User has no subaccount, using master account: ${userCredentials.error}`);
-    }
-
-    // Send SMS or RCS via Twilio utility
-    const result = await sendSMS({
+    // Send SMS via Telnyx
+    const result = await sendTelnyxSMS({
       to: toPhone,
       message: messageBody,
       from: fromPhone,
-      channel,
-      userAccountSid,
-      userAuthToken,
     });
 
     if (!result.success) {
@@ -152,7 +127,7 @@ export async function POST(req: NextRequest) {
         lead_id: leadId || null,
         campaign_id: campaignId || null,
         to_phone: toPhone,
-        from_phone: fromPhone,
+        from_phone: fromPhone || result.from,
         message_body: messageBody,
         twilio_status: 'failed',
         twilio_error_message: result.error,
@@ -160,6 +135,7 @@ export async function POST(req: NextRequest) {
         is_automated: isAutomated,
         cost_points: isBulk ? 2 : 1,
         failed_at: new Date().toISOString(),
+        provider: 'telnyx',
       });
 
       // Log activity for lead if leadId provided
@@ -183,7 +159,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`✅ SMS sent successfully! SID: ${result.messageSid}, Status: ${result.status}`);
+    // Use from number from result or the one we provided
+    const actualFromPhone = result.from || fromPhone;
+
+    console.log(`✅ SMS sent successfully via Telnyx! SID: ${result.messageSid}, Status: ${result.status}, From: ${actualFromPhone}`);
 
     // Log successful SMS to database
     const { data: smsMessage } = await supabase
@@ -193,13 +172,14 @@ export async function POST(req: NextRequest) {
         lead_id: leadId || null,
         campaign_id: campaignId || null,
         to_phone: toPhone,
-        from_phone: fromPhone,
+        from_phone: actualFromPhone,
         message_body: messageBody,
         twilio_sid: result.messageSid,
         twilio_status: result.status || 'sent',
         template_id: templateId || null,
         is_automated: isAutomated,
         cost_points: isBulk ? 2 : 1,
+        provider: 'telnyx',
       })
       .select()
       .single();
@@ -265,7 +245,7 @@ export async function POST(req: NextRequest) {
 
       await supabase.from('messages').insert({
         thread_id: threadId,
-        sender: fromPhone,
+        sender: actualFromPhone,
         recipient: toPhone,
         body: messageBody,
         direction: 'outbound',
@@ -278,6 +258,7 @@ export async function POST(req: NextRequest) {
         campaign_id: campaignId || null,
         user_id: user.id,
         lead_id: leadId || null,
+        provider: 'telnyx',
       });
     }
 
@@ -300,10 +281,11 @@ export async function POST(req: NextRequest) {
       messageId: result.messageSid,
       status: result.status,
       to: toPhone,
-      from: fromPhone,
+      from: actualFromPhone,
       pointsDeducted: isBulk ? 2 : 1,
       remainingBalance: pointsResult.balance,
       smsMessageId: smsMessage?.id,
+      provider: 'telnyx',
     });
   } catch (error) {
     console.error('SMS send error:', error);

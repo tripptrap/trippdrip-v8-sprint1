@@ -162,7 +162,7 @@ export default function PreviewClient() {
         </nav>
 
         {/* Hero Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
           {/* 3D Diamond - positioned on right */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden lg:block opacity-90 pointer-events-none">
             <TelnyxDiamond />
@@ -181,9 +181,11 @@ export default function PreviewClient() {
               initial={{ opacity: 0, y: 25 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.8 }}
-              className="text-5xl md:text-7xl font-bold text-gray-900 mb-6"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-gray-900 mb-4 sm:mb-6"
             >
-              AI-Powered SMS Marketing for Insurance & Real Estate Agents<br />
+              <span className="hidden sm:inline">AI-Powered SMS Marketing for Insurance & Real Estate Agents</span>
+              <span className="sm:hidden">AI-Powered SMS Marketing</span>
+              <br />
               <span className="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
                 Automate Conversations, Close More Deals
               </span>
@@ -192,7 +194,7 @@ export default function PreviewClient() {
               initial={{ opacity: 0, y: 25 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.8 }}
-              className="text-xl text-gray-600 mb-8 max-w-2xl"
+              className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-2xl"
             >
               Automate personalized conversations, nurture leads with AI, and close more deals with intelligent SMS and email campaigns.
             </motion.p>
@@ -200,23 +202,23 @@ export default function PreviewClient() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.6, duration: 0.6 }}
-            className="flex flex-col items-start gap-4"
+            className="flex flex-col items-start gap-3 sm:gap-4"
           >
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-3 sm:gap-4">
               <motion.button
                 whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(20, 184, 166, 0.2)" }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
                   document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg transition-all shadow-lg"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg transition-all shadow-lg text-center"
               >
                 View Pricing
               </motion.button>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
                 <Link
                   href="/auth/register"
-                  className="inline-block px-8 py-4 bg-white hover:bg-gray-50 text-gray-900 font-semibold rounded-lg transition-all border border-gray-200 shadow-sm"
+                  className="block w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white hover:bg-gray-50 text-gray-900 font-semibold rounded-lg transition-all border border-gray-200 shadow-sm text-center"
                 >
                   Create Account
                 </Link>
@@ -226,7 +228,7 @@ export default function PreviewClient() {
               whileHover={{ scale: 1.05, boxShadow: "0 15px 30px rgba(20, 184, 166, 0.15)" }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowDemo(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-teal-500/20"
+              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-teal-500/20 text-center"
             >
               View Demo
             </motion.button>
@@ -236,23 +238,23 @@ export default function PreviewClient() {
       </div>
 
       {/* How It Works Section */}
-      <div className="max-w-7xl mx-auto px-6 py-20 border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-b border-gray-200">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 sm:mb-16"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             Get Started in Minutes
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
             No complex setup. No waiting for verification. Start sending messages today.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
           {[
             { step: '1', title: 'Create Account', desc: 'Sign up in under a minute. Choose your plan and get instant access to all features.', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
             { step: '2', title: 'Get Your Number', desc: 'Claim a pre-verified phone number instantly from our shared pool. No A2P wait times.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
@@ -270,32 +272,32 @@ export default function PreviewClient() {
               {i < 3 && (
                 <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-emerald-500/50 to-transparent" />
               )}
-              <div className="relative z-10 w-24 h-24 mx-auto mb-4 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20">
-                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="relative z-10 w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <svg className="w-7 h-7 sm:w-10 sm:h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                 </svg>
               </div>
-              <div className="text-teal-600 text-sm font-bold mb-2">STEP {item.step}</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{item.title}</h3>
-              <p className="text-gray-600">{item.desc}</p>
+              <div className="text-teal-600 text-xs sm:text-sm font-bold mb-1 sm:mb-2">STEP {item.step}</div>
+              <h3 className="text-base sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">{item.title}</h3>
+              <p className="text-gray-600 text-xs sm:text-base">{item.desc}</p>
             </motion.div>
           ))}
         </div>
       </div>
 
       {/* Product Deep Dive Section */}
-      <div className="max-w-7xl mx-auto px-6 py-20 border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20 border-b border-gray-200">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="text-center mb-10 sm:mb-16"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             Everything You Need to Dominate Your Market
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
             A complete SMS & email marketing platform built specifically for insurance agents, real estate professionals, and sales teams.
           </p>
         </motion.div>
@@ -2073,28 +2075,31 @@ export default function PreviewClient() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div className="p-6 bg-white border border-gray-200 rounded-xl">
                         <div className="text-gray-600 mb-2">Total Messages Sent</div>
-                        <div className="text-3xl font-bold text-white">12,847</div>
+                        <div className="text-3xl font-bold text-gray-900">12,847</div>
                         <div className="text-teal-600 text-sm mt-2">↑ 34% from last month</div>
                       </div>
                       <div className="p-6 bg-white border border-gray-200 rounded-xl">
                         <div className="text-gray-600 mb-2">Average Response Rate</div>
-                        <div className="text-3xl font-bold text-white">72.4%</div>
+                        <div className="text-3xl font-bold text-gray-900">72.4%</div>
                         <div className="text-teal-600 text-sm mt-2">↑ 8.3% from last month</div>
                       </div>
                       <div className="p-6 bg-white border border-gray-200 rounded-xl">
                         <div className="text-gray-600 mb-2">Appointments Booked</div>
-                        <div className="text-3xl font-bold text-white">234</div>
+                        <div className="text-3xl font-bold text-gray-900">234</div>
                         <div className="text-teal-600 text-sm mt-2">↑ 12% from last month</div>
                       </div>
                     </div>
 
                     <div className="p-6 bg-white border border-gray-200 rounded-xl">
-                      <h3 className="text-white font-semibold text-lg mb-4">Message Volume (Last 7 Days)</h3>
-                      <div className="h-64 flex items-end justify-between gap-2">
-                        {[45, 62, 58, 73, 81, 95, 88].map((height, i) => (
-                          <div key={i} className="flex-1 flex flex-col items-center">
-                            <div className="w-full bg-gradient-to-t from-teal-500 to-cyan-500 rounded-t" style={{ height: `${height}%` }}></div>
-                            <div className="text-gray-600 text-sm mt-2">
+                      <h3 className="text-gray-900 font-semibold text-lg mb-4">Message Volume (Last 7 Days)</h3>
+                      <div className="flex items-end justify-between gap-3" style={{ height: '200px' }}>
+                        {[45, 62, 58, 73, 81, 95, 88].map((value, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center h-full justify-end">
+                            <div
+                              className="w-full bg-gradient-to-t from-teal-500 to-cyan-500 rounded-t-lg min-h-[20px]"
+                              style={{ height: `${value}%` }}
+                            />
+                            <div className="text-gray-500 text-xs mt-3 font-medium">
                               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
                             </div>
                           </div>

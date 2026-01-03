@@ -18,15 +18,17 @@ export async function middleware(request: NextRequest) {
     '/auth/onboarding',
     '/api/auth',
     '/api/stripe/webhook',
+    '/api/contact-form',
     '/preview',
     '/privacy',
     '/terms',
     '/compliance',
     '/refund',
+    '/opt-in',
   ]
 
-  // Check if the current path is public
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+  // Check if the current path is public (exact match for '/' or startsWith for others)
+  const isPublicRoute = pathname === '/' || publicRoutes.some(route => pathname.startsWith(route))
 
   if (isPublicRoute) {
     return response

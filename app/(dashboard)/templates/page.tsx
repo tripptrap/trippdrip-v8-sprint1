@@ -1153,32 +1153,32 @@ export default function FlowsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Conversation Flows</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Conversation Flows</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Create AI-powered conversation flows for your campaigns</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowAISettings(true)}
-            className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+            className="bg-white hover:bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
           >
             <Cpu className="w-4 h-4" />
             AI Model: {aiSettings.selectedModel.toUpperCase()}
           </button>
           <a
             href="/ai-workflows"
-            className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+            className="bg-sky-600 hover:bg-sky-700 border border-sky-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
           >
             📚 Browse Templates
           </a>
           <button
             onClick={() => setShowNewFlowDialog(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-sky-600 hover:bg-sky-700 border border-sky-500/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + AI Flow
           </button>
           <button
             onClick={() => setShowManualFlowDialog(true)}
-            className="bg-emerald-400 hover:bg-emerald-500 border border-emerald-400/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="bg-sky-500 hover:bg-sky-500 border border-sky-400/50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + Manual Flow
           </button>
@@ -1188,20 +1188,20 @@ export default function FlowsPage() {
       {/* AI Model Settings Modal */}
       {showAISettings && (
         <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={() => setShowAISettings(false)}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border-b border-white/10 px-6 py-4 sticky top-0 bg-[#1a1a1a] z-10">
+            <div className="bg-gradient-to-r from-sky-900/20 to-sky-900/20 border-b border-slate-200 dark:border-slate-700 px-6 py-4 sticky top-0 bg-slate-100 dark:bg-slate-800 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                    <Cpu className="w-5 h-5 text-emerald-400" />
+                  <div className="w-10 h-10 rounded-full bg-sky-500/10 border border-sky-500/30 flex items-center justify-center">
+                    <Cpu className="w-5 h-5 text-sky-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-white">AI Model Settings</h3>
-                    <p className="text-sm text-white/60">Choose and configure your AI reply model</p>
+                    <h3 className="text-lg font-semibold text-gray-900">AI Model Settings</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Choose and configure your AI reply model</p>
                   </div>
                 </div>
-                <button onClick={() => setShowAISettings(false)} className="text-white/60 hover:text-white">
+                <button onClick={() => setShowAISettings(false)} className="text-slate-600 dark:text-slate-400 hover:text-gray-900">
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -1213,25 +1213,25 @@ export default function FlowsPage() {
             <div className="px-6 py-6 space-y-6">
               {/* Model Selection */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-white">Select AI Model</label>
+                <label className="text-sm font-medium text-gray-900">Select AI Model</label>
                 <div className="grid grid-cols-2 gap-4">
                   {/* Model V1 */}
                   <button
                     onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v1' })}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
                       aiSettings.selectedModel === 'v1'
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-slate-200 dark:border-slate-700 bg-white hover:border-slate-300 dark:border-slate-600'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-5 h-5 text-emerald-400" />
-                      <span className="font-semibold text-white">Model V1</span>
+                      <Sparkles className="w-5 h-5 text-sky-600" />
+                      <span className="font-semibold text-gray-900">Model V1</span>
                       {aiSettings.selectedModel === 'v1' && (
-                        <span className="ml-auto text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Active</span>
+                        <span className="ml-auto text-xs bg-sky-500/20 text-sky-600 px-2 py-0.5 rounded">Active</span>
                       )}
                     </div>
-                    <p className="text-sm text-white/60">Original HyveWyre AI - optimized for insurance & real estate conversations</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Original HyveWyre AI - optimized for insurance & real estate conversations</p>
                   </button>
 
                   {/* Model V2 */}
@@ -1239,34 +1239,34 @@ export default function FlowsPage() {
                     onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v2' })}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
                       aiSettings.selectedModel === 'v2'
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-slate-200 dark:border-slate-700 bg-white hover:border-slate-300 dark:border-slate-600'
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <Settings className="w-5 h-5 text-teal-400" />
-                      <span className="font-semibold text-white">Model V2</span>
+                      <Settings className="w-5 h-5 text-sky-400" />
+                      <span className="font-semibold text-gray-900">Model V2</span>
                       {aiSettings.selectedModel === 'v2' && (
-                        <span className="ml-auto text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Active</span>
+                        <span className="ml-auto text-xs bg-sky-500/20 text-sky-600 px-2 py-0.5 rounded">Active</span>
                       )}
                     </div>
-                    <p className="text-sm text-white/60">Custom AI - build your own prompts from scratch</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">Custom AI - build your own prompts from scratch</p>
                   </button>
                 </div>
               </div>
 
               {/* V2 Configuration (only show when V2 is selected) */}
               {aiSettings.selectedModel === 'v2' && (
-                <div className="space-y-4 pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-2 text-emerald-400">
+                <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2 text-sky-600">
                     <Settings className="w-4 h-4" />
                     <span className="text-sm font-medium">Model V2 Configuration</span>
                   </div>
 
                   {/* System Prompt */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-white">System Prompt</label>
-                    <p className="text-xs text-white/50">Define how the AI should behave. Leave empty for minimal default.</p>
+                    <label className="text-sm font-medium text-gray-900">System Prompt</label>
+                    <p className="text-xs text-gray-900/50">Define how the AI should behave. Leave empty for minimal default.</p>
                     <textarea
                       value={aiSettings.v2Config.systemPrompt}
                       onChange={(e) => setAiSettings({
@@ -1285,20 +1285,20 @@ Available variables:
 {{leadStatus}} - Lead's current status
 {{leadTags}} - Lead's tags
 {{flowGuidance}} - Flow step instructions"
-                      className="w-full h-48 px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm font-mono"
+                      className="w-full h-48 px-4 py-3 rounded-lg bg-white border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-white/30 focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none text-sm font-mono"
                     />
                   </div>
 
                   {/* Advanced Settings */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-white">Advanced Settings</span>
+                      <span className="text-sm font-medium text-gray-900">Advanced Settings</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       {/* Temperature */}
                       <div className="space-y-2">
-                        <label className="text-xs text-white/60">Temperature: {aiSettings.v2Config.temperature}</label>
+                        <label className="text-xs text-slate-600 dark:text-slate-400">Temperature: {aiSettings.v2Config.temperature}</label>
                         <input
                           type="range"
                           min="0"
@@ -1309,14 +1309,14 @@ Available variables:
                             ...aiSettings,
                             v2Config: { ...aiSettings.v2Config, temperature: parseFloat(e.target.value) }
                           })}
-                          className="w-full accent-emerald-500"
+                          className="w-full accent-sky-500"
                         />
-                        <p className="text-xs text-white/40">Higher = more creative, Lower = more focused</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">Higher = more creative, Lower = more focused</p>
                       </div>
 
                       {/* Max Tokens */}
                       <div className="space-y-2">
-                        <label className="text-xs text-white/60">Max Tokens: {aiSettings.v2Config.maxTokens}</label>
+                        <label className="text-xs text-slate-600 dark:text-slate-400">Max Tokens: {aiSettings.v2Config.maxTokens}</label>
                         <input
                           type="range"
                           min="50"
@@ -1327,14 +1327,14 @@ Available variables:
                             ...aiSettings,
                             v2Config: { ...aiSettings.v2Config, maxTokens: parseInt(e.target.value) }
                           })}
-                          className="w-full accent-emerald-500"
+                          className="w-full accent-sky-500"
                         />
-                        <p className="text-xs text-white/40">Response length limit</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">Response length limit</p>
                       </div>
 
                       {/* Presence Penalty */}
                       <div className="space-y-2">
-                        <label className="text-xs text-white/60">Presence Penalty: {aiSettings.v2Config.presencePenalty}</label>
+                        <label className="text-xs text-slate-600 dark:text-slate-400">Presence Penalty: {aiSettings.v2Config.presencePenalty}</label>
                         <input
                           type="range"
                           min="0"
@@ -1345,14 +1345,14 @@ Available variables:
                             ...aiSettings,
                             v2Config: { ...aiSettings.v2Config, presencePenalty: parseFloat(e.target.value) }
                           })}
-                          className="w-full accent-emerald-500"
+                          className="w-full accent-sky-500"
                         />
-                        <p className="text-xs text-white/40">Encourage new topics</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">Encourage new topics</p>
                       </div>
 
                       {/* Frequency Penalty */}
                       <div className="space-y-2">
-                        <label className="text-xs text-white/60">Frequency Penalty: {aiSettings.v2Config.frequencyPenalty}</label>
+                        <label className="text-xs text-slate-600 dark:text-slate-400">Frequency Penalty: {aiSettings.v2Config.frequencyPenalty}</label>
                         <input
                           type="range"
                           min="0"
@@ -1363,9 +1363,9 @@ Available variables:
                             ...aiSettings,
                             v2Config: { ...aiSettings.v2Config, frequencyPenalty: parseFloat(e.target.value) }
                           })}
-                          className="w-full accent-emerald-500"
+                          className="w-full accent-sky-500"
                         />
-                        <p className="text-xs text-white/40">Reduce repetition</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">Reduce repetition</p>
                       </div>
                     </div>
                   </div>
@@ -1374,12 +1374,12 @@ Available variables:
 
               {/* V1 Info (only show when V1 is selected) */}
               {aiSettings.selectedModel === 'v1' && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <div className="p-4 bg-sky-500/10 border border-sky-500/30 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-emerald-400 mt-0.5" />
+                    <Sparkles className="w-5 h-5 text-sky-600 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-emerald-400">Model V1 is Pre-configured</p>
-                      <p className="text-sm text-white/60 mt-1">
+                      <p className="text-sm font-medium text-sky-600">Model V1 is Pre-configured</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                         This model uses optimized prompts for insurance and real estate conversations.
                         It's trained to be warm, professional, and never pushy.
                       </p>
@@ -1390,17 +1390,17 @@ Available variables:
             </div>
 
             {/* Footer */}
-            <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex gap-3 justify-end sticky bottom-0">
+            <div className="bg-white border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end sticky bottom-0">
               <button
                 onClick={() => setShowAISettings(false)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 hover:bg-white/20 border border-slate-300 dark:border-slate-600 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={saveAISettings}
                 disabled={savingAISettings}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-sky-600 hover:bg-sky-700 border border-sky-500/50 transition-colors disabled:opacity-50"
               >
                 {savingAISettings ? 'Saving...' : 'Save Settings'}
               </button>
@@ -1412,18 +1412,18 @@ Available variables:
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && flowToDelete && (
         <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={cancelDeleteFlow}>
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border-b border-white/10 px-6 py-4">
+            <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
                   <span className="text-2xl">⚠️</span>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">
+                  <h3 className="text-lg font-semibold text-gray-900">
                     {flowToDelete.isAIGenerated || flowToDelete.is_ai_generated ? 'Delete AI-Generated Flow' : 'Delete Flow'}
                   </h3>
-                  <p className="text-sm text-white/60">This action cannot be undone</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">This action cannot be undone</p>
                 </div>
               </div>
             </div>
@@ -1433,34 +1433,34 @@ Available variables:
               {(flowToDelete.isAIGenerated || flowToDelete.is_ai_generated) && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
                   <p className="text-sm font-medium text-red-400">Warning: This is an AI-generated flow</p>
-                  <p className="text-sm text-white/70">
-                    Deleting it will <span className="font-semibold text-white">NOT refund your points</span>.
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    Deleting it will <span className="font-semibold text-gray-900">NOT refund your points</span>.
                     The points used to create this flow are non-refundable.
                   </p>
                 </div>
               )}
 
               <div className="space-y-2">
-                <p className="text-sm text-white/90">
-                  Are you sure you want to delete <span className="font-semibold text-white">"{flowToDelete.name}"</span>?
+                <p className="text-sm text-gray-900/90">
+                  Are you sure you want to delete <span className="font-semibold text-gray-900">"{flowToDelete.name}"</span>?
                 </p>
-                <p className="text-sm text-white/60">
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   All steps and configurations will be permanently removed.
                 </p>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex gap-3 justify-end">
+            <div className="bg-white border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
               <button
                 onClick={cancelDeleteFlow}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800 hover:bg-white/20 border border-slate-300 dark:border-slate-600 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteFlow}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-500/50 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-900 dark:text-slate-100 bg-red-600 hover:bg-red-700 border border-red-500/50 transition-colors"
               >
                 Delete Flow
               </button>
@@ -1474,14 +1474,14 @@ Available variables:
           <div className="card max-w-lg w-full mx-4">
             <div className="space-y-4">
               <div>
-                <div className="text-lg font-semibold text-white">Generate New Step with AI</div>
+                <div className="text-lg font-semibold text-gray-900">Generate New Step with AI</div>
                 <div className="text-sm text-[var(--muted)] mt-1">
                   Describe what this step should accomplish (1 point)
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Step Purpose *</label>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Step Purpose *</label>
                 <textarea
                   placeholder="e.g., 'Ask about their budget range', 'Handle price objection', 'Qualify timeline'"
                   value={stepPurpose}
@@ -1498,7 +1498,7 @@ Available variables:
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={generateAndInsertStep}
-                  className="bg-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isGenerating || !stepPurpose.trim()}
                 >
                   {isGenerating ? "Generating Step..." : "Generate Step (1 pt)"}
@@ -1509,7 +1509,7 @@ Available variables:
                     setStepPurpose("");
                     setInsertAfterIndex(-1);
                   }}
-                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                  className="bg-slate-50 dark:bg-slate-800 px-6 py-3 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-white/20"
                   disabled={isGenerating}
                 >
                   Cancel
@@ -1526,7 +1526,7 @@ Available variables:
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-white">Create New Flow with AI</div>
+                  <div className="text-lg font-semibold text-gray-900">Create New Flow with AI</div>
                   <div className="text-sm text-[var(--muted)] mt-1">
                     Tell us about your outreach so AI can generate a customized conversation flow
                   </div>
@@ -1539,7 +1539,7 @@ Available variables:
                     setRequiredQuestions([]);
                     setRequiresCall(false);
                   }}
-                  className="text-white/60 hover:text-white text-2xl leading-none"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
                   disabled={isGenerating}
                 >
                   ×
@@ -1547,7 +1547,7 @@ Available variables:
               </div>
 
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Flow Name *</label>
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Flow Name *</label>
               <input
                 type="text"
                 placeholder="e.g., 'Lead Qualification', 'IUL Sales Outreach', 'Solar Leads'"
@@ -1560,7 +1560,7 @@ Available variables:
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Who are you? *</label>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Who are you? *</label>
                 <input
                   type="text"
                   placeholder="e.g., 'Insurance agent', 'Real estate broker'"
@@ -1571,7 +1571,7 @@ Available variables:
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Who are you texting? *</label>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Who are you texting? *</label>
                 <input
                   type="text"
                   placeholder="e.g., 'Homeowners 40-65', 'Small business owners'"
@@ -1583,7 +1583,7 @@ Available variables:
             </div>
 
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">What are you offering? *</label>
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">What are you offering? *</label>
               <textarea
                 placeholder="e.g., 'Free IUL policy review with no obligation. We help families protect their future with indexed universal life insurance that builds cash value.'"
                 value={flowContext.whatOffering}
@@ -1596,13 +1596,13 @@ Available variables:
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <label className="text-sm font-medium text-white block">Required Questions *</label>
+                  <label className="text-sm font-medium text-slate-900 dark:text-slate-100 block">Required Questions *</label>
                   <p className="text-xs text-[var(--muted)] mt-1">Specific information the AI must collect from every client</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setRequiredQuestions([...requiredQuestions, { question: '', fieldName: '' }])}
-                  className="text-emerald-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                  className="text-sky-600 hover:text-blue-300 text-sm flex items-center gap-1"
                 >
                   <span className="text-lg leading-none">+</span> Add Question
                 </button>
@@ -1640,28 +1640,28 @@ Available variables:
                   </div>
                 ))}
                 {requiredQuestions.length === 0 && (
-                  <div className="text-sm text-[var(--muted)] bg-white/5 rounded-lg p-3 text-center">
+                  <div className="text-sm text-[var(--muted)] bg-white rounded-lg p-3 text-center">
                     No required questions yet. Click "+ Add Question" to add one.
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-slate-200 dark:border-slate-700">
               <input
                 type="checkbox"
                 id="requiresCall"
                 checked={requiresCall}
                 onChange={(e) => setRequiresCall(e.target.checked)}
-                className="w-5 h-5 rounded border-2 border-white/30 bg-white/10 checked:bg-emerald-500 checked:border-emerald-500 cursor-pointer"
+                className="w-5 h-5 rounded border-2 border-white/30 bg-slate-50 dark:bg-slate-800 checked:bg-sky-500 checked:border-sky-500 cursor-pointer"
               />
-              <label htmlFor="requiresCall" className="text-sm font-medium text-white cursor-pointer flex-1">
+              <label htmlFor="requiresCall" className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer flex-1">
                 This flow requires a phone call or Zoom meeting with the client
               </label>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Client goals (optional)</label>
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Client goals (optional)</label>
               <textarea
                 placeholder="e.g., 'Protect family income, build retirement savings, leave a legacy, supplement retirement income'"
                 value={flowContext.clientGoals}
@@ -1675,7 +1675,7 @@ Available variables:
             <div className="flex gap-2 pt-2">
               <button
                 onClick={createNewFlow}
-                className="bg-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting}
               >
                 {isGenerating ? "Generating Flow..." : "Generate Flow with AI"}
@@ -1688,7 +1688,7 @@ Available variables:
                   setRequiredQuestions([]);
                   setRequiresCall(false);
                 }}
-                className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                className="bg-slate-50 dark:bg-slate-800 px-6 py-3 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-white/20"
                 disabled={isGenerating}
               >
                 Cancel
@@ -1702,8 +1702,8 @@ Available variables:
       <div className="grid grid-cols-12 gap-4">
         {/* Left: Flow List */}
         <div className="col-span-12 md:col-span-3">
-          <div className="border border-white/20 rounded-xl overflow-hidden bg-white/10">
-            <div className="bg-white/15 px-3 py-2 text-sm font-medium text-white border-b border-white/20">Your Flows ({flows.length})</div>
+          <div className="border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800">
+            <div className="bg-white/15 px-3 py-2 text-sm font-medium text-slate-900 dark:text-slate-100 border-b border-slate-300 dark:border-slate-600">Your Flows ({flows.length})</div>
             <div className="divide-y divide-white/20">
               {flows.length === 0 && (
                 <div className="px-3 py-6 text-sm text-[var(--muted)] text-center">
@@ -1718,8 +1718,8 @@ Available variables:
                     selectedFlow?.id === flow.id ? 'bg-white/20' : ''
                   } ${
                     flow.isAIGenerated !== false
-                      ? 'border-l-4 border-emerald-400'
-                      : 'border-l-4 border-emerald-300'
+                      ? 'border-l-4 border-sky-400'
+                      : 'border-l-4 border-sky-300'
                   }`}
                   onClick={() => setSelectedFlow(flow)}
                 >
@@ -1747,12 +1747,12 @@ Available variables:
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="font-medium text-sm text-white bg-white/20 border border-white/30 rounded px-2 py-1 w-full focus:outline-none focus:border-emerald-400"
+                      className="font-medium text-sm text-slate-900 dark:text-slate-100 bg-white/20 border border-white/30 rounded px-2 py-1 w-full focus:outline-none focus:border-sky-400"
                       autoFocus
                     />
                   ) : (
                     <div
-                      className="font-medium text-sm text-white flex items-center justify-between group"
+                      className="font-medium text-sm text-slate-900 dark:text-slate-100 flex items-center justify-between group"
                       onClick={(e) => {
                         if (selectedFlow?.id === flow.id) {
                           e.stopPropagation();
@@ -1763,7 +1763,7 @@ Available variables:
                     >
                       <span>{flow.name}</span>
                       {selectedFlow?.id === flow.id && (
-                        <span className="text-xs text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
                           click to edit
                         </span>
                       )}
@@ -1797,7 +1797,7 @@ Available variables:
               {/* Flow Header with Test Button */}
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-white">{selectedFlow.name}</div>
+                  <div className="text-lg font-semibold text-gray-900">{selectedFlow.name}</div>
                   <div className="text-sm text-[var(--muted)]">
                     {selectedFlow.steps.length} step{selectedFlow.steps.length !== 1 ? 's' : ''} • {selectedFlow.isAIGenerated !== false ? 'AI Generated' : 'Manual'}
                   </div>
@@ -1805,7 +1805,7 @@ Available variables:
                 <div className="flex gap-2">
                   <button
                     onClick={startTestFlow}
-                    className="bg-emerald-600 hover:bg-emerald-700 border border-emerald-500/50 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
+                    className="bg-sky-600 hover:bg-sky-700 border border-sky-500/50 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors"
                   >
                     Test Flow
                   </button>
@@ -1814,45 +1814,45 @@ Available variables:
 
               {/* Flow Statistics */}
               {flowStats && !loadingStats && (
-                <div className="card bg-blue-900/10 border-emerald-700/30">
-                  <h3 className="text-sm font-semibold text-[#e7eef9] mb-3 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-emerald-400" />
+                <div className="card bg-blue-900/10 border-sky-700/30">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-sky-600" />
                     Flow Performance (Last 30 Days)
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-1">
                         <MessageSquare className="h-4 w-4" />
                         <span>Messages Sent</span>
                       </div>
-                      <div className="text-2xl font-bold text-[#e7eef9]">{flowStats.messages_sent || 0}</div>
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{flowStats.messages_sent || 0}</div>
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-1">
                         <Users className="h-4 w-4" />
                         <span>Unique Leads</span>
                       </div>
-                      <div className="text-2xl font-bold text-[#e7eef9]">{flowStats.unique_leads || 0}</div>
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{flowStats.unique_leads || 0}</div>
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-1">
                         <TrendingUp className="h-4 w-4" />
                         <span>Response Rate</span>
                       </div>
                       <div className={`text-2xl font-bold ${
-                        flowStats.response_rate >= 50 ? 'text-emerald-400' :
-                        flowStats.response_rate >= 25 ? 'text-emerald-400' :
+                        flowStats.response_rate >= 50 ? 'text-sky-600' :
+                        flowStats.response_rate >= 25 ? 'text-sky-600' :
                         'text-red-400'
                       }`}>
                         {flowStats.response_rate || 0}%
                       </div>
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 text-sm text-[#9fb0c3] mb-1">
+                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-1">
                         <Clock className="h-4 w-4" />
                         <span>Avg Response Time</span>
                       </div>
-                      <div className="text-2xl font-bold text-[#e7eef9]">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                         {flowStats.avg_response_time_minutes ? `${Math.round(flowStats.avg_response_time_minutes)}m` : '-'}
                       </div>
                     </div>
@@ -1861,16 +1861,16 @@ Available variables:
               )}
 
               {loadingStats && (
-                <div className="card bg-blue-900/10 border-emerald-700/30">
-                  <div className="text-sm text-[#9fb0c3]">Loading flow statistics...</div>
+                <div className="card bg-blue-900/10 border-sky-700/30">
+                  <div className="text-sm text-slate-600 dark:text-slate-400">Loading flow statistics...</div>
                 </div>
               )}
 
               {/* Required Questions (Prominent Display) */}
               {selectedFlow.requiredQuestions && selectedFlow.requiredQuestions.length > 0 && (
-                <div className="border border-emerald-500/30 rounded-xl p-4 bg-emerald-500/10">
+                <div className="border border-sky-500/30 rounded-xl p-4 bg-sky-500/10">
                   <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <div className="text-sm font-semibold text-blue-300">Required Questions</div>
@@ -1878,16 +1878,16 @@ Available variables:
                   <div className="space-y-2">
                     {selectedFlow.requiredQuestions.map((q, idx) => (
                       <div key={idx} className="flex items-start gap-2">
-                        <div className="text-emerald-400 font-bold text-sm mt-0.5">{idx + 1}.</div>
+                        <div className="text-sky-600 font-bold text-sm mt-0.5">{idx + 1}.</div>
                         <div className="flex-1">
-                          <div className="text-sm text-white">{q.question}</div>
+                          <div className="text-sm text-gray-900">{q.question}</div>
                           <div className="text-xs text-blue-300/70 mt-0.5">Field: {q.fieldName}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                   {selectedFlow.requiresCall && (
-                    <div className="mt-3 pt-3 border-t border-emerald-500/30 flex items-center gap-2 text-sm text-blue-300">
+                    <div className="mt-3 pt-3 border-t border-sky-500/30 flex items-center gap-2 text-sm text-blue-300">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
@@ -1898,20 +1898,20 @@ Available variables:
               )}
 
               {/* Advanced Details Toggle */}
-              <div className="border border-white/20 rounded-xl overflow-hidden bg-white/5">
+              <div className="border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden bg-white">
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/10 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span className="text-sm font-medium text-white">Advanced Details</span>
+                    <span className="text-sm font-medium text-gray-900">Advanced Details</span>
                   </div>
                   <svg
-                    className={`w-5 h-5 text-white/60 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 text-slate-600 dark:text-slate-400 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1921,7 +1921,7 @@ Available variables:
                 </button>
 
                 {showAdvanced && (
-                  <div className="border-t border-white/20 p-4 space-y-4">
+                  <div className="border-t border-slate-300 dark:border-slate-600 p-4 space-y-4">
                     {/* Rebuttal & Alternate Paths - Only show for AI flows */}
                     {selectedFlow.isAIGenerated !== false && (
                       <div className="border border-amber-500/30 rounded-lg p-4 bg-amber-500/10">
@@ -1962,11 +1962,11 @@ Available variables:
                                               ⚠️ Ends
                                             </div>
                                           ) : nextStepIndex >= 0 ? (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap">
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 whitespace-nowrap">
                                               → Step {nextStepIndex + 1}
                                             </div>
                                           ) : (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap">
+                                            <div className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 whitespace-nowrap">
                                               ↻ Loop
                                             </div>
                                           )}
@@ -1995,15 +1995,15 @@ Available variables:
 
               {/* Main Flow Steps */}
               <div className="space-y-4">
-                <div className="text-sm font-semibold text-white px-1">Flow Steps</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 px-1">Flow Steps</div>
 
                 {selectedFlow.steps.map((step, stepIndex) => (
                   <div key={step.id}>
                     {/* Main Step Card */}
-                    <div className="border border-white/10 rounded-xl p-4 bg-white/5">
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-white">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="text-sm font-bold text-white/60">STEP {stepIndex + 1}</div>
+                          <div className="text-sm font-bold text-slate-600 dark:text-slate-400">STEP {stepIndex + 1}</div>
                           {step.tag && (
                             <div
                               className="px-3 py-1 rounded-full text-xs font-medium"
@@ -2029,7 +2029,7 @@ Available variables:
 
                       {/* Your Message */}
                       <div className="mb-4">
-                        <div className="text-sm font-medium mb-2 text-emerald-400">Your Message:</div>
+                        <div className="text-sm font-medium mb-2 text-sky-600">Your Message:</div>
                         <textarea
                           value={step.yourMessage}
                           onChange={e => updateStep(step.id, { yourMessage: e.target.value })}
@@ -2039,10 +2039,10 @@ Available variables:
                       </div>
 
                       {/* Step Advanced Options - Collapsible */}
-                      <div className="border-t border-white/10 pt-4">
+                      <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
                         <button
                           onClick={() => toggleStepExpansion(step.id)}
-                          className="w-full flex items-center justify-between text-sm font-medium mb-3 text-emerald-400 hover:text-emerald-300 transition-colors"
+                          className="w-full flex items-center justify-between text-sm font-medium mb-3 text-sky-600 hover:text-sky-300 transition-colors"
                         >
                           <span>Advanced Options</span>
                           <svg
@@ -2058,8 +2058,8 @@ Available variables:
                         {expandedSteps.has(step.id) && (
                           <div className="space-y-4">
                             {/* Step Tag Editor */}
-                            <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                              <div className="text-xs font-medium text-white mb-2">Step Tag (visible to team)</div>
+                            <div className="p-3 bg-white rounded-lg border border-slate-200 dark:border-slate-700">
+                              <div className="text-xs font-medium text-slate-900 dark:text-slate-100 mb-2">Step Tag (visible to team)</div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                 <div>
                                   <input
@@ -2080,7 +2080,7 @@ Available variables:
                                         tag: { label: step.tag?.label || `Step ${stepIndex + 1}`, color }
                                       })}
                                       className={`w-8 h-8 rounded-lg border-2 ${
-                                        step.tag?.color === color ? 'border-white' : 'border-white/20'
+                                        step.tag?.color === color ? 'border-white' : 'border-slate-300 dark:border-slate-600'
                                       }`}
                                       style={{ backgroundColor: color }}
                                       title={color}
@@ -2091,11 +2091,11 @@ Available variables:
                             </div>
 
                             {/* Response Options */}
-                            <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
+                            <div className="p-3 bg-sky-500/5 rounded-lg border border-sky-200">
                               <div className="text-xs font-medium text-blue-300 mb-3">Client Response Options ({step.responses.length})</div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {step.responses.map((response, responseIndex) => (
-                                  <div key={responseIndex} className="border border-emerald-500/30 rounded-lg p-3 bg-emerald-500/10">
+                                  <div key={responseIndex} className="border border-sky-500/30 rounded-lg p-3 bg-sky-500/10">
                                     <div className="text-xs font-bold mb-2 text-blue-300">Response {responseIndex + 1}</div>
 
                                     <input
@@ -2126,7 +2126,7 @@ Available variables:
                     <div className="flex justify-center my-2">
                       <button
                         onClick={() => insertStepAfter(stepIndex)}
-                        className="bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                        className="bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/50 text-sky-600 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2146,14 +2146,14 @@ Available variables:
       {showTestFlow && (
         <div className="fixed inset-0 md:left-64 bg-black/70 flex items-center justify-center z-[9999] p-4">
           <div className="card max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
               <div>
-                <div className="text-lg font-semibold text-white">🧪 Test Flow: {selectedFlow?.name}</div>
+                <div className="text-lg font-semibold text-gray-900">🧪 Test Flow: {selectedFlow?.name}</div>
                 <div className="text-sm text-[var(--muted)] mt-1">
                   You are the client - respond naturally to test your flow
                 </div>
                 {(selectedFlow?.requiredQuestions || []).length > 0 && (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-emerald-400">
+                  <div className="mt-2 flex items-center gap-2 text-sm text-sky-600">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
@@ -2179,10 +2179,10 @@ Available variables:
                   <div
                     className={`max-w-[75%] px-4 py-3 rounded-lg ${
                       message.role === 'user'
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-sky-500 text-white'
                         : message.role === 'system'
                         ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-100'
-                        : 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-100'
+                        : 'bg-sky-500/20 border border-sky-500/50 text-sky-100'
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 opacity-70 flex items-center justify-between">
@@ -2195,7 +2195,7 @@ Available variables:
               ))}
               {isTestingAI && (
                 <div className="flex justify-start">
-                  <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-100 px-4 py-3 rounded-lg">
+                  <div className="bg-sky-500/20 border border-sky-500/50 text-sky-100 px-4 py-3 rounded-lg">
                     <div className="text-xs font-semibold mb-1 opacity-70">Agent</div>
                     <div className="text-sm">Thinking...</div>
                   </div>
@@ -2204,7 +2204,7 @@ Available variables:
             </div>
 
             {/* Input Area */}
-            <div className="flex gap-2 pt-4 border-t border-white/10">
+            <div className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
               <input
                 type="text"
                 value={testInput}
@@ -2221,35 +2221,35 @@ Available variables:
               <button
                 onClick={sendTestMessage}
                 disabled={isTestingAI || !testInput.trim()}
-                className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium text-sm"
+                className="bg-sky-500 hover:bg-sky-600 disabled:bg-sky-500/50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium text-sm"
               >
                 {isTestingAI ? 'Sending...' : 'Send'}
               </button>
             </div>
 
             {/* Time Controls & Drip Visualization */}
-            <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
               {/* Time Display and Controls */}
               <div className="flex items-center justify-between">
                 <div className="text-xs text-[var(--muted)]">
-                  <span className="mr-3">⏰ Current Time: <span className="text-white font-semibold">{simulatedTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span></span>
+                  <span className="mr-3">⏰ Current Time: <span className="text-slate-900 dark:text-slate-100 font-semibold">{simulatedTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span></span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => advanceTime(3)}
-                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-sky-500/20 border border-sky-400/50 text-sky-200 hover:bg-sky-500/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +3 hours
                   </button>
                   <button
                     onClick={() => advanceTime(24)}
-                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-sky-500/20 border border-sky-400/50 text-sky-200 hover:bg-sky-500/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +1 day
                   </button>
                   <button
                     onClick={() => advanceTime(48)}
-                    className="bg-emerald-400/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-400/30 px-3 py-1 rounded text-xs font-medium"
+                    className="bg-sky-500/20 border border-sky-400/50 text-sky-200 hover:bg-sky-500/30 px-3 py-1 rounded text-xs font-medium"
                   >
                     +2 days
                   </button>
@@ -2258,11 +2258,11 @@ Available variables:
 
               {/* Pending Drips Display */}
               {pendingDrips.length > 0 && (
-                <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-emerald-200 mb-2">📬 Scheduled Follow-ups ({pendingDrips.length})</div>
+                <div className="bg-sky-500/10 border border-sky-400/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-sky-200 mb-2">📬 Scheduled Follow-ups ({pendingDrips.length})</div>
                   <div className="space-y-1">
                     {pendingDrips.map((drip, idx) => (
-                      <div key={idx} className="text-xs text-emerald-100/70">
+                      <div key={idx} className="text-xs text-sky-100/70">
                         • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
                       </div>
                     ))}
@@ -2272,12 +2272,12 @@ Available variables:
 
               {/* Calendar Appointments */}
               {enableCalendarAppointments && createdAppointments.length > 0 && (
-                <div className="bg-emerald-400/10 border border-emerald-400/30 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-emerald-200 mb-2">📅 Calendar Appointments Created ({createdAppointments.length})</div>
+                <div className="bg-sky-500/10 border border-sky-400/30 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-sky-200 mb-2">📅 Calendar Appointments Created ({createdAppointments.length})</div>
                   <div className="space-y-1">
                     {createdAppointments.map((appt, idx) => (
-                      <div key={idx} className="text-xs text-emerald-100/70">
-                        • <span className="font-medium text-emerald-200">{appt.title}</span> - {appt.date} at {appt.time}
+                      <div key={idx} className="text-xs text-sky-100/70">
+                        • <span className="font-medium text-sky-200">{appt.title}</span> - {appt.date} at {appt.time}
                       </div>
                     ))}
                   </div>
@@ -2286,7 +2286,7 @@ Available variables:
 
               {/* Collected Client Information */}
               {Object.keys(collectedInfo).length > 0 && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3">
                   <div className="text-xs font-semibold text-blue-200 mb-2">📋 Collected Client Information</div>
                   <div className="space-y-1">
                     {Object.entries(collectedInfo).map(([key, value]) => (
@@ -2301,7 +2301,7 @@ Available variables:
               {/* Current Step Indicator */}
               {selectedFlow && selectedFlow.steps[currentStepIndex] && (
                 <div className="text-xs text-[var(--muted)]">
-                  Current Step: <span className="text-white font-semibold">Step {currentStepIndex + 1}</span>
+                  Current Step: <span className="text-slate-900 dark:text-slate-100 font-semibold">Step {currentStepIndex + 1}</span>
                   {selectedFlow.steps[currentStepIndex].tag && (
                     <span
                       className="ml-2 px-2 py-0.5 rounded text-xs font-medium"
@@ -2328,7 +2328,7 @@ Available variables:
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-white">Create New Manual Flow</div>
+                  <div className="text-lg font-semibold text-gray-900">Create New Manual Flow</div>
                   <div className="text-sm text-[var(--muted)] mt-1">
                     Create a flow with your first message step
                   </div>
@@ -2339,14 +2339,14 @@ Available variables:
                     setManualFlowName("");
                     setManualFlowMessage("");
                   }}
-                  className="text-white/60 hover:text-white text-2xl leading-none"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
                 >
                   ×
                 </button>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Flow Name *</label>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Flow Name *</label>
                 <input
                   type="text"
                   placeholder="e.g., 'Welcome Sequence', 'Follow-up Flow'"
@@ -2358,7 +2358,7 @@ Available variables:
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
                   {manualFlowSteps.length === 0 ? 'First Message *' : 'Next Message *'}
                 </label>
                 <textarea
@@ -2377,13 +2377,13 @@ Available variables:
               </div>
 
               {manualFlowSteps.length > 0 && (
-                <div className="border border-white/20 rounded-lg p-3">
-                  <div className="text-sm font-medium text-white mb-2">Steps Added ({manualFlowSteps.length})</div>
+                <div className="border border-slate-300 dark:border-slate-600 rounded-lg p-3">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Steps Added ({manualFlowSteps.length})</div>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {manualFlowSteps.map((step, index) => (
-                      <div key={index} className="flex items-start gap-2 text-sm bg-white/5 p-2 rounded">
-                        <span className="text-white/60 font-medium">{index + 1}.</span>
-                        <span className="text-white/80 flex-1 line-clamp-2">{step}</span>
+                      <div key={index} className="flex items-start gap-2 text-sm bg-white p-2 rounded">
+                        <span className="text-slate-600 dark:text-slate-400 font-medium">{index + 1}.</span>
+                        <span className="text-slate-700 dark:text-slate-300 flex-1 line-clamp-2">{step}</span>
                         <button
                           onClick={() => {
                             const updatedSteps = manualFlowSteps.filter((_, i) => i !== index);
@@ -2416,7 +2416,7 @@ Available variables:
                     setManualFlowSteps([...manualFlowSteps, manualFlowMessage]);
                     setManualFlowMessage("");
                   }}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50"
+                  className="bg-sky-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-sky-700 disabled:opacity-50"
                   disabled={!manualFlowMessage.trim()}
                 >
                   + Add Another Step
@@ -2478,7 +2478,7 @@ Available variables:
                     setManualFlowMessage("");
                     setManualFlowSteps([]);
                   }}
-                  className="bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-400 disabled:opacity-50"
+                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-500 disabled:opacity-50"
                   disabled={!manualFlowName.trim() || (manualFlowSteps.length === 0 && !manualFlowMessage.trim())}
                 >
                   Create Flow
@@ -2490,7 +2490,7 @@ Available variables:
                     setManualFlowMessage("");
                     setManualFlowSteps([]);
                   }}
-                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                  className="bg-slate-50 dark:bg-slate-800 px-6 py-3 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-white/20"
                 >
                   Cancel
                 </button>
@@ -2507,7 +2507,7 @@ Available variables:
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-lg font-semibold text-white">
+                  <div className="text-lg font-semibold text-gray-900">
                     {editingStepIndex >= 0 ? 'Edit Manual Step' : 'Add Manual Step'}
                   </div>
                   <div className="text-sm text-[var(--muted)] mt-1">
@@ -2521,14 +2521,14 @@ Available variables:
                     setEditingStepIndex(-1);
                     setInsertAfterIndex(-1);
                   }}
-                  className="text-white/60 hover:text-white text-2xl leading-none"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
                 >
                   ×
                 </button>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white mb-2 block">Your Message *</label>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Your Message *</label>
                 <textarea
                   placeholder="Enter the message you want to send..."
                   value={manualStep.yourMessage}
@@ -2545,7 +2545,7 @@ Available variables:
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={saveManualStep}
-                  className="bg-emerald-400 text-white px-6 py-3 rounded-lg font-medium hover:bg-emerald-400 disabled:opacity-50"
+                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-500 disabled:opacity-50"
                   disabled={!manualStep.yourMessage.trim()}
                 >
                   {editingStepIndex >= 0 ? 'Update Step' : 'Add Step'}
@@ -2557,7 +2557,7 @@ Available variables:
                     setEditingStepIndex(-1);
                     setInsertAfterIndex(-1);
                   }}
-                  className="bg-white/10 px-6 py-3 rounded-lg text-white hover:bg-white/20"
+                  className="bg-slate-50 dark:bg-slate-800 px-6 py-3 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-white/20"
                 >
                   Cancel
                 </button>
@@ -2570,12 +2570,12 @@ Available variables:
       {/* AI Flow Generation Loading Modal */}
       {isGenerating && (
         <div className="fixed inset-0 md:left-64 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[99999]">
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-emerald-400/20">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border border-sky-200">
             <div className="text-center">
               {/* Animated AI Icon */}
               <div className="mb-6 relative">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-emerald-400/50">
-                  <svg className="w-10 h-10 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-sky-400 to-sky-400 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-sky-400/50">
+                  <svg className="w-10 h-10 text-slate-900 dark:text-slate-100 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -2583,16 +2583,16 @@ Available variables:
                 {/* Orbiting dots */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-32 h-32 animate-spin-slow">
-                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-teal-400 rounded-full"></div>
-                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-emerald-400 rounded-full"></div>
-                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-teal-400 rounded-full"></div>
-                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-teal-400 rounded-full"></div>
+                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-sky-400 rounded-full"></div>
+                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-sky-500 rounded-full"></div>
+                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-sky-400 rounded-full"></div>
+                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-sky-400 rounded-full"></div>
                   </div>
                 </div>
               </div>
 
               {/* Text */}
-              <h3 className="text-2xl font-bold text-white mb-2">
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                 Generating Your Flow
               </h3>
               <p className="text-gray-300 mb-4">
@@ -2601,26 +2601,26 @@ Available variables:
 
               {/* Progress indicators */}
               <div className="space-y-2 text-left">
-                <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
+                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
+                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse"></div>
                   <span>Analyzing your business context</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
+                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
                   <span>Building conversation steps</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-400">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
+                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
                   <span>Optimizing response paths</span>
                 </div>
               </div>
 
               {/* Loading bar */}
               <div className="mt-6 bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-teal-500 via-teal-500 to-teal-500 animate-shimmer bg-[length:200%_100%]"></div>
+                <div className="h-full bg-gradient-to-r from-sky-500 via-sky-500 to-sky-500 animate-shimmer bg-[length:200%_100%]"></div>
               </div>
 
-              <p className="text-xs text-gray-500 mt-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
                 This usually takes 10-20 seconds
               </p>
             </div>

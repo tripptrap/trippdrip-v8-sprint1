@@ -27,7 +27,7 @@ export default function ConversationDrawer({ open, onClose, leadName, messages, 
   return (
     <div className="fixed inset-0 bg-black/40 flex justify-end z-50" onClick={onClose}>
       <div className="w-full max-w-xl h-full bg-[var(--surface)]" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="font-semibold">Conversation · {leadName}</div>
           <button onClick={onClose} className="text-[var(--muted)]">Close</button>
         </div>
@@ -37,7 +37,7 @@ export default function ConversationDrawer({ open, onClose, leadName, messages, 
             const statusInfo = m.status ? getMessageStatusIcon(m.status) : null;
             return (
               <div key={m.id} className={`max-w-[80%] ${m.direction === 'out' ? 'ml-auto' : ''}`}>
-                <div className={`px-3 py-2 rounded-xl ${m.direction === 'out' ? 'bg-emerald-500 text-white' : 'bg-white/10'}`}>
+                <div className={`px-3 py-2 rounded-xl ${m.direction === 'out' ? 'bg-sky-500 text-white' : 'bg-slate-50 dark:bg-slate-800'}`}>
                   <div className="text-xs opacity-60 mb-1">
                     {new Date(m.created_at).toLocaleString()}
                   </div>
@@ -54,9 +54,9 @@ export default function ConversationDrawer({ open, onClose, leadName, messages, 
           })}
         </div>
 
-        <div className="p-3 border-t border-white/10 flex gap-2">
+        <div className="p-3 border-t border-slate-200 dark:border-slate-700 flex gap-2">
           <input
-            className="flex-1 bg-transparent border border-white/10 rounded-xl px-3 py-2"
+            className="flex-1 bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2"
             placeholder="Type a message…"
             value={text}
             onChange={e => setText(e.target.value)}

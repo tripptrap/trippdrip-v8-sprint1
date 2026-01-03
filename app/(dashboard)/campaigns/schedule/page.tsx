@@ -200,14 +200,14 @@ export default function ScheduleCampaignPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Schedule Bulk Campaigns</h1>
-          <p className="text-sm text-white/60 mt-1">
+          <h1 className="text-2xl font-semibold text-gray-900">Schedule Bulk Campaigns</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Schedule campaigns to send messages to leads over time
           </p>
         </div>
         <button
           onClick={() => setShowScheduler(!showScheduler)}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors"
         >
           {showScheduler ? 'Hide Scheduler' : 'New Scheduled Campaign'}
         </button>
@@ -215,11 +215,11 @@ export default function ScheduleCampaignPage() {
 
       {showScheduler && (
         <div className="card space-y-4">
-          <h2 className="text-lg font-semibold text-white">Schedule New Campaign</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Schedule New Campaign</h2>
 
           {/* Campaign Name */}
           <div>
-            <label className="text-sm font-medium text-white mb-2 block">Campaign Name *</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Campaign Name *</label>
             <input
               type="text"
               value={campaignName}
@@ -231,7 +231,7 @@ export default function ScheduleCampaignPage() {
 
           {/* Message */}
           <div>
-            <label className="text-sm font-medium text-white mb-2 block">Message *</label>
+            <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Message *</label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -239,21 +239,21 @@ export default function ScheduleCampaignPage() {
               rows={4}
               className="input-dark w-full px-4 py-2 rounded-lg resize-none"
             />
-            <p className="text-xs text-white/60 mt-1">{message.length} characters</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{message.length} characters</p>
           </div>
 
           {/* Lead Selection */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-white">Select Leads *</label>
+              <label className="text-sm font-medium text-gray-900">Select Leads *</label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={selectAll}
-                  className="text-xs text-emerald-400 hover:text-blue-300"
+                  className="text-xs text-sky-600 hover:text-blue-300"
                 >
                   Select All ({filteredLeads.length})
                 </button>
-                <span className="text-white/40">|</span>
+                <span className="text-slate-400 dark:text-slate-500">|</span>
                 <button
                   onClick={deselectAll}
                   className="text-xs text-red-400 hover:text-red-300"
@@ -279,13 +279,13 @@ export default function ScheduleCampaignPage() {
               </div>
             )}
 
-            <div className="border border-white/10 rounded-lg p-3 max-h-48 overflow-y-auto">
+            <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 max-h-48 overflow-y-auto">
               {filteredLeads.length === 0 ? (
-                <p className="text-sm text-white/60 text-center py-4">No leads found</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 text-center py-4">No leads found</p>
               ) : (
                 <div className="space-y-2">
                   {filteredLeads.map(lead => (
-                    <label key={lead.id} className="flex items-center gap-3 p-2 hover:bg-white/5 rounded cursor-pointer">
+                    <label key={lead.id} className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selectedLeads.includes(lead.id)}
@@ -293,17 +293,17 @@ export default function ScheduleCampaignPage() {
                         className="w-4 h-4"
                       />
                       <div className="flex-1">
-                        <div className="text-sm text-white">
+                        <div className="text-sm text-gray-900">
                           {lead.first_name} {lead.last_name}
                         </div>
-                        <div className="text-xs text-white/60">{lead.phone}</div>
+                        <div className="text-xs text-slate-600 dark:text-slate-400">{lead.phone}</div>
                       </div>
                     </label>
                   ))}
                 </div>
               )}
             </div>
-            <p className="text-xs text-white/60 mt-2">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
               {selectedLeads.length} lead{selectedLeads.length !== 1 ? 's' : ''} selected
             </p>
           </div>
@@ -311,7 +311,7 @@ export default function ScheduleCampaignPage() {
           {/* Schedule Settings */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Start Date *</label>
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Start Date *</label>
               <input
                 type="date"
                 value={startDate}
@@ -320,7 +320,7 @@ export default function ScheduleCampaignPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-white mb-2 block">Start Time *</label>
+              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Start Time *</label>
               <input
                 type="time"
                 value={startTime}
@@ -331,7 +331,7 @@ export default function ScheduleCampaignPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-white mb-2 block">
+            <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
               Percentage per Batch: {percentage}%
             </label>
             <input
@@ -342,13 +342,13 @@ export default function ScheduleCampaignPage() {
               onChange={(e) => setPercentage(Number(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-white/60 mt-1">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
               Will send to {leadsPerBatch} leads per batch
             </p>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-white mb-2 block">
+            <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
               Hours Between Batches: {intervalHours}h
             </label>
             <input
@@ -359,7 +359,7 @@ export default function ScheduleCampaignPage() {
               onChange={(e) => setIntervalHours(Number(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-white/60 mt-1">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
               {totalBatches} total batches • Estimated completion in {Math.ceil((totalBatches * intervalHours) / 24)} days
             </p>
           </div>
@@ -372,8 +372,8 @@ export default function ScheduleCampaignPage() {
               className="w-4 h-4"
             />
             <div>
-              <div className="text-sm font-medium text-white">Auto-repeat until all leads are sent</div>
-              <div className="text-xs text-white/60">
+              <div className="text-sm font-medium text-gray-900">Auto-repeat until all leads are sent</div>
+              <div className="text-xs text-slate-600 dark:text-slate-400">
                 Automatically schedule the next batch until all selected leads have been contacted
               </div>
             </div>
@@ -383,13 +383,13 @@ export default function ScheduleCampaignPage() {
             <button
               onClick={scheduleCampaign}
               disabled={loading}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors disabled:opacity-50"
             >
               {loading ? 'Scheduling...' : 'Schedule Campaign'}
             </button>
             <button
               onClick={() => setShowScheduler(false)}
-              className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+              className="px-6 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-white/20 text-slate-900 dark:text-slate-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -399,14 +399,14 @@ export default function ScheduleCampaignPage() {
 
       {/* Scheduled Campaigns List */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-white">Active Scheduled Campaigns</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Active Scheduled Campaigns</h2>
         {campaigns.length === 0 ? (
           <div className="card text-center py-12">
-            <svg className="w-16 h-16 mx-auto text-white/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-16 h-16 mx-auto text-gray-900/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            <h3 className="text-lg font-semibold text-white mb-2">No Scheduled Campaigns</h3>
-            <p className="text-white/60">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Scheduled Campaigns</h3>
+            <p className="text-slate-600 dark:text-slate-400">
               Create your first scheduled campaign to automate your outreach
             </p>
           </div>
@@ -415,12 +415,12 @@ export default function ScheduleCampaignPage() {
             const progress = (campaign.leads_sent / campaign.total_leads) * 100;
             const getStatusColor = (status: string) => {
               switch (status) {
-                case 'scheduled': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-                case 'running': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                case 'scheduled': return 'text-sky-600 bg-sky-500/10 border-sky-200';
+                case 'running': return 'text-sky-600 bg-sky-500/10 border-sky-200';
                 case 'paused': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-                case 'completed': return 'text-[#5a6b7f] bg-gray-500/10 border-gray-500/20';
+                case 'completed': return 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-8000/10 border-gray-500/20';
                 case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
-                default: return 'text-white/60 bg-white/5 border-white/10';
+                default: return 'text-slate-600 dark:text-slate-400 bg-white border-slate-200 dark:border-slate-700';
               }
             };
 
@@ -429,43 +429,43 @@ export default function ScheduleCampaignPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-white">{campaign.name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
                       <div className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(campaign.status)}`}>
                         {campaign.status.toUpperCase()}
                       </div>
                     </div>
-                    <p className="text-sm text-white/80 mb-2 line-clamp-2">{campaign.message}</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 mb-2 line-clamp-2">{campaign.message}</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Progress</span>
-                    <span className="text-white">{campaign.leads_sent} / {campaign.total_leads} leads sent</span>
+                    <span className="text-slate-600 dark:text-slate-400">Progress</span>
+                    <span className="text-slate-900 dark:text-slate-100">{campaign.leads_sent} / {campaign.total_leads} leads sent</span>
                   </div>
-                  <div className="w-full bg-white/10 rounded-full h-2">
+                  <div className="w-full bg-slate-50 dark:bg-slate-800 rounded-full h-2">
                     <div
-                      className="bg-emerald-500 h-2 rounded-full transition-all"
+                      className="bg-sky-500 h-2 rounded-full transition-all"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <span className="text-white/60">Next Batch:</span>
-                      <div className="text-white">{new Date(campaign.next_batch_date).toLocaleString()}</div>
+                      <span className="text-slate-600 dark:text-slate-400">Next Batch:</span>
+                      <div className="text-slate-900 dark:text-slate-100">{new Date(campaign.next_batch_date).toLocaleString()}</div>
                     </div>
                     <div>
-                      <span className="text-white/60">Batch Size:</span>
-                      <div className="text-white">{campaign.percentage_per_batch}% ({Math.ceil((campaign.total_leads * campaign.percentage_per_batch) / 100)} leads)</div>
+                      <span className="text-slate-600 dark:text-slate-400">Batch Size:</span>
+                      <div className="text-slate-900 dark:text-slate-100">{campaign.percentage_per_batch}% ({Math.ceil((campaign.total_leads * campaign.percentage_per_batch) / 100)} leads)</div>
                     </div>
                     <div>
-                      <span className="text-white/60">Interval:</span>
-                      <div className="text-white">Every {campaign.interval_hours}h</div>
+                      <span className="text-slate-600 dark:text-slate-400">Interval:</span>
+                      <div className="text-slate-900 dark:text-slate-100">Every {campaign.interval_hours}h</div>
                     </div>
                     <div>
-                      <span className="text-white/60">Auto-repeat:</span>
-                      <div className="text-white">{campaign.auto_repeat ? 'Yes' : 'No'}</div>
+                      <span className="text-slate-600 dark:text-slate-400">Auto-repeat:</span>
+                      <div className="text-slate-900 dark:text-slate-100">{campaign.auto_repeat ? 'Yes' : 'No'}</div>
                     </div>
                   </div>
 
@@ -482,7 +482,7 @@ export default function ScheduleCampaignPage() {
                       {campaign.status === 'paused' && (
                         <button
                           onClick={() => updateCampaignStatus(campaign.id, 'resume')}
-                          className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-sm transition-colors"
+                          className="px-4 py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 rounded-lg text-sm transition-colors"
                         >
                           Resume
                         </button>

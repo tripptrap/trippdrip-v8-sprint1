@@ -382,13 +382,13 @@ export default function CampaignsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[#e7eef9]">Campaigns</h1>
-          <p className="text-[#9fb0c3] mt-1">View and manage your SMS campaigns</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Campaigns</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">View and manage your SMS campaigns</p>
         </div>
         <div className="flex gap-2">
           <Link
             href="/campaigns/schedule"
-            className="bg-emerald-400 text-white px-4 py-2 rounded-lg hover:bg-emerald-400 flex items-center gap-2"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-500 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -397,7 +397,7 @@ export default function CampaignsPage() {
           </Link>
           <button
             onClick={() => setCreateOpen(true)}
-            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 flex items-center gap-2"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -414,43 +414,43 @@ export default function CampaignsPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search campaigns by name or tag..."
-          className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder:text-[#5a6b7f]"
+          className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400"
         />
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Total Campaigns</div>
-          <div className="text-3xl font-bold text-[#e7eef9]">{campaigns.length}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Campaigns</div>
+          <div className="text-3xl font-bold text-gray-900">{campaigns.length}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Total Leads</div>
-          <div className="text-3xl font-bold text-[#e7eef9]">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Leads</div>
+          <div className="text-3xl font-bold text-gray-900">
             {campaigns.reduce((sum, c) => sum + (c.lead_count || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Messages Sent</div>
-          <div className="text-3xl font-bold text-[#e7eef9]">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Sent</div>
+          <div className="text-3xl font-bold text-gray-900">
             {campaigns.reduce((sum, c) => sum + (c.messages_sent || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Credits Used</div>
-          <div className="text-3xl font-bold text-emerald-400">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Credits Used</div>
+          <div className="text-3xl font-bold text-sky-600">
             {campaigns.reduce((sum, c) => sum + (c.credits_used || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Active Tags</div>
-          <div className="text-3xl font-bold text-[#e7eef9]">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Active Tags</div>
+          <div className="text-3xl font-bold text-gray-900">
             {new Set(campaigns.flatMap(c => c.tags || [])).size}
           </div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Archived</div>
-          <div className="text-3xl font-bold text-[#5a6b7f]">
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Archived</div>
+          <div className="text-3xl font-bold text-slate-500 dark:text-slate-400">
             {campaigns.filter(c => c.status === 'archived').length}
           </div>
         </div>
@@ -459,16 +459,16 @@ export default function CampaignsPage() {
       {/* Campaigns List */}
       <div className="card p-0">
         {loading ? (
-          <div className="p-8 text-center text-[#9fb0c3]">Loading campaigns...</div>
+          <div className="p-8 text-center text-slate-600 dark:text-slate-400">Loading campaigns...</div>
         ) : filteredCampaigns.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-[#9fb0c3] mb-4">
+            <div className="text-slate-600 dark:text-slate-400 mb-4">
               {searchQuery ? 'No campaigns found matching your search.' : 'No campaigns yet.'}
             </div>
             {!searchQuery && (
               <button
                 onClick={() => setCreateOpen(true)}
-                className="inline-block bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600"
+                className="inline-block bg-sky-500 text-white px-6 py-2 rounded-lg hover:bg-sky-600"
               >
                 Create Your First Campaign
               </button>
@@ -477,33 +477,33 @@ export default function CampaignsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#0c1420] border-b border-[#223246]">
+              <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Campaign Name</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Flow</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Tags Applied</th>
-                  <th className="text-center px-4 py-3 text-sm font-medium text-[#9fb0c3]">Leads</th>
-                  <th className="text-center px-4 py-3 text-sm font-medium text-[#9fb0c3]">Messages Sent</th>
-                  <th className="text-center px-4 py-3 text-sm font-medium text-[#9fb0c3]">Credits Used</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Created</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-[#9fb0c3]">Last Updated</th>
-                  <th className="text-center px-4 py-3 text-sm font-medium text-[#9fb0c3]">Actions</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Campaign Name</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Flow</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Tags Applied</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Leads</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Messages Sent</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Credits Used</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Created</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Last Updated</th>
+                  <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#223246]">
                 {filteredCampaigns.map((campaign) => (
-                  <tr key={campaign.id} className="hover:bg-[#0c1420]/50">
+                  <tr key={campaign.id} className="hover:bg-slate-50 dark:bg-slate-800/50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-[#e7eef9]">{campaign.name}</div>
-                      <div className="text-xs text-[#5a6b7f]">{campaign.id}</div>
+                      <div className="font-medium text-gray-900">{campaign.name}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{campaign.id}</div>
                     </td>
                     <td className="px-4 py-3">
                       {campaign.flow_id ? (
-                        <span className="inline-block px-2 py-1 text-xs bg-emerald-900/30 text-emerald-300 border border-emerald-700 rounded">
+                        <span className="inline-block px-2 py-1 text-xs bg-sky-900/30 text-sky-300 border border-sky-700 rounded">
                           {flows.find(f => f.id === campaign.flow_id)?.name || 'Unknown Flow'}
                         </span>
                       ) : (
-                        <span className="text-[#5a6b7f] text-sm">No flow</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-sm">No flow</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -527,30 +527,30 @@ export default function CampaignsPage() {
                             );
                           })
                         ) : (
-                          <span className="text-[#5a6b7f] text-sm">No tags</span>
+                          <span className="text-slate-500 dark:text-slate-400 text-sm">No tags</span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="font-medium text-[#e7eef9]">{campaign.lead_count || 0}</div>
+                      <div className="font-medium text-gray-900">{campaign.lead_count || 0}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="font-medium text-[#e7eef9]">{campaign.messages_sent || 0}</div>
+                      <div className="font-medium text-gray-900">{campaign.messages_sent || 0}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="font-medium text-emerald-400">{campaign.credits_used || 0}</div>
+                      <div className="font-medium text-sky-600">{campaign.credits_used || 0}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#9fb0c3]">
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                       {new Date(campaign.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-sm text-[#9fb0c3]">
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
                       {new Date(campaign.updated_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-3">
                         <button
                           onClick={() => openEditModal(campaign)}
-                          className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
+                          className="text-sky-600 hover:text-sky-300 text-sm font-medium"
                         >
                           Edit
                         </button>
@@ -571,25 +571,25 @@ export default function CampaignsPage() {
       </div>
 
       {/* Help */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
-        <h3 className="font-semibold mb-2 text-[#e7eef9]">💡 Campaign Tips</h3>
-        <ul className="text-sm text-[#9fb0c3] space-y-1">
+      <div className="card bg-blue-50 border-sky-700/50">
+        <h3 className="font-semibold mb-2 text-gray-900">💡 Campaign Tips</h3>
+        <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Tag your leads to organize them into campaigns</li>
           <li>• Track messages sent and lead engagement</li>
-          <li>• Use the <Link href="/leads" className="text-emerald-400 hover:underline">Leads</Link> page to filter by campaign tags</li>
-          <li>• Create automated messaging workflows in <Link href="/templates" className="text-emerald-400 hover:underline">Templates</Link></li>
+          <li>• Use the <Link href="/leads" className="text-sky-600 hover:underline">Leads</Link> page to filter by campaign tags</li>
+          <li>• Create automated messaging workflows in <Link href="/templates" className="text-sky-600 hover:underline">Templates</Link></li>
         </ul>
       </div>
 
       {/* Create Campaign Modal */}
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-xl border border-[#223246] bg-[#0e1623] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[#e7eef9]">Create New Campaign</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Create New Campaign</h2>
               <button
                 onClick={() => { setCreateOpen(false); setNewCampaignName(''); setSelectedFlowId(''); }}
-                className="text-[#9fb0c3] hover:text-[#e7eef9]"
+                className="text-slate-600 dark:text-slate-400 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -599,25 +599,25 @@ export default function CampaignsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">Campaign Name</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Campaign Name</label>
                 <input
                   type="text"
                   value={newCampaignName}
                   onChange={(e) => setNewCampaignName(e.target.value)}
                   placeholder="Enter campaign name..."
-                  className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder:text-[#5a6b7f] focus:outline-none focus:border-emerald-500"
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 focus:outline-none focus:border-sky-500"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter' && !creating) createCampaign(); }}
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">AI Flow (Optional)</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow (Optional)</label>
                 {flows.length > 0 ? (
                   <select
                     value={selectedFlowId}
                     onChange={(e) => setSelectedFlowId(e.target.value)}
-                    className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                   >
                     <option value="">No flow selected</option>
                     {flows.map((flow) => (
@@ -628,10 +628,10 @@ export default function CampaignsPage() {
                   </select>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-[#5a6b7f]">No flows created yet</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">No flows created yet</span>
                     <Link
                       href="/templates"
-                      className="text-sm text-emerald-400 hover:underline"
+                      className="text-sm text-sky-600 hover:underline"
                     >
                       Create a flow
                     </Link>
@@ -641,7 +641,7 @@ export default function CampaignsPage() {
 
               {/* Tags Selection */}
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">Tags (Optional)</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags (Optional)</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {availableTags.map((tag) => (
                     <button
@@ -650,7 +650,7 @@ export default function CampaignsPage() {
                       onClick={() => toggleTag(tag.name)}
                       className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
                         selectedTags.includes(tag.name)
-                          ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-[#0e1623]'
+                          ? 'ring-2 ring-sky-400 ring-offset-1 ring-offset-[#0e1623]'
                           : 'opacity-70 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: tag.color + '30', color: tag.color, borderColor: tag.color }}
@@ -668,14 +668,14 @@ export default function CampaignsPage() {
                       value={newTagName}
                       onChange={(e) => setNewTagName(e.target.value)}
                       placeholder="Create new tag..."
-                      className="flex-1 px-3 py-1.5 bg-[#0c1420] border border-[#223246] rounded-lg text-sm text-[#e7eef9] placeholder:text-[#5a6b7f] focus:outline-none focus:border-emerald-500"
+                      className="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 focus:outline-none focus:border-sky-500"
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createNewTag(newTagName); } }}
                     />
                     <button
                       type="button"
                       onClick={() => createNewTag(newTagName)}
                       disabled={!newTagName.trim() || creatingTag}
-                      className="px-3 py-1.5 text-white rounded-lg text-sm hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 text-slate-900 dark:text-slate-100 rounded-lg text-sm hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: newTagColor }}
                     >
                       {creatingTag ? '...' : '+'}
@@ -683,7 +683,7 @@ export default function CampaignsPage() {
                   </div>
                   {/* Color picker */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-[#5a6b7f] mr-1">Color:</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">Color:</span>
                     {tagColors.map((c) => (
                       <button
                         key={c.color}
@@ -699,27 +699,27 @@ export default function CampaignsPage() {
                   </div>
                 </div>
                 {selectedTags.length > 0 && (
-                  <p className="text-xs text-emerald-400 mt-2">
+                  <p className="text-xs text-sky-600 mt-2">
                     {selectedTags.length} tag{selectedTags.length > 1 ? 's' : ''} selected
                   </p>
                 )}
               </div>
 
-              <p className="text-xs text-[#5a6b7f]">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 After creating your campaign, you can add leads to it from the Leads page by selecting leads and running a campaign.
               </p>
 
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => { setCreateOpen(false); setNewCampaignName(''); setSelectedFlowId(''); setSelectedTags([]); }}
-                  className="flex-1 px-4 py-2 border border-[#223246] rounded-lg text-[#9fb0c3] hover:bg-[#0c1420] transition"
+                  className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={createCampaign}
                   disabled={creating || !newCampaignName.trim()}
-                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {creating ? 'Creating...' : 'Create Campaign'}
                 </button>
@@ -732,12 +732,12 @@ export default function CampaignsPage() {
       {/* Edit Campaign Modal */}
       {editOpen && editingCampaign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-xl border border-[#223246] bg-[#0e1623] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[#e7eef9]">Edit Campaign</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Edit Campaign</h2>
               <button
                 onClick={() => { setEditOpen(false); setEditingCampaign(null); }}
-                className="text-[#9fb0c3] hover:text-[#e7eef9]"
+                className="text-slate-600 dark:text-slate-400 hover:text-gray-900"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -747,25 +747,25 @@ export default function CampaignsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">Campaign Name</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Campaign Name</label>
                 <input
                   type="text"
                   value={editCampaignName}
                   onChange={(e) => setEditCampaignName(e.target.value)}
                   placeholder="Enter campaign name..."
-                  className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder:text-[#5a6b7f] focus:outline-none focus:border-emerald-500"
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 focus:outline-none focus:border-sky-500"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter' && !saving) saveEditCampaign(); }}
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">AI Flow</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow</label>
                 {flows.length > 0 ? (
                   <select
                     value={editFlowId}
                     onChange={(e) => setEditFlowId(e.target.value)}
-                    className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                   >
                     <option value="">No flow selected</option>
                     {flows.map((flow) => (
@@ -776,10 +776,10 @@ export default function CampaignsPage() {
                   </select>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-[#5a6b7f]">No flows created yet</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">No flows created yet</span>
                     <Link
                       href="/templates"
-                      className="text-sm text-emerald-400 hover:underline"
+                      className="text-sm text-sky-600 hover:underline"
                     >
                       Create a flow
                     </Link>
@@ -789,7 +789,7 @@ export default function CampaignsPage() {
 
               {/* Tags Selection for Edit */}
               <div>
-                <label className="block text-sm text-[#9fb0c3] mb-2">Tags</label>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {availableTags.map((tag) => (
                     <button
@@ -798,7 +798,7 @@ export default function CampaignsPage() {
                       onClick={() => toggleTag(tag.name, true)}
                       className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
                         editTags.includes(tag.name)
-                          ? 'ring-2 ring-emerald-400 ring-offset-1 ring-offset-[#0e1623]'
+                          ? 'ring-2 ring-sky-400 ring-offset-1 ring-offset-[#0e1623]'
                           : 'opacity-70 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: tag.color + '30', color: tag.color, borderColor: tag.color }}
@@ -809,7 +809,7 @@ export default function CampaignsPage() {
                   ))}
                 </div>
                 {editTags.length > 0 && (
-                  <p className="text-xs text-emerald-400 mt-1">
+                  <p className="text-xs text-sky-600 mt-1">
                     {editTags.length} tag{editTags.length > 1 ? 's' : ''} selected
                   </p>
                 )}
@@ -818,14 +818,14 @@ export default function CampaignsPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => { setEditOpen(false); setEditingCampaign(null); setEditTags([]); }}
-                  className="flex-1 px-4 py-2 border border-[#223246] rounded-lg text-[#9fb0c3] hover:bg-[#0c1420] transition"
+                  className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveEditCampaign}
                   disabled={saving || !editCampaignName.trim()}
-                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>

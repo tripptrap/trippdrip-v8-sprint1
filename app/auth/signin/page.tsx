@@ -35,8 +35,8 @@ export default function SignInPage() {
           <div className="flex justify-center mb-4">
             <img src="/logo-premium.png" alt="HyveWyre" className="h-20 w-20 rounded-2xl" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">HyveWyre™</h1>
-          <p className="text-white/80">SMS & Email Campaign Management</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">HyveWyre™</h1>
+          <p className="text-gray-900/80">SMS & Email Campaign Management</p>
         </div>
 
         {/* Sign In Card */}
@@ -55,7 +55,7 @@ export default function SignInPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
             </div>
@@ -70,14 +70,14 @@ export default function SignInPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
             </div>
 
             <div className="flex items-center justify-between">
               <label className="flex items-center">
-                <input type="checkbox" className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500" />
+                <input type="checkbox" className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-teal-500" />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
               <Link href="/auth/forgot-password" className="text-sm text-emerald-600 hover:text-emerald-700">
@@ -88,7 +88,7 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white py-3 rounded-lg font-semibold hover:from-emerald-500 hover:to-teal-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-gray-900 py-3 rounded-lg font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -117,7 +117,7 @@ export default function SignInPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-white/80 text-sm">
+        <div className="text-center mt-8 text-gray-900/80 text-sm">
           <p>&copy; 2025 HyveWyre™. All rights reserved.</p>
         </div>
       </div>

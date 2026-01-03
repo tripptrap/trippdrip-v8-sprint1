@@ -206,7 +206,7 @@ export default function LeadScraperPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
       </div>
     );
   }
@@ -218,15 +218,15 @@ export default function LeadScraperPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-lg">
-                <Globe className="h-6 w-6 text-white" />
+              <div className="p-2 bg-gradient-to-r from-sky-400 to-sky-400 rounded-lg">
+                <Globe className="h-6 w-6 text-gray-900" />
               </div>
-              <h1 className="text-3xl font-bold text-white">Lead Scraper</h1>
-              <span className="px-3 py-1 bg-emerald-400/20 border border-emerald-400/30 rounded-full text-emerald-400 text-xs font-bold uppercase">
+              <h1 className="text-3xl font-bold text-gray-900">Lead Scraper</h1>
+              <span className="px-3 py-1 bg-sky-500/20 border border-sky-400/30 rounded-full text-sky-600 text-xs font-bold uppercase">
                 Beta
               </span>
             </div>
-            <p className="text-white/60">
+            <p className="text-slate-600 dark:text-slate-400">
               Extract leads from websites automatically - similar to Octoparse
             </p>
             <div className="mt-2 p-3 bg-yellow-600/10 border border-yellow-500/30 rounded-lg">
@@ -235,9 +235,9 @@ export default function LeadScraperPage() {
               </p>
             </div>
           </div>
-          <div className="px-6 py-4 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-center">
+          <div className="px-6 py-4 bg-sky-600/20 border border-sky-500/30 rounded-lg text-center">
             <div className="text-sm text-blue-300 mb-1">Cost per scrape</div>
-            <div className="text-3xl font-bold text-white">50 <span className="text-lg text-white/60">points</span></div>
+            <div className="text-3xl font-bold text-gray-900">50 <span className="text-lg text-slate-600 dark:text-slate-400">points</span></div>
           </div>
         </div>
       </div>
@@ -246,7 +246,7 @@ export default function LeadScraperPage() {
       {message && (
         <div className={`mb-6 p-4 rounded-lg border ${
           message.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            ? 'bg-sky-500/10 border-sky-500/30 text-sky-600'
             : 'bg-red-500/10 border-red-500/30 text-red-400'
         }`}>
           <div className="flex items-center gap-2">
@@ -262,30 +262,30 @@ export default function LeadScraperPage() {
 
       {/* Pre-built Templates */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-white mb-4">Quick Start Templates</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Quick Start Templates</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Object.entries(SCRAPER_TEMPLATES).map(([key, template]) => {
             const isComingSoon = (template as any).comingSoon;
             return (
-              <div key={key} className={`p-4 bg-white/5 border rounded-lg transition-colors relative ${
+              <div key={key} className={`p-4 bg-white border rounded-lg transition-colors relative ${
                 isComingSoon
                   ? 'border-yellow-500/30 opacity-60'
-                  : 'border-white/10 hover:bg-white/10'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800'
               }`}>
                 {isComingSoon && (
                   <span className="absolute top-2 right-2 px-2 py-1 bg-yellow-600/80 text-yellow-100 text-xs font-bold rounded uppercase">
                     Coming Soon
                   </span>
                 )}
-                <h3 className="font-semibold text-white mb-1">{template.name}</h3>
-                <p className="text-sm text-white/60 mb-3">{template.description}</p>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">{template.name}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{template.description}</p>
                 <button
                   onClick={() => !isComingSoon && createFromTemplate(key)}
                   disabled={isComingSoon}
                   className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isComingSoon
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      ? 'bg-gray-600 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                      : 'bg-sky-600 hover:bg-sky-700 text-white'
                   }`}
                 >
                   {isComingSoon ? 'Coming Soon' : 'Use Template'}
@@ -298,39 +298,39 @@ export default function LeadScraperPage() {
 
       {/* My Scrapers */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-white mb-4">My Scrapers</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">My Scrapers</h2>
         {scrapers.filter(s => !s.is_template).length === 0 ? (
-          <div className="p-8 bg-white/5 border border-white/10 rounded-lg text-center">
-            <Globe className="h-12 w-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No scrapers yet. Create one from a template above!</p>
+          <div className="p-8 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-center">
+            <Globe className="h-12 w-12 text-gray-900/20 mx-auto mb-3" />
+            <p className="text-slate-600 dark:text-slate-400">No scrapers yet. Create one from a template above!</p>
           </div>
         ) : (
           <div className="space-y-3">
             {scrapers.filter(s => !s.is_template).map(scraper => (
-              <div key={scraper.id} className="p-4 bg-white/5 border border-white/10 rounded-lg">
+              <div key={scraper.id} className="p-4 bg-white border border-slate-200 dark:border-slate-700 rounded-lg">
                 {editingScraperId === scraper.id ? (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm text-white/60 mb-2">Target URL</label>
+                      <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Target URL</label>
                       <input
                         type="url"
                         value={editUrl}
                         onChange={(e) => setEditUrl(e.target.value)}
                         placeholder="https://example.com"
-                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => saveUrl(scraper.id)}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg flex items-center gap-2 transition-colors"
                       >
                         <Save className="h-4 w-4" />
                         Save URL
                       </button>
                       <button
                         onClick={cancelEdit}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg flex items-center gap-2 transition-colors"
                       >
                         <X className="h-4 w-4" />
                         Cancel
@@ -340,16 +340,16 @@ export default function LeadScraperPage() {
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-white">{scraper.name}</h3>
-                      <p className="text-sm text-white/60">{scraper.start_url}</p>
-                      <p className="text-xs text-white/40 mt-1">
+                      <h3 className="font-semibold text-gray-900">{scraper.name}</h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{scraper.start_url}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                         {scraper.total_records_scraped} leads scraped · {scraper.total_runs} runs
                       </p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => startEdit(scraper)}
-                        className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg flex items-center gap-2 transition-colors"
                         title="Edit URL"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -357,7 +357,7 @@ export default function LeadScraperPage() {
                       <button
                         onClick={() => runScraper(scraper.id)}
                         disabled={running === scraper.id}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
                       >
                         {running === scraper.id ? (
                           <>
@@ -383,12 +383,12 @@ export default function LeadScraperPage() {
       {/* Scraped Data */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Scraped Leads ({scrapedData.length})</h2>
+          <h2 className="text-xl font-bold text-gray-900">Scraped Leads ({scrapedData.length})</h2>
           {selectedRecords.length > 0 && (
             <button
               onClick={convertToLeads}
               disabled={converting}
-              className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+              className="px-4 py-2 bg-sky-500 hover:bg-sky-500 disabled:bg-gray-600 text-white rounded-lg flex items-center gap-2 transition-colors"
             >
               {converting ? (
                 <>
@@ -406,14 +406,14 @@ export default function LeadScraperPage() {
         </div>
 
         {scrapedData.length === 0 ? (
-          <div className="p-8 bg-white/5 border border-white/10 rounded-lg text-center">
-            <Download className="h-12 w-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No scraped data yet. Run a scraper to get started!</p>
+          <div className="p-8 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-center">
+            <Download className="h-12 w-12 text-gray-900/20 mx-auto mb-3" />
+            <p className="text-slate-600 dark:text-slate-400">No scraped data yet. Run a scraper to get started!</p>
           </div>
         ) : (
-          <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
             <table className="w-full">
-              <thead className="bg-white/5">
+              <thead className="bg-white">
                 <tr>
                   <th className="px-4 py-3 text-left">
                     <input
@@ -423,18 +423,18 @@ export default function LeadScraperPage() {
                       className="rounded"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/80">Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/80">Email</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/80">Phone</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/80">Company</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/80">Source</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">Name</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">Email</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">Phone</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">Company</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">Source</th>
                 </tr>
               </thead>
               <tbody>
                 {scrapedData.map(record => {
                   const data = record.data;
                   return (
-                    <tr key={record.id} className="border-t border-white/10">
+                    <tr key={record.id} className="border-t border-slate-200 dark:border-slate-700">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -443,19 +443,19 @@ export default function LeadScraperPage() {
                           className="rounded"
                         />
                       </td>
-                      <td className="px-4 py-3 text-white">
+                      <td className="px-4 py-3 text-gray-900">
                         {data.name || data.businessName || data.fullName || '-'}
                       </td>
-                      <td className="px-4 py-3 text-white/80 text-sm">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300 text-sm">
                         {data.email || '-'}
                       </td>
-                      <td className="px-4 py-3 text-white/80 text-sm">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300 text-sm">
                         {data.phone || data.phoneNumber || '-'}
                       </td>
-                      <td className="px-4 py-3 text-white/80 text-sm">
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300 text-sm">
                         {data.company || data.businessName || data.companyName || '-'}
                       </td>
-                      <td className="px-4 py-3 text-white/60 text-xs">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                         {new URL(record.source_url).hostname}
                       </td>
                     </tr>

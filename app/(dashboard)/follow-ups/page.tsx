@@ -272,10 +272,10 @@ export default function FollowUpsPage() {
   function getPriorityColor(priority: string) {
     switch (priority) {
       case 'urgent': return 'bg-red-900/30 text-red-300 border-red-700';
-      case 'high': return 'bg-orange-900/30 text-emerald-300 border-orange-700';
-      case 'medium': return 'bg-blue-900/30 text-blue-300 border-emerald-700';
-      case 'low': return 'bg-gray-800/50 text-gray-400 border-gray-700';
-      default: return 'bg-gray-800/50 text-gray-400 border-gray-700';
+      case 'high': return 'bg-orange-900/30 text-sky-300 border-orange-700';
+      case 'medium': return 'bg-blue-900/30 text-blue-300 border-sky-700';
+      case 'low': return 'bg-gray-800/50 text-slate-400 dark:text-slate-500 border-gray-700';
+      default: return 'bg-gray-800/50 text-slate-400 dark:text-slate-500 border-gray-700';
     }
   }
 
@@ -303,20 +303,20 @@ export default function FollowUpsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[#e7eef9]">Follow-ups & Reminders</h1>
-          <p className="text-[#9fb0c3] mt-1">Manage your lead follow-up schedule</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Follow-ups & Reminders</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">Manage your lead follow-up schedule</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={loadSuggestions}
             disabled={loadingSuggestions}
-            className="bg-emerald-400 text-white px-4 py-2 rounded-lg hover:bg-emerald-400 disabled:opacity-50"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-500 disabled:opacity-50"
           >
             {loadingSuggestions ? 'Loading...' : 'Smart Suggestions'}
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600"
           >
             Create Follow-up
           </button>
@@ -326,41 +326,41 @@ export default function FollowUpsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Pending</div>
-          <div className="text-3xl font-bold text-emerald-400">{pendingCount}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Pending</div>
+          <div className="text-3xl font-bold text-sky-600">{pendingCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Overdue</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Overdue</div>
           <div className="text-3xl font-bold text-red-400">{overdueCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Completed</div>
-          <div className="text-3xl font-bold text-emerald-400">{completedCount}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Completed</div>
+          <div className="text-3xl font-bold text-sky-600">{completedCount}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-[#9fb0c3] mb-1">Total</div>
-          <div className="text-3xl font-bold text-[#e7eef9]">{followUps.length}</div>
+          <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total</div>
+          <div className="text-3xl font-bold text-gray-900">{followUps.length}</div>
         </div>
       </div>
 
       {/* Filter Tabs */}
       <div className="card">
-        <div className="flex gap-2 border-b border-[#223246] pb-2">
+        <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700 pb-2">
           <button
             onClick={() => setStatusFilter('pending')}
-            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'pending' ? 'bg-sky-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}
           >
             Pending ({pendingCount})
           </button>
           <button
             onClick={() => setStatusFilter('completed')}
-            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'completed' ? 'bg-sky-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}
           >
             Completed ({completedCount})
           </button>
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-emerald-500 text-white' : 'bg-[#0c1420] text-[#9fb0c3] border border-[#223246]'}`}
+            className={`px-4 py-2 rounded ${statusFilter === 'all' ? 'bg-sky-500 text-white' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}
           >
             All ({followUps.length})
           </button>
@@ -370,17 +370,17 @@ export default function FollowUpsPage() {
       {/* Follow-ups List */}
       <div className="card p-0">
         {loading ? (
-          <div className="p-8 text-center text-[#9fb0c3]">Loading follow-ups...</div>
+          <div className="p-8 text-center text-slate-600 dark:text-slate-400">Loading follow-ups...</div>
         ) : filteredFollowUps.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-[#9fb0c3] mb-4">
+            <div className="text-slate-600 dark:text-slate-400 mb-4">
               No follow-ups yet. Create one or use Smart Suggestions to get started.
             </div>
           </div>
         ) : (
           <div className="divide-y divide-[#223246]">
             {filteredFollowUps.map((followUp) => (
-              <div key={followUp.id} className="p-4 hover:bg-[#0c1420]/50">
+              <div key={followUp.id} className="p-4 hover:bg-slate-50 dark:bg-slate-800/50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -393,24 +393,24 @@ export default function FollowUpsPage() {
                         </span>
                       )}
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        followUp.status === 'completed' ? 'bg-emerald-900/30 text-emerald-300 border border-emerald-700' :
-                        followUp.status === 'cancelled' ? 'bg-gray-800/50 text-gray-400 border border-gray-700' :
+                        followUp.status === 'completed' ? 'bg-sky-900/30 text-sky-300 border border-sky-700' :
+                        followUp.status === 'cancelled' ? 'bg-gray-800/50 text-slate-400 dark:text-slate-500 border border-gray-700' :
                         'bg-yellow-900/30 text-yellow-300 border border-yellow-700'
                       }`}>
                         {followUp.status.toUpperCase()}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-lg mb-1 text-[#e7eef9]">{followUp.title}</h3>
+                    <h3 className="font-semibold text-lg mb-1 text-gray-900">{followUp.title}</h3>
                     {followUp.leads && (
-                      <div className="text-sm text-[#9fb0c3] mb-1">
+                      <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                         Lead: {followUp.leads.first_name} {followUp.leads.last_name} • {followUp.leads.phone}
                         {followUp.leads.disposition && ` • ${followUp.leads.disposition}`}
                       </div>
                     )}
                     {followUp.notes && (
-                      <p className="text-sm text-[#9fb0c3] mb-2">{followUp.notes}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{followUp.notes}</p>
                     )}
-                    <div className="text-sm text-[#5a6b7f]">
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
                       Due: {format(new Date(followUp.due_date), 'MMM d, yyyy h:mm a')}
                     </div>
                   </div>
@@ -419,14 +419,14 @@ export default function FollowUpsPage() {
                       <>
                         <button
                           onClick={() => updateFollowUp(followUp.id, { status: 'completed' })}
-                          className="px-3 py-1 text-sm bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 border border-emerald-700"
+                          className="px-3 py-1 text-sm bg-sky-900/30 text-sky-300 rounded hover:bg-sky-900/50 border border-sky-700"
                         >
                           Complete
                         </button>
                         {followUp.leads && (
                           <Link
                             href={`/texts?leadId=${followUp.lead_id}`}
-                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-emerald-700"
+                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-sky-700"
                           >
                             Message
                           </Link>
@@ -450,31 +450,31 @@ export default function FollowUpsPage() {
       {/* Suggestions Panel */}
       {showSuggestionsPanel && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6 border-b border-[#1a2637]">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-[#e7eef9]">Smart Follow-up Suggestions</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Smart Follow-up Suggestions</h2>
                 <button
                   onClick={() => setShowSuggestionsPanel(false)}
-                  className="text-[#9fb0c3] hover:text-[#e7eef9] text-2xl"
+                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl"
                 >
                   &times;
                 </button>
               </div>
-              <p className="text-sm text-[#9fb0c3] mt-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
                 AI-powered suggestions based on lead engagement and timing
               </p>
             </div>
 
             <div className="p-6">
               {suggestions.length === 0 ? (
-                <div className="text-center py-8 text-[#9fb0c3]">
+                <div className="text-center py-8 text-slate-600 dark:text-slate-400">
                   No suggestions at this time. All leads are being followed up appropriately!
                 </div>
               ) : (
                 <div className="space-y-4">
                   {suggestions.map((suggestion, index) => (
-                    <div key={index} className="bg-[#0c1420] border border-[#223246] rounded-lg p-4">
+                    <div key={index} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
@@ -482,18 +482,18 @@ export default function FollowUpsPage() {
                               {suggestion.priority.toUpperCase()}
                             </span>
                           </div>
-                          <h3 className="font-semibold text-[#e7eef9] mb-1">{suggestion.title}</h3>
-                          <div className="text-sm text-[#9fb0c3] mb-2">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">{suggestion.title}</h3>
+                          <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
                             {suggestion.lead_name} • {suggestion.lead_phone}
                           </div>
-                          <p className="text-sm text-[#9fb0c3] mb-2">{suggestion.notes}</p>
-                          <div className="text-xs text-[#5a6b7f]">
+                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">{suggestion.notes}</p>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
                             Reason: {suggestion.reason}
                           </div>
                         </div>
                         <button
                           onClick={() => createFromSuggestion(suggestion)}
-                          className="ml-4 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600"
+                          className="ml-4 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600"
                         >
                           Create
                         </button>
@@ -510,15 +510,15 @@ export default function FollowUpsPage() {
       {/* Create/Edit Modal - Simplified for now */}
       {showCreateModal && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-semibold mb-4 text-[#e7eef9]">Create Follow-up</h2>
-            <p className="text-sm text-[#9fb0c3] mb-4">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Create Follow-up</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
               Note: Currently you need to create follow-ups from the leads page or use Smart Suggestions.
               Manual creation coming soon!
             </p>
             <button
               onClick={() => setShowCreateModal(false)}
-              className="w-full px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] hover:bg-[#101b2a]"
+              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-[#101b2a]"
             >
               Close
             </button>
@@ -527,9 +527,9 @@ export default function FollowUpsPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
-        <h3 className="font-semibold mb-2 text-[#e7eef9]">Smart Follow-up System</h3>
-        <ul className="text-sm text-[#9fb0c3] space-y-1">
+      <div className="card bg-blue-50 border-sky-700/50">
+        <h3 className="font-semibold mb-2 text-gray-900">Smart Follow-up System</h3>
+        <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Click "Smart Suggestions" to see AI-powered follow-up recommendations</li>
           <li>• Suggestions are based on lead engagement, response times, and disposition</li>
           <li>• Urgent priorities are for hot leads that need immediate attention</li>

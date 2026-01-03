@@ -32,7 +32,7 @@ const integrations: Integration[] = [
       'Export directly to leads database'
     ],
     setupUrl: '/lead-scraper',
-    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30'
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-100 dark:bg-sky-900/20 border-sky-500/30'
   },
   {
     id: 'landline-remover',
@@ -47,7 +47,7 @@ const integrations: Integration[] = [
       'Reduce SMS bounce rates',
       'Save credits on invalid numbers'
     ],
-    color: 'text-emerald-400 bg-blue-900/20 border-emerald-500/30'
+    color: 'text-sky-600 bg-blue-100 dark:bg-blue-100 dark:bg-blue-900/20 border-sky-500/30'
   },
 
   // Communication
@@ -66,7 +66,7 @@ const integrations: Integration[] = [
     ],
     setupUrl: '/email',
     docsUrl: 'https://docs.hyvewyre.com/integrations/google-calendar',
-    color: 'text-emerald-400 bg-teal-800/50 border-emerald-400/30'
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-800/50 border-sky-400/30'
   },
   {
     id: 'twilio-voice',
@@ -81,7 +81,7 @@ const integrations: Integration[] = [
       'Voicemail to SMS notifications',
       'Click-to-call from lead profiles'
     ],
-    color: 'text-red-400 bg-red-900/20 border-red-500/30'
+    color: 'text-red-400 bg-red-100 dark:bg-red-100 dark:bg-red-900/20 border-red-500/30'
   },
   {
     id: 'email-service',
@@ -96,7 +96,7 @@ const integrations: Integration[] = [
       'Track opens and clicks',
       'Automated follow-up sequences'
     ],
-    color: 'text-emerald-400 bg-orange-900/20 border-emerald-400/30'
+    color: 'text-sky-600 bg-orange-100 dark:bg-orange-100 dark:bg-orange-900/20 border-sky-400/30'
   },
 
   // Productivity
@@ -114,7 +114,7 @@ const integrations: Integration[] = [
       'Export data to spreadsheets'
     ],
     docsUrl: 'https://zapier.com',
-    color: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30'
+    color: 'text-yellow-400 bg-yellow-100 dark:bg-yellow-100 dark:bg-yellow-900/20 border-yellow-500/30'
   },
 
   // Compliance
@@ -131,7 +131,7 @@ const integrations: Integration[] = [
       'Compliance reporting',
       'TCPA violation prevention'
     ],
-    color: 'text-teal-400 bg-cyan-900/20 border-teal-500/30'
+    color: 'text-sky-400 bg-cyan-100 dark:bg-cyan-100 dark:bg-cyan-900/20 border-sky-500/30'
   },
 ];
 
@@ -153,17 +153,17 @@ export default function IntegrationsPage() {
   const statusConfig = {
     available: {
       label: 'Available',
-      color: 'text-emerald-400 bg-emerald-900/20',
+      color: 'text-sky-600 bg-sky-100 dark:bg-sky-100 dark:bg-sky-900/20',
       icon: CheckCircle
     },
     connected: {
       label: 'Connected',
-      color: 'text-emerald-400 bg-blue-900/20',
+      color: 'text-sky-600 bg-blue-100 dark:bg-blue-100 dark:bg-blue-900/20',
       icon: CheckCircle
     },
     coming_soon: {
       label: 'Coming Soon',
-      color: 'text-emerald-400 bg-orange-900/20',
+      color: 'text-sky-600 bg-orange-100 dark:bg-orange-100 dark:bg-orange-900/20',
       icon: AlertCircle
     }
   };
@@ -172,8 +172,8 @@ export default function IntegrationsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[#e7eef9]">Integrations</h1>
-        <p className="text-[#9fb0c3] mt-1">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Integrations</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">
           Connect HyveWyre with your favorite tools to streamline your workflow and boost productivity.
         </p>
       </div>
@@ -186,8 +186,8 @@ export default function IntegrationsPage() {
             onClick={() => setSelectedCategory(category.id)}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
               selectedCategory === category.id
-                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-white/5 text-[#9fb0c3] hover:bg-white/10'
+                ? 'bg-sky-600/20 text-sky-600 border border-sky-500/30'
+                : 'bg-white text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800'
             }`}
           >
             {category.label}
@@ -199,38 +199,38 @@ export default function IntegrationsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-900/20 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-100 dark:bg-sky-900/20 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {integrations.filter(i => i.status === 'available').length}
               </div>
-              <div className="text-sm text-[#9fb0c3]">Available Now</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Available Now</div>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-900/20 flex items-center justify-center">
-              <AlertCircle className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+              <AlertCircle className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {integrations.filter(i => i.status === 'coming_soon').length}
               </div>
-              <div className="text-sm text-[#9fb0c3]">Coming Soon</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Coming Soon</div>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">{integrations.length}</div>
-              <div className="text-sm text-[#9fb0c3]">Total Integrations</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{integrations.length}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Total Integrations</div>
             </div>
           </div>
         </div>
@@ -254,7 +254,7 @@ export default function IntegrationsPage() {
                     <IntegrationIcon className={`h-6 w-6 ${integration.color.split(' ')[0]}`} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[#e7eef9] text-lg">{integration.name}</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-lg">{integration.name}</h3>
                     <div className={`inline-flex items-center gap-1 mt-1 px-2 py-1 rounded text-xs ${statusInfo.color}`}>
                       <StatusIcon className="h-3 w-3" />
                       {statusInfo.label}
@@ -263,24 +263,24 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <p className="text-sm text-[#9fb0c3] mb-4">{integration.description}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{integration.description}</p>
 
               {/* Features */}
               <div className="space-y-2 mb-4">
                 {integration.features.map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm text-[#9fb0c3]">
-                    <CheckCircle className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div key={idx} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <CheckCircle className="h-4 w-4 text-sky-600 mt-0.5 flex-shrink-0" />
                     <span>{feature}</span>
                   </div>
                 ))}
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-4 border-t border-white/10">
+              <div className="flex items-center gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
                 {integration.status === 'available' && integration.setupUrl && (
                   <a
                     href={integration.setupUrl}
-                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium text-center flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-sm font-medium text-center flex items-center justify-center gap-2"
                   >
                     <Settings className="h-4 w-4" />
                     Setup
@@ -289,7 +289,7 @@ export default function IntegrationsPage() {
                 {integration.status === 'coming_soon' && (
                   <button
                     disabled
-                    className="flex-1 px-4 py-2 bg-white/5 text-[#9fb0c3] rounded-lg text-sm font-medium cursor-not-allowed"
+                    className="flex-1 px-4 py-2 bg-white text-slate-600 dark:text-slate-400 rounded-lg text-sm font-medium cursor-not-allowed"
                   >
                     Coming Soon
                   </button>
@@ -299,7 +299,7 @@ export default function IntegrationsPage() {
                     href={integration.docsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 text-[#9fb0c3] rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+                    className="px-4 py-2 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
                   >
                     <ExternalLink className="h-4 w-4" />
                     Docs
@@ -314,24 +314,24 @@ export default function IntegrationsPage() {
       {/* Empty State */}
       {filteredIntegrations.length === 0 && (
         <div className="card text-center py-12">
-          <AlertCircle className="h-12 w-12 text-[#9fb0c3] mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">No integrations found</h3>
-          <p className="text-[#9fb0c3]">Try selecting a different category</p>
+          <AlertCircle className="h-12 w-12 text-slate-600 dark:text-slate-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No integrations found</h3>
+          <p className="text-slate-600 dark:text-slate-400">Try selecting a different category</p>
         </div>
       )}
 
       {/* Feature Request Section */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
-        <h3 className="font-semibold mb-2 text-[#e7eef9] flex items-center gap-2">
-          <Zap className="h-5 w-5 text-emerald-400" />
+      <div className="card bg-blue-100 dark:bg-blue-100 dark:bg-blue-900/20 border-sky-700/50">
+        <h3 className="font-semibold mb-2 text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <Zap className="h-5 w-5 text-sky-600" />
           Need a Specific Integration?
         </h3>
-        <p className="text-sm text-[#9fb0c3] mb-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
           We're always looking to add integrations that help you work more efficiently. Let us know which tools you'd like to see integrated with HyveWyre!
         </p>
         <a
           href="mailto:support@hyvewyre.com?subject=Integration Request"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-sm"
         >
           <Mail className="h-4 w-4" />
           Request Integration

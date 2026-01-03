@@ -33,11 +33,11 @@ export default function CustomModal({
     switch (type) {
       case 'success':
         return {
-          gradient: 'from-emerald-900/20 to-emerald-900/20',
-          border: 'border-emerald-500/30',
-          bg: 'bg-emerald-500/10',
-          text: 'text-emerald-400',
-          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
+          gradient: 'from-sky-900/20 to-sky-900/20',
+          border: 'border-sky-500/30',
+          bg: 'bg-sky-500/10',
+          text: 'text-sky-600',
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
         };
       case 'error':
         return {
@@ -58,18 +58,18 @@ export default function CustomModal({
       case 'confirm':
         return {
           gradient: 'from-blue-900/20 to-cyan-900/20',
-          border: 'border-emerald-500/30',
-          bg: 'bg-emerald-500/10',
-          text: 'text-emerald-400',
-          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
+          border: 'border-sky-500/30',
+          bg: 'bg-sky-500/10',
+          text: 'text-sky-600',
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
         };
       default:
         return {
-          gradient: 'from-gray-900/20 to-teal-900/20',
+          gradient: 'from-gray-900/20 to-sky-900/20',
           border: 'border-white/30',
-          bg: 'bg-white/10',
+          bg: 'bg-slate-50 dark:bg-slate-800',
           text: 'text-white',
-          button: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500/50'
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
         };
     }
   };
@@ -92,18 +92,18 @@ export default function CustomModal({
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden"
+        className="bg-[#1a1a1a] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`bg-gradient-to-r ${colors.gradient} border-b border-white/10 px-6 py-4`}>
+        <div className={`bg-gradient-to-r ${colors.gradient} border-b border-slate-200 dark:border-slate-700 px-6 py-4`}>
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-full ${colors.bg} border ${colors.border} flex items-center justify-center`}>
               <span className="text-2xl">{icon || getDefaultIcon()}</span>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">{title}</h3>
-              <p className="text-sm text-white/60">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 {type === 'confirm' ? 'Please confirm your action' : ''}
               </p>
             </div>
@@ -118,12 +118,12 @@ export default function CustomModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-white/5 border-t border-white/10 px-6 py-4 flex gap-3 justify-end">
+        <div className="bg-white border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
           {type === 'confirm' && onConfirm ? (
             <>
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-50 dark:bg-slate-800 hover:bg-white/20 border border-slate-300 dark:border-slate-600 transition-colors"
               >
                 {cancelText}
               </button>

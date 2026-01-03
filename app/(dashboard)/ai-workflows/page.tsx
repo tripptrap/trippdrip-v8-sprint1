@@ -30,7 +30,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Collect essential information for auto, home, or life insurance quotes with automated follow-up.',
     icon: Briefcase,
-    color: 'text-emerald-400 bg-blue-900/20 border-emerald-500/30',
+    color: 'text-sky-600 bg-blue-100 dark:bg-blue-900/20 border-sky-500/30',
     useCase: 'Perfect for capturing leads interested in insurance quotes and scheduling policy review calls.',
     questions: [
       { fieldName: 'insurance_type', question: 'What type of insurance are you interested in? (Auto, Home, Life, or Other)', type: 'text' },
@@ -50,7 +50,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Proactively reach out to existing clients before their policy expires to discuss renewal options.',
     icon: Calendar,
-    color: 'text-emerald-400 bg-teal-800/50 border-emerald-400/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-800/50 border-sky-400/30',
     useCase: 'Automate policy renewal outreach to maintain customer retention and upsell opportunities.',
     questions: [
       { fieldName: 'renewal_interest', question: 'Your policy expires soon. Would you like to review your coverage and renewal options? (Yes/No)', type: 'text' },
@@ -69,7 +69,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Keep clients informed about their claim status and collect additional information if needed.',
     icon: TrendingUp,
-    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-900/20 border-sky-500/30',
     useCase: 'Improve customer satisfaction by proactively communicating claim progress.',
     questions: [
       { fieldName: 'claim_questions', question: 'Do you have any questions about your claim?', type: 'text' },
@@ -86,7 +86,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Qualify potential home buyers by understanding their needs, budget, and timeline.',
     icon: Home,
-    color: 'text-emerald-400 bg-orange-900/20 border-emerald-400/30',
+    color: 'text-sky-600 bg-orange-100 dark:bg-orange-900/20 border-sky-400/30',
     useCase: 'Quickly identify serious buyers and gather information to match them with perfect properties.',
     questions: [
       { fieldName: 'home_type', question: 'What type of property are you looking for? (Single Family, Condo, Townhouse, etc.)', type: 'text' },
@@ -107,7 +107,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Engage potential home sellers and gather property details for a listing consultation.',
     icon: Users,
-    color: 'text-teal-400 bg-cyan-900/20 border-teal-500/30',
+    color: 'text-sky-400 bg-cyan-100 dark:bg-cyan-900/20 border-sky-500/30',
     useCase: 'Convert seller leads into listing appointments by understanding their motivation and property.',
     questions: [
       { fieldName: 'property_address', question: 'What\'s the address of the property you\'re thinking about selling?', type: 'text' },
@@ -127,7 +127,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Automatically follow up with open house attendees to gauge interest and schedule private showings.',
     icon: Calendar,
-    color: 'text-teal-400 bg-teal-900/20 border-teal-500/30',
+    color: 'text-sky-400 bg-sky-100 dark:bg-sky-900/20 border-sky-500/30',
     useCase: 'Turn open house visitors into qualified buyers with timely, personalized follow-up.',
     questions: [
       { fieldName: 'property_interest', question: 'Thanks for visiting [Property Address]! What did you think of the property? (Loved it, It was nice, Not for me)', type: 'text' },
@@ -146,7 +146,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Keep past clients engaged with regular market updates and stay top-of-mind for referrals.',
     icon: TrendingUp,
-    color: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30',
+    color: 'text-yellow-400 bg-yellow-100 dark:bg-yellow-900/20 border-yellow-500/30',
     useCase: 'Build long-term relationships and generate repeat business through valuable market insights.',
     questions: [
       { fieldName: 'referral_interest', question: 'Do you know anyone looking to buy or sell in the area?', type: 'text' },
@@ -162,7 +162,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'insurance',
     description: 'Identify and convert cross-sell opportunities with existing clients.',
     icon: Users,
-    color: 'text-emerald-400 bg-teal-900/20 border-emerald-400/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-900/20 border-sky-400/30',
     useCase: 'Maximize customer lifetime value by offering complementary insurance products.',
     questions: [
       { fieldName: 'current_policies', question: 'Which insurance policies do you currently have with us? (Auto, Home, Life, etc.)', type: 'text' },
@@ -199,7 +199,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Guide first-time buyers through the home buying process with educational follow-ups.',
     icon: Users,
-    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-900/20 border-sky-500/30',
     useCase: 'Build trust with first-time buyers by providing value and education throughout their journey.',
     questions: [
       { fieldName: 'buyer_experience', question: 'Is this your first time buying a home? (Yes/No)', type: 'text' },
@@ -241,7 +241,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Convert expired listings by offering a fresh marketing strategy and pricing analysis.',
     icon: Briefcase,
-    color: 'text-emerald-400 bg-emerald-900/20 border-emerald-500/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-900/20 border-sky-500/30',
     useCase: 'Win new listings by demonstrating your superior marketing approach to frustrated sellers.',
     questions: [
       { fieldName: 'previous_listing_experience', question: 'I noticed your listing expired. What was the biggest challenge you faced?', type: 'text' },
@@ -261,7 +261,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'real-estate',
     description: 'Convert For Sale By Owner listings by offering professional expertise and marketing.',
     icon: Home,
-    color: 'text-emerald-400 bg-sky-900/20 border-emerald-400/30',
+    color: 'text-sky-600 bg-sky-100 dark:bg-sky-900/20 border-sky-400/30',
     useCase: 'Help FSBO sellers understand the value of professional representation.',
     questions: [
       { fieldName: 'fsbo_duration', question: 'How long have you been selling on your own?', type: 'text' },
@@ -283,7 +283,7 @@ const workflowTemplates: WorkflowTemplate[] = [
     industry: 'general',
     description: 'Universal appointment scheduling flow that integrates with your calendar.',
     icon: Calendar,
-    color: 'text-emerald-400 bg-indigo-900/20 border-emerald-400/30',
+    color: 'text-sky-600 bg-indigo-900/20 border-sky-400/30',
     useCase: 'Schedule calls, consultations, or meetings with automated calendar integration.',
     questions: [
       { fieldName: 'meeting_purpose', question: 'What would you like to discuss on our call?', type: 'text' },
@@ -349,8 +349,8 @@ export default function AIWorkflowsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[#e7eef9]">AI Workflow Templates</h1>
-        <p className="text-[#9fb0c3] mt-1">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">AI Workflow Templates</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">
           Pre-built conversation flows designed for insurance and real estate professionals. Click any template to get started.
         </p>
       </div>
@@ -365,8 +365,8 @@ export default function AIWorkflowsPage() {
               onClick={() => setSelectedIndustry(industry.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
                 selectedIndustry === industry.id
-                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-white/5 text-[#9fb0c3] hover:bg-white/10'
+                  ? 'bg-sky-600/20 text-sky-600 border border-sky-500/30'
+                  : 'bg-white text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800'
               }`}
             >
               <IndustryIcon className="h-4 w-4" />
@@ -380,38 +380,38 @@ export default function AIWorkflowsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+              <Briefcase className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {workflowTemplates.filter(w => w.industry === 'insurance').length}
               </div>
-              <div className="text-sm text-[#9fb0c3]">Insurance Templates</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Insurance Templates</div>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-orange-900/20 flex items-center justify-center">
-              <Home className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+              <Home className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {workflowTemplates.filter(w => w.industry === 'real-estate').length}
               </div>
-              <div className="text-sm text-[#9fb0c3]">Real Estate Templates</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Real Estate Templates</div>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-teal-800/50 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-800/50 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-sky-600" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">{workflowTemplates.length}</div>
-              <div className="text-sm text-[#9fb0c3]">Total Templates</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{workflowTemplates.length}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">Total Templates</div>
             </div>
           </div>
         </div>
@@ -435,10 +435,10 @@ export default function AIWorkflowsPage() {
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-semibold text-[#e7eef9] text-lg">{template.name}</h3>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-lg">{template.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                         {template.tags.map((tag) => (
-                          <span key={tag} className="text-xs px-2 py-1 rounded bg-white/5 text-[#9fb0c3]">
+                          <span key={tag} className="text-xs px-2 py-1 rounded bg-white text-slate-600 dark:text-slate-400">
                             {tag}
                           </span>
                         ))}
@@ -446,28 +446,28 @@ export default function AIWorkflowsPage() {
                     </div>
                   </div>
 
-                  <p className="text-sm text-[#9fb0c3] mb-3">{template.description}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{template.description}</p>
 
-                  <div className="bg-white/5 rounded-lg p-3 mb-3">
-                    <div className="text-xs uppercase tracking-wide text-[#9fb0c3] mb-2">Use Case</div>
-                    <div className="text-sm text-[#e7eef9]">{template.useCase}</div>
+                  <div className="bg-white rounded-lg p-3 mb-3">
+                    <div className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400 mb-2">Use Case</div>
+                    <div className="text-sm text-slate-900 dark:text-slate-100">{template.useCase}</div>
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-xs uppercase tracking-wide text-[#9fb0c3] mb-2">
+                    <div className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400 mb-2">
                       Conversation Flow ({template.questions.length} questions)
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm text-[#9fb0c3] bg-white/5 rounded p-2">
-                        <span className="text-emerald-400">Initial:</span> {template.initialMessage.substring(0, 100)}...
+                      <div className="text-sm text-slate-600 dark:text-slate-400 bg-white rounded p-2">
+                        <span className="text-sky-600">Initial:</span> {template.initialMessage.substring(0, 100)}...
                       </div>
                       {template.questions.slice(0, 2).map((q, idx) => (
-                        <div key={idx} className="text-sm text-[#9fb0c3] bg-white/5 rounded p-2">
-                          <span className="text-emerald-400">Q{idx + 1}:</span> {q.question}
+                        <div key={idx} className="text-sm text-slate-600 dark:text-slate-400 bg-white rounded p-2">
+                          <span className="text-sky-600">Q{idx + 1}:</span> {q.question}
                         </div>
                       ))}
                       {template.questions.length > 2 && (
-                        <div className="text-xs text-[#9fb0c3] italic">
+                        <div className="text-xs text-slate-600 dark:text-slate-400 italic">
                           +{template.questions.length - 2} more questions...
                         </div>
                       )}
@@ -476,7 +476,7 @@ export default function AIWorkflowsPage() {
 
                   <button
                     onClick={() => handleUseTemplate(template)}
-                    className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
                   >
                     {copiedId === template.id ? (
                       <>
@@ -500,9 +500,9 @@ export default function AIWorkflowsPage() {
       {/* Empty State */}
       {filteredWorkflows.length === 0 && (
         <div className="card text-center py-12">
-          <MessageSquare className="h-12 w-12 text-[#9fb0c3] mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[#e7eef9] mb-2">No templates found</h3>
-          <p className="text-[#9fb0c3]">Try selecting a different industry</p>
+          <MessageSquare className="h-12 w-12 text-slate-600 dark:text-slate-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No templates found</h3>
+          <p className="text-slate-600 dark:text-slate-400">Try selecting a different industry</p>
         </div>
       )}
     </div>

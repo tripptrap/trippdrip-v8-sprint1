@@ -98,11 +98,11 @@ export default function ScheduledMessagesPage() {
 
   function getStatusColor(status: string) {
     switch (status) {
-      case 'pending': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-      case 'sent': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      case 'pending': return 'text-sky-600 bg-sky-500/10 border-sky-200';
+      case 'sent': return 'text-sky-600 bg-sky-500/10 border-sky-200';
       case 'failed': return 'text-red-400 bg-red-500/10 border-red-500/20';
-      case 'cancelled': return 'text-[#5a6b7f] bg-gray-500/10 border-gray-500/20';
-      default: return 'text-white/60 bg-white/5 border-white/10';
+      case 'cancelled': return 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-8000/10 border-gray-500/20';
+      default: return 'text-slate-600 dark:text-slate-400 bg-white border-slate-200 dark:border-slate-700';
     }
   }
 
@@ -133,9 +133,9 @@ export default function ScheduledMessagesPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold text-white">Scheduled Messages</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Scheduled Messages</h1>
         <div className="card">
-          <p className="text-white/60">Loading...</p>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
         </div>
       </div>
     );
@@ -156,14 +156,14 @@ export default function ScheduledMessagesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Scheduled Messages</h1>
-          <p className="text-sm text-white/60 mt-1">
+          <h1 className="text-2xl font-semibold text-gray-900">Scheduled Messages</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             View and manage your scheduled messages
           </p>
         </div>
         <button
           onClick={fetchScheduledMessages}
-          className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-white/20 rounded-lg text-slate-900 dark:text-slate-100 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -174,11 +174,11 @@ export default function ScheduledMessagesPage() {
 
       {scheduledMessages.length === 0 ? (
         <div className="card text-center py-12">
-          <svg className="w-16 h-16 mx-auto text-white/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-16 h-16 mx-auto text-gray-900/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h3 className="text-lg font-semibold text-white mb-2">No Scheduled Messages</h3>
-          <p className="text-white/60">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Scheduled Messages</h3>
+          <p className="text-slate-600 dark:text-slate-400">
             You don't have any scheduled messages. Schedule a message from the Texts page.
           </p>
         </div>
@@ -192,7 +192,7 @@ export default function ScheduledMessagesPage() {
                     <div className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(message.status)}`}>
                       {message.status.toUpperCase()}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-white/60">
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
@@ -200,7 +200,7 @@ export default function ScheduledMessagesPage() {
                         {message.leads?.first_name} {message.leads?.last_name}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-white/60">
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
@@ -208,9 +208,9 @@ export default function ScheduledMessagesPage() {
                     </div>
                   </div>
 
-                  <p className="text-white mb-3 line-clamp-2">{message.body}</p>
+                  <p className="text-slate-900 dark:text-slate-100 mb-3 line-clamp-2">{message.body}</p>
 
-                  <div className="flex items-center gap-4 text-sm text-white/60">
+                  <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                     <div className="flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

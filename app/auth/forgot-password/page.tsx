@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
 
           <Link
             href="/auth/login"
-            className="inline-block text-emerald-500 hover:text-emerald-400 font-semibold"
+            className="inline-block text-emerald-500 hover:text-teal-600 font-semibold"
           >
             Back to login
           </Link>
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
               style={{
                 background: 'rgba(255,255,255,0.06)',
                 border: '1px solid rgba(255,255,255,0.1)',
@@ -101,14 +101,14 @@ export default function ForgotPasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full bg-emerald-600 text-gray-900 py-3 rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? 'Sending...' : 'Send Reset Link'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <Link href="/auth/login" className="text-emerald-500 hover:text-emerald-400 font-semibold">
+          <Link href="/auth/login" className="text-emerald-500 hover:text-teal-600 font-semibold">
             Back to login
           </Link>
         </div>

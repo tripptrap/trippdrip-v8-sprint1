@@ -317,20 +317,20 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Bulk SMS</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Bulk SMS</h1>
           <p className="text-[var(--muted)] mt-1">Select leads by tags or campaign, then send messages</p>
         </div>
 
         {/* Points Balance */}
-        <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-400/20 border-emerald-500/30">
+        <div className="card bg-gradient-to-br from-sky-500/20 to-sky-400/20 border-sky-500/30">
           <div className="text-sm text-[var(--muted)] mb-1">Points Balance</div>
-          <div className="text-3xl font-bold text-white">{points.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-gray-900">{points.toLocaleString()}</div>
           <div className="text-xs text-[var(--muted)] mt-1">Each SMS costs 2 points</div>
         </div>
 
         {/* Filter by Tags */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-white mb-3">Filter by Tags</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Filter by Tags</h2>
           <p className="text-sm text-[var(--muted)] mb-4">Select one or more tags to target specific lead groups</p>
 
           {availableTags.length === 0 ? (
@@ -345,8 +345,8 @@ export default function BulkSMSPage() {
                   onClick={() => toggleTag(tag)}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     selectedTags.includes(tag)
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-white/5 text-white hover:bg-white/10'
+                      ? 'bg-sky-500 text-white'
+                      : 'bg-white text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:bg-slate-800'
                   }`}
                 >
                   {tag}
@@ -358,7 +358,7 @@ export default function BulkSMSPage() {
 
         {/* Filter by Campaign */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-white mb-3">Filter by Campaign</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Filter by Campaign</h2>
           <p className="text-sm text-[var(--muted)] mb-4">Select a specific campaign (optional) - auto-selects the campaign&apos;s flow</p>
 
           {availableCampaigns.length === 0 ? (
@@ -381,7 +381,7 @@ export default function BulkSMSPage() {
 
         {/* Select Flow (Optional) */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-white mb-3">Use a Flow (Optional)</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">Use a Flow (Optional)</h2>
           <p className="text-sm text-[var(--muted)] mb-4">Pre-fill your message with a conversation flow</p>
 
           {availableFlows.length === 0 ? (
@@ -402,7 +402,7 @@ export default function BulkSMSPage() {
           )}
 
           {selectedFlowId && (
-            <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <div className="mt-3 p-3 bg-sky-500/10 border border-sky-200 rounded-lg">
               <p className="text-sm text-blue-300">
                 The first message from this flow will be used. You can edit it in the next step.
               </p>
@@ -415,7 +415,7 @@ export default function BulkSMSPage() {
           <button
             onClick={loadFilteredLeads}
             disabled={selectedTags.length === 0 && !selectedCampaign}
-            className="flex-1 bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="flex-1 bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             Continue to Compose
           </button>
@@ -429,34 +429,34 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setStep('filter')} className="text-[var(--muted)] hover:text-white">
+          <button onClick={() => setStep('filter')} className="text-[var(--muted)] hover:text-gray-900">
             ← Back
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-white">Compose Message</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Compose Message</h1>
             <p className="text-[var(--muted)] mt-1">Write your message for {filteredLeads.length} leads</p>
           </div>
         </div>
 
         {/* Step Indicators */}
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">1. Filter</div>
-          <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-blue-300 text-sm">2. Compose</div>
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">3. Review</div>
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">4. Send</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">1. Filter</div>
+          <div className="px-3 py-1 rounded-full bg-sky-500/20 text-blue-300 text-sm">2. Compose</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">3. Review</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">4. Send</div>
         </div>
 
         {/* Selected Filters Summary */}
-        <div className="card bg-white/5">
-          <h3 className="text-sm font-medium text-white mb-2">Selected Filters:</h3>
+        <div className="card bg-white">
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Selected Filters:</h3>
           <div className="flex flex-wrap gap-2">
             {selectedTags.map(tag => (
-              <span key={tag} className="px-3 py-1 bg-emerald-500/20 text-blue-300 rounded-full text-sm">
+              <span key={tag} className="px-3 py-1 bg-sky-500/20 text-blue-300 rounded-full text-sm">
                 {tag}
               </span>
             ))}
             {selectedCampaign && (
-              <span className="px-3 py-1 bg-emerald-400/20 text-emerald-300 rounded-full text-sm">
+              <span className="px-3 py-1 bg-sky-500/20 text-sky-300 rounded-full text-sm">
                 Campaign: {availableCampaigns.find(c => c.id === selectedCampaign)?.name || selectedCampaign}
               </span>
             )}
@@ -465,7 +465,7 @@ export default function BulkSMSPage() {
 
         {/* Message Compose */}
         <div className="card">
-          <label className="block text-sm font-medium text-white mb-2">Message</label>
+          <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Message</label>
           <textarea
             value={messageBody}
             onChange={(e) => setMessageBody(e.target.value)}
@@ -484,9 +484,9 @@ export default function BulkSMSPage() {
 
           {/* Spam Detection Results */}
           {checkingSpam && (
-            <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+            <div className="mt-3 p-3 bg-white border border-slate-200 dark:border-slate-700 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                <div className="animate-spin h-4 w-4 border-2 border-emerald-400 border-t-transparent rounded-full"></div>
+                <div className="animate-spin h-4 w-4 border-2 border-sky-400 border-t-transparent rounded-full"></div>
                 Checking for spam trigger words...
               </div>
             </div>
@@ -499,8 +499,8 @@ export default function BulkSMSPage() {
                 spamCheck.spamDetection.isSpammy
                   ? spamCheck.spamDetection.spamScore >= 60
                     ? 'bg-red-500/10 border-red-500/30'
-                    : 'bg-emerald-400/10 border-emerald-400/30'
-                  : 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-sky-500/10 border-sky-400/30'
+                  : 'bg-sky-500/10 border-sky-500/30'
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -508,17 +508,17 @@ export default function BulkSMSPage() {
                       spamCheck.spamDetection.spamScore >= 60 ? (
                         <XCircle className="h-5 w-5 text-red-400" />
                       ) : (
-                        <AlertTriangle className="h-5 w-5 text-emerald-400" />
+                        <AlertTriangle className="h-5 w-5 text-sky-600" />
                       )
                     ) : (
-                      <CheckCircle className="h-5 w-5 text-emerald-400" />
+                      <CheckCircle className="h-5 w-5 text-sky-600" />
                     )}
                     <span className={`font-semibold ${
                       spamCheck.spamDetection.isSpammy
                         ? spamCheck.spamDetection.spamScore >= 60
                           ? 'text-red-300'
-                          : 'text-emerald-300'
-                        : 'text-emerald-300'
+                          : 'text-sky-300'
+                        : 'text-sky-300'
                     }`}>
                       {spamCheck.spamDetection.isSpammy
                         ? spamCheck.spamDetection.spamScore >= 60
@@ -531,21 +531,21 @@ export default function BulkSMSPage() {
                     spamCheck.spamDetection.isSpammy
                       ? spamCheck.spamDetection.spamScore >= 60
                         ? 'text-red-400'
-                        : 'text-emerald-400'
-                      : 'text-emerald-400'
+                        : 'text-sky-600'
+                      : 'text-sky-600'
                   }`}>
                     {spamCheck.spamDetection.spamScore}/100
                   </span>
                 </div>
 
                 {spamCheck.spamDetection.detectedWords.length > 0 && (
-                  <div className="text-sm text-white/80 mb-2">
+                  <div className="text-sm text-slate-700 dark:text-slate-300 mb-2">
                     Found {spamCheck.spamDetection.detectedWords.length} spam trigger word(s)
                   </div>
                 )}
 
                 {spamCheck.quality && spamCheck.quality.score < 70 && (
-                  <div className="text-sm text-white/60 mt-2">
+                  <div className="text-sm text-slate-600 dark:text-slate-400 mt-2">
                     Message Quality Score: {spamCheck.quality.score}/100
                   </div>
                 )}
@@ -553,9 +553,9 @@ export default function BulkSMSPage() {
 
               {/* Detected Words */}
               {spamCheck.spamDetection.detectedWords.length > 0 && (
-                <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
-                  <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-emerald-400" />
+                <div className="p-4 bg-white border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-sky-600" />
                     Detected Spam Words
                   </h4>
                   <div className="space-y-2">
@@ -565,13 +565,13 @@ export default function BulkSMSPage() {
                           item.severity === 'high'
                             ? 'bg-red-500/20 text-red-300'
                             : item.severity === 'medium'
-                            ? 'bg-emerald-400/20 text-emerald-300'
+                            ? 'bg-sky-500/20 text-sky-300'
                             : 'bg-yellow-500/20 text-yellow-300'
                         }`}>
                           {item.severity}
                         </span>
                         <div className="flex-1">
-                          <div className="text-white font-medium">"{item.word}"</div>
+                          <div className="text-slate-900 dark:text-slate-100 font-medium">"{item.word}"</div>
                           <div className="text-[var(--muted)] text-xs mt-1">
                             Alternatives: {item.alternatives.slice(0, 3).join(', ')}
                           </div>
@@ -582,7 +582,7 @@ export default function BulkSMSPage() {
 
                   <button
                     onClick={handleCleanMessage}
-                    className="mt-4 w-full bg-emerald-500/20 hover:bg-emerald-500/30 text-blue-300 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="mt-4 w-full bg-sky-500/20 hover:bg-sky-500/30 text-blue-300 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <Sparkles className="h-4 w-4" />
                     Auto-Clean Message
@@ -592,12 +592,12 @@ export default function BulkSMSPage() {
 
               {/* Quality Issues */}
               {spamCheck.quality && spamCheck.quality.issues.length > 0 && (
-                <div className="p-4 bg-white/5 border border-white/10 rounded-lg">
-                  <h4 className="text-sm font-semibold text-white mb-2">Quality Issues:</h4>
+                <div className="p-4 bg-white border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Quality Issues:</h4>
                   <ul className="space-y-1">
                     {spamCheck.quality.issues.map((issue: string, idx: number) => (
                       <li key={idx} className="text-sm text-[var(--muted)] flex items-start gap-2">
-                        <span className="text-emerald-400 mt-0.5">•</span>
+                        <span className="text-sky-600 mt-0.5">•</span>
                         {issue}
                       </li>
                     ))}
@@ -607,12 +607,12 @@ export default function BulkSMSPage() {
 
               {/* Recommendations */}
               {spamCheck.quality && spamCheck.quality.recommendations.length > 0 && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                <div className="p-4 bg-sky-500/10 border border-sky-200 rounded-lg">
                   <h4 className="text-sm font-semibold text-blue-300 mb-2">Recommendations:</h4>
                   <ul className="space-y-1">
                     {spamCheck.quality.recommendations.map((rec: string, idx: number) => (
-                      <li key={idx} className="text-sm text-white/80 flex items-start gap-2">
-                        <span className="text-emerald-400 mt-0.5">→</span>
+                      <li key={idx} className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                        <span className="text-sky-600 mt-0.5">→</span>
                         {rec}
                       </li>
                     ))}
@@ -625,9 +625,9 @@ export default function BulkSMSPage() {
 
         {/* Preview */}
         {messageBody && filteredLeads[0] && (
-          <div className="card bg-emerald-500/10 border-emerald-500/20">
+          <div className="card bg-sky-500/10 border-sky-200">
             <h3 className="text-sm font-medium text-blue-300 mb-2">Preview (for {filteredLeads[0].first_name}):</h3>
-            <p className="text-white">
+            <p className="text-slate-900 dark:text-slate-100">
               {messageBody
                 .replace(/\{\{first\}\}/gi, filteredLeads[0].first_name || 'there')
                 .replace(/\{\{last\}\}/gi, filteredLeads[0].last_name || '')
@@ -640,14 +640,14 @@ export default function BulkSMSPage() {
         <div className="flex gap-3">
           <button
             onClick={() => setStep('filter')}
-            className="px-6 py-3 bg-white/5 text-white rounded-lg hover:bg-white/10"
+            className="px-6 py-3 bg-white text-slate-900 dark:text-slate-100 rounded-lg hover:bg-slate-50 dark:bg-slate-800"
           >
             Back to Filters
           </button>
           <button
             onClick={handleNextFromCompose}
             disabled={!messageBody.trim()}
-            className="flex-1 bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="flex-1 bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             Review Before Sending
           </button>
@@ -663,42 +663,42 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setStep('compose')} className="text-[var(--muted)] hover:text-white">
+          <button onClick={() => setStep('compose')} className="text-[var(--muted)] hover:text-gray-900">
             ← Back
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-white">Review & Send</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Review & Send</h1>
             <p className="text-[var(--muted)] mt-1">Review your bulk SMS campaign before sending</p>
           </div>
         </div>
 
         {/* Step Indicators */}
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">1. Filter</div>
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">2. Compose</div>
-          <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-blue-300 text-sm">3. Review</div>
-          <div className="px-3 py-1 rounded-full bg-white/5 text-[var(--muted)] text-sm">4. Send</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">1. Filter</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">2. Compose</div>
+          <div className="px-3 py-1 rounded-full bg-sky-500/20 text-blue-300 text-sm">3. Review</div>
+          <div className="px-3 py-1 rounded-full bg-white text-[var(--muted)] text-sm">4. Send</div>
         </div>
 
         {/* Summary Card */}
-        <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-400/20 border-emerald-500/30">
-          <h2 className="text-lg font-semibold text-white mb-4">Campaign Summary</h2>
+        <div className="card bg-gradient-to-br from-sky-500/20 to-sky-400/20 border-sky-500/30">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Campaign Summary</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-[var(--muted)]">Recipients</div>
-              <div className="text-2xl font-bold text-white">{filteredLeads.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{filteredLeads.length}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Total Cost</div>
-              <div className="text-2xl font-bold text-white">{totalCost} points</div>
+              <div className="text-2xl font-bold text-gray-900">{totalCost} points</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Current Balance</div>
-              <div className="text-2xl font-bold text-white">{points} points</div>
+              <div className="text-2xl font-bold text-gray-900">{points} points</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">After Sending</div>
-              <div className={`text-2xl font-bold ${points - totalCost < 100 ? 'text-emerald-400' : 'text-emerald-400'}`}>
+              <div className={`text-2xl font-bold ${points - totalCost < 100 ? 'text-sky-600' : 'text-sky-600'}`}>
                 {points - totalCost} points
               </div>
             </div>
@@ -707,23 +707,23 @@ export default function BulkSMSPage() {
 
         {/* Message Preview */}
         <div className="card">
-          <h3 className="text-sm font-medium text-white mb-2">Message:</h3>
-          <div className="bg-white/5 rounded-lg p-4">
-            <p className="text-white whitespace-pre-wrap">{messageBody}</p>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Message:</h3>
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-slate-900 dark:text-slate-100 whitespace-pre-wrap">{messageBody}</p>
           </div>
         </div>
 
         {/* Filters Summary */}
         <div className="card">
-          <h3 className="text-sm font-medium text-white mb-2">Targeting:</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Targeting:</h3>
           <div className="flex flex-wrap gap-2">
             {selectedTags.map(tag => (
-              <span key={tag} className="px-3 py-1 bg-emerald-500/20 text-blue-300 rounded-full text-sm">
+              <span key={tag} className="px-3 py-1 bg-sky-500/20 text-blue-300 rounded-full text-sm">
                 {tag}
               </span>
             ))}
             {selectedCampaign && (
-              <span className="px-3 py-1 bg-emerald-400/20 text-emerald-300 rounded-full text-sm">
+              <span className="px-3 py-1 bg-sky-500/20 text-sky-300 rounded-full text-sm">
                 Campaign: {availableCampaigns.find(c => c.id === selectedCampaign)?.name || selectedCampaign}
               </span>
             )}
@@ -744,14 +744,14 @@ export default function BulkSMSPage() {
         <div className="flex gap-3">
           <button
             onClick={() => setStep('compose')}
-            className="px-6 py-3 bg-white/5 text-white rounded-lg hover:bg-white/10"
+            className="px-6 py-3 bg-white text-slate-900 dark:text-slate-100 rounded-lg hover:bg-slate-50 dark:bg-slate-800"
           >
             Back to Edit
           </button>
           <button
             onClick={handleSendMessages}
             disabled={points < totalCost}
-            className="flex-1 bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="flex-1 bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             Send {filteredLeads.length} Messages
           </button>
@@ -769,7 +769,7 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Sending Messages</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Sending Messages</h1>
           <p className="text-[var(--muted)] mt-1">Please wait while we send your messages...</p>
         </div>
 
@@ -777,18 +777,18 @@ export default function BulkSMSPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-[var(--muted)]">Progress</span>
-            <span className="text-sm font-medium text-white">{sendResults.length} / {filteredLeads.length}</span>
+            <span className="text-sm font-medium text-gray-900">{sendResults.length} / {filteredLeads.length}</span>
           </div>
-          <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-slate-50 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-emerald-500 to-emerald-500 h-full transition-all duration-300"
+              className="bg-gradient-to-r from-sky-500 to-sky-500 h-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-[var(--muted)]">Sent</div>
-              <div className="text-xl font-bold text-emerald-400">{successCount}</div>
+              <div className="text-xl font-bold text-sky-600">{successCount}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Failed</div>
@@ -799,18 +799,18 @@ export default function BulkSMSPage() {
 
         {/* Live Results */}
         <div className="card">
-          <h3 className="text-sm font-medium text-white mb-3">Recent Activity:</h3>
+          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">Recent Activity:</h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {sendResults.slice(-10).reverse().map((result, idx) => (
               <div
                 key={idx}
-                className={`p-3 rounded-lg ${result.success ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}
+                className={`p-3 rounded-lg ${result.success ? 'bg-sky-500/10' : 'bg-red-500/10'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-white">
+                  <span className="text-sm text-gray-900">
                     {result.lead.first_name} {result.lead.last_name} - {result.lead.phone}
                   </span>
-                  <span className={`text-xs ${result.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-xs ${result.success ? 'text-sky-600' : 'text-red-400'}`}>
                     {result.success ? 'Sent' : 'Failed'}
                   </span>
                 </div>
@@ -833,21 +833,21 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Campaign Complete</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Campaign Complete</h1>
           <p className="text-[var(--muted)] mt-1">Your bulk SMS campaign has finished sending</p>
         </div>
 
         {/* Results Summary */}
-        <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-500/20 border-emerald-500/30">
-          <h2 className="text-lg font-semibold text-white mb-4">Results</h2>
+        <div className="card bg-gradient-to-br from-sky-500/20 to-sky-500/20 border-sky-500/30">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Results</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="text-sm text-[var(--muted)]">Total Sent</div>
-              <div className="text-2xl font-bold text-white">{filteredLeads.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{filteredLeads.length}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Successful</div>
-              <div className="text-2xl font-bold text-emerald-400">{successCount}</div>
+              <div className="text-2xl font-bold text-sky-600">{successCount}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Failed</div>
@@ -859,12 +859,12 @@ export default function BulkSMSPage() {
         {/* Failed Messages */}
         {failedCount > 0 && (
           <div className="card">
-            <h3 className="text-sm font-medium text-white mb-3">Failed Messages:</h3>
+            <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">Failed Messages:</h3>
             <div className="space-y-2">
               {sendResults.filter(r => !r.success).map((result, idx) => (
                 <div key={idx} className="p-3 bg-red-500/10 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-gray-900">
                       {result.lead.first_name} {result.lead.last_name} - {result.lead.phone}
                     </span>
                   </div>
@@ -881,7 +881,7 @@ export default function BulkSMSPage() {
         <div className="flex gap-3">
           <button
             onClick={resetFlow}
-            className="flex-1 bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 font-medium"
+            className="flex-1 bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 font-medium"
           >
             Send Another Campaign
           </button>

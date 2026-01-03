@@ -115,7 +115,7 @@ export default function SMSAnalyticsPage() {
     }
     if (deliveredAt || status === 'delivered') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-700">
           <CheckCircle className="w-3 h-3" />
           Delivered
         </span>
@@ -123,7 +123,7 @@ export default function SMSAnalyticsPage() {
     }
     if (status === 'sent') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-emerald-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-sky-700">
           <CheckCircle className="w-3 h-3" />
           Sent
         </span>
@@ -168,12 +168,12 @@ export default function SMSAnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">SMS Analytics</h1>
-          <p className="text-gray-600">Track your SMS campaigns and delivery rates</p>
+          <p className="text-slate-600 dark:text-slate-400">Track your SMS campaigns and delivery rates</p>
         </div>
         <button
           onClick={exportToCSV}
           disabled={messages.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Download className="w-4 h-4" />
           Export CSV
@@ -182,61 +182,61 @@ export default function SMSAnalyticsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <MessageSquare className="w-5 h-5 text-emerald-600" />
+              <MessageSquare className="w-5 h-5 text-sky-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Sent</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Sent</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalSent}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
+            <div className="p-2 bg-sky-100 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-sky-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Delivered</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Delivered</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalDelivered}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 rounded-lg">
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Failed</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Failed</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalFailed}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
+            <div className="p-2 bg-sky-100 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-sky-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Delivery Rate</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Delivery Rate</p>
               <p className="text-2xl font-bold text-gray-900">{stats.deliveryRate.toFixed(1)}%</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-yellow-100 rounded-lg">
               <DollarSign className="w-5 h-5 text-yellow-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Cost</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Cost</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalCost} pts</p>
             </div>
           </div>
@@ -244,17 +244,17 @@ export default function SMSAnalyticsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
+            <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Filters:</span>
           </div>
 
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
@@ -265,7 +265,7 @@ export default function SMSAnalyticsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
           >
             <option value="all">All Statuses</option>
             <option value="delivered">Delivered</option>
@@ -279,7 +279,7 @@ export default function SMSAnalyticsPage() {
                 setDateFilter('all');
                 setStatusFilter('all');
               }}
-              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+              className="text-sm text-sky-600 hover:text-sky-700 font-medium"
             >
               Clear Filters
             </button>
@@ -295,30 +295,30 @@ export default function SMSAnalyticsPage() {
       )}
 
       {/* Messages Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Recipient
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Lead
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Campaign
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Message
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Cost
                 </th>
               </tr>
@@ -326,40 +326,40 @@ export default function SMSAnalyticsPage() {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                     Loading analytics...
                   </td>
                 </tr>
               ) : messages.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                     No SMS messages found. Send your first SMS to see analytics here.
                   </td>
                 </tr>
               ) : (
                 messages.map((message) => (
-                  <tr key={message.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                  <tr key={message.id} className="hover:bg-slate-50 dark:bg-slate-800">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {formatDate(message.sent_at)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {formatPhone(message.to_phone)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {message.lead ? (
                         <span>{message.lead.first_name} {message.lead.last_name}</span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-slate-400 dark:text-slate-500">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {message.campaign ? (
                         <span>{message.campaign.name}</span>
                       ) : (
-                        <span className="text-gray-400">Manual</span>
+                        <span className="text-slate-400 dark:text-slate-500">Manual</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-xs truncate">
                       {message.message_body}
                       {message.twilio_error_message && (
                         <div className="text-xs text-red-600 mt-1">
@@ -370,7 +370,7 @@ export default function SMSAnalyticsPage() {
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {getStatusBadge(message.twilio_status, message.failed_at, message.delivered_at)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {message.cost_points} pt{message.cost_points !== 1 ? 's' : ''}
                     </td>
                   </tr>

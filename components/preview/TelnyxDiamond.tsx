@@ -14,124 +14,24 @@ export default function TelnyxDiamond() {
           className="relative w-full h-full flex items-center justify-center"
           style={{ transformStyle: 'preserve-3d' }}
           animate={{
-            rotateY: [0, 8, 0, -8, 0],
-            rotateX: [0, 4, 0, -4, 0],
+            rotateY: [0, 10, 0, -10, 0],
+            rotateX: [0, 5, 0, -5, 0],
           }}
           transition={{
-            rotateY: { duration: 8, repeat: Infinity, ease: 'easeInOut' },
-            rotateX: { duration: 6, repeat: Infinity, ease: 'easeInOut' },
+            rotateY: { duration: 10, repeat: Infinity, ease: 'easeInOut' },
+            rotateX: { duration: 8, repeat: Infinity, ease: 'easeInOut' },
           }}
         >
-          {/* HyveWyre Honeycomb Logo */}
+          {/* Central Glowing Orb */}
           <motion.div
-            className="relative"
-            animate={{
-              scale: [1, 1.03, 1],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
+            className="absolute w-20 h-20 md:w-24 md:h-24 rounded-full"
             style={{
-              filter: 'drop-shadow(0 20px 60px rgba(6, 182, 212, 0.4)) drop-shadow(0 10px 30px rgba(45, 212, 191, 0.3))',
-            }}
-          >
-            <svg
-              width="220"
-              height="260"
-              viewBox="0 0 260 280"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="md:w-[280px] md:h-[330px]"
-            >
-              <defs>
-                <linearGradient id="hiveGradient" x1="130" y1="0" x2="130" y2="280" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="100%" stopColor="#06b6d4" />
-                </linearGradient>
-              </defs>
-
-              {/* Honeycomb structure centered at 130, 140 */}
-              <g transform="translate(130, 120)">
-                {/* Row 1: 1 hexagon at top */}
-                <path
-                  d="M 0,-80 L 30,-60 L 30,-20 L 0,0 L -30,-20 L -30,-60 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-
-                {/* Row 2: 2 hexagons */}
-                <path
-                  d="M -40,-40 L -10,-20 L -10,20 L -40,40 L -70,20 L -70,-20 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M 40,-40 L 70,-20 L 70,20 L 40,40 L 10,20 L 10,-20 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-
-                {/* Row 3: 3 hexagons */}
-                <path
-                  d="M -80,0 L -50,20 L -50,60 L -80,80 L -110,60 L -110,20 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M 0,0 L 30,20 L 30,60 L 0,80 L -30,60 L -30,20 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M 80,0 L 110,20 L 110,60 L 80,80 L 50,60 L 50,20 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-
-                {/* Row 4: 2 hexagons at bottom */}
-                <path
-                  d="M -40,40 L -10,60 L -10,100 L -40,120 L -70,100 L -70,60 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M 40,40 L 70,60 L 70,100 L 40,120 L 10,100 L 10,60 Z"
-                  stroke="url(#hiveGradient)"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeLinejoin="round"
-                />
-              </g>
-            </svg>
-          </motion.div>
-
-          {/* Glow Ring Layer */}
-          <motion.div
-            className="absolute w-[240px] h-[280px] md:w-[300px] md:h-[350px] rounded-[30px]"
-            style={{
-              background: 'transparent',
-              border: '2px solid rgba(45, 212, 191, 0.2)',
-              transform: 'translateZ(-20px)',
+              background: 'radial-gradient(circle, rgba(20, 184, 166, 0.8) 0%, rgba(6, 182, 212, 0.4) 50%, transparent 70%)',
+              boxShadow: '0 0 60px rgba(20, 184, 166, 0.6), 0 0 100px rgba(6, 182, 212, 0.4)',
             }}
             animate={{
-              opacity: [0.2, 0.4, 0.2],
-              scale: [1, 1.05, 1],
+              scale: [1, 1.2, 1],
+              opacity: [0.8, 1, 0.8],
             }}
             transition={{
               duration: 3,
@@ -139,79 +39,167 @@ export default function TelnyxDiamond() {
               ease: 'easeInOut',
             }}
           />
+
+          {/* Orbiting Ring 1 */}
+          <motion.div
+            className="absolute w-48 h-48 md:w-64 md:h-64 rounded-full border-2 border-sky-400/30"
+            style={{ transformStyle: 'preserve-3d' }}
+            animate={{
+              rotateX: [60, 60, 60],
+              rotateZ: [0, 360],
+            }}
+            transition={{
+              rotateZ: { duration: 12, repeat: Infinity, ease: 'linear' },
+            }}
+          >
+            {/* Orbit dot */}
+            <motion.div
+              className="absolute w-3 h-3 md:w-4 md:h-4 bg-sky-400 rounded-full"
+              style={{
+                top: '-6px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                boxShadow: '0 0 20px rgba(20, 184, 166, 0.8)',
+              }}
+            />
+          </motion.div>
+
+          {/* Orbiting Ring 2 */}
+          <motion.div
+            className="absolute w-56 h-56 md:w-72 md:h-72 rounded-full border border-cyan-400/20"
+            style={{ transformStyle: 'preserve-3d' }}
+            animate={{
+              rotateX: [-60, -60, -60],
+              rotateY: [30, 30, 30],
+              rotateZ: [0, -360],
+            }}
+            transition={{
+              rotateZ: { duration: 15, repeat: Infinity, ease: 'linear' },
+            }}
+          >
+            {/* Orbit dot */}
+            <motion.div
+              className="absolute w-2 h-2 md:w-3 md:h-3 bg-cyan-400 rounded-full"
+              style={{
+                top: '-4px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                boxShadow: '0 0 15px rgba(6, 182, 212, 0.8)',
+              }}
+            />
+          </motion.div>
+
+          {/* Orbiting Ring 3 - Vertical */}
+          <motion.div
+            className="absolute w-40 h-40 md:w-52 md:h-52 rounded-full border border-sky-300/25"
+            style={{ transformStyle: 'preserve-3d' }}
+            animate={{
+              rotateY: [90, 90, 90],
+              rotateZ: [0, 360],
+            }}
+            transition={{
+              rotateZ: { duration: 10, repeat: Infinity, ease: 'linear' },
+            }}
+          >
+            {/* Orbit dot */}
+            <motion.div
+              className="absolute w-2 h-2 bg-sky-300 rounded-full"
+              style={{
+                top: '-4px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                boxShadow: '0 0 12px rgba(94, 234, 212, 0.8)',
+              }}
+            />
+          </motion.div>
+
+          {/* Floating Hexagon Outlines */}
+          <motion.svg
+            className="absolute w-32 h-32 md:w-40 md:h-40"
+            viewBox="0 0 100 100"
+            style={{ transform: 'translateZ(30px)' }}
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              rotate: { duration: 20, repeat: Infinity, ease: 'linear' },
+              scale: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
+            }}
+          >
+            <polygon
+              points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5"
+              fill="none"
+              stroke="url(#hexGrad)"
+              strokeWidth="1.5"
+              opacity="0.4"
+            />
+            <defs>
+              <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#14b8a6" />
+                <stop offset="100%" stopColor="#06b6d4" />
+              </linearGradient>
+            </defs>
+          </motion.svg>
+
+          {/* Inner Hexagon */}
+          <motion.svg
+            className="absolute w-20 h-20 md:w-24 md:h-24"
+            viewBox="0 0 100 100"
+            style={{ transform: 'translateZ(50px)' }}
+            animate={{
+              rotate: [0, -360],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              rotate: { duration: 15, repeat: Infinity, ease: 'linear' },
+              opacity: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
+            }}
+          >
+            <polygon
+              points="50,10 85,30 85,70 50,90 15,70 15,30"
+              fill="none"
+              stroke="#14b8a6"
+              strokeWidth="2"
+              opacity="0.5"
+            />
+          </motion.svg>
         </motion.div>
       </div>
 
       {/* Floating Particles */}
-      <motion.div
-        className="absolute w-3 h-3 bg-teal-400 rounded-full"
-        style={{ top: '15%', left: '20%', filter: 'blur(1px)' }}
-        animate={{
-          y: [-15, 15, -15],
-          x: [-8, 8, -8],
-          opacity: [0.4, 0.8, 0.4],
-          scale: [1, 1.2, 1],
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
-
-      <motion.div
-        className="absolute w-2 h-2 bg-cyan-400 rounded-full"
-        style={{ top: '70%', left: '15%', filter: 'blur(1px)' }}
-        animate={{
-          y: [10, -20, 10],
-          x: [5, -10, 5],
-          opacity: [0.3, 0.7, 0.3],
-        }}
-        transition={{
-          duration: 5,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 1,
-        }}
-      />
-
-      <motion.div
-        className="absolute w-4 h-4 bg-teal-300 rounded-full"
-        style={{ top: '25%', right: '10%', filter: 'blur(2px)' }}
-        animate={{
-          y: [-20, 20, -20],
-          x: [10, -5, 10],
-          opacity: [0.5, 0.9, 0.5],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 0.5,
-        }}
-      />
-
-      <motion.div
-        className="absolute w-2.5 h-2.5 bg-cyan-300 rounded-full"
-        style={{ bottom: '20%', right: '25%', filter: 'blur(1px)' }}
-        animate={{
-          y: [15, -15, 15],
-          x: [-10, 10, -10],
-          opacity: [0.4, 0.8, 0.4],
-        }}
-        transition={{
-          duration: 4.5,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 2,
-        }}
-      />
+      {[...Array(6)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            width: `${8 + (i % 3) * 4}px`,
+            height: `${8 + (i % 3) * 4}px`,
+            background: i % 2 === 0 ? '#14b8a6' : '#06b6d4',
+            top: `${15 + (i * 12)}%`,
+            left: i % 2 === 0 ? `${10 + (i * 5)}%` : `${70 + (i * 4)}%`,
+            filter: 'blur(1px)',
+          }}
+          animate={{
+            y: [0, -20, 0, 20, 0],
+            x: [0, 10, 0, -10, 0],
+            opacity: [0.3, 0.7, 0.3],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 4 + i * 0.5,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: i * 0.3,
+          }}
+        />
+      ))}
 
       {/* Ambient Glow Effect */}
       <div
         className="absolute top-1/2 left-1/2 w-[300px] h-[300px] md:w-[400px] md:h-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(45, 212, 191, 0.15) 0%, rgba(6, 182, 212, 0.05) 50%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, rgba(6, 182, 212, 0.08) 40%, transparent 70%)',
         }}
       />
     </div>

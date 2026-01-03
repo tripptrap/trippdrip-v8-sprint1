@@ -117,7 +117,7 @@ export default function CalendarPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Google Calendar</h1>
-        <div className="card p-8 text-center text-white/60">Loading...</div>
+        <div className="card p-8 text-center text-slate-600 dark:text-slate-400">Loading...</div>
       </div>
     );
   }
@@ -126,47 +126,47 @@ export default function CalendarPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Google Calendar</h1>
-        <p className="text-white/70 mt-1">Connect your Google Calendar to enable AI-powered appointment scheduling</p>
+        <p className="text-slate-700 dark:text-slate-300 mt-1">Connect your Google Calendar to enable AI-powered appointment scheduling</p>
       </div>
 
       {calendarConnected ? (
         <div className="space-y-4">
-          <div className="card bg-emerald-500/10 border-emerald-500/30">
-            <h3 className="text-lg font-semibold text-emerald-400 mb-2">Calendar Connected</h3>
-            <p className="text-white/80">
+          <div className="card bg-sky-500/10 border-sky-500/30">
+            <h3 className="text-lg font-semibold text-sky-600 mb-2">Calendar Connected</h3>
+            <p className="text-slate-700 dark:text-slate-300">
               Your Google Calendar is connected and ready to use.
             </p>
           </div>
 
           <div className="card">
             <h3 className="text-lg font-medium mb-3">What You Can Do</h3>
-            <ul className="text-white/70 space-y-2">
+            <ul className="text-slate-700 dark:text-slate-300 space-y-2">
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>AI can check your availability before scheduling meetings</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Automatically create calendar events when booking appointments</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Send calendar invites to leads via email</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Sync all lead interactions to your calendar</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Get email and popup reminders for upcoming appointments</span>
@@ -179,7 +179,7 @@ export default function CalendarPage() {
             <button
               onClick={handleDisconnectCalendar}
               disabled={disconnectingCalendar}
-              className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              className="bg-red-500 hover:bg-red-600 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
             >
               {disconnectingCalendar ? 'Disconnecting...' : 'Disconnect Calendar'}
             </button>
@@ -187,15 +187,15 @@ export default function CalendarPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="card bg-emerald-500/10 border-emerald-500/30">
-            <h3 className="text-xl font-semibold mb-3 text-emerald-400">Connect Google Calendar</h3>
-            <p className="text-white/80 mb-4">
+          <div className="card bg-sky-500/10 border-sky-500/30">
+            <h3 className="text-xl font-semibold mb-3 text-sky-600">Connect Google Calendar</h3>
+            <p className="text-slate-700 dark:text-slate-300 mb-4">
               Connect your Google Calendar to enable smart scheduling features powered by AI.
             </p>
             <button
               onClick={handleConnectCalendar}
               disabled={connectingCalendar}
-              className="bg-gradient-to-r from-emerald-400 to-teal-400 text-white px-8 py-3 rounded-lg hover:opacity-90 font-medium disabled:opacity-50 transition-all shadow-lg"
+              className="bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 px-8 py-3 rounded-lg hover:opacity-90 font-medium disabled:opacity-50 transition-all shadow-lg"
             >
               {connectingCalendar ? 'Connecting...' : 'Connect Google Calendar'}
             </button>
@@ -203,39 +203,39 @@ export default function CalendarPage() {
 
           <div className="card">
             <h3 className="text-lg font-medium mb-3">Features You'll Get</h3>
-            <ul className="text-white/70 space-y-2">
+            <ul className="text-slate-700 dark:text-slate-300 space-y-2">
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>AI checks your calendar before suggesting meeting times</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Automatically create appointments when AI books meetings</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Send calendar invitations to leads</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Track all interactions in one place</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Email and popup reminders</span>
               </li>
               <li className="flex items-start">
-                <svg className="w-5 h-5 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-sky-600 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Completely free - no additional costs</span>
@@ -245,7 +245,7 @@ export default function CalendarPage() {
 
           <div className="card bg-yellow-500/10 border-yellow-500/30">
             <h3 className="text-lg font-medium text-yellow-400 mb-3">Privacy & Security</h3>
-            <ul className="text-white/70 space-y-2">
+            <ul className="text-slate-700 dark:text-slate-300 space-y-2">
               <li className="flex items-start">
                 <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

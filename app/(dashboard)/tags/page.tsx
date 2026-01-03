@@ -337,27 +337,27 @@ export default function TagsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Tags</h1>
-          <p className="text-[#9fb0c3] mt-1">Organize and filter your leads by tags</p>
+          <p className="text-slate-600 dark:text-slate-400 mt-1">Organize and filter your leads by tags</p>
         </div>
         <div className="flex gap-2">
           {activeTab === 'tags' ? (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600"
+              className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600"
             >
               Create Tag
             </button>
           ) : (
             <button
               onClick={() => setShowGroupModal(true)}
-              className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600"
+              className="bg-indigo-500 text-slate-900 dark:text-slate-100 px-4 py-2 rounded-lg hover:bg-indigo-600"
             >
               Create Group
             </button>
           )}
           <Link
             href="/leads"
-            className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600"
           >
             Manage Leads
           </Link>
@@ -365,13 +365,13 @@ export default function TagsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-[#0c1420] rounded-lg w-fit">
+      <div className="flex gap-1 p-1 bg-slate-50 dark:bg-slate-800 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('tags')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition ${
             activeTab === 'tags'
-              ? 'bg-emerald-500 text-white'
-              : 'text-[#9fb0c3] hover:text-white hover:bg-[#1a2535]'
+              ? 'bg-sky-500 text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:bg-slate-800'
           }`}
         >
           Tags ({tags.length})
@@ -380,8 +380,8 @@ export default function TagsPage() {
           onClick={() => setActiveTab('groups')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition ${
             activeTab === 'groups'
-              ? 'bg-indigo-500 text-white'
-              : 'text-[#9fb0c3] hover:text-white hover:bg-[#1a2535]'
+              ? 'bg-indigo-500 text-gray-900'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:bg-slate-800'
           }`}
         >
           Groups ({tagGroups.length})
@@ -405,15 +405,15 @@ export default function TagsPage() {
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Total Tags</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Tags</div>
               <div className="text-3xl font-bold">{tags.length}</div>
             </div>
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Total Tagged Leads</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Tagged Leads</div>
               <div className="text-3xl font-bold">{totalLeads.toLocaleString()}</div>
             </div>
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Average per Tag</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Average per Tag</div>
               <div className="text-3xl font-bold">
                 {tags.length > 0 ? Math.round(totalLeads / tags.length) : 0}
               </div>
@@ -423,16 +423,16 @@ export default function TagsPage() {
           {/* Tags Grid */}
           <div className="card p-0">
             {loading ? (
-              <div className="p-8 text-center text-[#9fb0c3]">Loading tags...</div>
+              <div className="p-8 text-center text-slate-600 dark:text-slate-400">Loading tags...</div>
             ) : filteredTags.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="text-[#9fb0c3] mb-4">
+                <div className="text-slate-600 dark:text-slate-400 mb-4">
                   {searchQuery ? 'No tags found matching your search.' : 'No tags yet.'}
                 </div>
                 {!searchQuery && (
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="text-emerald-400 hover:underline"
+                    className="text-sky-600 hover:underline"
                   >
                     Create your first tag
                   </button>
@@ -467,13 +467,13 @@ export default function TagsPage() {
                             style={{ width: `${percentage}%`, backgroundColor: tag.color }}
                           />
                         </div>
-                        <div className="text-sm text-[#9fb0c3] mb-3">
+                        <div className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                           {percentage.toFixed(1)}% of all tagged leads
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => openEditModal(tag)}
-                            className="flex-1 text-sm px-3 py-1 bg-blue-900/20 text-emerald-400 rounded hover:bg-blue-900/30"
+                            className="flex-1 text-sm px-3 py-1 bg-blue-50 text-sky-600 rounded hover:bg-blue-900/30"
                           >
                             Edit
                           </button>
@@ -485,7 +485,7 @@ export default function TagsPage() {
                           </button>
                           <Link
                             href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                            className="flex-1 text-sm px-3 py-1 bg-[#0c1420]/30 text-[#9fb0c3] rounded hover:bg-[#0c1420]/50 text-center"
+                            className="flex-1 text-sm px-3 py-1 bg-slate-50 dark:bg-slate-800/30 text-slate-600 dark:text-slate-400 rounded hover:bg-slate-50 dark:bg-slate-800/50 text-center"
                           >
                             View
                           </Link>
@@ -506,17 +506,17 @@ export default function TagsPage() {
           {/* Groups Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Total Groups</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Groups</div>
               <div className="text-3xl font-bold text-indigo-400">{tagGroups.length}</div>
             </div>
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Tags in Groups</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Tags in Groups</div>
               <div className="text-3xl font-bold text-indigo-400">
                 {tagGroups.reduce((sum, g) => sum + g.tags.length, 0)}
               </div>
             </div>
             <div className="card">
-              <div className="text-sm text-[#9fb0c3] mb-1">Total Grouped Leads</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Grouped Leads</div>
               <div className="text-3xl font-bold text-indigo-400">
                 {tagGroups.reduce((sum, g) => sum + getGroupLeadCount(g), 0).toLocaleString()}
               </div>
@@ -527,7 +527,7 @@ export default function TagsPage() {
           <div className="card p-0">
             {tagGroups.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="text-[#9fb0c3] mb-4">No tag groups yet.</div>
+                <div className="text-slate-600 dark:text-slate-400 mb-4">No tag groups yet.</div>
                 <button
                   onClick={() => setShowGroupModal(true)}
                   className="text-indigo-400 hover:underline"
@@ -545,7 +545,7 @@ export default function TagsPage() {
                       return (
                         <div
                           key={group.id}
-                          className="block p-4 border border-[#223246] rounded-lg hover:shadow-md transition-all bg-[#0c1420]"
+                          className="block p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-md transition-all bg-slate-50 dark:bg-slate-800"
                           style={{ borderLeft: `4px solid ${group.color}` }}
                         >
                           <div className="flex items-center justify-between mb-3">
@@ -554,7 +554,7 @@ export default function TagsPage() {
                                 className="w-4 h-4 rounded"
                                 style={{ backgroundColor: group.color }}
                               />
-                              <h3 className="font-semibold text-lg text-[#e7eef9]">{group.name}</h3>
+                              <h3 className="font-semibold text-lg text-gray-900">{group.name}</h3>
                             </div>
                             <span className="text-xl font-bold" style={{ color: group.color }}>
                               {leadCount}
@@ -562,14 +562,14 @@ export default function TagsPage() {
                           </div>
 
                           <div className="mb-3">
-                            <div className="text-xs text-[#9fb0c3] mb-2">{group.tags.length} tags in this group:</div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400 mb-2">{group.tags.length} tags in this group:</div>
                             <div className="flex flex-wrap gap-1">
                               {group.tags.slice(0, 5).map((tagName) => {
                                 const tag = tags.find(t => t.name === tagName);
                                 return (
                                   <span
                                     key={tagName}
-                                    className="px-2 py-0.5 rounded-full text-xs text-white"
+                                    className="px-2 py-0.5 rounded-full text-xs text-gray-900"
                                     style={{ backgroundColor: tag?.color || '#6b7280' }}
                                   >
                                     {tagName}
@@ -577,7 +577,7 @@ export default function TagsPage() {
                                 );
                               })}
                               {group.tags.length > 5 && (
-                                <span className="px-2 py-0.5 rounded-full text-xs bg-[#1a2535] text-[#9fb0c3]">
+                                <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                                   +{group.tags.length - 5} more
                                 </span>
                               )}
@@ -593,13 +593,13 @@ export default function TagsPage() {
                             </button>
                             <button
                               onClick={() => deleteTagGroup(group.id)}
-                              className="flex-1 text-sm px-3 py-1 bg-red-900/20 text-red-400 rounded hover:bg-red-900/30"
+                              className="flex-1 text-sm px-3 py-1 bg-red-50 text-red-400 rounded hover:bg-red-900/30"
                             >
                               Delete
                             </button>
                             <Link
                               href={`/leads?tags=${encodeURIComponent(group.tags.join(','))}`}
-                              className="flex-1 text-sm px-3 py-1 bg-[#1a2535] text-[#9fb0c3] rounded hover:bg-[#223246] text-center"
+                              className="flex-1 text-sm px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded hover:bg-[#223246] text-center"
                             >
                               View
                             </Link>
@@ -617,33 +617,33 @@ export default function TagsPage() {
       {/* Create/Edit Modal */}
       {(showCreateModal || editingTag) && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-semibold mb-4 text-[#e7eef9]">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">
               {editingTag ? 'Edit Tag' : 'Create New Tag'}
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1 text-[#9fb0c3]">Tag Name</label>
+                <label className="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Tag Name</label>
                 <input
                   type="text"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value)}
                   placeholder="Enter tag name"
-                  className="w-full px-3 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder:text-[#5a6b7f] outline-none focus:border-[#3b82f6]"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 outline-none focus:border-sky-500"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2 text-[#9fb0c3]">Tag Color</label>
+                <label className="block text-sm font-medium mb-2 text-slate-600 dark:text-slate-400">Tag Color</label>
                 <div className="grid grid-cols-5 gap-2 mb-3">
                   {PRESET_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setNewTagColor(color)}
                       className={`w-full h-10 rounded-lg border-2 transition-all ${
-                        newTagColor === color ? 'border-[#60a5fa] scale-110' : 'border-[#223246]'
+                        newTagColor === color ? 'border-[#60a5fa] scale-110' : 'border-slate-200 dark:border-slate-700'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -654,38 +654,38 @@ export default function TagsPage() {
                     type="color"
                     value={newTagColor}
                     onChange={(e) => setNewTagColor(e.target.value)}
-                    className="w-12 h-10 rounded cursor-pointer bg-[#0c1420] border border-[#223246]"
+                    className="w-12 h-10 rounded cursor-pointer bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
                   />
                   <input
                     type="text"
                     value={newTagColor}
                     onChange={(e) => setNewTagColor(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-[#0c1420] border border-[#223246] rounded-lg font-mono text-sm text-[#e7eef9] placeholder:text-[#5a6b7f] outline-none focus:border-[#3b82f6]"
+                    className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 outline-none focus:border-sky-500"
                     placeholder="#3b82f6"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 p-3 bg-[#0c1420] border border-[#223246] rounded-lg">
+              <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                 <div
                   className="w-8 h-8 rounded-full"
                   style={{ backgroundColor: newTagColor }}
                 />
-                <span className="font-medium text-[#e7eef9]">{newTagName || 'Preview'}</span>
+                <span className="font-medium text-gray-900">{newTagName || 'Preview'}</span>
               </div>
             </div>
 
             <div className="flex gap-2 mt-6">
               <button
                 onClick={closeModal}
-                className="flex-1 px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] hover:bg-[#101b2a]"
+                className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={editingTag ? updateTag : createTag}
                 disabled={!newTagName.trim()}
-                className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {editingTag ? 'Update' : 'Create'}
               </button>
@@ -697,33 +697,33 @@ export default function TagsPage() {
       {/* Create/Edit Group Modal */}
       {showGroupModal && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-[#0f1722] border border-[#1a2637] rounded-lg p-6 max-w-lg w-full max-h-[80vh] flex flex-col">
-            <h2 className="text-xl font-semibold mb-4 text-[#e7eef9]">
+          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-lg w-full max-h-[80vh] flex flex-col">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">
               {editingGroup ? 'Edit Tag Group' : 'Create Tag Group'}
             </h2>
 
             <div className="space-y-4 flex-1 overflow-y-auto">
               <div>
-                <label className="block text-sm font-medium mb-1 text-[#9fb0c3]">Group Name</label>
+                <label className="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Group Name</label>
                 <input
                   type="text"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
                   placeholder="e.g., Insurance Leads, Hot Prospects"
-                  className="w-full px-3 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] placeholder:text-[#5a6b7f] outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 outline-none focus:border-indigo-500"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2 text-[#9fb0c3]">Group Color</label>
+                <label className="block text-sm font-medium mb-2 text-slate-600 dark:text-slate-400">Group Color</label>
                 <div className="grid grid-cols-5 gap-2">
                   {PRESET_COLORS.map((color) => (
                     <button
                       key={color}
                       onClick={() => setNewGroupColor(color)}
                       className={`w-full h-8 rounded-lg border-2 transition-all ${
-                        newGroupColor === color ? 'border-white scale-110' : 'border-[#223246]'
+                        newGroupColor === color ? 'border-white scale-110' : 'border-slate-200 dark:border-slate-700'
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -732,15 +732,15 @@ export default function TagsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2 text-[#9fb0c3]">
+                <label className="block text-sm font-medium mb-2 text-slate-600 dark:text-slate-400">
                   Select Tags ({selectedGroupTags.length} selected)
                 </label>
                 {tags.length === 0 ? (
-                  <div className="p-4 bg-[#0c1420] border border-[#223246] rounded-lg text-center text-[#9fb0c3]">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-slate-600 dark:text-slate-400">
                     No tags available. Create some tags first.
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto bg-[#0c1420] border border-[#223246] rounded-lg p-2 space-y-1">
+                  <div className="max-h-48 overflow-y-auto bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 space-y-1">
                     {tags.map((tag) => (
                       <button
                         key={tag.id}
@@ -748,15 +748,15 @@ export default function TagsPage() {
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-md transition ${
                           selectedGroupTags.includes(tag.name)
                             ? 'bg-indigo-900/30 border border-indigo-500'
-                            : 'hover:bg-[#1a2535] border border-transparent'
+                            : 'hover:bg-slate-100 dark:bg-slate-800 border border-transparent'
                         }`}
                       >
                         <div
                           className="w-4 h-4 rounded-full flex-shrink-0"
                           style={{ backgroundColor: tag.color }}
                         />
-                        <span className="flex-1 text-left text-[#e7eef9]">{tag.name}</span>
-                        <span className="text-sm text-[#9fb0c3]">{tag.count} leads</span>
+                        <span className="flex-1 text-left text-gray-900">{tag.name}</span>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">{tag.count} leads</span>
                         {selectedGroupTags.includes(tag.name) && (
                           <svg className="w-5 h-5 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -770,14 +770,14 @@ export default function TagsPage() {
 
               {/* Preview */}
               {selectedGroupTags.length > 0 && (
-                <div className="p-3 bg-[#0c1420] border border-[#223246] rounded-lg">
-                  <div className="text-xs text-[#9fb0c3] mb-2">Preview:</div>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-2">Preview:</div>
                   <div className="flex items-center gap-2 mb-2">
                     <div
                       className="w-4 h-4 rounded"
                       style={{ backgroundColor: newGroupColor }}
                     />
-                    <span className="font-medium text-[#e7eef9]">{newGroupName || 'Group Name'}</span>
+                    <span className="font-medium text-gray-900">{newGroupName || 'Group Name'}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {selectedGroupTags.map((tagName) => {
@@ -785,7 +785,7 @@ export default function TagsPage() {
                       return (
                         <span
                           key={tagName}
-                          className="px-2 py-0.5 rounded-full text-xs text-white"
+                          className="px-2 py-0.5 rounded-full text-xs text-gray-900"
                           style={{ backgroundColor: tag?.color || '#6b7280' }}
                         >
                           {tagName}
@@ -797,17 +797,17 @@ export default function TagsPage() {
               )}
             </div>
 
-            <div className="flex gap-2 mt-6 pt-4 border-t border-[#223246]">
+            <div className="flex gap-2 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
               <button
                 onClick={closeGroupModal}
-                className="flex-1 px-4 py-2 bg-[#0c1420] border border-[#223246] rounded-lg text-[#e7eef9] hover:bg-[#101b2a]"
+                className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-[#101b2a]"
               >
                 Cancel
               </button>
               <button
                 onClick={editingGroup ? updateTagGroup : createTagGroup}
                 disabled={!newGroupName.trim() || selectedGroupTags.length === 0}
-                className="flex-1 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-indigo-500 text-slate-900 dark:text-slate-100 rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {editingGroup ? 'Update Group' : 'Create Group'}
               </button>
@@ -817,9 +817,9 @@ export default function TagsPage() {
       )}
 
       {/* Help */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
+      <div className="card bg-blue-50 border-sky-700/50">
         <h3 className="font-semibold mb-2">Working with Tags</h3>
-        <ul className="text-sm text-[#9fb0c3] space-y-1">
+        <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Create custom tags with color coding for easy organization</li>
           <li>• Click any tag to see all leads with that tag</li>
           <li>• Tags help you organize and segment your leads effectively</li>

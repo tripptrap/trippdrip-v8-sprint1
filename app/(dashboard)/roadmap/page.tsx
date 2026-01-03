@@ -134,32 +134,32 @@ export default function RoadmapPage() {
   const statusConfig = {
     completed: {
       label: 'Completed',
-      color: 'text-emerald-400',
-      bgColor: 'bg-emerald-900/20',
-      borderColor: 'border-emerald-500/30',
+      color: 'text-sky-700',
+      bgColor: 'bg-white',
+      borderColor: 'border-slate-200 dark:border-slate-700',
       icon: CheckCircle
     },
     'in-progress': {
       label: 'In Progress',
-      color: 'text-emerald-400',
-      bgColor: 'bg-blue-900/20',
-      borderColor: 'border-emerald-500/30',
+      color: 'text-amber-700',
+      bgColor: 'bg-white',
+      borderColor: 'border-slate-200 dark:border-slate-700',
       icon: Clock
     },
     planned: {
       label: 'Planned',
-      color: 'text-emerald-400',
-      bgColor: 'bg-teal-800/50',
-      borderColor: 'border-emerald-400/30',
+      color: 'text-violet-700',
+      bgColor: 'bg-white',
+      borderColor: 'border-slate-200 dark:border-slate-700',
       icon: Rocket
     }
   };
 
   const categoryConfig = {
-    features: { label: 'Features', color: 'text-emerald-400' },
-    integrations: { label: 'Integrations', color: 'text-emerald-400' },
-    compliance: { label: 'Compliance', color: 'text-emerald-400' },
-    analytics: { label: 'Analytics', color: 'text-emerald-400' }
+    features: { label: 'Features', color: 'text-sky-600' },
+    integrations: { label: 'Integrations', color: 'text-sky-600' },
+    compliance: { label: 'Compliance', color: 'text-sky-600' },
+    analytics: { label: 'Analytics', color: 'text-sky-600' }
   };
 
   const groupedItems = {
@@ -172,25 +172,25 @@ export default function RoadmapPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[#e7eef9]">Product Roadmap</h1>
-        <p className="text-[#9fb0c3] mt-1">
+        <h1 className="text-2xl font-semibold text-black">Product Roadmap</h1>
+        <p className="text-slate-700 dark:text-slate-300 mt-1">
           See what we're building and what's coming next. Your feedback shapes our roadmap!
         </p>
       </div>
 
       {/* Referral Program Section */}
-      <div className="card bg-gradient-to-br from-teal-800/50 to-teal-800/50 border-teal-600/50">
+      <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 py-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-teal-800/60 flex items-center justify-center">
-              <Lock className="h-8 w-8 text-emerald-400" />
+            <div className="w-16 h-16 rounded-full bg-sky-100 flex items-center justify-center">
+              <Lock className="h-8 w-8 text-sky-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#e7eef9] mb-1">Referral Program</h2>
-              <p className="text-[#9fb0c3]">
+              <h2 className="text-xl font-bold text-black mb-1">Referral Program</h2>
+              <p className="text-slate-700 dark:text-slate-300">
                 Earn 1 month of free premium for each successful referral
               </p>
-              <div className="flex items-center gap-2 text-sm text-emerald-400 mt-2">
+              <div className="flex items-center gap-2 text-sm text-sky-600 mt-2">
                 <Gift className="h-4 w-4" />
                 <span className="font-medium">Coming Soon!</span>
               </div>
@@ -199,22 +199,22 @@ export default function RoadmapPage() {
           <div className="text-center md:text-right">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
-                  <span className="text-sm font-bold text-emerald-400">1</span>
+                <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-white">1</span>
                 </div>
-                <p className="text-xs text-[#9fb0c3]">Share Link</p>
+                <p className="text-xs text-slate-700 dark:text-slate-300">Share Link</p>
               </div>
               <div>
-                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
-                  <span className="text-sm font-bold text-emerald-400">2</span>
+                <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-white">2</span>
                 </div>
-                <p className="text-xs text-[#9fb0c3]">They Sign Up</p>
+                <p className="text-xs text-slate-700 dark:text-slate-300">They Sign Up</p>
               </div>
               <div>
-                <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center mb-1 mx-auto">
-                  <span className="text-sm font-bold text-emerald-400">3</span>
+                <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center mb-1 mx-auto">
+                  <span className="text-sm font-bold text-white">3</span>
                 </div>
-                <p className="text-xs text-[#9fb0c3]">Get Reward</p>
+                <p className="text-xs text-slate-700 dark:text-slate-300">Get Reward</p>
               </div>
             </div>
           </div>
@@ -223,36 +223,36 @@ export default function RoadmapPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
+        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-900/20 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-sky-100 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-sky-700" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems.completed.length}</div>
-              <div className="text-sm text-[#9fb0c3]">Completed</div>
+              <div className="text-2xl font-bold text-sky-700">{groupedItems.completed.length}</div>
+              <div className="text-sm text-slate-700 dark:text-slate-300">Completed</div>
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-900/20 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Clock className="h-5 w-5 text-amber-700" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems['in-progress'].length}</div>
-              <div className="text-sm text-[#9fb0c3]">In Progress</div>
+              <div className="text-2xl font-bold text-amber-700">{groupedItems['in-progress'].length}</div>
+              <div className="text-sm text-slate-700 dark:text-slate-300">In Progress</div>
             </div>
           </div>
         </div>
-        <div className="card">
+        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-teal-800/50 flex items-center justify-center">
-              <Rocket className="h-5 w-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
+              <Rocket className="h-5 w-5 text-violet-700" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-[#e7eef9]">{groupedItems.planned.length}</div>
-              <div className="text-sm text-[#9fb0c3]">Planned</div>
+              <div className="text-2xl font-bold text-violet-700">{groupedItems.planned.length}</div>
+              <div className="text-sm text-slate-700 dark:text-slate-300">Planned</div>
             </div>
           </div>
         </div>
@@ -271,7 +271,7 @@ export default function RoadmapPage() {
             <div className="flex items-center gap-3">
               <StatusIcon className={`h-6 w-6 ${config.color}`} />
               <h2 className={`text-xl font-semibold ${config.color}`}>{config.label}</h2>
-              <span className="text-sm text-[#9fb0c3]">({items.length})</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">({items.length})</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -282,24 +282,24 @@ export default function RoadmapPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`card ${config.bgColor} border ${config.borderColor}`}
+                    className={`card ${config.bgColor} border ${config.borderColor} shadow-sm`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
+                      <div className={`w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0`}>
                         <ItemIcon className={`h-5 w-5 ${config.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="font-semibold text-[#e7eef9]">{item.title}</h3>
+                          <h3 className="font-semibold text-black">{item.title}</h3>
                           {item.quarter && (
-                            <span className="text-xs px-2 py-1 rounded bg-white/5 text-[#9fb0c3] whitespace-nowrap">
+                            <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                               {item.quarter}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-[#9fb0c3] mb-3">{item.description}</p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">{item.description}</p>
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs px-2 py-1 rounded bg-white/5 ${categoryInfo.color}`}>
+                          <span className={`text-xs px-2 py-1 rounded bg-sky-50 text-sky-700`}>
                             {categoryInfo.label}
                           </span>
                         </div>
@@ -314,17 +314,17 @@ export default function RoadmapPage() {
       })}
 
       {/* Feedback Section */}
-      <div className="card bg-blue-900/20 border-emerald-700/50">
-        <h3 className="font-semibold mb-2 text-[#e7eef9] flex items-center gap-2">
-          <Zap className="h-5 w-5 text-emerald-400" />
+      <div className="card bg-sky-50 border border-sky-200">
+        <h3 className="font-semibold mb-2 text-black flex items-center gap-2">
+          <Zap className="h-5 w-5 text-sky-700" />
           Have a Feature Request?
         </h3>
-        <p className="text-sm text-[#9fb0c3] mb-4">
+        <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
           We'd love to hear your ideas! Your feedback directly influences what we build next. Reach out to us with suggestions, improvements, or new feature ideas.
         </p>
         <a
           href="mailto:support@hyvewyre.com?subject=Feature Request"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-sm"
         >
           <Mail className="h-4 w-4" />
           Send Feedback

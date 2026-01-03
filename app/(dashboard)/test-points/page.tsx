@@ -90,20 +90,20 @@ export default function TestPointsPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold mb-2">Points System Test Page</h1>
-        <p className="text-sm text-white/60">Test the points deduction system to verify it's working correctly</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Test the points deduction system to verify it's working correctly</p>
       </div>
 
       {/* Current Balance Card */}
-      <div className="card bg-gradient-to-br from-emerald-500/20 to-emerald-400/20 border-emerald-500/30">
+      <div className="card bg-gradient-to-br from-sky-500/20 to-sky-400/20 border-sky-500/30">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm text-white/60 mb-1">Current Balance</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Current Balance</div>
             <div className="text-4xl font-bold">{balance.toLocaleString()} points</div>
           </div>
           <button
             onClick={loadData}
             disabled={loading}
-            className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            className="px-4 py-2 bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-50"
           >
             Refresh
           </button>
@@ -117,55 +117,55 @@ export default function TestPointsPage() {
           <button
             onClick={() => testAction('sms_sent')}
             disabled={loading}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
           >
             <div className="font-semibold">Send SMS (1-to-1)</div>
-            <div className="text-sm text-white/60">Costs: 1 point</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 1 point</div>
           </button>
 
           <button
             onClick={() => testAction('ai_response')}
             disabled={loading}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
           >
             <div className="font-semibold">AI Response</div>
-            <div className="text-sm text-white/60">Costs: 2 points</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 2 points</div>
           </button>
 
           <button
             onClick={() => testAction('document_upload')}
             disabled={loading}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
           >
             <div className="font-semibold">Document Upload w/ AI</div>
-            <div className="text-sm text-white/60">Costs: 5 points</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 5 points</div>
           </button>
 
           <button
             onClick={() => testAction('bulk_message')}
             disabled={loading}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
           >
             <div className="font-semibold">Bulk Message (per contact)</div>
-            <div className="text-sm text-white/60">Costs: 2 points</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 2 points</div>
           </button>
 
           <button
             onClick={() => testAction('flow_creation')}
             disabled={loading}
-            className="p-4 bg-white/5 hover:bg-white/10 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
           >
             <div className="font-semibold">Flow Creation</div>
-            <div className="text-sm text-white/60">Costs: 15 points</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 15 points</div>
           </button>
 
           <button
             onClick={testAddPoints}
             disabled={loading}
-            className="p-4 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-lg text-left transition disabled:opacity-50"
+            className="p-4 bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 rounded-lg text-left transition disabled:opacity-50"
           >
-            <div className="font-semibold text-emerald-400">Add 100 Points (Test)</div>
-            <div className="text-sm text-white/60">Test point addition</div>
+            <div className="font-semibold text-sky-600">Add 100 Points (Test)</div>
+            <div className="text-sm text-slate-600 dark:text-slate-400">Test point addition</div>
           </button>
         </div>
       </div>
@@ -174,21 +174,21 @@ export default function TestPointsPage() {
       <div className="card">
         <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
         {transactions.length === 0 ? (
-          <p className="text-white/60 text-sm">No transactions yet. Try testing some actions above!</p>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">No transactions yet. Try testing some actions above!</p>
         ) : (
           <div className="space-y-2">
             {transactions.map((txn) => (
               <div
                 key={txn.id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                className="flex items-center justify-between p-3 bg-white rounded-lg"
               >
                 <div>
                   <div className="font-medium">{txn.description}</div>
-                  <div className="text-xs text-white/60">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
                     {new Date(txn.created_at).toLocaleString()}
                   </div>
                 </div>
-                <div className={`font-bold ${txn.amount > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className={`font-bold ${txn.amount > 0 ? 'text-sky-600' : 'text-red-400'}`}>
                   {txn.amount > 0 ? '+' : ''}{txn.amount} pts
                 </div>
               </div>
@@ -200,7 +200,7 @@ export default function TestPointsPage() {
       {/* Instructions */}
       <div className="card bg-yellow-500/10 border-yellow-500/30">
         <h3 className="font-semibold mb-2">📝 How to Test:</h3>
-        <ol className="text-sm space-y-2 text-white/80 list-decimal list-inside">
+        <ol className="text-sm space-y-2 text-slate-700 dark:text-slate-300 list-decimal list-inside">
           <li>Check your current balance at the top</li>
           <li>Click any action button to test point deduction</li>
           <li>Watch the balance update in real-time</li>
@@ -217,17 +217,17 @@ export default function TestPointsPage() {
       </div>
 
       {/* Database Check */}
-      <div className="card bg-emerald-500/10 border-emerald-500/30">
+      <div className="card bg-sky-500/10 border-sky-500/30">
         <h3 className="font-semibold mb-2">🗄️ Verify in Supabase:</h3>
-        <div className="text-sm space-y-2 text-white/80">
-          <p>1. Go to your Supabase dashboard: <a href="https://supabase.com/dashboard/project/ljibsszhcvhwnoegweat" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Open Dashboard</a></p>
+        <div className="text-sm space-y-2 text-slate-700 dark:text-slate-300">
+          <p>1. Go to your Supabase dashboard: <a href="https://supabase.com/dashboard/project/ljibsszhcvhwnoegweat" target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline">Open Dashboard</a></p>
           <p>2. Navigate to Table Editor</p>
           <p>3. Check these tables:</p>
           <ul className="ml-6 space-y-1 list-disc list-inside">
             <li><strong>users</strong> → Your <code className="bg-black/30 px-1 rounded">credits</code> column should match the balance above</li>
             <li><strong>points_transactions</strong> → Should show all test transactions with timestamps</li>
           </ul>
-          <p className="mt-3 text-white/60">Your User ID: <code className="bg-black/30 px-1 rounded text-xs">{user.id}</code></p>
+          <p className="mt-3 text-slate-600 dark:text-slate-400">Your User ID: <code className="bg-black/30 px-1 rounded text-xs">{user.id}</code></p>
         </div>
       </div>
     </div>

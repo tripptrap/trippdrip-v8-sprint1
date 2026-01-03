@@ -86,7 +86,7 @@ export default function OnboardingPage() {
             className={`rounded-2xl p-8 cursor-pointer transition-all duration-200 ${
               selectedPlan === 'basic'
                 ? 'shadow-[0_0_30px_rgba(59,130,246,0.4)] border-2 border-emerald-500'
-                : 'border border-white/10 hover:border-white/20'
+                : 'border border-gray-200 hover:border-white/20'
             }`}
             style={{
               background: selectedPlan === 'basic' ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.06)',
@@ -162,13 +162,13 @@ export default function OnboardingPage() {
             className={`rounded-2xl p-8 cursor-pointer transition-all duration-200 relative ${
               selectedPlan === 'premium'
                 ? 'shadow-[0_0_30px_rgba(168,85,247,0.4)] border-2 border-emerald-400'
-                : 'border border-white/10 hover:border-white/20'
+                : 'border border-gray-200 hover:border-white/20'
             }`}
             style={{
               background: selectedPlan === 'premium' ? 'rgba(168,85,247,0.1)' : 'rgba(255,255,255,0.06)',
             }}
           >
-            <div className="absolute top-4 right-4 bg-emerald-400 text-white px-3 py-1 rounded-full text-sm font-semibold">
+            <div className="absolute top-4 right-4 bg-emerald-400 text-gray-900 px-3 py-1 rounded-full text-sm font-semibold">
               POPULAR
             </div>
 

@@ -60,29 +60,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419]">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-[#FAF8F5]">
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
+      <div className="absolute inset-0 opacity-[0.03]">
         <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+          backgroundImage: 'radial-gradient(circle at 2px 2px, #14b8a6 1px, transparent 0)',
           backgroundSize: '40px 40px'
         }} />
       </div>
 
-      <div className="max-w-md w-full rounded-2xl shadow-2xl p-8 relative z-10 bg-white/5 border border-white/10 backdrop-blur-sm">
+      <div className="max-w-md w-full rounded-2xl shadow-xl p-8 relative z-10 bg-white border border-gray-200">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="h-20 w-20 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="h-20 w-20 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-2xl">HW</span>
             </div>
           </div>
-          <h1 className="text-3xl font-bold mb-2 text-white">HyveWyre™</h1>
-          <p className="text-white/60">Sign in to your account</p>
+          <h1 className="text-3xl font-bold mb-2 text-gray-900">HyveWyre™</h1>
+          <p className="text-gray-600">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2 text-white">
+            <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-700">
               Email Address
             </label>
             <input
@@ -91,13 +91,13 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2 text-white">
+            <label htmlFor="password" className="block text-sm font-medium mb-2 text-gray-700">
               Password
             </label>
             <input
@@ -106,7 +106,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
               placeholder="Enter your password"
             />
           </div>
@@ -114,29 +114,29 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
+            className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/20"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-white/60">
+          <p className="text-gray-600">
             Don't have an account?{' '}
-            <Link href="/auth/register" className="text-emerald-400 hover:text-blue-300 font-semibold transition-colors">
+            <Link href="/auth/register" className="text-teal-600 hover:text-teal-700 font-semibold transition-colors">
               Sign up
             </Link>
           </p>
         </div>
 
         <div className="mt-4 text-center">
-          <Link href="/auth/forgot-password" className="text-sm text-white/60 hover:text-emerald-400 transition-colors">
+          <Link href="/auth/forgot-password" className="text-sm text-gray-500 hover:text-teal-600 transition-colors">
             Forgot your password?
           </Link>
         </div>
 
         <div className="mt-6 text-center">
-          <Link href="/preview" className="text-sm text-white/40 hover:text-white/60 transition-colors">
+          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
             ← Back to home
           </Link>
         </div>

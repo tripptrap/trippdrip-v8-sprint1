@@ -64,8 +64,8 @@ export default function SignUpPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">HyveWyre™</h1>
-          <p className="text-white/80">Start your campaign journey today</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">HyveWyre™</h1>
+          <p className="text-gray-900/80">Start your campaign journey today</p>
         </div>
 
         {/* Sign Up Card */}
@@ -84,7 +84,7 @@ export default function SignUpPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
             </div>
@@ -99,7 +99,7 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
             </div>
@@ -114,7 +114,7 @@ export default function SignUpPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
                 minLength={8}
               />
@@ -131,7 +131,7 @@ export default function SignUpPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
             </div>
@@ -142,7 +142,7 @@ export default function SignUpPage() {
                 type="checkbox"
                 checked={agreeToTerms}
                 onChange={(e) => setAgreeToTerms(e.target.checked)}
-                className="w-4 h-4 mt-1 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                className="w-4 h-4 mt-1 text-emerald-600 border-gray-300 rounded focus:ring-teal-500"
               />
               <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
                 I agree to the{' '}
@@ -159,7 +159,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-emerald-400 to-teal-400 text-white py-3 rounded-lg font-semibold hover:from-emerald-500 hover:to-teal-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-gray-900 py-3 rounded-lg font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -192,7 +192,7 @@ export default function SignUpPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-white/80 text-sm">
+        <div className="text-center mt-8 text-gray-900/80 text-sm">
           <p>&copy; 2025 HyveWyre™. All rights reserved.</p>
         </div>
       </div>
