@@ -70,6 +70,33 @@ function getLocalTime(timezone: { abbr: string; name: string } | null): string {
   }
 }
 
+// Format phone number to E.164 format (+1XXXXXXXXXX)
+function formatPhoneE164(phone: string): string {
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+
+  // If empty, return empty
+  if (!digits) return '';
+
+  // If already has country code (11 digits starting with 1)
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  // If 10 digits (US number without country code)
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  // If already starts with +, keep as is
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+
+  // Otherwise return with + prefix
+  return digits.length > 0 ? `+${digits}` : '';
+}
+
 interface SendSMSModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -121,8 +148,8 @@ export default function SendSMSModal({
   useEffect(() => {
     if (isOpen) {
       loadTelnyxNumbers();
-      // Set or reset toPhone based on leadPhone prop
-      setToPhone(leadPhone || '');
+      // Set or reset toPhone based on leadPhone prop, auto-format to E.164
+      setToPhone(leadPhone ? formatPhoneE164(leadPhone) : '');
       setMessage('');
       setError('');
       setSuccess(false);
@@ -414,7 +441,8 @@ export default function SendSMSModal({
               type="tel"
               value={toPhone}
               onChange={(e) => setToPhone(e.target.value)}
-              placeholder="+1234567890 or 1234567890"
+              onBlur={(e) => setToPhone(formatPhoneE164(e.target.value))}
+              placeholder="(555) 123-4567"
               className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
               disabled={sending || success}
             />
