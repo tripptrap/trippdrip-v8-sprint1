@@ -144,7 +144,7 @@ export default function SendSMSModal({
     return () => clearTimeout(timer);
   }, [message]);
 
-  // Load Telnyx phone numbers when modal opens
+  // Load phone numbers from Telnyx when modal opens
   useEffect(() => {
     if (isOpen) {
       loadTelnyxNumbers();
@@ -164,15 +164,18 @@ export default function SendSMSModal({
       const response = await fetch('/api/telnyx/numbers');
       const data = await response.json();
 
-      if (data.success && data.numbers && data.numbers.length > 0) {
-        setAvailableNumbers(data.numbers);
-        // Auto-select primary number if available, otherwise select first number
-        const primary = data.numbers.find((n: any) => n.is_primary);
-        const numberToSelect = primary ? primary.phone_number : data.numbers[0].phone_number;
-        setFromNumber(numberToSelect);
-        console.log('Auto-selected Telnyx number:', numberToSelect);
+      if (data.success && data.numbers?.length > 0) {
+        const numbers = data.numbers.map((n: any, idx: number) => ({
+          phone_number: n.phone_number,
+          friendly_name: n.friendly_name,
+          is_primary: idx === 0
+        }));
+        setAvailableNumbers(numbers);
+        // Auto-select primary (first number)
+        setFromNumber(numbers[0].phone_number);
+        console.log('Auto-selected Telnyx number:', numbers[0].phone_number);
       } else {
-        console.log('No Telnyx numbers found:', data);
+        console.log('No Telnyx numbers found');
       }
     } catch (error) {
       console.error('Error loading Telnyx numbers:', error);
@@ -310,14 +313,14 @@ export default function SendSMSModal({
     setError('');
 
     try {
-      const response = await fetch('/api/sms/send', {
+      const response = await fetch('/api/telnyx/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId,
-          toPhone: toPhone,
+          to: toPhone,
           from: fromNumber,
-          messageBody: message,
+          message: message,
         }),
       });
 
