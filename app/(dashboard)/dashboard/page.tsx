@@ -2,26 +2,13 @@
 import { useEffect, useState } from "react";
 import dynamic from 'next/dynamic';
 import { POINT_COSTS } from "@/lib/pointsSupabase";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { MessageSquare } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-// Lazy-load heavy components
+// Lazy-load heavy modal component
 const SendSMSModal = dynamic(() => import('@/components/SendSMSModal'), { ssr: false });
-const motion = {
-  div: dynamic(() => import('framer-motion').then(mod => mod.motion.div), { ssr: false }),
-  h1: dynamic(() => import('framer-motion').then(mod => mod.motion.h1), { ssr: false }),
-  button: dynamic(() => import('framer-motion').then(mod => mod.motion.button), { ssr: false }),
-};
-
-// Lazy-load Recharts (~600KB savings)
-const LineChart = dynamic(() => import('recharts').then(mod => mod.LineChart), { ssr: false });
-const Line = dynamic(() => import('recharts').then(mod => mod.Line), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
-const Legend = dynamic(() => import('recharts').then(mod => mod.Legend), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
 
 interface AnalyticsData {
   totalLeads: number;
