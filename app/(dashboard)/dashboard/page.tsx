@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic';
 import { POINT_COSTS } from "@/lib/pointsSupabase";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Users, Send, Plus, Clock, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 // Lazy-load heavy modal component
@@ -34,14 +35,31 @@ export default function Dashboard(){
   const [chartLoading, setChartLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30');
   const [showSendModal, setShowSendModal] = useState(false);
+  const [recentLeads, setRecentLeads] = useState<Array<{ id: string; name: string; phone?: string; created_at: string; status?: string }>>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
 
   useEffect(() => {
     fetchAnalytics();
+    fetchRecentLeads();
   }, []);
 
   useEffect(() => {
     fetchChartData();
   }, [timeRange]);
+
+  async function fetchRecentLeads() {
+    try {
+      const res = await fetch('/api/leads?limit=5&sort=created_at&order=desc');
+      const data = await res.json();
+      if (data.leads) {
+        setRecentLeads(data.leads.slice(0, 5));
+      }
+    } catch (error) {
+      console.error('Failed to fetch recent leads:', error);
+    } finally {
+      setRecentLoading(false);
+    }
+  }
 
   async function fetchAnalytics() {
     try {
@@ -178,6 +196,144 @@ export default function Dashboard(){
             </svg>
           </div>
         </div>
+      </div>
+
+      {/* Quick Actions & Recent Activity Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+          className="card p-4 md:p-6"
+        >
+          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+            <Plus className="w-5 h-5 text-sky-500" />
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/leads"
+              className="flex items-center gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded-lg transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center">
+                <Users className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">View Leads</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Manage contacts</div>
+              </div>
+            </Link>
+            <button
+              onClick={() => setShowSendModal(true)}
+              className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 rounded-lg transition-colors group text-left"
+            >
+              <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
+                <Send className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Send SMS</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Quick message</div>
+              </div>
+            </button>
+            <Link
+              href="/campaigns"
+              className="flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Campaigns</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Bulk messaging</div>
+              </div>
+            </Link>
+            <Link
+              href="/messages"
+              className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Messages</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">View inbox</div>
+              </div>
+            </Link>
+          </div>
+        </motion.div>
+
+        {/* Recent Activity */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-sky-500" />
+              Recent Leads
+            </h2>
+            <Link href="/leads" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {recentLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentLeads.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No leads yet</p>
+              <Link href="/leads" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
+                Add your first lead
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentLeads.map((lead) => (
+                <Link
+                  key={lead.id}
+                  href={`/leads?selected=${lead.id}`}
+                  className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-teal-400 flex items-center justify-center text-white text-xs font-medium">
+                    {lead.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {lead.name || 'Unknown'}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {format(new Date(lead.created_at), 'MMM d, h:mm a')}
+                    </div>
+                  </div>
+                  {lead.status && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      lead.status === 'new' ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300' :
+                      lead.status === 'contacted' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
+                      lead.status === 'qualified' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                      'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {lead.status}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </motion.div>
       </div>
 
       {/* Messages Over Time Chart */}

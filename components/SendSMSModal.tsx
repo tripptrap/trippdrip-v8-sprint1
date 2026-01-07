@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw, Clock, AlertTriangle, Shield, ShieldCheck, ShieldAlert, Wand2 } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw, Clock, AlertTriangle, Shield, ShieldCheck, ShieldAlert, Wand2, ChevronDown, FileText } from 'lucide-react';
 import { analyzeSpamContent, type SpamAnalysis } from '@/lib/ai/spam-detection';
 
 // Helper function to guess timezone from phone number area code
@@ -97,6 +97,41 @@ function formatPhoneE164(phone: string): string {
   return digits.length > 0 ? `+${digits}` : '';
 }
 
+// Quick reply templates for common messages
+const QUICK_TEMPLATES = [
+  {
+    category: 'Initial Contact',
+    templates: [
+      { label: 'Introduction', text: 'Hi {name}! This is {agent} from HyveWyre. I wanted to reach out about your insurance quote request. When would be a good time to chat?' },
+      { label: 'Follow-up', text: 'Hi {name}, just following up on your insurance inquiry. Do you have a few minutes to discuss your options?' },
+    ]
+  },
+  {
+    category: 'Scheduling',
+    templates: [
+      { label: 'Schedule Call', text: 'Hi {name}! I\'d love to go over your quote. Are you available for a quick call today or tomorrow?' },
+      { label: 'Confirm Appointment', text: 'Hi {name}, just confirming our appointment for tomorrow. Looking forward to speaking with you!' },
+      { label: 'Reschedule', text: 'Hi {name}, I need to reschedule our call. What other times work for you this week?' },
+    ]
+  },
+  {
+    category: 'Quick Replies',
+    templates: [
+      { label: 'Thank You', text: 'Thank you! I\'ll get that information over to you shortly.' },
+      { label: 'Got It', text: 'Got it, thanks for letting me know!' },
+      { label: 'Questions', text: 'Do you have any questions I can help answer?' },
+      { label: 'More Info', text: 'I\'d be happy to provide more details. What specific information are you looking for?' },
+    ]
+  },
+  {
+    category: 'Closing',
+    templates: [
+      { label: 'Next Steps', text: 'Great! I\'ll send over the details and next steps shortly. Let me know if you have any questions!' },
+      { label: 'Thanks for Business', text: 'Thank you for choosing us! Please don\'t hesitate to reach out if you need anything.' },
+    ]
+  }
+];
+
 interface SendSMSModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -128,6 +163,7 @@ export default function SendSMSModal({
   const [spamAnalysis, setSpamAnalysis] = useState<SpamAnalysis | null>(null);
   const [fixingSpam, setFixingSpam] = useState(false);
   const [showSpamDetails, setShowSpamDetails] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Analyze message for spam as user types (debounced)
   useEffect(() => {
@@ -293,6 +329,22 @@ export default function SendSMSModal({
     }
   };
 
+  // Insert template into message, replacing placeholders
+  const insertTemplate = (templateText: string) => {
+    let text = templateText;
+    // Replace {name} with lead name if available
+    if (leadName) {
+      const firstName = leadName.split(' ')[0];
+      text = text.replace(/{name}/g, firstName);
+    } else {
+      text = text.replace(/{name}/g, 'there');
+    }
+    // Replace {agent} with a placeholder (could be from user settings later)
+    text = text.replace(/{agent}/g, 'your agent');
+    setMessage(text);
+    setShowTemplates(false);
+  };
+
   const handleSend = async () => {
     if (!message.trim()) {
       setError('Please enter a message');
@@ -449,6 +501,44 @@ export default function SendSMSModal({
               className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
               disabled={sending || success}
             />
+          </div>
+
+          {/* Quick Templates */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center gap-2 text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Quick Templates
+              <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showTemplates && (
+              <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 max-h-48 overflow-y-auto">
+                {QUICK_TEMPLATES.map((category) => (
+                  <div key={category.category} className="mb-3 last:mb-0">
+                    <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
+                      {category.category}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {category.templates.map((template) => (
+                        <button
+                          key={template.label}
+                          type="button"
+                          onClick={() => insertTemplate(template.text)}
+                          className="px-2.5 py-1 text-xs bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded-md hover:bg-sky-50 dark:hover:bg-sky-900/30 hover:border-sky-300 dark:hover:border-sky-500 text-slate-700 dark:text-slate-200 transition-all"
+                          title={template.text}
+                        >
+                          {template.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Message */}
