@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X } from 'lucide-react';
+import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X, Users, Megaphone } from 'lucide-react';
 import SendSMSModal from '@/components/SendSMSModal';
 
 // Helper function to guess timezone from phone number area code
@@ -51,6 +51,17 @@ interface Thread {
   messages_from_user?: number;
   messages_from_lead?: number;
   status: string;
+  campaign_id?: string;
+  campaigns?: {
+    id: string;
+    name: string;
+  } | null;
+  leads?: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+  } | null;
 }
 
 interface Message {
@@ -101,6 +112,10 @@ export default function MessagesPage() {
   const [sendModalPhone, setSendModalPhone] = useState('');
   const [sendModalName, setSendModalName] = useState('');
 
+  // View toggle: 'conversations' (default) or 'campaign_only'
+  const [viewMode, setViewMode] = useState<'conversations' | 'campaign_only'>('conversations');
+  const [campaignRecipientCount, setCampaignRecipientCount] = useState(0);
+
   // Lead selector state
   const [showLeadSelector, setShowLeadSelector] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -116,10 +131,10 @@ export default function MessagesPage() {
     }
   }, []);
 
-  // Load threads
+  // Load threads when viewMode changes
   useEffect(() => {
     loadThreads();
-  }, []);
+  }, [viewMode]);
 
   // Load messages when thread selected
   useEffect(() => {
@@ -162,8 +177,8 @@ export default function MessagesPage() {
           setSelectedThread(demoThreads[0]);
         }
       } else {
-        // Fetch real data
-        const response = await fetch('/api/messages/threads');
+        // Fetch real data with view filter
+        const response = await fetch(`/api/messages/threads?view=${viewMode}`);
         const data = await response.json();
 
         if (data.success) {
@@ -171,6 +186,15 @@ export default function MessagesPage() {
           // Auto-select first thread
           if (data.threads && data.threads.length > 0 && !selectedThread) {
             setSelectedThread(data.threads[0]);
+          }
+        }
+
+        // Also fetch campaign recipient count for the badge
+        if (viewMode === 'conversations') {
+          const countResponse = await fetch('/api/messages/threads?view=campaign_only');
+          const countData = await countResponse.json();
+          if (countData.success) {
+            setCampaignRecipientCount(countData.filteredCount || 0);
           }
         }
       }
@@ -304,7 +328,7 @@ export default function MessagesPage() {
 
       {/* Header */}
       <div className="bg-slate-800 border-b border-slate-700 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-6 w-6 text-teal-400" />
             <h1 className="text-2xl font-bold text-white">Messages</h1>
@@ -315,6 +339,37 @@ export default function MessagesPage() {
           >
             <Plus className="h-4 w-4" />
             New Message
+          </button>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode('conversations')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'conversations'
+                ? 'bg-teal-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Conversations
+          </button>
+          <button
+            onClick={() => setViewMode('campaign_only')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'campaign_only'
+                ? 'bg-teal-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            <Megaphone className="h-4 w-4" />
+            Campaign Recipients
+            {campaignRecipientCount > 0 && viewMode === 'conversations' && (
+              <span className="ml-1 px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full">
+                {campaignRecipientCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -344,53 +399,87 @@ export default function MessagesPage() {
               </div>
             ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                <MessageSquare className="h-12 w-12 text-slate-500 mb-3" />
-                <p className="text-slate-400 mb-2">No conversations yet</p>
-                <p className="text-sm text-slate-500">Send your first message to get started</p>
+                {viewMode === 'campaign_only' ? (
+                  <>
+                    <Megaphone className="h-12 w-12 text-slate-500 mb-3" />
+                    <p className="text-slate-400 mb-2">No campaign recipients</p>
+                    <p className="text-sm text-slate-500">Campaign messages that haven't received replies will appear here</p>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="h-12 w-12 text-slate-500 mb-3" />
+                    <p className="text-slate-400 mb-2">No conversations yet</p>
+                    <p className="text-sm text-slate-500">Send your first message to get started</p>
+                  </>
+                )}
               </div>
             ) : (
-              filteredThreads.map((thread) => (
-                <button
-                  key={thread.id}
-                  onClick={() => handleThreadClick(thread)}
-                  className={`w-full p-4 border-b border-slate-700 hover:bg-slate-700 transition-colors text-left ${
-                    selectedThread?.id === thread.id ? 'bg-slate-700' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                      <User className="h-5 w-5 text-teal-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-white text-sm truncate">
-                          {formatPhoneNumber(thread.phone_number)}
-                        </span>
-                        <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
-                          {formatTimestamp(thread.updated_at)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-400 truncate">
-                        {thread.last_message || 'No messages yet'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          thread.channel === 'sms' ? 'bg-teal-500/20 text-teal-400' :
-                          thread.channel === 'mms' ? 'bg-blue-500/20 text-blue-400' :
-                          'bg-slate-600 text-slate-400'
-                        }`}>
-                          {thread.channel.toUpperCase()}
-                        </span>
-                        {(thread.messages_from_user || thread.messages_from_lead) && (
-                          <span className="text-xs text-slate-500">
-                            {(thread.messages_from_user || 0) + (thread.messages_from_lead || 0)} messages
-                          </span>
+              filteredThreads.map((thread) => {
+                // Get display name from lead or fallback to phone number
+                const leadName = thread.leads
+                  ? [thread.leads.first_name, thread.leads.last_name].filter(Boolean).join(' ')
+                  : null;
+                const displayName = leadName || formatPhoneNumber(thread.phone_number || thread.leads?.phone || '');
+
+                return (
+                  <button
+                    key={thread.id}
+                    onClick={() => handleThreadClick(thread)}
+                    className={`w-full p-4 border-b border-slate-700 hover:bg-slate-700 transition-colors text-left ${
+                      selectedThread?.id === thread.id ? 'bg-slate-700' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        thread.campaign_id ? 'bg-orange-500/20' : 'bg-teal-500/20'
+                      }`}>
+                        {thread.campaign_id ? (
+                          <Megaphone className="h-5 w-5 text-orange-400" />
+                        ) : (
+                          <User className="h-5 w-5 text-teal-400" />
                         )}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-white text-sm truncate">
+                            {displayName}
+                          </span>
+                          <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
+                            {formatTimestamp(thread.updated_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-400 truncate">
+                          {thread.last_message || 'No messages yet'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            thread.channel === 'sms' ? 'bg-teal-500/20 text-teal-400' :
+                            thread.channel === 'mms' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-slate-600 text-slate-400'
+                          }`}>
+                            {(thread.channel || 'sms').toUpperCase()}
+                          </span>
+                          {thread.campaigns && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 truncate max-w-[100px]" title={thread.campaigns.name}>
+                              {thread.campaigns.name}
+                            </span>
+                          )}
+                          {(thread.messages_from_user || thread.messages_from_lead) && (
+                            <span className="text-xs text-slate-500">
+                              {(thread.messages_from_user || 0) + (thread.messages_from_lead || 0)} msgs
+                            </span>
+                          )}
+                          {thread.messages_from_lead && thread.messages_from_lead > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400">
+                              {thread.messages_from_lead} replies
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

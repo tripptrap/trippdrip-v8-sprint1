@@ -80,6 +80,39 @@ export async function POST(req: Request) {
 
     const targetLeads = leads || [];
 
+    // Create or get campaign FIRST so we have campaignId for thread tracking
+    const { data: existingCampaigns } = await supabase
+      .from('campaigns')
+      .select('*')
+      .eq('user_id', user.id)
+      .ilike('name', campaignName);
+
+    let campaignId: string;
+
+    if (existingCampaigns && existingCampaigns.length > 0) {
+      // Use existing campaign
+      campaignId = String(existingCampaigns[0].id);
+    } else {
+      // Create new campaign
+      const { data: newCampaign } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          name: campaignName,
+          tags_applied: addTags,
+          lead_ids: leadIds,
+          lead_count: leadIds.length,
+          messages_sent: 0,
+          credits_used: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      campaignId = newCampaign ? String(newCampaign.id) : '';
+    }
+
     // SMS sending logic
     const sendResults: SendResult[] = [];
     let pointsUsed = 0;
@@ -183,22 +216,28 @@ export async function POST(req: Request) {
               .single();
 
             if (existingThread) {
-              // Update existing thread
+              // Update existing thread - only set campaign_id if not already set (preserve individual origins)
+              const updateData: any = {
+                messages_from_user: (existingThread.messages_from_user || 0) + 1,
+                last_message_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              // Only set campaign_id if thread doesn't have one (new campaign thread)
+              if (!existingThread.campaign_id) {
+                updateData.campaign_id = campaignId || null;
+              }
               await supabase
                 .from('threads')
-                .update({
-                  messages_from_user: (existingThread.messages_from_user || 0) + 1,
-                  last_message_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                })
+                .update(updateData)
                 .eq('id', existingThread.id);
             } else {
-              // Create new thread
+              // Create new thread with campaign_id
               const { data: newThread } = await supabase
                 .from('threads')
                 .insert({
                   user_id: user.id,
                   lead_id: lead.id,
+                  campaign_id: campaignId || null,
                   messages_from_user: 1,
                   messages_from_lead: 0,
                   created_at: new Date().toISOString(),
@@ -260,53 +299,31 @@ export async function POST(req: Request) {
         .eq('user_id', user.id);
     }
 
-    // Create or update campaign
-    const { data: existingCampaigns } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('user_id', user.id)
-      .ilike('name', campaignName);
-
-    let campaignId: string;
-
-    if (existingCampaigns && existingCampaigns.length > 0) {
-      // Update existing campaign
-      const found = existingCampaigns[0];
-      const currentLeadIds = Array.isArray(found.lead_ids) ? found.lead_ids : [];
-      const currentTags = Array.isArray(found.tags_applied) ? found.tags_applied : [];
-
-      await supabase
+    // Update campaign stats after sending
+    if (campaignId) {
+      // Get current campaign data for merging
+      const { data: currentCampaign } = await supabase
         .from('campaigns')
-        .update({
-          tags_applied: Array.from(new Set([...currentTags, ...addTags])),
-          lead_ids: Array.from(new Set([...currentLeadIds, ...leadIds])),
-          lead_count: Array.from(new Set([...currentLeadIds, ...leadIds])).length,
-          messages_sent: (found.messages_sent || 0) + sendResults.filter(r => r.success).length,
-          credits_used: (found.credits_used || 0) + totalCreditsUsed,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', found.id);
-
-      campaignId = String(found.id);
-    } else {
-      // Create new campaign
-      const { data: newCampaign } = await supabase
-        .from('campaigns')
-        .insert({
-          user_id: user.id,
-          name: campaignName,
-          tags_applied: addTags,
-          lead_ids: leadIds,
-          lead_count: leadIds.length,
-          messages_sent: sendResults.filter(r => r.success).length,
-          credits_used: totalCreditsUsed,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
+        .select('*')
+        .eq('id', campaignId)
         .single();
 
-      campaignId = newCampaign ? String(newCampaign.id) : '';
+      if (currentCampaign) {
+        const currentLeadIds = Array.isArray(currentCampaign.lead_ids) ? currentCampaign.lead_ids : [];
+        const currentTags = Array.isArray(currentCampaign.tags_applied) ? currentCampaign.tags_applied : [];
+
+        await supabase
+          .from('campaigns')
+          .update({
+            tags_applied: Array.from(new Set([...currentTags, ...addTags])),
+            lead_ids: Array.from(new Set([...currentLeadIds, ...leadIds])),
+            lead_count: Array.from(new Set([...currentLeadIds, ...leadIds])).length,
+            messages_sent: (currentCampaign.messages_sent || 0) + sendResults.filter(r => r.success).length,
+            credits_used: (currentCampaign.credits_used || 0) + totalCreditsUsed,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', campaignId);
+      }
     }
 
     const successCount = sendResults.filter(r => r.success).length;
