@@ -12,9 +12,34 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [useCase, setUseCase] = useState('')
   const [loading, setLoading] = useState(false)
 
   const [showSuccess, setShowSuccess] = useState(false)
+
+  const industries = [
+    { value: 'insurance', label: 'Insurance' },
+    { value: 'real_estate', label: 'Real Estate' },
+    { value: 'solar', label: 'Solar' },
+    { value: 'roofing', label: 'Roofing' },
+    { value: 'home_services', label: 'Home Services' },
+    { value: 'financial_services', label: 'Financial Services' },
+    { value: 'healthcare', label: 'Healthcare' },
+    { value: 'automotive', label: 'Automotive' },
+    { value: 'retail', label: 'Retail / E-commerce' },
+    { value: 'other', label: 'Other' },
+  ]
+
+  const useCases = [
+    { value: 'lead_generation', label: 'Lead Generation' },
+    { value: 'customer_followup', label: 'Customer Follow-up' },
+    { value: 'sales_outreach', label: 'Sales Outreach' },
+    { value: 'appointment_scheduling', label: 'Appointment Scheduling' },
+    { value: 'marketing_campaigns', label: 'Marketing Campaigns' },
+    { value: 'customer_support', label: 'Customer Support' },
+    { value: 'other', label: 'Other' },
+  ]
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +69,8 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: fullName,
+            industry: industry,
+            use_case: useCase,
           },
           // Production domain for email verification
           emailRedirectTo: `${baseUrl}/auth/callback`,
@@ -163,6 +190,46 @@ export default function RegisterPage() {
               className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
               placeholder="John Doe"
             />
+          </div>
+
+          <div>
+            <label htmlFor="industry" className="block text-sm font-medium mb-2 text-gray-700">
+              What industry are you in?
+            </label>
+            <select
+              id="industry"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
+            >
+              <option value="">Select your industry...</option>
+              {industries.map((ind) => (
+                <option key={ind.value} value={ind.value}>
+                  {ind.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="useCase" className="block text-sm font-medium mb-2 text-gray-700">
+              What will you use HyveWyre for?
+            </label>
+            <select
+              id="useCase"
+              value={useCase}
+              onChange={(e) => setUseCase(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
+            >
+              <option value="">Select your primary use case...</option>
+              {useCases.map((uc) => (
+                <option key={uc.value} value={uc.value}>
+                  {uc.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
