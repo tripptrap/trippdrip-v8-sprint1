@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { findLead as seedFindLead } from "@/lib/db";
 import { motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
+import { isAdminEmail } from "@/lib/admin";
+import { Shield } from "lucide-react";
 
 type NavItem = {
   href: string;
@@ -53,6 +56,7 @@ export default function Sidebar(){
   const [store, setStore] = useState<any>({ leads:[], threads:[] });
   const [userPlan, setUserPlan] = useState<string>('basic');
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(()=>{
     const sync = () => { const s = loadStore(); if (s) setStore(s); };
@@ -66,6 +70,22 @@ export default function Sidebar(){
       window.removeEventListener("storage", sync);
       document.removeEventListener("visibilitychange", ()=>{});
     };
+  }, []);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && isAdminEmail(user.email)) {
+          setIsAdmin(true);
+        }
+      } catch (e) {
+        console.error('Error checking admin status:', e);
+      }
+    };
+    checkAdmin();
   }, []);
 
   // Detect user plan type and listen for changes
@@ -268,6 +288,27 @@ export default function Sidebar(){
             </motion.div>
           );
         })}
+
+        {/* Admin Link - Only visible to admins */}
+        {isAdmin && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+          >
+            <Link
+              href="/admin"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-150 ${
+                path?.startsWith('/admin')
+                  ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30"
+                  : "hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400"
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Admin</span>
+            </Link>
+          </motion.div>
+        )}
       </nav>
 
       {showTextList && (
