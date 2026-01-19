@@ -3,6 +3,7 @@ import { useState } from "react";
 import Sidebar from "@/components/Sidebar"
 import Topbar from "@/components/Topbar"
 import DemoModeBanner from "@/components/DemoModeBanner"
+import ThemeSelectionModal from "@/components/ThemeSelectionModal"
 import { ThemeProvider } from "@/lib/ThemeContext"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -56,6 +57,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Topbar />
           <div className="container py-6 px-4 md:px-6">{children}</div>
         </main>
+
+        {/* Theme Selection Modal for new users */}
+        <ThemeSelectionModal />
       </div>
     </ThemeProvider>
   )
