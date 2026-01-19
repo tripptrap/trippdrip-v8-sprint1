@@ -69,7 +69,7 @@ interface Message {
   sender: string;
   recipient: string;
   body: string;
-  direction: 'inbound' | 'outbound';
+  direction: 'inbound' | 'outbound' | 'in' | 'out';
   status: string;
   created_at: string;
   media_urls?: string[];
@@ -546,60 +546,65 @@ export default function MessagesPage() {
                     </div>
                   </div>
                 ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                    >
+                  messages.map((message) => {
+                    // Handle both direction formats: 'outbound'/'inbound' and 'out'/'in'
+                    const isOutbound = message.direction === 'outbound' || message.direction === 'out';
+
+                    return (
                       <div
-                        className={`max-w-md rounded-lg p-3 ${
-                          message.direction === 'outbound'
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-slate-800 text-white border border-slate-700'
-                        }`}
+                        key={message.id}
+                        className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}
                       >
-                        <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                        <div
+                          className={`max-w-md rounded-lg p-3 ${
+                            isOutbound
+                              ? 'bg-teal-600 text-white'
+                              : 'bg-slate-800 text-white border border-slate-700'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
 
-                        {/* Media attachments */}
-                        {message.media_urls && message.media_urls.length > 0 && (
-                          <div className="mt-2 space-y-2">
-                            {message.media_urls.map((url, idx) => (
-                              <div key={idx} className="rounded overflow-hidden">
-                                <img
-                                  src={url}
-                                  alt={`Media ${idx + 1}`}
-                                  className="max-w-full h-auto"
-                                  onError={(e) => {
-                                    // If image fails to load, show link instead
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs underline opacity-75 hover:opacity-100"
-                                >
-                                  View media
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs opacity-75">
-                            {formatTimestamp(message.created_at)}
-                          </span>
-                          {message.direction === 'outbound' && (
-                            <span className="text-xs opacity-75">
-                              • {message.status}
-                            </span>
+                          {/* Media attachments */}
+                          {message.media_urls && message.media_urls.length > 0 && (
+                            <div className="mt-2 space-y-2">
+                              {message.media_urls.map((url, idx) => (
+                                <div key={idx} className="rounded overflow-hidden">
+                                  <img
+                                    src={url}
+                                    alt={`Media ${idx + 1}`}
+                                    className="max-w-full h-auto"
+                                    onError={(e) => {
+                                      // If image fails to load, show link instead
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs underline opacity-75 hover:opacity-100"
+                                  >
+                                    View media
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
                           )}
+
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs opacity-75">
+                              {formatTimestamp(message.created_at)}
+                            </span>
+                            {isOutbound && message.status && (
+                              <span className="text-xs opacity-75">
+                                • {message.status}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </>

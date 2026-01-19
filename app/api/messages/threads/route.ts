@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch user's conversation threads with campaign info
+    // Use left join syntax to handle null lead_id
     let query = supabase
       .from('threads')
       .select(`
