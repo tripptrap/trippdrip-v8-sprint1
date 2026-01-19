@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -13,7 +14,19 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, from, message, userId, threadId, mediaUrls } = await req.json();
+    const { to, from, message, userId: passedUserId, threadId, mediaUrls, leadId } = await req.json();
+
+    // Get current user from session if userId not passed
+    let userId = passedUserId;
+    if (!userId) {
+      try {
+        const serverClient = await createServerClient();
+        const { data: { user } } = await serverClient.auth.getUser();
+        userId = user?.id;
+      } catch (e) {
+        console.log('Could not get user from session:', e);
+      }
+    }
 
     // Validate required fields
     if (!to || !message) {
