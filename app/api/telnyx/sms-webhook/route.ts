@@ -171,7 +171,7 @@ async function handleInboundSMS(payload: any) {
   // Find or create thread for this conversation
   let threadId: string;
 
-  const { data: existingThread } = await supabaseAdmin
+  const { data: threadData } = await supabaseAdmin
     .from('threads')
     .select('id, messages_from_lead')
     .eq('user_id', userId)
@@ -179,8 +179,8 @@ async function handleInboundSMS(payload: any) {
     .eq('channel', 'sms')
     .single();
 
-  if (existingThread) {
-    threadId = existingThread.id;
+  if (threadData) {
+    threadId = threadData.id;
 
     // Update thread
     await supabaseAdmin
@@ -188,7 +188,7 @@ async function handleInboundSMS(payload: any) {
       .update({
         last_message: messageBody,
         updated_at: new Date().toISOString(),
-        messages_from_lead: (existingThread.messages_from_lead || 0) + 1,
+        messages_from_lead: (threadData.messages_from_lead || 0) + 1,
       })
       .eq('id', threadId);
   } else {
