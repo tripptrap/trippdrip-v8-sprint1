@@ -118,36 +118,53 @@ async function handleInboundSMS(payload: any) {
     mediaCount: mediaUrls.length,
   });
 
-  // Find which user owns this phone number
-  // Check both Telnyx and Twilio number tables
+  // Find which user this message belongs to
+  // Strategy: Match the sender's phone number to an existing thread or lead
   let userId: string | null = null;
 
-  // First try Telnyx numbers table
-  const { data: telnyxNumber } = await supabaseAdmin
-    .from('user_telnyx_numbers')
+  // First, check if there's an existing thread with this phone number
+  const { data: existingThread } = await supabaseAdmin
+    .from('threads')
     .select('user_id')
-    .eq('phone_number', to)
-    .eq('status', 'active')
+    .eq('phone_number', from)
     .single();
 
-  if (telnyxNumber) {
-    userId = telnyxNumber.user_id;
-  } else {
-    // Fallback to Twilio numbers table (in case numbers are stored there)
-    const { data: twilioNumber } = await supabaseAdmin
-      .from('user_twilio_numbers')
+  if (existingThread) {
+    userId = existingThread.user_id;
+    console.log('Found user via existing thread:', userId);
+  }
+
+  // If no thread, try to find a lead with this phone number
+  if (!userId) {
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('user_id')
+      .eq('phone', from)
+      .single();
+
+    if (lead) {
+      userId = lead.user_id;
+      console.log('Found user via lead:', userId);
+    }
+  }
+
+  // Fallback: Try user_telnyx_numbers table (if user registered their number)
+  if (!userId) {
+    const { data: telnyxNumber } = await supabaseAdmin
+      .from('user_telnyx_numbers')
       .select('user_id')
       .eq('phone_number', to)
       .eq('status', 'active')
       .single();
 
-    if (twilioNumber) {
-      userId = twilioNumber.user_id;
+    if (telnyxNumber) {
+      userId = telnyxNumber.user_id;
+      console.log('Found user via Telnyx number:', userId);
     }
   }
 
   if (!userId) {
-    console.error('Phone number not found in database:', to);
+    console.error('Could not find user for incoming message. From:', from, 'To:', to);
     return;
   }
 
