@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar"
 import Topbar from "@/components/Topbar"
 import DemoModeBanner from "@/components/DemoModeBanner"
 import ThemeSelectionModal from "@/components/ThemeSelectionModal"
+import OnboardingTour from "@/components/OnboardingTour"
 import { ThemeProvider } from "@/lib/ThemeContext"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Theme Selection Modal for new users */}
         <ThemeSelectionModal />
+
+        {/* Interactive Onboarding Tour */}
+        <OnboardingTour />
       </div>
     </ThemeProvider>
   )
