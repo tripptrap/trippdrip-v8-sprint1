@@ -23,6 +23,28 @@
           "value": "noindex"
         }
       ]
+    },
+    {
+      "source": "/api/telnyx/sms-webhook",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/telnyx/sms-webhook",
+      "destination": "/api/telnyx/sms-webhook",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "telnyx-webhooks"
+        }
+      ]
     }
   ]
 }
