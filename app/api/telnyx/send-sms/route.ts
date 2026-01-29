@@ -108,11 +108,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fetch user's opt-out keyword
+    let optOutKeyword: string | null = null;
+    if (userId && supabaseAdmin) {
+      const { data: userSettings } = await supabaseAdmin
+        .from('user_settings')
+        .select('opt_out_keyword')
+        .eq('user_id', userId)
+        .single();
+      optOutKeyword = userSettings?.opt_out_keyword || null;
+    }
+
+    if (!optOutKeyword) {
+      return NextResponse.json(
+        { error: 'Opt-out keyword not configured. Please set one in Settings > DNC List.' },
+        { status: 400 }
+      );
+    }
+
+    // Check if this is the first message to this lead (new thread)
+    let isFirstMessage = false;
+    if (userId && supabaseAdmin) {
+      const { data: existingCheck } = await supabaseAdmin
+        .from('threads')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('phone_number', to)
+        .single();
+      isFirstMessage = !existingCheck;
+    }
+
+    // Append opt-out footer on first message
+    const messageToSend = isFirstMessage
+      ? `${message}\n\nReply ${optOutKeyword} to opt out`
+      : message;
+
     // Build request body
     const requestBody: any = {
       from: resolvedFrom || undefined, // If not provided, Telnyx will use number pool
       to: to,
-      text: message,
+      text: messageToSend,
       messaging_profile_id: messagingProfileId,
     };
 

@@ -56,6 +56,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Fetch user's opt-out keyword
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('opt_out_keyword')
+      .eq('user_id', user.id)
+      .single();
+
+    const optOutKeyword = userSettings?.opt_out_keyword || null;
+
+    if (!optOutKeyword) {
+      return NextResponse.json(
+        { error: 'Opt-out keyword not configured. Please set one in Settings > DNC List.' },
+        { status: 400 }
+      );
+    }
+
+    // Check if this is the first message to this lead (no existing thread)
+    const { data: existingThreadCheck } = await supabase
+      .from('threads')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('phone_number', toPhone)
+      .eq('channel', channel)
+      .single();
+
+    const isFirstMessage = !existingThreadCheck;
+    const messageToSend = isFirstMessage
+      ? `${messageBody}\n\nReply ${optOutKeyword} to opt out`
+      : messageBody;
+
     // Check DNC list BEFORE sending
     const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
       p_user_id: user.id,
@@ -111,10 +141,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone} via Telnyx...`);
 
-    // Send SMS via Telnyx
+    // Send SMS via Telnyx (with opt-out footer if first message)
     const result = await sendTelnyxSMS({
       to: toPhone,
-      message: messageBody,
+      message: messageToSend,
       from: fromPhone,
     });
 

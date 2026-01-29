@@ -115,12 +115,27 @@ export async function POST(req: Request) {
       campaignId = newCampaign ? String(newCampaign.id) : '';
     }
 
+    // Fetch user's opt-out keyword
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('opt_out_keyword')
+      .eq('user_id', user.id)
+      .single();
+    const optOutKeyword = userSettings?.opt_out_keyword || null;
+
     // SMS sending logic
     const sendResults: SendResult[] = [];
     let pointsUsed = 0;
     let totalCreditsUsed = 0;
 
     if (sendSMS && messageTemplate) {
+      // Block if opt-out keyword not configured
+      if (!optOutKeyword) {
+        return NextResponse.json({
+          ok: false,
+          error: 'Opt-out keyword not configured. Please set one in Settings > DNC List before sending campaigns.'
+        }, { status: 400 });
+      }
       // Calculate credits per message based on character count
       const creditCalc = calculateSMSCredits(messageTemplate, 0);
       const creditsPerMessage = creditCalc.credits;
@@ -182,11 +197,29 @@ export async function POST(req: Request) {
           const geoFrom = await selectClosestNumber(user.id, lead.zip_code || null, supabase);
           const effectiveFrom = geoFrom || fromNumber || twilioConfig.phoneNumbers?.[0] || '';
 
+          // Check if this is the first message to this lead (for opt-out footer)
+          let isFirstMessageToLead = true;
+          const { data: existThreadCheck } = await supabase
+            .from('threads')
+            .select('id')
+            .eq('user_id', user.id)
+            .or(`lead_id.eq.${lead.id},phone_number.eq.${lead.phone}`)
+            .limit(1)
+            .single();
+          if (existThreadCheck) {
+            isFirstMessageToLead = false;
+          }
+
+          // Append opt-out footer on first message to lead
+          const messageToSend = isFirstMessageToLead
+            ? `${personalizedMessage}\n\nReply ${optOutKeyword} to opt out`
+            : personalizedMessage;
+
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
           const params = new URLSearchParams();
           params.append('To', lead.phone);
           params.append('From', effectiveFrom);
-          params.append('Body', personalizedMessage);
+          params.append('Body', messageToSend);
 
           const response = await fetch(twilioUrl, {
             method: 'POST',

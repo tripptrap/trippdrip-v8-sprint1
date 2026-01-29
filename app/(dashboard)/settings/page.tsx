@@ -979,7 +979,62 @@ export default function Page() {
       {activeTab === 'integrations' && <IntegrationsPage />}
 
       {/* DNC List Tab */}
-      {activeTab === 'dnc' && <DNCPage />}
+      {activeTab === 'dnc' && (
+        <div className="space-y-6">
+          {/* Opt-Out Keyword Configuration */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">SMS Opt-Out Keyword</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Choose the keyword leads can reply with to opt out of receiving messages. This keyword will be appended to the first message sent to each new lead.
+            </p>
+            <div className="flex items-end gap-3">
+              <div className="flex-1 max-w-xs">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Opt-Out Keyword
+                </label>
+                <input
+                  type="text"
+                  value={settings?.optOutKeyword || ''}
+                  onChange={(e) => {
+                    if (settings) {
+                      setSettings({ ...settings, optOutKeyword: e.target.value.toUpperCase() });
+                    }
+                  }}
+                  placeholder="e.g. STOP"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                />
+              </div>
+              <button
+                onClick={async () => {
+                  if (!settings?.optOutKeyword?.trim()) {
+                    toast.error('Please enter an opt-out keyword');
+                    return;
+                  }
+                  try {
+                    await fetch('/api/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ optOutKeyword: settings.optOutKeyword.trim().toUpperCase() }),
+                    });
+                    toast.success('Opt-out keyword saved');
+                  } catch (err) {
+                    toast.error('Failed to save opt-out keyword');
+                  }
+                }}
+                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              First messages will include: &quot;Reply {settings?.optOutKeyword || 'STOP'} to opt out&quot;
+            </p>
+          </div>
+
+          {/* DNC List */}
+          <DNCPage />
+        </div>
+      )}
 
       {/* Contact Tab */}
       {activeTab === 'contact' && <ContactPage />}

@@ -47,6 +47,7 @@ export async function GET() {
       twilio: settings.twilio_config,
       stripe: settings.stripe_config,
       email: settings.email_config,
+      optOutKeyword: settings.opt_out_keyword || undefined,
       spamProtection: settings.spam_protection,
       autoRefill: settings.auto_refill
     };
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { smsProvider, twilio, stripe, email, spamProtection, autoRefill } = body;
+    const { smsProvider, twilio, stripe, email, spamProtection, autoRefill, optOutKeyword } = body;
 
     const { data: existing } = await supabase
       .from('user_settings')
@@ -76,15 +77,20 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    const settingsData = {
+    const settingsData: any = {
       user_id: user.id,
       sms_provider: smsProvider,
       twilio_config: twilio,
       stripe_config: stripe,
       email_config: email,
       spam_protection: spamProtection,
-      auto_refill: autoRefill
+      auto_refill: autoRefill,
     };
+
+    // Only include opt_out_keyword if explicitly provided
+    if (optOutKeyword !== undefined) {
+      settingsData.opt_out_keyword = optOutKeyword || null;
+    }
 
     let data, error;
 

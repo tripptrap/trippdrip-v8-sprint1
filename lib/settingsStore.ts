@@ -44,6 +44,7 @@ export type Settings = {
   twilio?: TwilioConfig;
   stripe?: StripeConfig;
   email?: EmailConfig;
+  optOutKeyword?: string;
   spamProtection: {
     enabled: boolean;
     blockOnHighRisk: boolean;

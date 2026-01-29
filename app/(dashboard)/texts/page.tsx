@@ -8,6 +8,7 @@ import { leads as seedLeads, threads as seedThreads, messages as seedMessages, f
 import { loadStore, saveStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { spendPoints, getPointsBalance } from "@/lib/pointsStore";
 import { calculateSMSCredits, getCharacterWarning } from "@/lib/creditCalculator";
+import { loadSettings, type Settings } from "@/lib/settingsStore";
 import CustomModal from "@/components/CustomModal";
 import SendSMSModal from "@/components/SendSMSModal";
 
@@ -174,6 +175,11 @@ function TextsPageContent(){
     message: ''
   });
 
+  // Opt-out keyword setup modal
+  const [showOptOutModal, setShowOptOutModal] = useState(false);
+  const [optOutKeyword, setOptOutKeyword] = useState('');
+  const [savingOptOut, setSavingOptOut] = useState(false);
+
   const search = useSearchParams();
 
   const refresh = async ()=>{ const s = await loadStore(); if (s) setStore(s); };
@@ -184,6 +190,15 @@ function TextsPageContent(){
       console.error("Error loading flows:", e);
       setFlows([]);
     });
+
+    // Check if opt-out keyword is configured
+    loadSettings().then((settings) => {
+      if (!settings.optOutKeyword) {
+        setShowOptOutModal(true);
+      } else {
+        setOptOutKeyword(settings.optOutKeyword);
+      }
+    }).catch(console.error);
 
     // Set up real-time polling for new messages (every 5 seconds)
     const pollInterval = setInterval(() => {
@@ -390,6 +405,60 @@ function TextsPageContent(){
 
   return (
     <div className="space-y-4">
+      {/* Opt-Out Keyword Setup Modal */}
+      {showOptOutModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+              Set Up Opt-Out Keyword
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Before you can send messages, you must set an opt-out keyword. This keyword will be included in the first message sent to each new lead so they can opt out of future messages.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Opt-Out Keyword
+              </label>
+              <input
+                type="text"
+                value={optOutKeyword}
+                onChange={(e) => setOptOutKeyword(e.target.value.toUpperCase())}
+                placeholder="e.g. STOP"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                autoFocus
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                First messages will include: &quot;Reply {optOutKeyword || 'STOP'} to opt out&quot;
+              </p>
+            </div>
+            <button
+              disabled={!optOutKeyword.trim() || savingOptOut}
+              onClick={async () => {
+                if (!optOutKeyword.trim()) return;
+                setSavingOptOut(true);
+                try {
+                  const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ optOutKeyword: optOutKeyword.trim().toUpperCase() }),
+                  });
+                  if (res.ok) {
+                    setShowOptOutModal(false);
+                  }
+                } catch (err) {
+                  console.error('Failed to save opt-out keyword:', err);
+                } finally {
+                  setSavingOptOut(false);
+                }
+              }}
+              className="w-full px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            >
+              {savingOptOut ? 'Saving...' : 'Save & Continue'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Texts</h1>

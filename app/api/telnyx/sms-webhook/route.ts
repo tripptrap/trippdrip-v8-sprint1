@@ -14,8 +14,10 @@ const OPT_OUT_KEYWORDS = [
   'no more', 'leave me alone', 'take me off', 'end', 'halt'
 ];
 
-function isOptOut(message: string): boolean {
+function isOptOut(message: string, customKeyword?: string | null): boolean {
   const lower = message.trim().toLowerCase();
+  // Check user's custom opt-out keyword first
+  if (customKeyword && lower === customKeyword.toLowerCase()) return true;
   // Exact match for short keywords (stop, quit, end, etc.)
   if (OPT_OUT_KEYWORDS.includes(lower)) return true;
   // Partial match for phrases
@@ -237,9 +239,18 @@ async function handleInboundSMS(payload: any) {
   // Save the message
   console.log('💾 Saving inbound message:', { userId, threadId, from, to, messageBody: messageBody?.substring(0, 50) });
 
+  // Fetch user's custom opt-out keyword
+  let userOptOutKeyword: string | null = null;
+  const { data: userSettings } = await supabaseAdmin
+    .from('user_settings')
+    .select('opt_out_keyword')
+    .eq('user_id', userId)
+    .single();
+  userOptOutKeyword = userSettings?.opt_out_keyword || null;
+
   // Run spam detection on inbound message
   const spamResult = messageBody ? detectSpam(messageBody) : null;
-  const optOut = messageBody ? isOptOut(messageBody) : false;
+  const optOut = messageBody ? isOptOut(messageBody, userOptOutKeyword) : false;
 
   // If opt-out, boost spam score and add flag
   const spamScore = optOut ? Math.max(spamResult?.spamScore || 0, 50) : (spamResult?.spamScore || 0);
