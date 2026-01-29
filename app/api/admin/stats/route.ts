@@ -25,17 +25,17 @@ export async function GET(req: NextRequest) {
     const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     const totalUsers = authUsers?.users?.length || 0;
 
-    // Get users by plan type from the users table (subscription_tier set by Stripe webhook)
+    // Get users by plan type from the users table
     const { data: usersData } = await adminClient
       .from('users')
-      .select('subscription_tier');
+      .select('*');
 
     const planCounts: Record<string, number> = { basic: 0, premium: 0, none: 0 };
     usersData?.forEach((u: any) => {
-      const tier = u.subscription_tier;
-      if (tier === 'premium') {
+      const tier = u.subscription_tier || u.plan_type || u.tier || null;
+      if (tier === 'premium' || tier === 'professional') {
         planCounts.premium += 1;
-      } else if (tier === 'basic') {
+      } else if (tier === 'basic' || tier === 'starter') {
         planCounts.basic += 1;
       } else {
         planCounts.none += 1;

@@ -32,12 +32,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Get user data from users table (subscription_tier and credits set by Stripe webhook)
+    // Select all columns to avoid failures from missing column names
     const { data: usersData, error: usersDataError } = await adminClient
       .from('users')
-      .select('id, subscription_tier, credits, monthly_credits, phone');
+      .select('*');
 
     if (usersDataError) {
       console.error('Error fetching users data:', usersDataError);
+    } else if (usersData && usersData.length > 0) {
+      console.log('Admin: Sample user row columns:', Object.keys(usersData[0]));
     }
 
     // Get total money spent per user from points_transactions (purchase actions)
@@ -100,9 +103,12 @@ export async function GET(req: NextRequest) {
     // Format user data
     const users = authUsers.users.map((authUser) => {
       const userData = userDataById[authUser.id];
-      // Map subscription_tier to display name
-      const planType = userData?.subscription_tier === 'premium' ? 'premium' :
-                       userData?.subscription_tier === 'basic' ? 'basic' : 'none';
+      // Check multiple possible column names for plan type
+      const tier = userData?.subscription_tier || userData?.plan_type || userData?.tier || null;
+      const planType = tier === 'premium' || tier === 'professional' ? 'premium' :
+                       tier === 'basic' || tier === 'starter' ? 'basic' : 'none';
+      // Check multiple possible column names for credits/points
+      const credits = userData?.credits || userData?.points || userData?.points_balance || 0;
       return {
         id: authUser.id,
         email: authUser.email,
@@ -115,7 +121,7 @@ export async function GET(req: NextRequest) {
         last_sign_in: authUser.last_sign_in_at,
         email_confirmed: authUser.email_confirmed_at ? true : false,
         plan_type: planType,
-        points_balance: userData?.credits || 0,
+        points_balance: credits,
         total_spent: totalSpentByUser[authUser.id] || 0,
         message_count: (messageCounts as Record<string, number>)?.[authUser.id] || 0,
         lead_count: (leadCounts as Record<string, number>)?.[authUser.id] || 0,
