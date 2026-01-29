@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
         created_at: authUser.created_at,
         last_sign_in: authUser.last_sign_in_at,
         email_confirmed: authUser.email_confirmed_at ? true : false,
+        account_status: userData?.account_status || ((authUser as any).banned_until ? 'suspended' : 'active'),
         plan_type: planType,
         points_balance: credits,
         total_spent: totalSpentByUser[authUser.id] || 0,

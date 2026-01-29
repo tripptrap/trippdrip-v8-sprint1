@@ -16,7 +16,13 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  MoreVertical,
+  Ban,
+  Pause,
+  Play,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface User {
@@ -30,6 +36,7 @@ interface User {
   created_at: string;
   last_sign_in: string | null;
   email_confirmed: boolean;
+  account_status: string;
   plan_type: string;
   points_balance: number;
   total_spent: number;
@@ -82,6 +89,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ userId: string; email: string; action: string; label: string } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -116,6 +126,34 @@ export default function AdminPage() {
       console.error('Failed to fetch admin data:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUserAction(userId: string, email: string, action: string) {
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/users/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, userId, userEmail: email }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Refresh data
+        if (action === 'delete') {
+          setUsers(prev => prev.filter(u => u.id !== userId));
+        } else {
+          fetchData();
+        }
+      } else {
+        alert(data.error || 'Action failed');
+      }
+    } catch (error) {
+      alert('Failed to perform action');
+    } finally {
+      setActionLoading(false);
+      setConfirmAction(null);
+      setActionMenuOpen(null);
     }
   }
 
@@ -310,6 +348,7 @@ export default function AdminPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Activity</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Joined</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -370,7 +409,17 @@ export default function AdminPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {user.email_confirmed ? (
+                    {user.account_status === 'banned' ? (
+                      <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                        <Ban className="w-4 h-4" />
+                        <span className="text-xs">Banned</span>
+                      </div>
+                    ) : user.account_status === 'suspended' ? (
+                      <div className="flex items-center gap-1 text-orange-500">
+                        <Pause className="w-4 h-4" />
+                        <span className="text-xs">Suspended</span>
+                      </div>
+                    ) : user.email_confirmed ? (
                       <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                         <CheckCircle className="w-4 h-4" />
                         <span className="text-xs">Verified</span>
@@ -381,6 +430,57 @@ export default function AdminPage() {
                         <span className="text-xs">Pending</span>
                       </div>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="relative flex justify-end">
+                      <button
+                        onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
+                        className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      </button>
+                      {actionMenuOpen === user.id && (
+                        <div className="absolute right-0 top-8 z-20 w-44 bg-white dark:bg-slate-700 rounded-lg shadow-xl border border-slate-200 dark:border-slate-600 py-1">
+                          {user.account_status === 'suspended' ? (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'unsuspend', label: 'unsuspend' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Play className="w-4 h-4" /> Unsuspend
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'suspend', label: 'suspend' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 dark:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Pause className="w-4 h-4" /> Suspend
+                            </button>
+                          )}
+                          {user.account_status === 'banned' ? (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'unban', label: 'unban' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Play className="w-4 h-4" /> Unban
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'ban', label: 'ban' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Ban className="w-4 h-4" /> Ban
+                            </button>
+                          )}
+                          <div className="border-t border-slate-200 dark:border-slate-600 my-1" />
+                          <button
+                            onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'delete', label: 'permanently delete' }); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete Account
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -398,6 +498,64 @@ export default function AdminPage() {
           Showing {filteredUsers.length} of {users.length} users
         </div>
       </div>
+
+      {/* Click-away listener for action menus */}
+      {actionMenuOpen && (
+        <div className="fixed inset-0 z-10" onClick={() => setActionMenuOpen(null)} />
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                confirmAction.action === 'delete' ? 'bg-red-100 dark:bg-red-900/30' :
+                confirmAction.action === 'ban' ? 'bg-red-100 dark:bg-red-900/30' :
+                'bg-orange-100 dark:bg-orange-900/30'
+              }`}>
+                <AlertTriangle className={`w-5 h-5 ${
+                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-orange-600 dark:text-orange-400'
+                }`} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white capitalize">{confirmAction.label} User</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{confirmAction.email}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+              Are you sure you want to <strong>{confirmAction.label}</strong> this account?
+              {confirmAction.action === 'delete' && ' This action cannot be undone.'}
+              {confirmAction.action === 'ban' && ' The user will be permanently blocked from signing in.'}
+              {confirmAction.action === 'suspend' && ' The user will be temporarily blocked from signing in.'}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setConfirmAction(null); setActionMenuOpen(null); }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 text-sm font-medium border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleUserAction(confirmAction.userId, confirmAction.email, confirmAction.action)}
+                disabled={actionLoading}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 ${
+                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : confirmAction.action === 'unsuspend' || confirmAction.action === 'unban'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-orange-600 hover:bg-orange-700'
+                }`}
+              >
+                {actionLoading ? 'Processing...' : `Yes, ${confirmAction.label}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
