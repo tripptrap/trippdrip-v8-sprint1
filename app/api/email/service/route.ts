@@ -9,6 +9,7 @@ import {
   campaignCompletedEmail,
   monthlySummaryEmail,
   accountSuspendedEmail,
+  accountBannedEmail,
   paymentFailedEmail,
   EmailTemplate
 } from '@/lib/emailTemplates';
@@ -52,6 +53,7 @@ type ServiceEmailType =
   | 'campaign_completed'
   | 'monthly_summary'
   | 'account_suspended'
+  | 'account_banned'
   | 'payment_failed';
 
 type ServiceEmailData = {
@@ -139,6 +141,15 @@ export async function POST(req: NextRequest) {
 
       case 'account_suspended':
         template = accountSuspendedEmail(
+          data.userName || 'there',
+          data.reason || 'Violation of terms of service',
+          `${baseUrl}/contact`,
+          data.suspendedUntil || undefined
+        );
+        break;
+
+      case 'account_banned':
+        template = accountBannedEmail(
           data.userName || 'there',
           data.reason || 'Violation of terms of service',
           `${baseUrl}/contact`

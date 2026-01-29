@@ -6,15 +6,23 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
+interface AccountStatusInfo {
+  status: string;
+  reason: string | null;
+  suspended_until: string | null;
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [accountStatus, setAccountStatus] = useState<AccountStatusInfo | null>(null)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setAccountStatus(null)
 
     // Create Supabase client inside the event handler to avoid SSR issues
     const supabase = createClient()
@@ -26,6 +34,25 @@ export default function LoginPage() {
       })
 
       if (error) {
+        // Check if the error is related to a banned/suspended user
+        const errorMsg = error.message.toLowerCase()
+        if (errorMsg.includes('banned') || errorMsg.includes('suspended')) {
+          // Fetch account status details
+          try {
+            const statusRes = await fetch('/api/auth/account-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            })
+            const statusData = await statusRes.json()
+            if (statusData.status === 'banned' || statusData.status === 'suspended') {
+              setAccountStatus(statusData)
+              return
+            }
+          } catch {
+            // Fall through to generic error
+          }
+        }
         toast.error(error.message)
         return
       }
@@ -79,6 +106,45 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold mb-2 text-gray-900">HyveWyre™</h1>
           <p className="text-gray-600">Sign in to your account</p>
         </div>
+
+        {accountStatus && (
+          <div className="mb-6 p-4 rounded-xl border-2 border-red-300 bg-red-50">
+            <h3 className="text-lg font-bold text-red-700 mb-2">
+              {accountStatus.status === 'banned' ? 'Account Banned' : 'Account Suspended'}
+            </h3>
+            {accountStatus.reason && (
+              <div className="mb-3">
+                <p className="text-sm font-medium text-red-600">Reason:</p>
+                <p className="text-sm text-red-700">{accountStatus.reason}</p>
+              </div>
+            )}
+            {accountStatus.status === 'suspended' && accountStatus.suspended_until ? (
+              <p className="text-sm text-red-600">
+                Access will be restored on{' '}
+                <strong>
+                  {new Date(accountStatus.suspended_until).toLocaleString('en-US', {
+                    dateStyle: 'long',
+                    timeStyle: 'short',
+                  })}
+                </strong>
+              </p>
+            ) : accountStatus.status === 'banned' ? (
+              <p className="text-sm text-red-600">
+                This ban is permanent. Contact support to appeal.
+              </p>
+            ) : (
+              <p className="text-sm text-red-600">
+                Your account is suspended indefinitely. Contact support to appeal.
+              </p>
+            )}
+            <p className="text-xs text-red-500 mt-3">
+              Need help?{' '}
+              <a href="mailto:support@hyvewyre.com" className="underline font-medium">
+                support@hyvewyre.com
+              </a>
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>

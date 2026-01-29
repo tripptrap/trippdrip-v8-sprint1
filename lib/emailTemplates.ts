@@ -249,26 +249,60 @@ export const monthlySummaryEmail = (userName: string, stats: { messagesSent: num
 });
 
 // Account Suspended
-export const accountSuspendedEmail = (userName: string, reason: string, supportUrl: string): EmailTemplate => ({
-  subject: `Account Suspended - ${BRAND_NAME}`,
+export const accountSuspendedEmail = (userName: string, reason: string, supportUrl: string, suspendedUntil?: string): EmailTemplate => {
+  const untilText = suspendedUntil
+    ? `Your access will be restored on <strong>${new Date(suspendedUntil).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}</strong>.`
+    : 'The suspension duration is indefinite.';
+  const untilPlain = suspendedUntil
+    ? `Your access will be restored on ${new Date(suspendedUntil).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}.`
+    : 'The suspension duration is indefinite.';
+  return {
+    subject: `Account Suspended - ${BRAND_NAME}`,
+    html: htmlWrapper(`
+      <h2 style="margin: 0 0 20px 0; color: #dc2626; font-size: 24px;">Account Suspended</h2>
+      <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+        Hi ${userName},
+      </p>
+      <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+        Your ${BRAND_NAME} account has been temporarily suspended.
+      </p>
+      <div style="padding: 15px; background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
+        <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: bold;">Reason:</p>
+        <p style="margin: 5px 0 0 0; color: #991b1b; font-size: 14px;">${reason}</p>
+      </div>
+      <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+        ${untilText}
+      </p>
+      <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+        If you believe this is a mistake or would like to appeal this suspension, please contact our support team immediately.
+      </p>
+      ${button('Contact Support', supportUrl)}
+    `),
+    text: `Account Suspended\n\nHi ${userName},\n\nYour ${BRAND_NAME} account has been temporarily suspended.\n\nReason: ${reason}\n\n${untilPlain}\n\nIf you believe this is a mistake or would like to appeal this suspension, please contact our support team immediately.\n\nContact support: ${supportUrl}`
+  };
+};
+
+// Account Banned
+export const accountBannedEmail = (userName: string, reason: string, supportUrl: string): EmailTemplate => ({
+  subject: `Account Banned - ${BRAND_NAME}`,
   html: htmlWrapper(`
-    <h2 style="margin: 0 0 20px 0; color: #dc2626; font-size: 24px;">⚠️ Account Suspended</h2>
+    <h2 style="margin: 0 0 20px 0; color: #dc2626; font-size: 24px;">Account Permanently Banned</h2>
     <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
       Hi ${userName},
     </p>
     <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-      Your ${BRAND_NAME} account has been temporarily suspended.
+      Your ${BRAND_NAME} account has been permanently banned.
     </p>
     <div style="padding: 15px; background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px; margin: 20px 0;">
       <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: bold;">Reason:</p>
       <p style="margin: 5px 0 0 0; color: #991b1b; font-size: 14px;">${reason}</p>
     </div>
     <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-      If you believe this is a mistake or would like to appeal this suspension, please contact our support team immediately.
+      This ban is permanent. If you believe this is a mistake, you may contact our support team to appeal.
     </p>
     ${button('Contact Support', supportUrl)}
   `),
-  text: `Account Suspended\n\nHi ${userName},\n\nYour ${BRAND_NAME} account has been temporarily suspended.\n\nReason: ${reason}\n\nIf you believe this is a mistake or would like to appeal this suspension, please contact our support team immediately.\n\nContact support: ${supportUrl}`
+  text: `Account Permanently Banned\n\nHi ${userName},\n\nYour ${BRAND_NAME} account has been permanently banned.\n\nReason: ${reason}\n\nThis ban is permanent. If you believe this is a mistake, you may contact our support team to appeal.\n\nContact support: ${supportUrl}`
 });
 
 // Payment Failed

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, userId, userEmail, duration } = await req.json();
+    const { action, userId, userEmail, duration, reason } = await req.json();
 
     if (!action || !userId) {
       return NextResponse.json({ error: 'action and userId required' }, { status: 400 });
@@ -49,12 +49,48 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: banError.message }, { status: 500 });
         }
 
-        // Update users table account_status
+        // Calculate suspended_until
+        let suspendedUntil: string | null = null;
+        if (duration) {
+          const until = new Date();
+          until.setHours(until.getHours() + Number(duration));
+          suspendedUntil = until.toISOString();
+        }
+
+        // Update users table account_status, reason, and suspended_until
         if (userEmail) {
           await adminClient
             .from('users')
-            .update({ account_status: 'suspended', updated_at: new Date().toISOString() })
+            .update({
+              account_status: 'suspended',
+              suspension_reason: reason || 'Violation of terms of service',
+              suspended_until: suspendedUntil,
+              updated_at: new Date().toISOString(),
+            })
             .eq('email', userEmail.toLowerCase());
+
+          // Send notification email
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
+            await fetch(`${baseUrl}/api/email/service`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.SYSTEM_API_KEY || '',
+              },
+              body: JSON.stringify({
+                type: 'account_suspended',
+                to: userEmail,
+                data: {
+                  userName: 'there',
+                  reason: reason || 'Violation of terms of service',
+                  suspendedUntil,
+                },
+              }),
+            });
+          } catch (emailErr) {
+            console.error('Failed to send suspension email:', emailErr);
+          }
         }
 
         const durationLabel = duration ? `${duration}h` : 'indefinitely';
@@ -74,7 +110,12 @@ export async function POST(req: NextRequest) {
         if (userEmail) {
           await adminClient
             .from('users')
-            .update({ account_status: 'active', updated_at: new Date().toISOString() })
+            .update({
+              account_status: 'active',
+              suspension_reason: null,
+              suspended_until: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('email', userEmail.toLowerCase());
         }
 
@@ -94,8 +135,35 @@ export async function POST(req: NextRequest) {
         if (userEmail) {
           await adminClient
             .from('users')
-            .update({ account_status: 'banned', updated_at: new Date().toISOString() })
+            .update({
+              account_status: 'banned',
+              suspension_reason: reason || 'Violation of terms of service',
+              suspended_until: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('email', userEmail.toLowerCase());
+
+          // Send notification email
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
+            await fetch(`${baseUrl}/api/email/service`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.SYSTEM_API_KEY || '',
+              },
+              body: JSON.stringify({
+                type: 'account_banned',
+                to: userEmail,
+                data: {
+                  userName: 'there',
+                  reason: reason || 'Violation of terms of service',
+                },
+              }),
+            });
+          } catch (emailErr) {
+            console.error('Failed to send ban email:', emailErr);
+          }
         }
 
         return NextResponse.json({ ok: true, message: 'User banned' });
@@ -114,7 +182,12 @@ export async function POST(req: NextRequest) {
         if (userEmail) {
           await adminClient
             .from('users')
-            .update({ account_status: 'active', updated_at: new Date().toISOString() })
+            .update({
+              account_status: 'active',
+              suspension_reason: null,
+              suspended_until: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('email', userEmail.toLowerCase());
         }
 
