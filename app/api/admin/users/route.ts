@@ -43,23 +43,31 @@ export async function GET(req: NextRequest) {
       console.log('Admin: Sample user row columns:', Object.keys(usersData[0]));
     }
 
-    // Get total money spent per user from points_transactions (purchase actions)
+    // Get total money spent per user from points_transactions (purchase/subscription actions)
     const totalSpentByUser: Record<string, number> = {};
     try {
       const { data: transactions } = await adminClient
         .from('points_transactions')
-        .select('user_id, points_amount, action_type')
+        .select('user_id, points_amount, action_type, amount_paid')
         .in('action_type', ['purchase', 'subscription']);
       transactions?.forEach((t: any) => {
-        if (t.user_id && t.points_amount) {
-          // Estimate spend: subscription credits are included in plan price
-          // Basic = $29/mo (3000 credits), Premium = $79/mo (10000 credits), Point packs vary
+        if (t.user_id) {
           let dollarAmount = 0;
-          if (t.action_type === 'subscription') {
-            dollarAmount = t.points_amount >= 10000 ? 79 : 29;
-          } else {
-            // Point packs: roughly $0.01 per point
-            dollarAmount = t.points_amount * 0.01;
+          if (t.amount_paid && t.amount_paid > 0) {
+            // Use actual Stripe amount (stored in cents)
+            dollarAmount = t.amount_paid / 100;
+          } else if (t.points_amount) {
+            // Fallback for historical records without amount_paid
+            if (t.action_type === 'subscription') {
+              dollarAmount = t.points_amount >= 10000 ? 98 : 30;
+            } else {
+              // Estimate point packs based on known pricing
+              if (t.points_amount >= 60000) dollarAmount = 510;
+              else if (t.points_amount >= 25000) dollarAmount = 225;
+              else if (t.points_amount >= 10000) dollarAmount = 95;
+              else if (t.points_amount >= 4000) dollarAmount = 40;
+              else dollarAmount = t.points_amount * 0.01;
+            }
           }
           totalSpentByUser[t.user_id] = (totalSpentByUser[t.user_id] || 0) + dollarAmount;
         }

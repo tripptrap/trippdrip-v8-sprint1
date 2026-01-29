@@ -136,12 +136,14 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Create points transaction record
+          // Create points transaction record with actual amount paid
+          const subscriptionAmountCents = session.amount_total || 0;
           await supabaseAdmin.from('points_transactions').insert({
             user_id: userId,
             points_amount: monthlyCredits,
             action_type: 'subscription',
             description: `${planType === 'premium' ? 'Premium' : 'Basic'} subscription - monthly credits`,
+            amount_paid: subscriptionAmountCents,
             created_at: new Date().toISOString()
           });
 
@@ -178,12 +180,15 @@ export async function POST(req: NextRequest) {
 
           // CRITICAL: Create transaction record FIRST (with unique constraint)
           // This prevents race conditions where both webhooks update credits
+          // Store actual amount paid from Stripe (in cents)
+          const packAmountCents = session.amount_total || 0;
           const { data: insertData, error: insertError } = await supabaseAdmin.from('points_transactions').insert({
             user_id: userId,
             points_amount: points,
             action_type: 'purchase',
             description: `${packName} purchased`,
             stripe_session_id: sessionId,
+            amount_paid: packAmountCents,
             created_at: new Date().toISOString()
           });
 
