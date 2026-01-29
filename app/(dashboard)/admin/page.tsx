@@ -22,7 +22,10 @@ import {
   Pause,
   Play,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 
 interface User {
@@ -42,6 +45,22 @@ interface User {
   total_spent: number;
   message_count: number;
   lead_count: number;
+  avg_spam_score: number;
+  high_spam_count: number;
+}
+
+interface UserMessage {
+  id: string;
+  body: string;
+  from_phone: string;
+  to_phone: string;
+  direction: string;
+  status: string;
+  spam_score: number;
+  spam_flags: string[];
+  created_at: string;
+  channel: string;
+  provider: string;
 }
 
 interface Stats {
@@ -51,6 +70,7 @@ interface Stats {
   totalMessages: number;
   messagesLast24h: number;
   totalLeads: number;
+  flaggedMessages: number;
   planBreakdown: Record<string, number>;
   industryBreakdown: Record<string, number>;
   useCaseBreakdown: Record<string, number>;
@@ -94,6 +114,9 @@ export default function AdminPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [suspendDuration, setSuspendDuration] = useState<string>('24');
   const [actionReason, setActionReason] = useState<string>('');
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [userMessages, setUserMessages] = useState<UserMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -166,6 +189,27 @@ export default function AdminPage() {
     }
   }
 
+  async function toggleUserMessages(userId: string) {
+    if (expandedUser === userId) {
+      setExpandedUser(null);
+      setUserMessages([]);
+      return;
+    }
+    setExpandedUser(userId);
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/messages`);
+      const data = await res.json();
+      if (data.ok) {
+        setUserMessages(data.messages);
+      }
+    } catch (error) {
+      console.error('Failed to fetch user messages:', error);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -197,7 +241,7 @@ export default function AdminPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="card p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
@@ -242,6 +286,18 @@ export default function AdminPage() {
               <div>
                 <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.totalLeads.toLocaleString()}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Total Leads</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{stats.flaggedMessages || 0}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Flagged Spam</p>
               </div>
             </div>
           </div>
@@ -355,18 +411,22 @@ export default function AdminPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Points</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Spent</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Activity</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Spam</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Joined</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              {filteredUsers.map((user) => (<>
+                <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => toggleUserMessages(user.id)}>
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{user.full_name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                    <div className="flex items-center gap-2">
+                      {expandedUser === user.id ? <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{user.full_name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -411,6 +471,22 @@ export default function AdminPage() {
                       <p>{user.lead_count} leads</p>
                     </div>
                   </td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="text-xs">
+                      <span className={`inline-block px-1.5 py-0.5 rounded font-medium ${
+                        user.avg_spam_score >= 30
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                          : user.avg_spam_score >= 10
+                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                      }`}>
+                        {user.avg_spam_score}
+                      </span>
+                      {user.high_spam_count > 0 && (
+                        <p className="text-red-500 mt-0.5">{user.high_spam_count} flagged</p>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                       <Clock className="w-3 h-3" />
@@ -440,7 +516,7 @@ export default function AdminPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     {isAdminEmail(user.email) ? (
                       <div className="flex justify-end">
                         <span className="px-2 py-1 text-[10px] font-medium bg-gradient-to-r from-red-500 to-orange-500 text-white rounded">
@@ -500,7 +576,75 @@ export default function AdminPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+                {expandedUser === user.id && (
+                  <tr key={`${user.id}-messages`}>
+                    <td colSpan={11} className="p-0">
+                      <div className="bg-slate-50 dark:bg-slate-800/80 border-t border-b border-slate-200 dark:border-slate-700 px-6 py-4">
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
+                          Recent Messages — {user.full_name}
+                        </h4>
+                        {messagesLoading ? (
+                          <div className="flex items-center gap-2 py-4">
+                            <Loader2 className="w-4 h-4 animate-spin text-sky-500" />
+                            <span className="text-sm text-slate-500">Loading messages...</span>
+                          </div>
+                        ) : userMessages.length === 0 ? (
+                          <p className="text-sm text-slate-500 py-2">No messages found</p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-600">
+                            <table className="w-full text-sm">
+                              <thead className="bg-slate-100 dark:bg-slate-700">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Date</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Dir</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">From</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">To</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Message</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Spam</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400">Flags</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 dark:divide-slate-600">
+                                {userMessages.map((msg) => (
+                                  <tr key={msg.id} className="hover:bg-white dark:hover:bg-slate-700/50">
+                                    <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
+                                      {format(new Date(msg.created_at), 'MMM d, h:mm a')}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className={`text-xs font-medium ${msg.direction === 'outbound' || msg.direction === 'out' ? 'text-sky-600' : 'text-green-600'}`}>
+                                        {msg.direction === 'outbound' || msg.direction === 'out' ? 'OUT' : 'IN'}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{msg.from_phone || '-'}</td>
+                                    <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{msg.to_phone || '-'}</td>
+                                    <td className="px-3 py-2 text-xs text-slate-700 dark:text-slate-300 max-w-xs truncate" title={msg.body}>
+                                      {msg.body}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                                        (msg.spam_score || 0) >= 30
+                                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                          : (msg.spam_score || 0) >= 10
+                                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                      }`}>
+                                        {msg.spam_score || 0}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-xs text-red-500 max-w-[150px] truncate" title={msg.spam_flags?.join(', ')}>
+                                      {msg.spam_flags?.length > 0 ? msg.spam_flags.join(', ') : '-'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>))}
             </tbody>
           </table>
 

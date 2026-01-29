@@ -94,6 +94,18 @@ export async function GET(req: NextRequest) {
       useCaseCounts[useCase] = (useCaseCounts[useCase] || 0) + 1;
     });
 
+    // Get flagged messages count (spam_score >= 30)
+    let flaggedMessages = 0;
+    try {
+      const { count } = await adminClient
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .gte('spam_score', 30);
+      flaggedMessages = count || 0;
+    } catch (e) {
+      console.log('Could not fetch spam stats:', e);
+    }
+
     return NextResponse.json({
       ok: true,
       stats: {
@@ -103,6 +115,7 @@ export async function GET(req: NextRequest) {
         totalMessages: totalMessages || 0,
         messagesLast24h: messagesLast24h || 0,
         totalLeads: totalLeads || 0,
+        flaggedMessages,
         planBreakdown: planCounts,
         industryBreakdown: industryCounts,
         useCaseBreakdown: useCaseCounts,

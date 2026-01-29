@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { selectClosestNumber } from '@/lib/geo/selectClosestNumber';
+import { detectSpam } from '@/lib/spam/detector';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -221,9 +222,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Save the message
+      // Save the message with spam score
       if (finalThreadId) {
         console.log('💾 Saving message to thread:', finalThreadId);
+        const spamResult = detectSpam(message);
+        const spamFlags = spamResult.detectedWords.map(w => w.word);
         const { error: insertError } = await supabaseAdmin.from('messages').insert({
           user_id: userId, // Required for RLS
           thread_id: finalThreadId,
@@ -238,6 +241,8 @@ export async function POST(req: NextRequest) {
           media_urls: mediaUrls?.length > 0 ? mediaUrls : null,
           channel: mediaUrls?.length > 0 ? 'mms' : 'sms',
           provider: 'telnyx',
+          spam_score: spamResult.spamScore,
+          spam_flags: spamFlags,
           created_at: new Date().toISOString(),
         });
 

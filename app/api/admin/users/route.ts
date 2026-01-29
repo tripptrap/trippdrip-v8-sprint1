@@ -76,15 +76,25 @@ export async function GET(req: NextRequest) {
       console.log('Could not fetch spending data:', e);
     }
 
-    // Get message counts per user
+    // Get message counts and spam data per user
+    const spamDataByUser: Record<string, { totalScore: number; count: number; highSpamCount: number }> = {};
     const { data: messageCounts } = await adminClient
       .from('messages')
-      .select('user_id')
+      .select('user_id, spam_score')
       .then(async (res) => {
-        // Group by user_id and count
         const counts: Record<string, number> = {};
         res.data?.forEach((msg: any) => {
           counts[msg.user_id] = (counts[msg.user_id] || 0) + 1;
+          // Aggregate spam data
+          if (!spamDataByUser[msg.user_id]) {
+            spamDataByUser[msg.user_id] = { totalScore: 0, count: 0, highSpamCount: 0 };
+          }
+          const score = msg.spam_score || 0;
+          spamDataByUser[msg.user_id].totalScore += score;
+          spamDataByUser[msg.user_id].count += 1;
+          if (score >= 30) {
+            spamDataByUser[msg.user_id].highSpamCount += 1;
+          }
         });
         return { data: counts };
       });
@@ -135,6 +145,10 @@ export async function GET(req: NextRequest) {
         total_spent: totalSpentByUser[authUser.id] || 0,
         message_count: (messageCounts as Record<string, number>)?.[authUser.id] || 0,
         lead_count: (leadCounts as Record<string, number>)?.[authUser.id] || 0,
+        avg_spam_score: spamDataByUser[authUser.id]?.count
+          ? Math.round(spamDataByUser[authUser.id].totalScore / spamDataByUser[authUser.id].count)
+          : 0,
+        high_spam_count: spamDataByUser[authUser.id]?.highSpamCount || 0,
       };
     });
 

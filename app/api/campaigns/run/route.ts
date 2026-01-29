@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
+import { detectSpam } from "@/lib/spam/detector";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -264,7 +265,8 @@ export async function POST(req: Request) {
                 .update(updateData)
                 .eq('id', existingThread.id);
 
-              // Save the message to database
+              // Save the message to database with spam score
+              const spamResult1 = detectSpam(personalizedMessage);
               await supabase
                 .from('messages')
                 .insert({
@@ -279,6 +281,8 @@ export async function POST(req: Request) {
                   channel: 'sms',
                   provider: 'twilio',
                   message_sid: result.sid,
+                  spam_score: spamResult1.spamScore,
+                  spam_flags: spamResult1.detectedWords.map(w => w.word),
                   created_at: new Date().toISOString()
                 });
             } else {
@@ -301,8 +305,9 @@ export async function POST(req: Request) {
                 .select()
                 .single();
 
-              // Save message to database
+              // Save message to database with spam score
               if (newThread) {
+                const spamResult2 = detectSpam(personalizedMessage);
                 await supabase
                   .from('messages')
                   .insert({
@@ -317,6 +322,8 @@ export async function POST(req: Request) {
                     channel: 'sms',
                     provider: 'twilio',
                     message_sid: result.sid,
+                    spam_score: spamResult2.spamScore,
+                    spam_flags: spamResult2.detectedWords.map(w => w.word),
                     created_at: new Date().toISOString()
                   });
               }
