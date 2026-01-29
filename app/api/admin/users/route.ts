@@ -32,20 +32,38 @@ export async function GET(req: NextRequest) {
     }
 
     // Get user data from users table (subscription_tier and credits set by Stripe webhook)
-    const { data: usersData } = await adminClient
+    const { data: usersData, error: usersDataError } = await adminClient
       .from('users')
       .select('id, subscription_tier, credits, monthly_credits, phone');
 
-    // Get total money spent per user from Stripe payments
-    const { data: paymentsData } = await adminClient
-      .from('payments')
-      .select('user_id, amount');
+    if (usersDataError) {
+      console.error('Error fetching users data:', usersDataError);
+    }
+
+    // Get total money spent per user from points_transactions (purchase actions)
     const totalSpentByUser: Record<string, number> = {};
-    paymentsData?.forEach((p: any) => {
-      if (p.user_id && p.amount) {
-        totalSpentByUser[p.user_id] = (totalSpentByUser[p.user_id] || 0) + (p.amount / 100);
-      }
-    });
+    try {
+      const { data: transactions } = await adminClient
+        .from('points_transactions')
+        .select('user_id, points_amount, action_type')
+        .in('action_type', ['purchase', 'subscription']);
+      transactions?.forEach((t: any) => {
+        if (t.user_id && t.points_amount) {
+          // Estimate spend: subscription credits are included in plan price
+          // Basic = $29/mo (3000 credits), Premium = $79/mo (10000 credits), Point packs vary
+          let dollarAmount = 0;
+          if (t.action_type === 'subscription') {
+            dollarAmount = t.points_amount >= 10000 ? 79 : 29;
+          } else {
+            // Point packs: roughly $0.01 per point
+            dollarAmount = t.points_amount * 0.01;
+          }
+          totalSpentByUser[t.user_id] = (totalSpentByUser[t.user_id] || 0) + dollarAmount;
+        }
+      });
+    } catch (e) {
+      console.log('Could not fetch spending data:', e);
+    }
 
     // Get message counts per user
     const { data: messageCounts } = await adminClient
@@ -77,6 +95,7 @@ export async function GET(req: NextRequest) {
     usersData?.forEach((userData: any) => {
       userDataById[userData.id] = userData;
     });
+    console.log(`Admin: Found ${usersData?.length || 0} users in users table, ${Object.keys(userDataById).length} mapped by id`);
 
     // Format user data
     const users = authUsers.users.map((authUser) => {

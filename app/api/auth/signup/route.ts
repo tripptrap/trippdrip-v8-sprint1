@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name } = await req.json();
+    const { email, password, name, phone, updatePreference } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
       options: {
         data: {
           full_name: name,
+          phone: phone || null,
+          update_preference: updatePreference || 'email',
         },
       },
     });

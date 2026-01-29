@@ -9,11 +9,13 @@ import toast from 'react-hot-toast'
 export default function RegisterPage() {
   const router = useRouter()
   const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [industry, setIndustry] = useState('')
   const [useCase, setUseCase] = useState('')
+  const [updatePref, setUpdatePref] = useState<'email' | 'phone' | 'both'>('email')
   const [loading, setLoading] = useState(false)
 
   const [showSuccess, setShowSuccess] = useState(false)
@@ -69,8 +71,10 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: fullName,
+            phone: phone || null,
             industry: industry,
             use_case: useCase,
+            update_preference: updatePref,
           },
           // Production domain for email verification
           emailRedirectTo: `${baseUrl}/auth/callback`,
@@ -193,6 +197,20 @@ export default function RegisterPage() {
           </div>
 
           <div>
+            <label htmlFor="phone" className="block text-sm font-medium mb-2 text-gray-700">
+              Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
+              placeholder="(555) 123-4567"
+            />
+          </div>
+
+          <div>
             <label htmlFor="industry" className="block text-sm font-medium mb-2 text-gray-700">
               What industry are you in?
             </label>
@@ -230,6 +248,53 @@ export default function RegisterPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-700">
+              How would you like to receive updates?
+            </label>
+            <div className="flex gap-4">
+              <label className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                updatePref === 'email' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="updatePref"
+                  value="email"
+                  checked={updatePref === 'email'}
+                  onChange={() => setUpdatePref('email')}
+                  className="sr-only"
+                />
+                <span className="text-sm font-medium">Email</span>
+              </label>
+              <label className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                updatePref === 'phone' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="updatePref"
+                  value="phone"
+                  checked={updatePref === 'phone'}
+                  onChange={() => setUpdatePref('phone')}
+                  className="sr-only"
+                />
+                <span className="text-sm font-medium">Phone</span>
+              </label>
+              <label className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                updatePref === 'both' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="updatePref"
+                  value="both"
+                  checked={updatePref === 'both'}
+                  onChange={() => setUpdatePref('both')}
+                  className="sr-only"
+                />
+                <span className="text-sm font-medium">Both</span>
+              </label>
+            </div>
           </div>
 
           <div>

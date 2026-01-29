@@ -8,9 +8,11 @@ import toast from 'react-hot-toast';
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [updatePref, setUpdatePref] = useState<'email' | 'phone' | 'both'>('email');
   const [loading, setLoading] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
 
@@ -38,6 +40,8 @@ export default function SignUpPage() {
           email,
           password,
           name,
+          phone: phone || null,
+          updatePreference: updatePref,
         }),
       });
 
@@ -87,6 +91,46 @@ export default function SignUpPage() {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                 required
               />
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Phone number <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                How would you like to receive updates?
+              </label>
+              <div className="flex gap-3">
+                <label className={`flex-1 flex items-center justify-center px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                  updatePref === 'email' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}>
+                  <input type="radio" name="updatePref" value="email" checked={updatePref === 'email'} onChange={() => setUpdatePref('email')} className="sr-only" />
+                  <span className="text-sm font-medium">Email</span>
+                </label>
+                <label className={`flex-1 flex items-center justify-center px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                  updatePref === 'phone' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}>
+                  <input type="radio" name="updatePref" value="phone" checked={updatePref === 'phone'} onChange={() => setUpdatePref('phone')} className="sr-only" />
+                  <span className="text-sm font-medium">Phone</span>
+                </label>
+                <label className={`flex-1 flex items-center justify-center px-3 py-2.5 rounded-lg border cursor-pointer transition ${
+                  updatePref === 'both' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}>
+                  <input type="radio" name="updatePref" value="both" checked={updatePref === 'both'} onChange={() => setUpdatePref('both')} className="sr-only" />
+                  <span className="text-sm font-medium">Both</span>
+                </label>
+              </div>
             </div>
 
             <div>

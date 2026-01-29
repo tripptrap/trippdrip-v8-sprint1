@@ -329,7 +329,7 @@ export default function AdminPage() {
                       {user.phone ? (
                         <p title="Phone">{user.phone}</p>
                       ) : (
-                        <p className="text-slate-400 dark:text-slate-500">No phone</p>
+                        <p className="text-slate-400 dark:text-slate-500">No number added</p>
                       )}
                     </div>
                   </td>
