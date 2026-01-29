@@ -5,6 +5,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { ContactType } from '@/lib/receptionist/types';
+import { detectSpam } from '@/lib/spam/detector';
+
+// Opt-out keywords that indicate a lead wants to stop receiving messages
+const OPT_OUT_KEYWORDS = [
+  'stop', 'unsubscribe', 'quit', 'cancel', 'opt out', 'optout',
+  'remove me', 'stop texting', 'don\'t text', 'dont text',
+  'no more', 'leave me alone', 'take me off', 'end', 'halt'
+];
+
+function isOptOut(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  // Exact match for short keywords (stop, quit, end, etc.)
+  if (OPT_OUT_KEYWORDS.includes(lower)) return true;
+  // Partial match for phrases
+  return OPT_OUT_KEYWORDS.some(kw => kw.length > 4 && lower.includes(kw));
+}
 
 // Create Supabase admin client (bypasses RLS)
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -221,6 +237,17 @@ async function handleInboundSMS(payload: any) {
   // Save the message
   console.log('💾 Saving inbound message:', { userId, threadId, from, to, messageBody: messageBody?.substring(0, 50) });
 
+  // Run spam detection on inbound message
+  const spamResult = messageBody ? detectSpam(messageBody) : null;
+  const optOut = messageBody ? isOptOut(messageBody) : false;
+
+  // If opt-out, boost spam score and add flag
+  const spamScore = optOut ? Math.max(spamResult?.spamScore || 0, 50) : (spamResult?.spamScore || 0);
+  const spamFlags = [
+    ...(spamResult?.detectedWords || []),
+    ...(optOut ? ['OPT_OUT_REQUEST'] : []),
+  ];
+
   const messageData = {
     user_id: userId, // Required for RLS
     thread_id: threadId,
@@ -235,6 +262,8 @@ async function handleInboundSMS(payload: any) {
     media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     channel: mediaUrls.length > 0 ? 'mms' : 'sms',
     provider: 'telnyx',
+    spam_score: spamScore,
+    spam_flags: spamFlags.length > 0 ? spamFlags : null,
     created_at: new Date().toISOString(),
   };
 
@@ -278,6 +307,59 @@ async function handleInboundSMS(payload: any) {
       }
     } catch (dripErr) {
       console.error('Error stopping AI drip:', dripErr);
+    }
+
+    // Handle opt-out: add to DNC list, update lead, skip receptionist
+    if (optOut) {
+      console.log(`🚫 Opt-out detected from ${from}: "${messageBody}"`);
+
+      try {
+        // Add to user's DNC list
+        await supabaseAdmin
+          .from('dnc_list')
+          .upsert({
+            user_id: userId,
+            phone_number: from,
+            reason: 'opt_out',
+            source: 'inbound_sms',
+            created_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,phone_number' });
+
+        console.log(`✅ Added ${from} to DNC list for user ${userId}`);
+
+        // Log DNC history
+        await supabaseAdmin
+          .from('dnc_history')
+          .insert({
+            user_id: userId,
+            phone_number: from,
+            action: 'added',
+            reason: 'opt_out',
+            source: 'inbound_sms',
+            notes: `Lead texted: "${messageBody}"`,
+            created_at: new Date().toISOString(),
+          });
+
+        // Update lead's sms_opt_in to false
+        const { data: updatedLead } = await supabaseAdmin
+          .from('leads')
+          .update({
+            sms_opt_in: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId)
+          .eq('phone', from)
+          .select('id');
+
+        if (updatedLead && updatedLead.length > 0) {
+          console.log(`✅ Set sms_opt_in=false for lead with phone ${from}`);
+        }
+      } catch (dncErr) {
+        console.error('Error handling opt-out DNC:', dncErr);
+      }
+
+      // Do NOT trigger receptionist for opt-out messages
+      return;
     }
 
     // Check and trigger AI Receptionist if enabled
