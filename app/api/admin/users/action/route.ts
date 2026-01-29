@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, userId, userEmail } = await req.json();
+    const { action, userId, userEmail, duration } = await req.json();
 
     if (!action || !userId) {
       return NextResponse.json({ error: 'action and userId required' }, { status: 400 });
@@ -27,15 +27,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cannot perform this action on your own account' }, { status: 400 });
     }
 
+    // Protect admin accounts from ban/suspend/delete
+    if (userEmail && isAdminEmail(userEmail)) {
+      return NextResponse.json({ error: 'Cannot suspend, ban, or delete an admin account' }, { status: 403 });
+    }
+
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
     switch (action) {
       case 'suspend': {
-        // Suspend: disable auth user + update users table
+        // Suspend: disable auth user for a duration
+        // duration is in hours; default to indefinite (~100 years)
+        const banHours = duration ? String(duration) + 'h' : '876000h';
         const { error: banError } = await adminClient.auth.admin.updateUserById(userId, {
-          ban_duration: '876000h', // ~100 years = effectively permanent but reversible
+          ban_duration: banHours,
         });
         if (banError) {
           console.error('Error suspending user:', banError);
@@ -50,7 +57,8 @@ export async function POST(req: NextRequest) {
             .eq('email', userEmail.toLowerCase());
         }
 
-        return NextResponse.json({ ok: true, message: 'User suspended' });
+        const durationLabel = duration ? `${duration}h` : 'indefinitely';
+        return NextResponse.json({ ok: true, message: `User suspended for ${durationLabel}` });
       }
 
       case 'unsuspend': {

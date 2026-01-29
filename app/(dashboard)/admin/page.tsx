@@ -92,6 +92,7 @@ export default function AdminPage() {
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ userId: string; email: string; action: string; label: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [suspendDuration, setSuspendDuration] = useState<string>('24');
 
   useEffect(() => {
     checkAdminAccess();
@@ -135,7 +136,12 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/users/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, userId, userEmail: email }),
+        body: JSON.stringify({
+          action,
+          userId,
+          userEmail: email,
+          ...(action === 'suspend' ? { duration: suspendDuration === 'indefinite' ? null : Number(suspendDuration) } : {}),
+        }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -432,6 +438,13 @@ export default function AdminPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    {isAdminEmail(user.email) ? (
+                      <div className="flex justify-end">
+                        <span className="px-2 py-1 text-[10px] font-medium bg-gradient-to-r from-red-500 to-orange-500 text-white rounded">
+                          ADMIN
+                        </span>
+                      </div>
+                    ) : (
                     <div className="relative flex justify-end">
                       <button
                         onClick={() => setActionMenuOpen(actionMenuOpen === user.id ? null : user.id)}
@@ -481,6 +494,7 @@ export default function AdminPage() {
                         </div>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -525,12 +539,35 @@ export default function AdminPage() {
                 <p className="text-sm text-slate-500 dark:text-slate-400">{confirmAction.email}</p>
               </div>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
               Are you sure you want to <strong>{confirmAction.label}</strong> this account?
               {confirmAction.action === 'delete' && ' This action cannot be undone.'}
               {confirmAction.action === 'ban' && ' The user will be permanently blocked from signing in.'}
               {confirmAction.action === 'suspend' && ' The user will be temporarily blocked from signing in.'}
             </p>
+
+            {confirmAction.action === 'suspend' && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Suspension Duration
+                </label>
+                <select
+                  value={suspendDuration}
+                  onChange={(e) => setSuspendDuration(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                >
+                  <option value="1">1 hour</option>
+                  <option value="6">6 hours</option>
+                  <option value="12">12 hours</option>
+                  <option value="24">24 hours</option>
+                  <option value="72">3 days</option>
+                  <option value="168">7 days</option>
+                  <option value="720">30 days</option>
+                  <option value="2160">90 days</option>
+                  <option value="indefinite">Indefinite</option>
+                </select>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => { setConfirmAction(null); setActionMenuOpen(null); }}
