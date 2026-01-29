@@ -6,6 +6,7 @@ import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 
 const TOUR_COMPLETED_KEY = 'onboarding_tour_completed';
 const THEME_SELECTED_KEY = 'theme_selection_shown';
+const PHONE_SELECTED_KEY = 'onboarding_phone_selected';
 
 interface TourStep {
   target: string; // CSS selector for the element to highlight
@@ -59,11 +60,13 @@ export default function OnboardingTour() {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
-    // Check if tour has been completed and theme has been selected
+    // Check if tour has been completed and previous steps are done
     const tourCompleted = localStorage.getItem(TOUR_COMPLETED_KEY);
     const themeSelected = localStorage.getItem(THEME_SELECTED_KEY);
+    const phoneSelected = localStorage.getItem(PHONE_SELECTED_KEY);
 
-    if (!tourCompleted && themeSelected) {
+    // Tour starts after both phone selection AND theme selection are done
+    if (!tourCompleted && phoneSelected && themeSelected) {
       // Start tour after a short delay (after theme modal closes)
       const timer = setTimeout(() => {
         setIsActive(true);

@@ -78,6 +78,16 @@ export default function CampaignsPage() {
   const [newTagColor, setNewTagColor] = useState('#22c55e');
   const [creatingTag, setCreatingTag] = useState(false);
 
+  // Lead management state for edit modal
+  type Lead = { id: string; first_name?: string; last_name?: string; phone?: string; email?: string; campaign_id?: string };
+  const [campaignLeads, setCampaignLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [leadSearchQuery, setLeadSearchQuery] = useState('');
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [movingLeads, setMovingLeads] = useState(false);
+  const [sourceCampaignId, setSourceCampaignId] = useState('');
+  const [editTab, setEditTab] = useState<'details' | 'leads'>('details');
+
   const tagColors = [
     { color: '#ef4444', name: 'Red' },
     { color: '#f59e0b', name: 'Orange' },
@@ -269,11 +279,161 @@ export default function CampaignsPage() {
     }
   }
 
+  async function loadCampaignLeads(campaignId: string) {
+    setLoadingLeads(true);
+    try {
+      const response = await fetch(`/api/leads?campaign_id=${campaignId}`);
+      const data = await response.json();
+      if (data.ok) {
+        setCampaignLeads(data.items || []);
+      }
+    } catch (error) {
+      console.error('Error loading campaign leads:', error);
+    } finally {
+      setLoadingLeads(false);
+    }
+  }
+
+  async function loadAllLeads() {
+    try {
+      const response = await fetch('/api/leads');
+      const data = await response.json();
+      if (data.ok) {
+        setAllLeads(data.items || []);
+      }
+    } catch (error) {
+      console.error('Error loading all leads:', error);
+    }
+  }
+
+  async function addLeadToCampaign(leadId: string) {
+    if (!editingCampaign) return;
+
+    try {
+      const response = await fetch('/api/leads/update-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadIds: [leadId],
+          campaignId: editingCampaign.id,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.ok) {
+        await loadCampaignLeads(editingCampaign.id);
+        await loadAllLeads();
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Lead added to campaign!'
+        });
+      } else {
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to add lead'
+        });
+      }
+    } catch (error: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'Failed to add lead'
+      });
+    }
+  }
+
+  async function removeLeadFromCampaign(leadId: string) {
+    if (!editingCampaign) return;
+
+    try {
+      const response = await fetch('/api/leads/update-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadIds: [leadId],
+          campaignId: null, // Remove from campaign
+        }),
+      });
+
+      const data = await response.json();
+      if (data.ok) {
+        await loadCampaignLeads(editingCampaign.id);
+        await loadAllLeads();
+      }
+    } catch (error) {
+      console.error('Error removing lead:', error);
+    }
+  }
+
+  async function moveLeadsFromCampaign() {
+    if (!editingCampaign || !sourceCampaignId) return;
+
+    setMovingLeads(true);
+    try {
+      // Get leads from source campaign
+      const response = await fetch(`/api/leads?campaign_id=${sourceCampaignId}`);
+      const data = await response.json();
+
+      if (data.ok && data.items?.length > 0) {
+        const leadIds = data.items.map((l: Lead) => l.id);
+
+        // Move them to this campaign
+        const moveResponse = await fetch('/api/leads/update-campaign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadIds,
+            campaignId: editingCampaign.id,
+          }),
+        });
+
+        const moveData = await moveResponse.json();
+        if (moveData.ok) {
+          await loadCampaignLeads(editingCampaign.id);
+          await loadCampaigns();
+          setSourceCampaignId('');
+          setModal({
+            isOpen: true,
+            type: 'success',
+            title: 'Success',
+            message: `Moved ${leadIds.length} leads to this campaign!`
+          });
+        }
+      } else {
+        setModal({
+          isOpen: true,
+          type: 'info',
+          title: 'No Leads',
+          message: 'No leads found in the selected campaign.'
+        });
+      }
+    } catch (error: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'Failed to move leads'
+      });
+    } finally {
+      setMovingLeads(false);
+    }
+  }
+
   function openEditModal(campaign: Campaign) {
     setEditingCampaign(campaign);
     setEditCampaignName(campaign.name);
     setEditFlowId(campaign.flow_id || '');
     setEditTags(campaign.tags || []);
+    setEditTab('details');
+    setLeadSearchQuery('');
+    setSourceCampaignId('');
+    loadCampaignLeads(campaign.id);
+    loadAllLeads();
     setEditOpen(true);
   }
 
@@ -382,7 +542,7 @@ export default function CampaignsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Campaigns</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Campaigns</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">View and manage your SMS campaigns</p>
         </div>
         <div className="flex gap-2">
@@ -422,17 +582,17 @@ export default function CampaignsPage() {
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="card">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Campaigns</div>
-          <div className="text-3xl font-bold text-gray-900">{campaigns.length}</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">{campaigns.length}</div>
         </div>
         <div className="card">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Leads</div>
-          <div className="text-3xl font-bold text-gray-900">
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">
             {campaigns.reduce((sum, c) => sum + (c.lead_count || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className="card">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Sent</div>
-          <div className="text-3xl font-bold text-gray-900">
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">
             {campaigns.reduce((sum, c) => sum + (c.messages_sent || 0), 0).toLocaleString()}
           </div>
         </div>
@@ -444,7 +604,7 @@ export default function CampaignsPage() {
         </div>
         <div className="card">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Active Tags</div>
-          <div className="text-3xl font-bold text-gray-900">
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">
             {new Set(campaigns.flatMap(c => c.tags || [])).size}
           </div>
         </div>
@@ -494,7 +654,7 @@ export default function CampaignsPage() {
                 {filteredCampaigns.map((campaign) => (
                   <tr key={campaign.id} className="hover:bg-slate-50 dark:bg-slate-800/50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{campaign.name}</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{campaign.name}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">{campaign.id}</div>
                     </td>
                     <td className="px-4 py-3">
@@ -532,10 +692,10 @@ export default function CampaignsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="font-medium text-gray-900">{campaign.lead_count || 0}</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{campaign.lead_count || 0}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="font-medium text-gray-900">{campaign.messages_sent || 0}</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{campaign.messages_sent || 0}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="font-medium text-sky-600">{campaign.credits_used || 0}</div>
@@ -572,7 +732,7 @@ export default function CampaignsPage() {
 
       {/* Help */}
       <div className="card bg-blue-50 border-sky-700/50">
-        <h3 className="font-semibold mb-2 text-gray-900">💡 Campaign Tips</h3>
+        <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">💡 Campaign Tips</h3>
         <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Tag your leads to organize them into campaigns</li>
           <li>• Track messages sent and lead engagement</li>
@@ -586,10 +746,10 @@ export default function CampaignsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Create New Campaign</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Campaign</h2>
               <button
                 onClick={() => { setCreateOpen(false); setNewCampaignName(''); setSelectedFlowId(''); }}
-                className="text-slate-600 dark:text-slate-400 hover:text-gray-900"
+                className="text-slate-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -732,12 +892,12 @@ export default function CampaignsPage() {
       {/* Edit Campaign Modal */}
       {editOpen && editingCampaign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Edit Campaign</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Campaign</h2>
               <button
-                onClick={() => { setEditOpen(false); setEditingCampaign(null); }}
-                className="text-slate-600 dark:text-slate-400 hover:text-gray-900"
+                onClick={() => { setEditOpen(false); setEditingCampaign(null); setCampaignLeads([]); }}
+                className="text-slate-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -745,91 +905,256 @@ export default function CampaignsPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Campaign Name</label>
-                <input
-                  type="text"
-                  value={editCampaignName}
-                  onChange={(e) => setEditCampaignName(e.target.value)}
-                  placeholder="Enter campaign name..."
-                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:text-slate-400 focus:outline-none focus:border-sky-500"
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !saving) saveEditCampaign(); }}
-                />
-              </div>
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+              <button
+                onClick={() => setEditTab('details')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+                  editTab === 'details'
+                    ? 'border-sky-500 text-sky-500'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Details
+              </button>
+              <button
+                onClick={() => setEditTab('leads')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+                  editTab === 'leads'
+                    ? 'border-sky-500 text-sky-500'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Manage Leads ({campaignLeads.length})
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow</label>
-                {flows.length > 0 ? (
-                  <select
-                    value={editFlowId}
-                    onChange={(e) => setEditFlowId(e.target.value)}
-                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
-                  >
-                    <option value="">No flow selected</option>
-                    {flows.map((flow) => (
-                      <option key={flow.id} value={flow.id}>
-                        {flow.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-500 dark:text-slate-400">No flows created yet</span>
-                    <Link
-                      href="/templates"
-                      className="text-sm text-sky-600 hover:underline"
-                    >
-                      Create a flow
-                    </Link>
+            <div className="flex-1 overflow-y-auto">
+              {editTab === 'details' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Campaign Name</label>
+                    <input
+                      type="text"
+                      value={editCampaignName}
+                      onChange={(e) => setEditCampaignName(e.target.value)}
+                      placeholder="Enter campaign name..."
+                      className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+                      autoFocus
+                    />
                   </div>
-                )}
-              </div>
 
-              {/* Tags Selection for Edit */}
-              <div>
-                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {availableTags.map((tag) => (
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow</label>
+                    {flows.length > 0 ? (
+                      <select
+                        value={editFlowId}
+                        onChange={(e) => setEditFlowId(e.target.value)}
+                        className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
+                      >
+                        <option value="">No flow selected</option>
+                        {flows.map((flow) => (
+                          <option key={flow.id} value={flow.id}>
+                            {flow.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">No flows created yet</span>
+                        <Link href="/templates" className="text-sm text-sky-600 hover:underline">Create a flow</Link>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags</label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {availableTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.name, true)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                            editTags.includes(tag.name)
+                              ? 'ring-2 ring-sky-400 ring-offset-1 ring-offset-slate-900'
+                              : 'opacity-70 hover:opacity-100'
+                          }`}
+                          style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                        >
+                          {tag.name}
+                          {editTags.includes(tag.name) && ' ✓'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
                     <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => toggleTag(tag.name, true)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                        editTags.includes(tag.name)
-                          ? 'ring-2 ring-sky-400 ring-offset-1 ring-offset-[#0e1623]'
-                          : 'opacity-70 hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: tag.color + '30', color: tag.color, borderColor: tag.color }}
+                      onClick={() => { setEditOpen(false); setEditingCampaign(null); setEditTags([]); setCampaignLeads([]); }}
+                      className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                     >
-                      {tag.name}
-                      {editTags.includes(tag.name) && ' ✓'}
+                      Cancel
                     </button>
-                  ))}
+                    <button
+                      onClick={saveEditCampaign}
+                      disabled={saving || !editCampaignName.trim()}
+                      className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition disabled:opacity-50"
+                    >
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 </div>
-                {editTags.length > 0 && (
-                  <p className="text-xs text-sky-600 mt-1">
-                    {editTags.length} tag{editTags.length > 1 ? 's' : ''} selected
-                  </p>
-                )}
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Current Leads in Campaign */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Current Leads ({campaignLeads.length})
+                    </label>
+                    {loadingLeads ? (
+                      <div className="text-sm text-slate-500 py-4 text-center">Loading leads...</div>
+                    ) : campaignLeads.length === 0 ? (
+                      <div className="text-sm text-slate-500 py-4 text-center bg-slate-50 dark:bg-slate-800 rounded-lg">
+                        No leads in this campaign yet
+                      </div>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
+                        {campaignLeads.map((lead) => (
+                          <div key={lead.id} className="flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div>
+                              <div className="text-sm text-slate-900 dark:text-white">
+                                {lead.first_name} {lead.last_name}
+                              </div>
+                              <div className="text-xs text-slate-500">{lead.phone || lead.email}</div>
+                            </div>
+                            <button
+                              onClick={() => removeLeadFromCampaign(lead.id)}
+                              className="text-xs text-red-500 hover:text-red-400"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => { setEditOpen(false); setEditingCampaign(null); setEditTags([]); }}
-                  className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveEditCampaign}
-                  disabled={saving || !editCampaignName.trim()}
-                  className="flex-1 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
+                  {/* Add Individual Lead */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Add Individual Lead
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={leadSearchQuery}
+                        onChange={(e) => setLeadSearchQuery(e.target.value)}
+                        placeholder="Search leads by name, phone, or email..."
+                        className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 text-sm"
+                      />
+                      <button
+                        onClick={() => {
+                          setEditOpen(false);
+                          router.push(`/leads?campaign_id=${editingCampaign.id}&campaign_name=${encodeURIComponent(editingCampaign.name)}`);
+                        }}
+                        className="px-3 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition text-lg font-bold"
+                        title="Add new lead to this campaign"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {leadSearchQuery && (
+                      <div className="mt-2 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-200 dark:divide-slate-700">
+                        {allLeads
+                          .filter(lead =>
+                            !campaignLeads.some(cl => cl.id === lead.id) &&
+                            (
+                              (lead.first_name?.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                              (lead.last_name?.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                              (lead.phone?.includes(leadSearchQuery)) ||
+                              (lead.email?.toLowerCase().includes(leadSearchQuery.toLowerCase()))
+                            )
+                          )
+                          .slice(0, 5)
+                          .map((lead) => (
+                            <div key={lead.id} className="flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                              <div>
+                                <div className="text-sm text-slate-900 dark:text-white">
+                                  {lead.first_name} {lead.last_name}
+                                </div>
+                                <div className="text-xs text-slate-500">{lead.phone || lead.email}</div>
+                              </div>
+                              <button
+                                onClick={() => addLeadToCampaign(lead.id)}
+                                className="text-xs text-sky-500 hover:text-sky-400 font-medium"
+                              >
+                                + Add
+                              </button>
+                            </div>
+                          ))
+                        }
+                        {allLeads.filter(lead =>
+                          !campaignLeads.some(cl => cl.id === lead.id) &&
+                          (
+                            (lead.first_name?.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                            (lead.last_name?.toLowerCase().includes(leadSearchQuery.toLowerCase())) ||
+                            (lead.phone?.includes(leadSearchQuery)) ||
+                            (lead.email?.toLowerCase().includes(leadSearchQuery.toLowerCase()))
+                          )
+                        ).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                            No matching leads found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Move Leads from Another Campaign */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Move Leads from Another Campaign
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={sourceCampaignId}
+                        onChange={(e) => setSourceCampaignId(e.target.value)}
+                        className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 text-sm"
+                      >
+                        <option value="">Select a campaign...</option>
+                        {campaigns
+                          .filter(c => c.id !== editingCampaign.id && c.lead_count > 0)
+                          .map((campaign) => (
+                            <option key={campaign.id} value={campaign.id}>
+                              {campaign.name} ({campaign.lead_count} leads)
+                            </option>
+                          ))
+                        }
+                      </select>
+                      <button
+                        onClick={moveLeadsFromCampaign}
+                        disabled={!sourceCampaignId || movingLeads}
+                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition disabled:opacity-50 text-sm font-medium"
+                      >
+                        {movingLeads ? 'Moving...' : 'Move All'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      This will move all leads from the selected campaign to this one.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => { setEditOpen(false); setEditingCampaign(null); setCampaignLeads([]); }}
+                      className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X, Users, Megaphone } from 'lucide-react';
+import { MessageSquare, Send, Phone, User, Clock, Search, Plus, X, Users, Megaphone, Sparkles, Zap, Calendar, CheckCircle, XCircle, Timer, Pencil, Trash2, Save } from 'lucide-react';
 import SendSMSModal from '@/components/SendSMSModal';
+import AIDripModal from '@/components/AIDripModal';
 
 // Helper function to guess timezone from phone number area code
 function getTimezoneFromPhone(phone: string | undefined): string {
@@ -61,6 +62,11 @@ interface Thread {
     first_name?: string;
     last_name?: string;
     phone?: string;
+    email?: string;
+    state?: string;
+    zip_code?: string;
+    status?: string;
+    tags?: string[];
   } | null;
 }
 
@@ -122,6 +128,26 @@ export default function MessagesPage() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [leadSearchQuery, setLeadSearchQuery] = useState('');
 
+  // AI reply state
+  const [generateAIResponse, setGenerateAIResponse] = useState(false);
+  const [aiContextMessage, setAiContextMessage] = useState('');
+
+  // AI Drip state
+  const [showDripModal, setShowDripModal] = useState(false);
+  const [activeDripStatus, setActiveDripStatus] = useState<{ active: boolean; messagesSent?: number } | null>(null);
+  const [scheduledDripMessages, setScheduledDripMessages] = useState<{
+    id: string;
+    messageNumber: number;
+    content: string;
+    scheduledFor: string;
+    status: string;
+    sentAt?: string;
+  }[]>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessage, setDeletingMessage] = useState<string | null>(null);
+
   // Handler for search params - memoized to prevent infinite loops
   const handleSearchParams = useCallback((phone: string | null, name: string | null) => {
     if (phone) {
@@ -140,12 +166,138 @@ export default function MessagesPage() {
   useEffect(() => {
     if (selectedThread) {
       loadMessages(selectedThread.id);
+      checkDripStatus(selectedThread.id);
+    } else {
+      setActiveDripStatus(null);
+      setScheduledDripMessages([]);
     }
   }, [selectedThread]);
 
-  const loadThreads = async () => {
+  // Check if there's an active drip for the selected thread
+  const checkDripStatus = async (threadId: string) => {
     try {
-      setLoading(true);
+      const response = await fetch(`/api/ai-drip/status?threadId=${threadId}`);
+      const data = await response.json();
+      if (data.success) {
+        setActiveDripStatus({
+          active: data.active,
+          messagesSent: data.drip?.messagesSent,
+        });
+        setScheduledDripMessages(data.scheduledMessages || []);
+      } else {
+        setScheduledDripMessages([]);
+      }
+    } catch (err) {
+      console.error('Error checking drip status:', err);
+      setScheduledDripMessages([]);
+    }
+  };
+
+  // Edit a scheduled drip message
+  const handleEditMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditContent(content);
+  };
+
+  // Save edited drip message
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editContent.trim()) return;
+    setSavingEdit(true);
+    try {
+      const response = await fetch('/api/ai-drip/message', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, content: editContent.trim() }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Update local state
+        setScheduledDripMessages(prev =>
+          prev.map(m => m.id === messageId ? { ...m, content: editContent.trim() } : m)
+        );
+        setEditingMessageId(null);
+        setEditContent('');
+      } else {
+        alert(data.error || 'Failed to save message');
+      }
+    } catch (err) {
+      console.error('Error saving edit:', err);
+      alert('Failed to save message');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Delete a scheduled drip message
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Are you sure you want to cancel this scheduled message?')) return;
+    setDeletingMessage(messageId);
+    try {
+      const response = await fetch(`/api/ai-drip/message?messageId=${messageId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Update local state - mark as cancelled
+        setScheduledDripMessages(prev =>
+          prev.map(m => m.id === messageId ? { ...m, status: 'cancelled' } : m)
+        );
+        // Refresh drip status
+        if (selectedThread) {
+          checkDripStatus(selectedThread.id);
+        }
+      } else {
+        alert(data.error || 'Failed to delete message');
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err);
+      alert('Failed to delete message');
+    } finally {
+      setDeletingMessage(null);
+    }
+  };
+
+  // Delete entire drip
+  const handleDeleteDrip = async () => {
+    if (!selectedThread) return;
+    if (!confirm('Are you sure you want to stop this drip and cancel all remaining messages?')) return;
+
+    try {
+      const response = await fetch('/api/ai-drip/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: selectedThread.id }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Refresh drip status
+        checkDripStatus(selectedThread.id);
+      } else {
+        alert(data.error || 'Failed to stop drip');
+      }
+    } catch (err) {
+      console.error('Error stopping drip:', err);
+      alert('Failed to stop drip');
+    }
+  };
+
+  // Auto-refresh: Poll for new messages every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Refresh threads list silently (without loading spinner)
+      loadThreads(true);
+      // Refresh current thread messages if one is selected
+      if (selectedThread) {
+        loadMessages(selectedThread.id, true);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedThread, viewMode]);
+
+  const loadThreads = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
 
       // Check if demo mode is active
       const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
@@ -205,9 +357,9 @@ export default function MessagesPage() {
     }
   };
 
-  const loadMessages = async (threadId: string) => {
+  const loadMessages = async (threadId: string, silent = false) => {
     try {
-      setLoadingMessages(true);
+      if (!silent) setLoadingMessages(true);
 
       // Check if demo mode is active
       const isDemoMode = typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true';
@@ -285,6 +437,18 @@ export default function MessagesPage() {
   const handleSendToThread = () => {
     if (selectedThread) {
       setSendModalPhone(selectedThread.phone_number);
+      setGenerateAIResponse(false);
+      setAiContextMessage('');
+      setShowSendModal(true);
+    }
+  };
+
+  // Handle AI reply to a specific inbound message
+  const handleReplyWithAI = (message: Message) => {
+    if (selectedThread) {
+      setSendModalPhone(selectedThread.phone_number);
+      setAiContextMessage(message.body);
+      setGenerateAIResponse(true);
       setShowSendModal(true);
     }
   };
@@ -496,9 +660,19 @@ export default function MessagesPage() {
                       <User className="h-5 w-5 text-teal-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-white">
+                      {/* Client Name & State */}
+                      {selectedThread.leads && (selectedThread.leads.first_name || selectedThread.leads.last_name) && (
+                        <h2 className="font-semibold text-white">
+                          {[selectedThread.leads.first_name, selectedThread.leads.last_name].filter(Boolean).join(' ')}
+                          {selectedThread.leads.state && (
+                            <span className="text-slate-400 font-normal ml-2">({selectedThread.leads.state})</span>
+                          )}
+                        </h2>
+                      )}
+                      {/* Phone Number */}
+                      <div className={`${selectedThread.leads?.first_name ? 'text-sm text-slate-400' : 'font-semibold text-white'}`}>
                         {formatPhoneNumber(selectedThread.phone_number)}
-                      </h2>
+                      </div>
                       <div className="flex items-center gap-2 text-sm text-slate-400">
                         <span>{selectedThread.channel.toUpperCase()}</span>
                         {(() => {
@@ -513,6 +687,44 @@ export default function MessagesPage() {
                         })()}
                       </div>
                     </div>
+                    {/* Lead Details - Email, Tags, Zip */}
+                    {selectedThread.leads && (
+                      <div className="ml-4 pl-4 border-l border-slate-700 flex flex-wrap items-center gap-3 text-sm">
+                        {selectedThread.leads.email && (
+                          <span className="text-slate-400" title="Email">
+                            ✉️ {selectedThread.leads.email}
+                          </span>
+                        )}
+                        {selectedThread.leads.zip_code && (
+                          <span className="text-slate-400" title="Zip Code">
+                            📍 {selectedThread.leads.zip_code}
+                          </span>
+                        )}
+                        {selectedThread.leads.status && (
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            selectedThread.leads.status === 'new' ? 'bg-blue-500/20 text-blue-400' :
+                            selectedThread.leads.status === 'contacted' ? 'bg-yellow-500/20 text-yellow-400' :
+                            selectedThread.leads.status === 'qualified' ? 'bg-green-500/20 text-green-400' :
+                            selectedThread.leads.status === 'converted' ? 'bg-teal-500/20 text-teal-400' :
+                            'bg-slate-500/20 text-slate-400'
+                          }`}>
+                            {selectedThread.leads.status}
+                          </span>
+                        )}
+                        {selectedThread.leads.tags && selectedThread.leads.tags.length > 0 && (
+                          <div className="flex gap-1">
+                            {selectedThread.leads.tags.slice(0, 3).map((tag: string, i: number) => (
+                              <span key={i} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
+                                {tag}
+                              </span>
+                            ))}
+                            {selectedThread.leads.tags.length > 3 && (
+                              <span className="text-slate-500 text-xs">+{selectedThread.leads.tags.length - 3}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -520,6 +732,37 @@ export default function MessagesPage() {
                       title="Call"
                     >
                       <Phone className="h-5 w-5 text-slate-400" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectedThread) {
+                          setSendModalPhone(selectedThread.phone_number);
+                          // Get the last inbound message for context
+                          const lastInbound = messages.filter(m =>
+                            m.direction === 'inbound' || m.direction === 'in'
+                          ).pop();
+                          setAiContextMessage(lastInbound?.body || '');
+                          setGenerateAIResponse(true);
+                          setShowSendModal(true);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors"
+                      title="Generate AI Reply"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      AI Reply
+                    </button>
+                    <button
+                      onClick={() => setShowDripModal(true)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                        activeDripStatus?.active
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                          : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50'
+                      }`}
+                      title={activeDripStatus?.active ? 'AI Drip Active - Click to manage' : 'Start AI Drip'}
+                    >
+                      <Zap className={`h-4 w-4 ${activeDripStatus?.active ? 'animate-pulse' : ''}`} />
+                      {activeDripStatus?.active ? `Drip (${activeDripStatus.messagesSent || 0})` : 'AI Drip'}
                     </button>
                     <button
                       onClick={handleSendToThread}
@@ -546,65 +789,252 @@ export default function MessagesPage() {
                     </div>
                   </div>
                 ) : (
-                  messages.map((message) => {
-                    // Handle both direction formats: 'outbound'/'inbound' and 'out'/'in'
-                    const isOutbound = message.direction === 'outbound' || message.direction === 'out';
+                  <>
+                    {messages.map((message) => {
+                      // Handle both direction formats: 'outbound'/'inbound' and 'out'/'in'
+                      const isOutbound = message.direction === 'outbound' || message.direction === 'out';
 
-                    return (
-                      <div
-                        key={message.id}
-                        className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}
-                      >
+                      return (
                         <div
-                          className={`max-w-md rounded-lg p-3 ${
-                            isOutbound
-                              ? 'bg-teal-600 text-white'
-                              : 'bg-slate-800 text-white border border-slate-700'
-                          }`}
+                          key={message.id}
+                          className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} group`}
                         >
-                          <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+                          <div className="relative">
+                            <div
+                              className={`max-w-md rounded-lg p-3 ${
+                                isOutbound
+                                  ? 'bg-teal-600 text-white'
+                                  : 'bg-slate-800 text-white border border-slate-700'
+                              }`}
+                            >
+                              <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
 
-                          {/* Media attachments */}
-                          {message.media_urls && message.media_urls.length > 0 && (
-                            <div className="mt-2 space-y-2">
-                              {message.media_urls.map((url, idx) => (
-                                <div key={idx} className="rounded overflow-hidden">
-                                  <img
-                                    src={url}
-                                    alt={`Media ${idx + 1}`}
-                                    className="max-w-full h-auto"
-                                    onError={(e) => {
-                                      // If image fails to load, show link instead
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs underline opacity-75 hover:opacity-100"
-                                  >
-                                    View media
-                                  </a>
+                              {/* Media attachments */}
+                              {message.media_urls && message.media_urls.length > 0 && (
+                                <div className="mt-2 space-y-2">
+                                  {message.media_urls.map((url, idx) => (
+                                    <div key={idx} className="rounded overflow-hidden">
+                                      <img
+                                        src={url}
+                                        alt={`Media ${idx + 1}`}
+                                        className="max-w-full h-auto"
+                                        onError={(e) => {
+                                          // If image fails to load, show link instead
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs underline opacity-75 hover:opacity-100"
+                                      >
+                                        View media
+                                      </a>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          )}
+                              )}
 
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs opacity-75">
-                              {formatTimestamp(message.created_at)}
-                            </span>
-                            {isOutbound && message.status && (
-                              <span className="text-xs opacity-75">
-                                • {message.status}
-                              </span>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs opacity-75">
+                                  {formatTimestamp(message.created_at)}
+                                </span>
+                                {isOutbound && message.status && (
+                                  <span className="text-xs opacity-75">
+                                    • {message.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Reply with AI button - shows on hover for inbound messages */}
+                            {!isOutbound && (
+                              <button
+                                onClick={() => handleReplyWithAI(message)}
+                                className="absolute -right-12 top-1/2 -translate-y-1/2 p-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:scale-110 shadow-lg"
+                                title="Reply with AI"
+                              >
+                                <Sparkles className="h-4 w-4" />
+                              </button>
                             )}
                           </div>
                         </div>
+                      );
+                    })}
+
+                    {/* Scheduled Drip Messages Preview */}
+                    {scheduledDripMessages.length > 0 && (
+                      <div className="mt-6 pt-4 border-t border-slate-700/50">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                              <Zap className="h-3 w-3 text-amber-400" />
+                            </div>
+                            <span className="text-sm font-medium text-amber-400">Scheduled AI Drip Messages</span>
+                            <span className="text-xs text-slate-500">
+                              ({scheduledDripMessages.filter(m => m.status === 'scheduled').length} pending)
+                            </span>
+                          </div>
+                          {scheduledDripMessages.some(m => m.status === 'scheduled') ? (
+                            <button
+                              onClick={handleDeleteDrip}
+                              className="text-xs px-2 py-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
+                            >
+                              Stop Drip
+                            </button>
+                          ) : scheduledDripMessages.some(m => m.status === 'cancelled') ? (
+                            <button
+                              onClick={async () => {
+                                // Delete cancelled messages from database
+                                const cancelledIds = scheduledDripMessages
+                                  .filter(m => m.status === 'cancelled')
+                                  .map(m => m.id);
+
+                                for (const id of cancelledIds) {
+                                  await fetch(`/api/ai-drip/message?messageId=${id}&permanent=true`, {
+                                    method: 'DELETE',
+                                  });
+                                }
+                                setScheduledDripMessages([]);
+                              }}
+                              className="text-xs px-2 py-1 text-slate-400 hover:text-slate-300 hover:bg-slate-700/50 rounded transition-colors"
+                            >
+                              Clear All
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <div className="space-y-3">
+                          {scheduledDripMessages.map((dripMsg) => {
+                            const scheduledDate = new Date(dripMsg.scheduledFor);
+                            const isSent = dripMsg.status === 'sent';
+                            const isCancelled = dripMsg.status === 'cancelled';
+                            const isFailed = dripMsg.status === 'failed';
+                            const isScheduled = dripMsg.status === 'scheduled';
+                            const isEditing = editingMessageId === dripMsg.id;
+
+                            return (
+                              <div
+                                key={dripMsg.id}
+                                className={`flex justify-end`}
+                              >
+                                <div className={`max-w-md w-full rounded-lg p-3 border ${
+                                  isSent
+                                    ? 'bg-teal-600/30 border-teal-500/30'
+                                    : isCancelled
+                                    ? 'bg-slate-700/30 border-slate-600/30 opacity-50'
+                                    : isFailed
+                                    ? 'bg-red-500/10 border-red-500/30'
+                                    : 'bg-amber-500/10 border-amber-500/30 border-dashed'
+                                }`}>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                      isSent
+                                        ? 'bg-teal-500/20 text-teal-400'
+                                        : isCancelled
+                                        ? 'bg-slate-600/20 text-slate-400'
+                                        : isFailed
+                                        ? 'bg-red-500/20 text-red-400'
+                                        : 'bg-amber-500/20 text-amber-400'
+                                    }`}>
+                                      {isSent ? (
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle className="h-3 w-3" /> Sent
+                                        </span>
+                                      ) : isCancelled ? (
+                                        <span className="flex items-center gap-1">
+                                          <XCircle className="h-3 w-3" /> Cancelled
+                                        </span>
+                                      ) : isFailed ? (
+                                        <span className="flex items-center gap-1">
+                                          <XCircle className="h-3 w-3" /> Failed
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-1">
+                                          <Timer className="h-3 w-3" /> #{dripMsg.messageNumber} Scheduled
+                                        </span>
+                                      )}
+                                    </span>
+                                    {/* Edit/Delete buttons for scheduled messages */}
+                                    {isScheduled && !isEditing && (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => handleEditMessage(dripMsg.id, dripMsg.content)}
+                                          className="p-1 text-slate-400 hover:text-amber-400 transition-colors"
+                                          title="Edit message"
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteMessage(dripMsg.id)}
+                                          disabled={deletingMessage === dripMsg.id}
+                                          className="p-1 text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                                          title="Cancel message"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Edit form or message content */}
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      <textarea
+                                        value={editContent}
+                                        onChange={(e) => setEditContent(e.target.value)}
+                                        className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-amber-500/50 rounded text-white resize-none focus:outline-none focus:border-amber-400"
+                                        rows={3}
+                                        maxLength={320}
+                                      />
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">{editContent.length}/320</span>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => {
+                                              setEditingMessageId(null);
+                                              setEditContent('');
+                                            }}
+                                            className="px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            onClick={() => handleSaveEdit(dripMsg.id)}
+                                            disabled={savingEdit || !editContent.trim()}
+                                            className="px-2 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded disabled:opacity-50 flex items-center gap-1"
+                                          >
+                                            <Save className="h-3 w-3" />
+                                            {savingEdit ? 'Saving...' : 'Save'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className={`text-sm whitespace-pre-wrap break-words ${
+                                      isCancelled ? 'text-slate-500 line-through' : 'text-white'
+                                    }`}>
+                                      {dripMsg.content}
+                                    </p>
+                                  )}
+
+                                  <div className="flex items-center gap-2 mt-2 text-xs">
+                                    <Calendar className="h-3 w-3 text-slate-400" />
+                                    <span className={isSent ? 'text-teal-400' : isCancelled ? 'text-slate-500' : 'text-amber-400'}>
+                                      {isSent && dripMsg.sentAt
+                                        ? `Sent ${new Date(dripMsg.sentAt).toLocaleString()}`
+                                        : scheduledDate.toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 )}
               </div>
             </>
@@ -707,9 +1137,19 @@ export default function MessagesPage() {
       {/* Send SMS Modal */}
       <SendSMSModal
         isOpen={showSendModal}
-        onClose={() => { setShowSendModal(false); setSendModalPhone(''); setSendModalName(''); }}
+        onClose={() => {
+          setShowSendModal(false);
+          setSendModalPhone('');
+          setSendModalName('');
+          setGenerateAIResponse(false);
+          setAiContextMessage('');
+        }}
         leadPhone={sendModalPhone}
         leadName={sendModalName}
+        leadId={selectedThread?.leads?.id}
+        generateAIResponse={generateAIResponse}
+        contextMessage={aiContextMessage}
+        conversationHistory={messages}
         onSuccess={() => {
           loadThreads();
           if (selectedThread) {
@@ -717,6 +1157,21 @@ export default function MessagesPage() {
           }
         }}
       />
+
+      {/* AI Drip Modal */}
+      {selectedThread && (
+        <AIDripModal
+          isOpen={showDripModal}
+          onClose={() => setShowDripModal(false)}
+          threadId={selectedThread.id}
+          phoneNumber={selectedThread.phone_number}
+          onSuccess={() => {
+            if (selectedThread) {
+              checkDripStatus(selectedThread.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

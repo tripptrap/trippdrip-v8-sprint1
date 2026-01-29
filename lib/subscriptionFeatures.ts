@@ -45,6 +45,9 @@ export interface SubscriptionFeatures {
   priorityDelivery: boolean;
   dedicatedNumber: boolean;
   customIntegrations: boolean;
+
+  // AI Receptionist (Premium only)
+  receptionistMode: boolean;
 }
 
 export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeatures> = {
@@ -74,7 +77,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 0,
     priorityDelivery: false,
     dedicatedNumber: false,
-    customIntegrations: false
+    customIntegrations: false,
+    receptionistMode: false
   },
 
   starter: {
@@ -103,7 +107,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 10,
     priorityDelivery: false,
     dedicatedNumber: false,
-    customIntegrations: false
+    customIntegrations: false,
+    receptionistMode: false
   },
 
   professional: {
@@ -132,7 +137,8 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     pointPackDiscount: 30,
     priorityDelivery: true,
     dedicatedNumber: true,
-    customIntegrations: true
+    customIntegrations: true,
+    receptionistMode: true
   }
 };
 
@@ -273,5 +279,6 @@ export const FEATURE_NAMES: Record<keyof SubscriptionFeatures, string> = {
   pointPackDiscount: 'Point Pack Discount',
   priorityDelivery: 'Priority Message Delivery',
   dedicatedNumber: 'Dedicated Phone Number',
-  customIntegrations: 'Custom Integrations'
+  customIntegrations: 'Custom Integrations',
+  receptionistMode: 'AI Receptionist Mode'
 };

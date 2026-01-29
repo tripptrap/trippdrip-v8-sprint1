@@ -1,6 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getTemperatureDisplay } from "@/lib/leadScoring";
 import CustomModal from "@/components/CustomModal";
 
@@ -85,6 +85,7 @@ function cap(s: string){ return s ? s[0].toUpperCase() + s.slice(1) : s; }
 
 export default function LeadsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [toast, setToast] = useState<string>("");
   const [modal, setModal] = useState<ModalState>({
     isOpen: false,
@@ -156,9 +157,11 @@ export default function LeadsPage() {
     state: "",
     zip_code: "",
     tags: "",
-    status: "new"
+    status: "new",
+    campaign_id: "" as string | null,
   });
   const [addingLead, setAddingLead] = useState(false);
+  const [preselectedCampaignName, setPreselectedCampaignName] = useState("");
 
   /* Edit Lead Modal */
   const [editLeadOpen, setEditLeadOpen] = useState(false);
@@ -185,6 +188,20 @@ export default function LeadsPage() {
   useEffect(() => {
     setIsDemoMode(typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true');
   }, []);
+
+  // Handle URL params for pre-selecting campaign when adding lead
+  useEffect(() => {
+    const campaignId = searchParams.get('campaign_id');
+    const campaignName = searchParams.get('campaign_name');
+
+    if (campaignId) {
+      setNewLead(prev => ({ ...prev, campaign_id: campaignId }));
+      setPreselectedCampaignName(campaignName || '');
+      setAddLeadOpen(true);
+      // Clear URL params without reloading
+      router.replace('/leads', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   async function fetchLeads() {
     setLoading(true);
@@ -239,7 +256,8 @@ export default function LeadsPage() {
     try {
       const leadData = {
         ...newLead,
-        tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(Boolean) : []
+        tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        campaign_id: newLead.campaign_id || null,
       };
 
       const res = await fetch('/api/leads', {
@@ -253,7 +271,8 @@ export default function LeadsPage() {
         setToast('Lead added successfully!');
         setTimeout(() => setToast(''), 2500);
         setAddLeadOpen(false);
-        setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" });
+        setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" });
+        setPreselectedCampaignName("");
         await fetchLeads();
       } else if (data.error === 'duplicate' && data.existingLead) {
         const lead = data.existingLead;
@@ -267,7 +286,8 @@ export default function LeadsPage() {
           confirmText: 'View Lead',
           onConfirm: () => {
             setAddLeadOpen(false);
-            setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" });
+            setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" });
+            setPreselectedCampaignName("");
             viewLeadDetails(lead.id);
           }
         });
@@ -1121,8 +1141,15 @@ export default function LeadsPage() {
           <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add New Lead</h3>
-              <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
+              <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" }); setPreselectedCampaignName(""); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
             </div>
+            {preselectedCampaignName && (
+              <div className="mb-4 px-3 py-2 rounded-lg bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-800">
+                <p className="text-sm text-sky-700 dark:text-sky-300">
+                  <span className="font-medium">Adding to campaign:</span> {preselectedCampaignName}
+                </p>
+              </div>
+            )}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1216,7 +1243,7 @@ export default function LeadsPage() {
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new" }); }}
+                onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" }); setPreselectedCampaignName(""); }}
                 className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 Cancel

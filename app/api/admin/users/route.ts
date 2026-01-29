@@ -31,10 +31,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
-    // Get user plans from user_plans table
-    const { data: userPlans } = await adminClient
-      .from('user_plans')
-      .select('user_id, plan_type, points_balance, created_at, updated_at');
+    // Get user data from users table (subscription_tier and credits set by Stripe webhook)
+    const { data: usersData } = await adminClient
+      .from('users')
+      .select('id, subscription_tier, credits, monthly_credits, phone');
+
+    // Get total money spent per user from Stripe payments
+    const { data: paymentsData } = await adminClient
+      .from('payments')
+      .select('user_id, amount');
+    const totalSpentByUser: Record<string, number> = {};
+    paymentsData?.forEach((p: any) => {
+      if (p.user_id && p.amount) {
+        totalSpentByUser[p.user_id] = (totalSpentByUser[p.user_id] || 0) + (p.amount / 100);
+      }
+    });
 
     // Get message counts per user
     const { data: messageCounts } = await adminClient
@@ -61,26 +72,32 @@ export async function GET(req: NextRequest) {
         return { data: counts };
       });
 
-    // Map plans by user_id for easy lookup
-    const plansByUserId: Record<string, any> = {};
-    userPlans?.forEach((plan: any) => {
-      plansByUserId[plan.user_id] = plan;
+    // Map user data by id for easy lookup
+    const userDataById: Record<string, any> = {};
+    usersData?.forEach((userData: any) => {
+      userDataById[userData.id] = userData;
     });
 
     // Format user data
     const users = authUsers.users.map((authUser) => {
-      const plan = plansByUserId[authUser.id];
+      const userData = userDataById[authUser.id];
+      // Map subscription_tier to display name
+      const planType = userData?.subscription_tier === 'premium' ? 'premium' :
+                       userData?.subscription_tier === 'basic' ? 'basic' : 'none';
       return {
         id: authUser.id,
         email: authUser.email,
+        personal_email: authUser.user_metadata?.personal_email || authUser.email || null,
+        phone: userData?.phone || authUser.user_metadata?.phone || authUser.phone || null,
         full_name: authUser.user_metadata?.full_name || 'Unknown',
         industry: authUser.user_metadata?.industry || null,
         use_case: authUser.user_metadata?.use_case || null,
         created_at: authUser.created_at,
         last_sign_in: authUser.last_sign_in_at,
         email_confirmed: authUser.email_confirmed_at ? true : false,
-        plan_type: plan?.plan_type || 'none',
-        points_balance: plan?.points_balance || 0,
+        plan_type: planType,
+        points_balance: userData?.credits || 0,
+        total_spent: totalSpentByUser[authUser.id] || 0,
         message_count: (messageCounts as Record<string, number>)?.[authUser.id] || 0,
         lead_count: (leadCounts as Record<string, number>)?.[authUser.id] || 0,
       };

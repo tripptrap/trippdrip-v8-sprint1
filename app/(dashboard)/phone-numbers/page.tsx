@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, Search, Plus, Star, Trash2, Loader2 } from 'lucide-react';
+import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard } from 'lucide-react';
+import PurchaseNumberModal from '@/components/PurchaseNumberModal';
 
 interface TwilioNumber {
   id: string;
@@ -59,6 +60,11 @@ export default function PhoneNumbersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [numberType, setNumberType] = useState<NumberType>('tollfree');
+
+  // Purchase modal state
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [selectedPhoneNumber, setSelectedPhoneNumber] = useState('');
+  const [userCredits, setUserCredits] = useState(0);
 
   // Show message temporarily
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -228,9 +234,35 @@ export default function PhoneNumbersPage() {
     }
   };
 
+  // Fetch user credits
+  const fetchUserCredits = async () => {
+    try {
+      const response = await fetch('/api/user/profile');
+      const data = await response.json();
+      setUserCredits(data.credits || 0);
+    } catch (error) {
+      console.error('Error fetching user credits:', error);
+    }
+  };
+
+  // Open purchase modal
+  const openPurchaseModal = (phoneNumber: string) => {
+    setSelectedPhoneNumber(phoneNumber);
+    setShowPurchaseModal(true);
+  };
+
+  // Handle successful purchase
+  const handlePurchaseSuccess = () => {
+    showMessage('success', `Successfully purchased ${selectedPhoneNumber}!`);
+    setAvailableNumbers((prev) => prev.filter((n) => n.phoneNumber !== selectedPhoneNumber));
+    fetchMyNumbers();
+    fetchUserCredits();
+  };
+
   useEffect(() => {
     fetchMyNumbers();
     loadPoolNumbers();
+    fetchUserCredits();
   }, []);
 
   return (
@@ -547,18 +579,12 @@ export default function PhoneNumbersPage() {
                           </span>
                         </div>
                         <button
-                          onClick={() => purchaseNumber(number.phoneNumber)}
+                          onClick={() => openPurchaseModal(number.phoneNumber)}
                           disabled={purchasing !== null}
                           className="px-3 py-1 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded font-medium text-sm transition-colors flex items-center gap-1"
                         >
-                          {purchasing === number.phoneNumber ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Plus className="h-3 w-3" />
-                              Buy
-                            </>
-                          )}
+                          <CreditCard className="h-3 w-3" />
+                          Buy
                         </button>
                       </div>
 
@@ -587,6 +613,15 @@ export default function PhoneNumbersPage() {
           </div>
         </div>
       </div>
+
+      {/* Purchase Number Modal */}
+      <PurchaseNumberModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        phoneNumber={selectedPhoneNumber}
+        onSuccess={handlePurchaseSuccess}
+        userCredits={userCredits}
+      />
     </div>
   );
 }

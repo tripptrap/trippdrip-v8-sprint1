@@ -33,7 +33,12 @@ export async function GET(req: NextRequest) {
           id,
           first_name,
           last_name,
-          phone
+          phone,
+          email,
+          state,
+          zip_code,
+          status,
+          tags
         )
       `)
       .eq('user_id', user.id)
@@ -47,6 +52,41 @@ export async function GET(req: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // Helper to normalize phone numbers (strip to just digits, last 10)
+    const normalizePhone = (phone: string): string => {
+      const digits = phone.replace(/\D/g, '');
+      return digits.slice(-10); // Get last 10 digits (removes country code)
+    };
+
+    // For threads without lead_id, try to find matching lead by phone number
+    const threadsWithoutLeads = (threads || []).filter(t => !t.leads && t.phone_number);
+    if (threadsWithoutLeads.length > 0) {
+      // Get all user's leads to match by normalized phone
+      const { data: allLeads } = await supabase
+        .from('leads')
+        .select('id, first_name, last_name, phone, email, state, zip_code, status, tags')
+        .eq('user_id', user.id);
+
+      // Create a map of normalized phone -> lead for quick lookup
+      const phoneToLead = new Map();
+      (allLeads || []).forEach(lead => {
+        if (lead.phone) {
+          const normalized = normalizePhone(lead.phone);
+          phoneToLead.set(normalized, lead);
+        }
+      });
+
+      // Attach matched leads to threads using normalized phone comparison
+      threads?.forEach(thread => {
+        if (!thread.leads && thread.phone_number) {
+          const normalizedThreadPhone = normalizePhone(thread.phone_number);
+          if (phoneToLead.has(normalizedThreadPhone)) {
+            thread.leads = phoneToLead.get(normalizedThreadPhone);
+          }
+        }
+      });
     }
 
     // Filter based on view type

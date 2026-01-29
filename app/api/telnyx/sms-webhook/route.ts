@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { ContactType } from '@/lib/receptionist/types';
 
 // Create Supabase admin client (bypasses RLS)
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -218,27 +219,69 @@ async function handleInboundSMS(payload: any) {
   }
 
   // Save the message
-  const { error: messageError } = await supabaseAdmin
+  console.log('💾 Saving inbound message:', { userId, threadId, from, to, messageBody: messageBody?.substring(0, 50) });
+
+  const messageData = {
+    user_id: userId, // Required for RLS
+    thread_id: threadId,
+    from_phone: from,
+    to_phone: to,
+    body: messageBody,
+    content: messageBody, // content column has NOT NULL constraint
+    direction: 'inbound',
+    status: 'delivered', // 'received' not allowed by check constraint
+    message_sid: messageSid,
+    num_media: mediaUrls.length,
+    media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+    channel: mediaUrls.length > 0 ? 'mms' : 'sms',
+    provider: 'telnyx',
+    created_at: new Date().toISOString(),
+  };
+
+  const { data: insertedMsg, error: messageError } = await supabaseAdmin
     .from('messages')
-    .insert({
-      thread_id: threadId,
-      sender: from,
-      recipient: to,
-      body: messageBody,
-      direction: 'inbound',
-      status: 'received',
-      message_sid: messageSid,
-      num_media: mediaUrls.length,
-      media_urls: mediaUrls.length > 0 ? mediaUrls : null,
-      channel: mediaUrls.length > 0 ? 'mms' : 'sms',
-      provider: 'telnyx',
-      created_at: new Date().toISOString(),
-    });
+    .insert(messageData)
+    .select();
 
   if (messageError) {
-    console.error('Error saving message:', messageError);
+    console.error('❌ Error saving inbound message:', messageError);
+    console.error('❌ Message data was:', JSON.stringify(messageData));
   } else {
-    console.log('✅ Telnyx message saved successfully');
+    console.log('✅ Telnyx inbound message saved:', insertedMsg);
+
+    // Stop any active AI drip for this phone number (client replied)
+    try {
+      const { data: stoppedDrips, error: dripError } = await supabaseAdmin
+        .from('ai_drips')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('phone_number', from)
+        .eq('status', 'active')
+        .select('id');
+
+      if (stoppedDrips && stoppedDrips.length > 0) {
+        console.log(`🛑 Stopped ${stoppedDrips.length} AI drip(s) for ${from} - client replied`);
+
+        // Cancel remaining scheduled messages for all stopped drips
+        for (const drip of stoppedDrips) {
+          await supabaseAdmin
+            .from('ai_drip_messages')
+            .update({
+              status: 'cancelled',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('drip_id', drip.id)
+            .eq('status', 'scheduled');
+        }
+      }
+    } catch (dripErr) {
+      console.error('Error stopping AI drip:', dripErr);
+    }
+
+    // Check and trigger AI Receptionist if enabled
+    await checkAndTriggerReceptionist(userId, threadId, from, to, messageBody);
   }
 }
 
@@ -275,4 +318,146 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
 // Handle GET requests (for webhook verification)
 export async function GET(req: NextRequest) {
   return NextResponse.json({ status: 'Telnyx webhook endpoint active' });
+}
+
+/**
+ * Check if receptionist should respond and trigger response
+ */
+async function checkAndTriggerReceptionist(
+  userId: string,
+  threadId: string,
+  phoneNumber: string,
+  toPhoneNumber: string,
+  messageBody: string
+) {
+  if (!supabaseAdmin) return;
+
+  try {
+    // Get user's receptionist settings
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('receptionist_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    // If no settings or not enabled, skip
+    if (settingsError || !settings || !settings.enabled) {
+      return;
+    }
+
+    // Get lead info for this phone number
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('id, name, status, disposition')
+      .eq('user_id', userId)
+      .eq('phone', phoneNumber)
+      .single();
+
+    // Determine contact type
+    let contactType: ContactType;
+    let leadId: string | undefined;
+    let leadName: string | undefined;
+
+    if (lead) {
+      leadId = lead.id;
+      leadName = lead.name;
+
+      // Check if this is a sold client
+      const isSoldClient = lead.disposition === 'sold' ||
+                           lead.status === 'sold' ||
+                           lead.disposition === 'closed_won';
+
+      if (isSoldClient) {
+        contactType = 'sold_client';
+        if (!settings.respond_to_sold_clients) {
+          console.log('🤖 Receptionist: Skipping sold client (disabled in settings)');
+          return;
+        }
+      } else {
+        contactType = 'existing_lead';
+        // For existing leads that aren't sold, only respond if they're configured to receive responses
+        // For now, treat existing leads like new contacts
+        if (!settings.respond_to_new_contacts) {
+          console.log('🤖 Receptionist: Skipping existing lead (new contacts disabled)');
+          return;
+        }
+      }
+    } else {
+      // New contact - no existing lead
+      contactType = 'new_contact';
+
+      if (!settings.respond_to_new_contacts) {
+        console.log('🤖 Receptionist: Skipping new contact (disabled in settings)');
+        return;
+      }
+
+      // Auto-create lead if enabled
+      if (settings.auto_create_leads) {
+        const { data: newLead, error: leadError } = await supabaseAdmin
+          .from('leads')
+          .insert({
+            user_id: userId,
+            phone: phoneNumber,
+            name: 'New Contact',
+            source: 'inbound_sms',
+            status: 'new',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select('id, name')
+          .single();
+
+        if (newLead && !leadError) {
+          leadId = newLead.id;
+          leadName = newLead.name;
+          console.log('🤖 Receptionist: Auto-created new lead:', leadId);
+
+          // Link the thread to the new lead
+          await supabaseAdmin
+            .from('threads')
+            .update({ lead_id: leadId })
+            .eq('id', threadId);
+        }
+      }
+    }
+
+    console.log('🤖 Receptionist: Triggering response', {
+      userId,
+      threadId,
+      phoneNumber,
+      contactType,
+      leadId,
+    });
+
+    // Call the receptionist respond API
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/receptionist/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        threadId,
+        phoneNumber,
+        toPhoneNumber,
+        inboundMessage: messageBody,
+        contactType,
+        leadId,
+        leadName,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      console.log('✅ Receptionist response sent:', {
+        responseType: result.responseType,
+        pointsUsed: result.pointsUsed,
+      });
+    } else {
+      console.log('⚠️ Receptionist response not sent:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ Receptionist trigger error:', error);
+    // Don't throw - we don't want to fail the webhook if receptionist fails
+  }
 }

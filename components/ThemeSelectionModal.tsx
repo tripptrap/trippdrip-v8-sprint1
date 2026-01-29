@@ -6,6 +6,7 @@ import { Sun, Moon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const THEME_SELECTED_KEY = 'theme_selection_shown';
+const PHONE_SELECTED_KEY = 'onboarding_phone_selected';
 
 export default function ThemeSelectionModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,11 +17,25 @@ export default function ThemeSelectionModal() {
     // Check if user has already seen the theme selection
     const hasSeenModal = localStorage.getItem(THEME_SELECTED_KEY);
     if (!hasSeenModal) {
-      // Small delay to let the page load first
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 500);
-      return () => clearTimeout(timer);
+      // Wait for phone selection to be completed first
+      const checkPhoneSelection = () => {
+        const phoneComplete = localStorage.getItem(PHONE_SELECTED_KEY);
+        if (phoneComplete) {
+          setIsOpen(true);
+          return true;
+        }
+        return false;
+      };
+
+      // Check immediately, then poll if not ready
+      if (!checkPhoneSelection()) {
+        const interval = setInterval(() => {
+          if (checkPhoneSelection()) {
+            clearInterval(interval);
+          }
+        }, 500);
+        return () => clearInterval(interval);
+      }
     }
   }, []);
 

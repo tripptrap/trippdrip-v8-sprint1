@@ -132,6 +132,14 @@ const QUICK_TEMPLATES = [
   }
 ];
 
+interface Message {
+  id: string;
+  body?: string;
+  content?: string;
+  direction: 'inbound' | 'outbound' | 'in' | 'out';
+  created_at: string;
+}
+
 interface SendSMSModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -139,6 +147,10 @@ interface SendSMSModalProps {
   leadName?: string;
   leadPhone?: string;
   onSuccess?: () => void;
+  // AI Response props
+  generateAIResponse?: boolean;
+  contextMessage?: string;
+  conversationHistory?: Message[];
 }
 
 export default function SendSMSModal({
@@ -148,6 +160,9 @@ export default function SendSMSModal({
   leadName = '',
   leadPhone,
   onSuccess,
+  generateAIResponse = false,
+  contextMessage,
+  conversationHistory = [],
 }: SendSMSModalProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -164,6 +179,11 @@ export default function SendSMSModal({
   const [fixingSpam, setFixingSpam] = useState(false);
   const [showSpamDetails, setShowSpamDetails] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+
+  // AI generation state
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [showAiSuggestions, setShowAiSuggestions] = useState(false);
 
   // Analyze message for spam as user types (debounced)
   useEffect(() => {
@@ -191,6 +211,10 @@ export default function SendSMSModal({
       setSuccess(false);
       setSpamAnalysis(null);
       setShowSpamDetails(false);
+      // Reset AI state
+      setAiSuggestions([]);
+      setShowAiSuggestions(false);
+      setGeneratingAI(false);
     }
   }, [isOpen, leadPhone]);
 
@@ -219,6 +243,104 @@ export default function SendSMSModal({
       setLoadingNumbers(false);
     }
   };
+
+  // Generate AI response based on conversation context
+  const handleGenerateAIResponse = async () => {
+    setGeneratingAI(true);
+    setError('');
+    setAiSuggestions([]);
+
+    try {
+      // If we have a leadId, use the smart-replies endpoint
+      if (leadId) {
+        const response = await fetch('/api/ai/smart-replies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.insufficientPoints) {
+            throw new Error('Insufficient points. Please add more points to use AI features.');
+          }
+          throw new Error(data.error || 'Failed to generate AI response');
+        }
+
+        if (data.suggestions && data.suggestions.length > 0) {
+          setAiSuggestions(data.suggestions);
+          setShowAiSuggestions(true);
+          // Auto-select the first suggestion
+          setMessage(data.suggestions[0]);
+        }
+      } else {
+        // No leadId - use direct AI endpoint with conversation context
+        const isInbound = (dir: string) => dir === 'inbound' || dir === 'in';
+        const conversationText = conversationHistory
+          .slice(-5) // Last 5 messages for context
+          .map(m => `${isInbound(m.direction) ? 'Customer' : 'Agent'}: ${m.body || m.content || ''}`)
+          .join('\n');
+
+        const lastInbound = contextMessage || conversationHistory
+          .filter(m => isInbound(m.direction))
+          .pop();
+        const lastMessage = typeof lastInbound === 'string'
+          ? lastInbound
+          : (lastInbound?.body || lastInbound?.content || '');
+
+        const prompt = `You are a helpful sales/customer service agent. Based on this conversation, generate 3 short, professional reply options to the customer's last message.
+
+Conversation:
+${conversationText}
+
+${lastMessage ? `Customer's last message: "${lastMessage}"` : ''}
+
+Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 160 characters for SMS). Be helpful and professional.`;
+
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: prompt }],
+            model: 'gpt-4o-mini'
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || 'Failed to generate AI response');
+        }
+
+        if (data.reply) {
+          // Parse the 3 suggestions from the response
+          const suggestions = data.reply
+            .split('\n')
+            .map((s: string) => s.replace(/^\d+[\.\)]\s*/, '').trim()) // Remove numbering
+            .filter((s: string) => s.length > 0)
+            .slice(0, 3);
+
+          if (suggestions.length > 0) {
+            setAiSuggestions(suggestions);
+            setShowAiSuggestions(true);
+            setMessage(suggestions[0]);
+          }
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate AI response');
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  // Auto-generate AI response when modal opens with generateAIResponse flag
+  useEffect(() => {
+    if (isOpen && generateAIResponse && !message && !generatingAI) {
+      handleGenerateAIResponse();
+    }
+  }, [isOpen, generateAIResponse]);
 
   const handleRephrase = async (style: 'shorter' | 'longer' | 'professional' | 'rewrite') => {
     if (!message.trim()) {
@@ -406,10 +528,10 @@ export default function SendSMSModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full border border-slate-200 dark:border-slate-700">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full border border-slate-200 dark:border-slate-700 max-h-[90vh] flex flex-col my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
               {leadName ? `Message to ${leadName}` : 'Send Message'}
@@ -430,7 +552,7 @@ export default function SendSMSModal({
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="bg-red-50 border border-red-500/50 text-red-300 px-4 py-3 rounded">
               {error}
@@ -537,6 +659,87 @@ export default function SendSMSModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* AI Response Generator */}
+          <div>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleGenerateAIResponse}
+                disabled={generatingAI || sending || success}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white text-sm font-medium rounded-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {generatingAI ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate AI Reply
+                  </>
+                )}
+              </button>
+              {aiSuggestions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAiSuggestions(!showAiSuggestions)}
+                  className="text-xs text-purple-400 hover:text-purple-300"
+                >
+                  {showAiSuggestions ? 'Hide' : 'Show'} suggestions
+                </button>
+              )}
+            </div>
+
+            {/* AI Suggestions Panel */}
+            {showAiSuggestions && aiSuggestions.length > 0 && (
+              <div className="mt-3 p-3 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+                <div className="text-xs font-semibold text-violet-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" />
+                  AI Suggestions (click to use)
+                </div>
+                <div className="space-y-2">
+                  {aiSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setMessage(suggestion);
+                        setShowAiSuggestions(false);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-md text-sm transition-all ${
+                        message === suggestion
+                          ? 'bg-violet-500/30 border-violet-400 text-white'
+                          : 'bg-slate-700/50 hover:bg-violet-500/20 text-slate-200 hover:text-white'
+                      } border border-slate-600 hover:border-violet-400`}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateAIResponse}
+                  disabled={generatingAI}
+                  className="mt-2 flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${generatingAI ? 'animate-spin' : ''}`} />
+                  Regenerate suggestions
+                </button>
+              </div>
+            )}
+
+            {/* Loading state for AI generation */}
+            {generatingAI && (
+              <div className="mt-3 p-4 bg-violet-500/10 border border-violet-500/30 rounded-lg flex items-center justify-center gap-3">
+                <div className="animate-pulse flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-violet-400 animate-bounce" />
+                  <span className="text-sm text-violet-300">AI is crafting your response...</span>
+                </div>
               </div>
             )}
           </div>
@@ -713,7 +916,7 @@ export default function SendSMSModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"

@@ -77,8 +77,8 @@ export default function TermsOfServicePage() {
             <strong>Subscription Plans:</strong>
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Basic Plan: $30/month (includes 1,000 monthly points)</li>
-            <li>Premium Plan: $98.99/month (includes 15,000 monthly points)</li>
+            <li>Basic Plan: $30/month (includes 3,000 monthly credits)</li>
+            <li>Premium Plan: $98/month (includes 10,000 monthly credits)</li>
             <li>Points never expire and roll over month-to-month</li>
             <li>Additional points can be purchased as needed</li>
           </ul>

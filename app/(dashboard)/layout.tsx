@@ -3,8 +3,10 @@ import { useState } from "react";
 import Sidebar from "@/components/Sidebar"
 import Topbar from "@/components/Topbar"
 import DemoModeBanner from "@/components/DemoModeBanner"
+import OnboardingPhoneSelector from "@/components/OnboardingPhoneSelector"
 import ThemeSelectionModal from "@/components/ThemeSelectionModal"
 import OnboardingTour from "@/components/OnboardingTour"
+import OnboardingCongratsModal from "@/components/OnboardingCongratsModal"
 import { ThemeProvider } from "@/lib/ThemeContext"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -59,11 +61,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="container py-6 px-4 md:px-6">{children}</div>
         </main>
 
-        {/* Theme Selection Modal for new users */}
+        {/* Onboarding Flow Components (in order) */}
+        {/* 1. Phone Number Selection - first step */}
+        <OnboardingPhoneSelector />
+
+        {/* 2. Theme Selection Modal - second step */}
         <ThemeSelectionModal />
 
-        {/* Interactive Onboarding Tour */}
+        {/* 3. Interactive Onboarding Tour - third step */}
         <OnboardingTour />
+
+        {/* 4. Congratulations Modal - final step */}
+        <OnboardingCongratsModal />
       </div>
     </ThemeProvider>
   )

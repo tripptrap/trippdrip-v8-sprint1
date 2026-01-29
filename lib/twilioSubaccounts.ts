@@ -165,7 +165,21 @@ export async function createTwilioSubaccount(
 
         console.log(`✅ Auto-purchased number: ${purchasedNumber} (${purchasedSid})`);
 
-        // Save the purchased number to the database
+        // Save to user_telnyx_numbers (primary ownership table for number validation)
+        const { error: telnyxError } = await supabase
+          .from('user_telnyx_numbers')
+          .insert({
+            user_id: userId,
+            phone_number: purchasedNumber,
+            friendly_name: purchasedNumber,
+            status: 'active',
+          });
+
+        if (telnyxError) {
+          console.error('❌ Error saving to user_telnyx_numbers:', telnyxError);
+        }
+
+        // Also save to user_twilio_numbers for backward compatibility
         const { error: numberError } = await supabase
           .from('user_twilio_numbers')
           .insert({

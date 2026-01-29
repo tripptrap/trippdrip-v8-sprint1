@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
+import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -176,10 +177,14 @@ export async function POST(req: Request) {
 
         // Send via Twilio API
         try {
+          // Geo-route: pick closest number to lead's zip code
+          const geoFrom = await selectClosestNumber(user.id, lead.zip_code || null, supabase);
+          const effectiveFrom = geoFrom || fromNumber || twilioConfig.phoneNumbers?.[0] || '';
+
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
           const params = new URLSearchParams();
           params.append('To', lead.phone);
-          params.append('From', fromNumber || twilioConfig.phoneNumbers?.[0] || '');
+          params.append('From', effectiveFrom);
           params.append('Body', personalizedMessage);
 
           const response = await fetch(twilioUrl, {
@@ -207,29 +212,75 @@ export async function POST(req: Request) {
             pointsUsed += messageCredits;
             totalCreditsUsed += messageCredits;
 
-            // Create or update thread
-            const { data: existingThread } = await supabase
+            // Create or update thread - check by lead_id OR phone_number to avoid duplicates
+            let existingThread = null;
+
+            // First try by lead_id
+            const { data: threadByLead } = await supabase
               .from('threads')
               .select('*')
               .eq('user_id', user.id)
               .eq('lead_id', lead.id)
               .single();
 
+            if (threadByLead) {
+              existingThread = threadByLead;
+            } else if (lead.phone) {
+              // Try by phone number if no lead match
+              const { data: threadByPhone } = await supabase
+                .from('threads')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('phone_number', lead.phone)
+                .single();
+
+              if (threadByPhone) {
+                existingThread = threadByPhone;
+                // Also link lead_id since we found a match
+                await supabase
+                  .from('threads')
+                  .update({ lead_id: lead.id })
+                  .eq('id', threadByPhone.id);
+              }
+            }
+
             if (existingThread) {
               // Update existing thread - only set campaign_id if not already set (preserve individual origins)
               const updateData: any = {
                 messages_from_user: (existingThread.messages_from_user || 0) + 1,
-                last_message_at: new Date().toISOString(),
+                last_message: personalizedMessage,
                 updated_at: new Date().toISOString()
               };
               // Only set campaign_id if thread doesn't have one (new campaign thread)
               if (!existingThread.campaign_id) {
                 updateData.campaign_id = campaignId || null;
               }
+              // Also ensure phone_number is set if missing
+              if (!existingThread.phone_number && lead.phone) {
+                updateData.phone_number = lead.phone;
+              }
               await supabase
                 .from('threads')
                 .update(updateData)
                 .eq('id', existingThread.id);
+
+              // Save the message to database
+              await supabase
+                .from('messages')
+                .insert({
+                  user_id: user.id,
+                  thread_id: existingThread.id,
+                  from_phone: effectiveFrom,
+                  to_phone: lead.phone,
+                  body: personalizedMessage,
+                  content: personalizedMessage,
+                  direction: 'outbound',
+                  status: 'sent',
+                  channel: 'sms',
+                  provider: 'twilio',
+                  message_sid: result.sid,
+                  created_at: new Date().toISOString()
+                });
             } else {
               // Create new thread with campaign_id
               const { data: newThread } = await supabase
@@ -237,12 +288,15 @@ export async function POST(req: Request) {
                 .insert({
                   user_id: user.id,
                   lead_id: lead.id,
+                  phone_number: lead.phone,
+                  channel: 'sms',
+                  status: 'active',
                   campaign_id: campaignId || null,
                   messages_from_user: 1,
                   messages_from_lead: 0,
+                  last_message: personalizedMessage,
                   created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  last_message_at: new Date().toISOString()
+                  updated_at: new Date().toISOString()
                 })
                 .select()
                 .single();
@@ -254,10 +308,15 @@ export async function POST(req: Request) {
                   .insert({
                     user_id: user.id,
                     thread_id: newThread.id,
-                    lead_id: lead.id,
-                    direction: 'outbound',
+                    from_phone: effectiveFrom,
+                    to_phone: lead.phone,
+                    body: personalizedMessage,
                     content: personalizedMessage,
+                    direction: 'outbound',
                     status: 'sent',
+                    channel: 'sms',
+                    provider: 'twilio',
+                    message_sid: result.sid,
                     created_at: new Date().toISOString()
                   });
               }

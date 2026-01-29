@@ -172,7 +172,7 @@ export default function RoadmapPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-black">Product Roadmap</h1>
+        <h1 className="text-2xl font-semibold text-black dark:text-white">Product Roadmap</h1>
         <p className="text-slate-700 dark:text-slate-300 mt-1">
           See what we're building and what's coming next. Your feedback shapes our roadmap!
         </p>
@@ -186,7 +186,7 @@ export default function RoadmapPage() {
               <Lock className="h-8 w-8 text-sky-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-black mb-1">Referral Program</h2>
+              <h2 className="text-xl font-bold text-black dark:text-white mb-1">Referral Program</h2>
               <p className="text-slate-700 dark:text-slate-300">
                 Earn 1 month of free premium for each successful referral
               </p>
@@ -290,7 +290,7 @@ export default function RoadmapPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="font-semibold text-black">{item.title}</h3>
+                          <h3 className="font-semibold text-black dark:text-white">{item.title}</h3>
                           {item.quarter && (
                             <span className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                               {item.quarter}
@@ -315,7 +315,7 @@ export default function RoadmapPage() {
 
       {/* Feedback Section */}
       <div className="card bg-sky-50 border border-sky-200">
-        <h3 className="font-semibold mb-2 text-black flex items-center gap-2">
+        <h3 className="font-semibold mb-2 text-black dark:text-white flex items-center gap-2">
           <Zap className="h-5 w-5 text-sky-700" />
           Have a Feature Request?
         </h3>

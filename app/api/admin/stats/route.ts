@@ -25,16 +25,27 @@ export async function GET(req: NextRequest) {
     const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
     const totalUsers = authUsers?.users?.length || 0;
 
-    // Get users by plan type
-    const { data: userPlans } = await adminClient
-      .from('user_plans')
-      .select('plan_type');
+    // Get users by plan type from the users table (subscription_tier set by Stripe webhook)
+    const { data: usersData } = await adminClient
+      .from('users')
+      .select('subscription_tier');
 
     const planCounts: Record<string, number> = { basic: 0, premium: 0, none: 0 };
-    userPlans?.forEach((plan: any) => {
-      const type = plan.plan_type || 'none';
-      planCounts[type] = (planCounts[type] || 0) + 1;
+    usersData?.forEach((u: any) => {
+      const tier = u.subscription_tier;
+      if (tier === 'premium') {
+        planCounts.premium += 1;
+      } else if (tier === 'basic') {
+        planCounts.basic += 1;
+      } else {
+        planCounts.none += 1;
+      }
     });
+    // Users in auth but not in users table count as "none"
+    const usersInTable = usersData?.length || 0;
+    if (totalUsers > usersInTable) {
+      planCounts.none += (totalUsers - usersInTable);
+    }
 
     // Get total messages
     const { count: totalMessages } = await adminClient

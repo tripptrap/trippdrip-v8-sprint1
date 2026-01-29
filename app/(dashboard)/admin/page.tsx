@@ -22,6 +22,8 @@ import {
 interface User {
   id: string;
   email: string;
+  personal_email: string | null;
+  phone: string | null;
   full_name: string;
   industry: string | null;
   use_case: string | null;
@@ -30,6 +32,7 @@ interface User {
   email_confirmed: boolean;
   plan_type: string;
   points_balance: number;
+  total_spent: number;
   message_count: number;
   lead_count: number;
 }
@@ -299,9 +302,11 @@ export default function AdminPage() {
             <thead className="bg-slate-50 dark:bg-slate-800">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">User</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Contact</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Industry</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Plan</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Points</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Spent</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Activity</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Joined</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Status</th>
@@ -314,6 +319,18 @@ export default function AdminPage() {
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{user.full_name}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-xs text-slate-600 dark:text-slate-400 space-y-0.5">
+                      {user.personal_email && user.personal_email !== user.email && (
+                        <p title="Personal email">{user.personal_email}</p>
+                      )}
+                      {user.phone ? (
+                        <p title="Phone">{user.phone}</p>
+                      ) : (
+                        <p className="text-slate-400 dark:text-slate-500">No phone</p>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -334,6 +351,11 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-sm text-slate-900 dark:text-white">{user.points_balance.toLocaleString()}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-sm font-medium ${user.total_spent > 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                      {user.total_spent > 0 ? `$${user.total_spent.toFixed(2)}` : '$0'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-xs text-slate-600 dark:text-slate-400">

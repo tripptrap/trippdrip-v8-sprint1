@@ -57,7 +57,7 @@ const POINT_PACKS: PointPack[] = [
 function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: number; name: string } {
   if (planType === 'premium') {
     return {
-      price: 98.99,
+      price: 98,
       monthlyPoints: 10000,
       name: 'Premium Plan'
     };

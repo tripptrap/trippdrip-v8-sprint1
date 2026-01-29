@@ -83,7 +83,21 @@ export async function POST(req: NextRequest) {
 
     const result = await response.json();
 
-    // Save the purchased number to the database
+    // Save to user_telnyx_numbers (primary ownership table for number validation)
+    const { error: telnyxDbError } = await supabase
+      .from('user_telnyx_numbers')
+      .insert({
+        user_id: user.id,
+        phone_number: result.phone_number,
+        friendly_name: result.friendly_name || result.phone_number,
+        status: 'active',
+      });
+
+    if (telnyxDbError) {
+      console.error('Error saving to user_telnyx_numbers:', telnyxDbError);
+    }
+
+    // Also save to user_twilio_numbers for backward compatibility
     const { error: dbError } = await supabase
       .from('user_twilio_numbers')
       .insert({

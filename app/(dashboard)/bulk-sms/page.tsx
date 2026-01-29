@@ -220,45 +220,140 @@ export default function BulkSMSPage() {
     setIsSending(true);
     setSendResults([]);
 
-    const results: SendResult[] = [];
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
 
-    for (const lead of filteredLeads) {
-      // Simulate sending (replace with actual Twilio call)
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const personalizedMessage = messageBody
-        .replace(/\{\{first\}\}/gi, lead.first_name || 'there')
-        .replace(/\{\{last\}\}/gi, lead.last_name || '')
-        .replace(/\{\{name\}\}/gi, `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'there');
-
-      try {
-        // Here you would call your SMS API
-        // const response = await fetch('/api/sms/send', { ... });
-
-        // Simulated success
-        results.push({
-          lead,
-          success: true
-        });
-
-        // Deduct points
-        spendPoints(2, `SMS to ${lead.phone}`, 'sms_sent');
-      } catch (error: any) {
-        results.push({
-          lead,
-          success: false,
-          error: error.message || 'Failed to send'
-        });
+      if (!user) {
+        toast.error('Not authenticated');
+        setIsSending(false);
+        setStep('review');
+        return;
       }
 
-      setSendResults([...results]);
+      // Verify user has at least one active number (geo-routing selects per-lead)
+      const { data: telnyxNumbers } = await supabase
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1);
+
+      if (!telnyxNumbers || telnyxNumbers.length === 0) {
+        toast.error('No active phone number found. Please configure a Telnyx number first.');
+        setIsSending(false);
+        setStep('review');
+        return;
+      }
+
+      // Create or get campaign for tracking
+      let campaignId = selectedCampaign;
+      if (!campaignId) {
+        // Create a new campaign for this bulk send
+        const campaignName = `Bulk Send ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+        const { data: newCampaign } = await supabase
+          .from('campaigns')
+          .insert({
+            user_id: user.id,
+            name: campaignName,
+            status: 'Running',
+            created_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (newCampaign) {
+          campaignId = newCampaign.id;
+        }
+      }
+
+      const results: SendResult[] = [];
+      let creditsUsed = 0;
+
+      // Send to each lead via Telnyx
+      for (const lead of filteredLeads) {
+        if (!lead.phone) {
+          results.push({ lead, success: false, error: 'No phone number' });
+          setSendResults([...results]);
+          continue;
+        }
+
+        // Personalize message
+        const personalizedMessage = messageBody
+          .replace(/\{\{first\}\}/gi, lead.first_name || 'there')
+          .replace(/\{\{last\}\}/gi, lead.last_name || '')
+          .replace(/\{\{name\}\}/gi, `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'there');
+
+        try {
+          // Send via Telnyx API - includes campaignId for thread tracking
+          const response = await fetch('/api/telnyx/send-sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: lead.phone,
+              // 'from' omitted — send-sms API auto-selects closest number by lead zip
+              message: personalizedMessage,
+              userId: user.id,
+              leadId: lead.id,
+              campaignId: campaignId, // This hides the message until they reply
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            results.push({ lead, success: true });
+            creditsUsed += 2;
+
+            // Deduct points
+            await fetch('/api/points/spend', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: 2,
+                description: `SMS to ${lead.phone}`,
+                actionType: 'bulk_message',
+              }),
+            });
+          } else {
+            results.push({ lead, success: false, error: data.error || 'Failed to send' });
+          }
+        } catch (error: any) {
+          results.push({ lead, success: false, error: error.message || 'Network error' });
+        }
+
+        setSendResults([...results]);
+
+        // Small delay between messages to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Update campaign stats
+      if (campaignId) {
+        const successCount = results.filter(r => r.success).length;
+        await supabase
+          .from('campaigns')
+          .update({
+            status: 'Completed',
+            stats: { sent: successCount, failed: results.length - successCount },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', campaignId);
+      }
+
+      setPoints(prev => prev - creditsUsed);
+      setIsSending(false);
+      setStep('results');
+
+      const successCount = results.filter(r => r.success).length;
+      toast.success(`Sent ${successCount} of ${filteredLeads.length} messages`);
+
+    } catch (error: any) {
+      console.error('Error sending messages:', error);
+      toast.error(error.message || 'Failed to send messages');
+      setIsSending(false);
+      setStep('review');
     }
-
-    setIsSending(false);
-    setStep('results');
-
-    const successCount = results.filter(r => r.success).length;
-    toast.success(`Sent ${successCount} of ${filteredLeads.length} messages`);
   }
 
   function resetFlow() {
@@ -317,14 +412,14 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Bulk SMS</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Bulk SMS</h1>
           <p className="text-[var(--muted)] mt-1">Select leads by tags or campaign, then send messages</p>
         </div>
 
         {/* Points Balance */}
         <div className="card bg-gradient-to-br from-sky-500/20 to-sky-400/20 border-sky-500/30">
           <div className="text-sm text-[var(--muted)] mb-1">Points Balance</div>
-          <div className="text-3xl font-bold text-gray-900">{points.toLocaleString()}</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-white">{points.toLocaleString()}</div>
           <div className="text-xs text-[var(--muted)] mt-1">Each SMS costs 2 points</div>
         </div>
 
@@ -429,11 +524,11 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setStep('filter')} className="text-[var(--muted)] hover:text-gray-900">
+          <button onClick={() => setStep('filter')} className="text-[var(--muted)] hover:text-gray-900 dark:text-white">
             ← Back
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Compose Message</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Compose Message</h1>
             <p className="text-[var(--muted)] mt-1">Write your message for {filteredLeads.length} leads</p>
           </div>
         </div>
@@ -663,11 +758,11 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setStep('compose')} className="text-[var(--muted)] hover:text-gray-900">
+          <button onClick={() => setStep('compose')} className="text-[var(--muted)] hover:text-gray-900 dark:text-white">
             ← Back
           </button>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Review & Send</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Review & Send</h1>
             <p className="text-[var(--muted)] mt-1">Review your bulk SMS campaign before sending</p>
           </div>
         </div>
@@ -686,15 +781,15 @@ export default function BulkSMSPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-[var(--muted)]">Recipients</div>
-              <div className="text-2xl font-bold text-gray-900">{filteredLeads.length}</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{filteredLeads.length}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Total Cost</div>
-              <div className="text-2xl font-bold text-gray-900">{totalCost} points</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{totalCost} points</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Current Balance</div>
-              <div className="text-2xl font-bold text-gray-900">{points} points</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{points} points</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">After Sending</div>
@@ -769,7 +864,7 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Sending Messages</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Sending Messages</h1>
           <p className="text-[var(--muted)] mt-1">Please wait while we send your messages...</p>
         </div>
 
@@ -777,7 +872,7 @@ export default function BulkSMSPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-[var(--muted)]">Progress</span>
-            <span className="text-sm font-medium text-gray-900">{sendResults.length} / {filteredLeads.length}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{sendResults.length} / {filteredLeads.length}</span>
           </div>
           <div className="w-full bg-slate-50 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
             <div
@@ -807,7 +902,7 @@ export default function BulkSMSPage() {
                 className={`p-3 rounded-lg ${result.success ? 'bg-sky-500/10' : 'bg-red-500/10'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-900">
+                  <span className="text-sm text-gray-900 dark:text-white">
                     {result.lead.first_name} {result.lead.last_name} - {result.lead.phone}
                   </span>
                   <span className={`text-xs ${result.success ? 'text-sky-600' : 'text-red-400'}`}>
@@ -833,7 +928,7 @@ export default function BulkSMSPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Campaign Complete</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Campaign Complete</h1>
           <p className="text-[var(--muted)] mt-1">Your bulk SMS campaign has finished sending</p>
         </div>
 
@@ -843,7 +938,7 @@ export default function BulkSMSPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <div className="text-sm text-[var(--muted)]">Total Sent</div>
-              <div className="text-2xl font-bold text-gray-900">{filteredLeads.length}</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{filteredLeads.length}</div>
             </div>
             <div>
               <div className="text-sm text-[var(--muted)]">Successful</div>
@@ -864,7 +959,7 @@ export default function BulkSMSPage() {
               {sendResults.filter(r => !r.success).map((result, idx) => (
                 <div key={idx} className="p-3 bg-red-500/10 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-900">
+                    <span className="text-sm text-gray-900 dark:text-white">
                       {result.lead.first_name} {result.lead.last_name} - {result.lead.phone}
                     </span>
                   </div>
