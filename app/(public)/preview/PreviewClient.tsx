@@ -85,6 +85,17 @@ export default function PreviewClient() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
+      {/* Development Banner */}
+      <div className="bg-amber-500 text-white text-center py-2.5 px-4 text-sm font-medium tracking-wide">
+        <span className="inline-flex items-center gap-2">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+          </span>
+          This site is currently in development and is not yet functional. Stay tuned!
+        </span>
+      </div>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
