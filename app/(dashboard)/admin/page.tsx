@@ -47,6 +47,7 @@ interface User {
   lead_count: number;
   avg_spam_score: number;
   high_spam_count: number;
+  telnyx_numbers: { phone_number: string; friendly_name: string | null; status: string; created_at: string }[];
 }
 
 interface UserMessage {
@@ -580,6 +581,36 @@ export default function AdminPage() {
                   <tr key={`${user.id}-messages`}>
                     <td colSpan={11} className="p-0">
                       <div className="bg-slate-50 dark:bg-slate-800/80 border-t border-b border-slate-200 dark:border-slate-700 px-6 py-4">
+                        {/* Owned Phone Numbers */}
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
+                          Owned Numbers — {user.full_name}
+                        </h4>
+                        {user.telnyx_numbers.length === 0 ? (
+                          <p className="text-sm text-slate-500 mb-4">No phone numbers owned</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {user.telnyx_numbers.map((num) => (
+                              <span
+                                key={num.phone_number}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  num.status === 'active'
+                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                    : num.status === 'pending'
+                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  num.status === 'active' ? 'bg-green-500' : num.status === 'pending' ? 'bg-yellow-500' : 'bg-slate-400'
+                                }`} />
+                                {num.phone_number}
+                                {num.friendly_name && <span className="text-[10px] opacity-70">({num.friendly_name})</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Recent Messages */}
                         <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
                           Recent Messages — {user.full_name}
                         </h4>

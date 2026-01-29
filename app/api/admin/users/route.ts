@@ -111,6 +111,27 @@ export async function GET(req: NextRequest) {
         return { data: counts };
       });
 
+    // Get Telnyx numbers per user
+    const telnyxNumbersByUser: Record<string, { phone_number: string; friendly_name: string | null; status: string; created_at: string }[]> = {};
+    try {
+      const { data: telnyxNumbers } = await adminClient
+        .from('user_telnyx_numbers')
+        .select('user_id, phone_number, friendly_name, status, created_at');
+      telnyxNumbers?.forEach((num: any) => {
+        if (!telnyxNumbersByUser[num.user_id]) {
+          telnyxNumbersByUser[num.user_id] = [];
+        }
+        telnyxNumbersByUser[num.user_id].push({
+          phone_number: num.phone_number,
+          friendly_name: num.friendly_name,
+          status: num.status,
+          created_at: num.created_at,
+        });
+      });
+    } catch (e) {
+      console.log('Could not fetch Telnyx numbers:', e);
+    }
+
     // Map user data by EMAIL for lookup (users table IDs don't match auth user IDs)
     const userDataByEmail: Record<string, any> = {};
     usersData?.forEach((userData: any) => {
@@ -149,6 +170,7 @@ export async function GET(req: NextRequest) {
           ? Math.round(spamDataByUser[authUser.id].totalScore / spamDataByUser[authUser.id].count)
           : 0,
         high_spam_count: spamDataByUser[authUser.id]?.highSpamCount || 0,
+        telnyx_numbers: telnyxNumbersByUser[authUser.id] || [],
       };
     });
 
