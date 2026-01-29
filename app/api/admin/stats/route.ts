@@ -32,12 +32,13 @@ export async function GET(req: NextRequest) {
 
     const planCounts: Record<string, number> = { basic: 0, premium: 0, none: 0 };
     usersData?.forEach((u: any) => {
-      const tier = u.subscription_tier || u.plan_type || u.tier || null;
+      const tier = u.subscription_tier || null;
       if (tier === 'premium' || tier === 'professional') {
         planCounts.premium += 1;
       } else if (tier === 'basic' || tier === 'starter') {
         planCounts.basic += 1;
       } else {
+        // "free", null, or anything else = no plan
         planCounts.none += 1;
       }
     });

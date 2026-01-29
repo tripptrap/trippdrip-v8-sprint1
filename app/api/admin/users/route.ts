@@ -93,28 +93,29 @@ export async function GET(req: NextRequest) {
         return { data: counts };
       });
 
-    // Map user data by id for easy lookup
-    const userDataById: Record<string, any> = {};
+    // Map user data by EMAIL for lookup (users table IDs don't match auth user IDs)
+    const userDataByEmail: Record<string, any> = {};
     usersData?.forEach((userData: any) => {
-      userDataById[userData.id] = userData;
+      if (userData.email) {
+        userDataByEmail[userData.email.toLowerCase()] = userData;
+      }
     });
-    console.log(`Admin: Found ${usersData?.length || 0} users in users table, ${Object.keys(userDataById).length} mapped by id`);
 
     // Format user data
     const users = authUsers.users.map((authUser) => {
-      const userData = userDataById[authUser.id];
-      // Check multiple possible column names for plan type
-      const tier = userData?.subscription_tier || userData?.plan_type || userData?.tier || null;
+      const userData = userDataByEmail[(authUser.email || '').toLowerCase()];
+      // Map subscription_tier: "premium" -> premium, "basic" -> basic, "free"/null -> none
+      const tier = userData?.subscription_tier || userData?.plan_type || null;
       const planType = tier === 'premium' || tier === 'professional' ? 'premium' :
                        tier === 'basic' || tier === 'starter' ? 'basic' : 'none';
-      // Check multiple possible column names for credits/points
-      const credits = userData?.credits || userData?.points || userData?.points_balance || 0;
+      // Credits from users table
+      const credits = userData?.credits || 0;
       return {
         id: authUser.id,
         email: authUser.email,
         personal_email: authUser.user_metadata?.personal_email || authUser.email || null,
-        phone: userData?.phone || authUser.user_metadata?.phone || authUser.phone || null,
-        full_name: authUser.user_metadata?.full_name || 'Unknown',
+        phone: userData?.phone_number || authUser.user_metadata?.phone || authUser.phone || null,
+        full_name: authUser.user_metadata?.full_name || userData?.full_name || 'Unknown',
         industry: authUser.user_metadata?.industry || null,
         use_case: authUser.user_metadata?.use_case || null,
         created_at: authUser.created_at,
