@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { useTextsState } from '@/lib/hooks/useTextsState';
 import type { Thread } from '@/lib/hooks/useTextsState';
@@ -48,6 +48,58 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [showSessionsPanel, setShowSessionsPanel] = useState(false);
+  const [flowAiActive, setFlowAiActive] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('flowAiActive') === 'true';
+    return false;
+  });
+  const [receptionistActive, setReceptionistActive] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('receptionistActive') === 'true';
+    return false;
+  });
+
+  // Listen for AI toggles from Topbar
+  useEffect(() => {
+    const handleAiToggle = (e: any) => {
+      if (e.detail.type === 'flow') setFlowAiActive(e.detail.active);
+      if (e.detail.type === 'receptionist') setReceptionistActive(e.detail.active);
+    };
+    window.addEventListener('aiToggled', handleAiToggle);
+    return () => window.removeEventListener('aiToggled', handleAiToggle);
+  }, []);
+
+  async function handleToggleFlowAI(enable: boolean) {
+    setFlowAiActive(enable);
+    try {
+      await fetch('/api/threads/bulk-ai-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, disable: !enable, contactType: 'lead' }),
+      });
+      localStorage.setItem('flowAiActive', String(enable));
+      toast.success(`AI Flow ${enable ? 'enabled' : 'disabled'} for all leads`);
+      window.dispatchEvent(new CustomEvent('aiToggled', { detail: { type: 'flow', active: enable } }));
+    } catch {
+      setFlowAiActive(!enable);
+      toast.error('Failed to toggle AI Flow');
+    }
+  }
+
+  async function handleToggleReceptionist(enable: boolean) {
+    setReceptionistActive(enable);
+    try {
+      await fetch('/api/threads/bulk-ai-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, disable: !enable, contactType: 'client' }),
+      });
+      localStorage.setItem('receptionistActive', String(enable));
+      toast.success(`Receptionist ${enable ? 'enabled' : 'disabled'} for all clients`);
+      window.dispatchEvent(new CustomEvent('aiToggled', { detail: { type: 'receptionist', active: enable } }));
+    } catch {
+      setReceptionistActive(!enable);
+      toast.error('Failed to toggle Receptionist');
+    }
+  }
 
   // Determine if this is the first outbound message in the active thread
   const isFirstMessage = useMemo(() => {
@@ -161,6 +213,27 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
             onArchiveThread={(id) => { archiveThread(id); toast.success('Archived'); }}
             onUnarchiveThread={(id) => { unarchiveThread(id); toast.success('Unarchived'); }}
             onBulkArchive={(ids) => { bulkArchiveThreads(ids); toast.success(`${ids.length} conversations archived`); }}
+            flowAiActive={flowAiActive}
+            receptionistActive={receptionistActive}
+            onToggleFlowAI={handleToggleFlowAI}
+            onToggleReceptionist={handleToggleReceptionist}
+            onBulkToggleAI={async (ids, disable) => {
+              try {
+                const isAll = ids.length === 0;
+                const res = await fetch('/api/threads/bulk-ai-toggle', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(isAll ? { all: true, disable } : { threadIds: ids, disable }),
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  toast.success(`AI ${disable ? 'disabled' : 'enabled'} for ${data.updated || 'all'} conversation(s)`);
+                  setSelectMode(false);
+                }
+              } catch {
+                toast.error('Failed to toggle AI');
+              }
+            }}
           />
         </div>
 

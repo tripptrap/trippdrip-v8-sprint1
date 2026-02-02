@@ -20,6 +20,7 @@ export interface Thread {
   display_name: string;
   is_archived?: boolean;
   archived_at?: string | null;
+  ai_disabled?: boolean;
   conversation_tags?: string[];
   leads?: {
     id: string;

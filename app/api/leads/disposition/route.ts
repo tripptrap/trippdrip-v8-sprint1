@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkAndEnrollDripTriggers } from '@/lib/drip/triggerEnrollment';
 
 export async function POST(req: NextRequest) {
   try {
@@ -128,6 +129,11 @@ export async function POST(req: NextRequest) {
     if (!lead) {
       return NextResponse.json({ ok: false, error: 'Lead not found or access denied' }, { status: 404 });
     }
+
+    // Check for drip campaign triggers (status_change)
+    checkAndEnrollDripTriggers(supabase, user.id, id, 'status_change', {
+      status: disposition,
+    });
 
     return NextResponse.json({
       ok: true,

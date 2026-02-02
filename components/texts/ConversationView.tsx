@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle, Archive, Tag, X } from 'lucide-react';
+import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle, Archive, Tag, X, Bot, UserCog } from 'lucide-react';
 import type { Thread, Message } from '@/lib/hooks/useTextsState';
 
 interface ConvTagItem {
@@ -115,6 +115,30 @@ export default function ConversationView({ thread, messages, loading, children, 
     });
   }
 
+  // AI takeover state
+  const [aiDisabled, setAiDisabled] = useState(thread.ai_disabled || false);
+  const [togglingAi, setTogglingAi] = useState(false);
+
+  useEffect(() => {
+    setAiDisabled(thread.ai_disabled || false);
+  }, [thread.id, thread.ai_disabled]);
+
+  async function toggleAi() {
+    setTogglingAi(true);
+    const newState = !aiDisabled;
+    setAiDisabled(newState);
+    try {
+      await fetch('/api/threads/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_ai', threadId: thread.id, disable: newState }),
+      });
+    } catch {
+      setAiDisabled(!newState); // revert on error
+    }
+    setTogglingAi(false);
+  }
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (messages.length > 0 && messagesEndRef.current) {
@@ -189,15 +213,32 @@ export default function ConversationView({ thread, messages, loading, children, 
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* AI Mode Indicator */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
-              isClient
-                ? 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 text-emerald-600'
-                : 'bg-sky-50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-800 text-sky-600'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isClient ? 'bg-emerald-500' : 'bg-sky-500'}`} />
-              {isClient ? 'Receptionist AI' : 'Flow AI'}
-            </div>
+            {/* AI Toggle Button */}
+            <button
+              onClick={toggleAi}
+              disabled={togglingAi}
+              title={aiDisabled ? 'AI is off — click to re-enable' : 'AI is active — click to take over'}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                aiDisabled
+                  ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/20'
+                  : isClient
+                    ? 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/20'
+                    : 'bg-sky-50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-800 text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900/20'
+              }`}
+            >
+              {aiDisabled ? (
+                <>
+                  <UserCog className="w-3.5 h-3.5" />
+                  You (Manual)
+                </>
+              ) : (
+                <>
+                  <Bot className="w-3.5 h-3.5" />
+                  <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isClient ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                  {isClient ? 'Receptionist AI' : 'Flow AI'}
+                </>
+              )}
+            </button>
             {/* Info Panel Toggle */}
             {onToggleInfoPanel && (
               <button

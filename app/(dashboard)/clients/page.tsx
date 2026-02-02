@@ -113,6 +113,33 @@ export default function ClientsPage() {
     setTimeout(() => setToast(""), 2500);
   }
 
+  async function bulkToggleAI(disable: boolean) {
+    // Use original_lead_id from clients to find threads
+    const selected = selectedIds.size > 0
+      ? clients.filter(c => selectedIds.has(c.id))
+      : clients;
+    const leadIds = selected.map(c => c.original_lead_id).filter(Boolean);
+    if (leadIds.length === 0) {
+      showToast('No linked leads found');
+      return;
+    }
+    try {
+      const res = await fetch('/api/threads/bulk-ai-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds, disable }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`AI ${disable ? 'disabled' : 'enabled'} for ${data.updated || 0} conversation(s)`);
+      } else {
+        showToast(`Error: ${data.error}`);
+      }
+    } catch {
+      showToast('Failed to toggle AI');
+    }
+  }
+
   async function handleAddClient() {
     if (!newClient.phone.trim()) {
       showToast("Phone number is required");
@@ -269,17 +296,31 @@ export default function ClientsPage() {
               Text All Clients
             </button>
             {selectedIds.size > 0 && (
-              <button
-                onClick={() => {
-                  const selected = clients.filter(c => selectedIds.has(c.id));
-                  const phones = selected.map(c => c.phone).filter(Boolean);
-                  if (phones.length === 0) { showToast("No phone numbers found"); return; }
-                  router.push(`/bulk-sms?phones=${encodeURIComponent(phones.join(","))}&source=clients`);
-                }}
-                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition shadow-sm"
-              >
-                Text Selected ({selectedIds.size})
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    const selected = clients.filter(c => selectedIds.has(c.id));
+                    const phones = selected.map(c => c.phone).filter(Boolean);
+                    if (phones.length === 0) { showToast("No phone numbers found"); return; }
+                    router.push(`/bulk-sms?phones=${encodeURIComponent(phones.join(","))}&source=clients`);
+                  }}
+                  className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition shadow-sm"
+                >
+                  Text Selected ({selectedIds.size})
+                </button>
+                <button
+                  onClick={() => bulkToggleAI(false)}
+                  className="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 transition shadow-sm"
+                >
+                  Enable AI ({selectedIds.size})
+                </button>
+                <button
+                  onClick={() => bulkToggleAI(true)}
+                  className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 transition shadow-sm"
+                >
+                  Disable AI ({selectedIds.size})
+                </button>
+              </>
             )}
             <button
               onClick={() => setAddOpen(true)}

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
 import { checkAndRenewCredits } from "@/lib/renewalSystem";
 import { motion, AnimatePresence } from "framer-motion";
+import { Bot, Headphones } from "lucide-react";
 
 export default function Topbar(){
   const router = useRouter();
@@ -14,6 +15,16 @@ export default function Topbar(){
   const [points, setPoints] = useState(0);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [flowAiActive, setFlowAiActive] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('flowAiActive') === 'true';
+    return false;
+  });
+  const [receptionistActive, setReceptionistActive] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('receptionistActive') === 'true';
+    return false;
+  });
+  const [togglingFlow, setTogglingFlow] = useState(false);
+  const [togglingReceptionist, setTogglingReceptionist] = useState(false);
 
   useEffect(() => {
     // Get current user and load credits from Supabase
@@ -45,6 +56,8 @@ export default function Topbar(){
         if (!error && userData) {
           setPoints(userData.credits || 0);
         }
+
+        // AI toggle states are managed via localStorage + events
       }
     };
     getUserAndCredits();
@@ -54,8 +67,18 @@ export default function Topbar(){
       setPoints(e.detail.balance);
     };
 
+    // Listen for AI toggle updates
+    const handleAiToggle = (e: any) => {
+      if (e.detail.type === 'flow') setFlowAiActive(e.detail.active);
+      if (e.detail.type === 'receptionist') setReceptionistActive(e.detail.active);
+    };
+
     window.addEventListener('pointsUpdated', handlePointsUpdate);
-    return () => window.removeEventListener('pointsUpdated', handlePointsUpdate);
+    window.addEventListener('aiToggled', handleAiToggle);
+    return () => {
+      window.removeEventListener('pointsUpdated', handlePointsUpdate);
+      window.removeEventListener('aiToggled', handleAiToggle);
+    };
   }, []);
 
   // Determine dot color based on points
@@ -64,6 +87,48 @@ export default function Topbar(){
     if (points < 500) return 'bg-sky-400';
     return 'bg-sky-500';
   };
+
+  async function handleToggleFlow() {
+    if (togglingFlow) return;
+    const newState = !flowAiActive;
+    setTogglingFlow(true);
+    setFlowAiActive(newState);
+    try {
+      await fetch('/api/threads/bulk-ai-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, disable: !newState, contactType: 'lead' }),
+      });
+      localStorage.setItem('flowAiActive', String(newState));
+      toast.success(`AI Flow ${newState ? 'enabled' : 'disabled'} for all leads`);
+      window.dispatchEvent(new CustomEvent('aiToggled', { detail: { type: 'flow', active: newState } }));
+    } catch {
+      setFlowAiActive(!newState);
+      toast.error('Failed to toggle AI Flow');
+    }
+    setTogglingFlow(false);
+  }
+
+  async function handleToggleReceptionist() {
+    if (togglingReceptionist) return;
+    const newState = !receptionistActive;
+    setTogglingReceptionist(true);
+    setReceptionistActive(newState);
+    try {
+      await fetch('/api/threads/bulk-ai-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, disable: !newState, contactType: 'client' }),
+      });
+      localStorage.setItem('receptionistActive', String(newState));
+      toast.success(`Receptionist ${newState ? 'enabled' : 'disabled'} for all clients`);
+      window.dispatchEvent(new CustomEvent('aiToggled', { detail: { type: 'receptionist', active: newState } }));
+    } catch {
+      setReceptionistActive(!newState);
+      toast.error('Failed to toggle Receptionist');
+    }
+    setTogglingReceptionist(false);
+  }
 
   return (
     <motion.div
@@ -82,6 +147,87 @@ export default function Topbar(){
       </motion.div>
 
       <div className="flex items-center gap-4">
+        {/* AI Toggle Buttons */}
+        <div className="flex items-center gap-2">
+          {/* AI Flow (Leads) */}
+          <motion.button
+            onClick={handleToggleFlow}
+            disabled={togglingFlow}
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer select-none overflow-hidden ${
+              flowAiActive
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-400/40 shadow-[0_0_12px_rgba(56,189,248,0.3)]'
+                : 'bg-slate-100 dark:bg-slate-700/50 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600 hover:border-sky-400/40 hover:text-sky-400'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={flowAiActive ? 'Click to disable AI Flow for leads' : 'Click to enable AI Flow for leads'}
+          >
+            {flowAiActive && (
+              <>
+                <motion.div
+                  className="absolute inset-0 rounded-lg bg-sky-400/10"
+                  animate={{ opacity: [0.1, 0.3, 0.1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                  className="absolute inset-0 rounded-lg"
+                  style={{ boxShadow: '0 0 15px rgba(56,189,248,0.4), inset 0 0 15px rgba(56,189,248,0.1)' }}
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </>
+            )}
+            <Bot className={`w-4 h-4 relative z-10 ${togglingFlow ? 'animate-spin' : ''}`} />
+            <span className="relative z-10">Flow</span>
+            {flowAiActive && (
+              <motion.div
+                className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-sky-400 z-20 shadow-[0_0_6px_rgba(56,189,248,0.8)]"
+                animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
+
+          {/* Receptionist (Clients) */}
+          <motion.button
+            onClick={handleToggleReceptionist}
+            disabled={togglingReceptionist}
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer select-none overflow-hidden ${
+              receptionistActive
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-400/40 shadow-[0_0_12px_rgba(52,211,153,0.3)]'
+                : 'bg-slate-100 dark:bg-slate-700/50 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600 hover:border-emerald-400/40 hover:text-emerald-400'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={receptionistActive ? 'Click to disable Receptionist for clients' : 'Click to enable Receptionist for clients'}
+          >
+            {receptionistActive && (
+              <>
+                <motion.div
+                  className="absolute inset-0 rounded-lg bg-emerald-400/10"
+                  animate={{ opacity: [0.1, 0.3, 0.1] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                  className="absolute inset-0 rounded-lg"
+                  style={{ boxShadow: '0 0 15px rgba(52,211,153,0.4), inset 0 0 15px rgba(52,211,153,0.1)' }}
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </>
+            )}
+            <Headphones className={`w-4 h-4 relative z-10 ${togglingReceptionist ? 'animate-spin' : ''}`} />
+            <span className="relative z-10">Receptionist</span>
+            {receptionistActive && (
+              <motion.div
+                className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 z-20 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
+        </div>
+
         {/* Points Balance */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}

@@ -512,6 +512,37 @@ export default function LeadsPage() {
     }
   }
 
+  async function bulkToggleAI(disable: boolean) {
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : null;
+    const scope = ids ? `${ids.length} selected` : 'all';
+
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: disable ? 'Disable AI' : 'Enable AI',
+      message: `${disable ? 'Disable' : 'Enable'} AI responses for ${scope} lead conversations?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/threads/bulk-ai-toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leadIds: ids, disable, all: !ids }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            setToast(`AI ${disable ? 'disabled' : 'enabled'} for ${data.updated || 0} conversation(s)`);
+          } else {
+            setToast(`Error: ${data.error}`);
+          }
+        } catch {
+          setToast('Failed to toggle AI');
+        }
+        setTimeout(() => setToast(''), 3000);
+        setBulkActionsOpen(false);
+      },
+    });
+  }
+
   async function bulkDeleteLeads() {
     if (selectedIds.size === 0) {
       setToast('No leads selected');
@@ -1706,6 +1737,19 @@ export default function LeadsPage() {
                         onClick={() => { setBulkActionModal('reDrip'); setBulkActionsOpen(false); }}
                       >
                         🔄 Re-Drip to Campaign
+                      </button>
+                      <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+                      <button
+                        className="w-full text-left px-3 py-2 text-sm text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        onClick={() => { bulkToggleAI(false); setBulkActionsOpen(false); }}
+                      >
+                        Enable AI (Selected)
+                      </button>
+                      <button
+                        className="w-full text-left px-3 py-2 text-sm text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        onClick={() => { bulkToggleAI(true); setBulkActionsOpen(false); }}
+                      >
+                        Disable AI (Selected)
                       </button>
                       <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       <button

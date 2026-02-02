@@ -438,6 +438,18 @@ async function checkAndTriggerReceptionist(
       return;
     }
 
+    // Check if user has taken over this conversation (ai_disabled flag)
+    const { data: threadData } = await supabaseAdmin
+      .from('threads')
+      .select('ai_disabled')
+      .eq('id', threadId)
+      .single();
+
+    if (threadData?.ai_disabled) {
+      console.log('🤖 Receptionist: Skipping — user has taken over this conversation');
+      return;
+    }
+
     // Get lead info for this phone number
     const { data: lead } = await supabaseAdmin
       .from('leads')

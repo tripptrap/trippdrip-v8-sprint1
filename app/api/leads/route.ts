@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndEnrollDripTriggers } from "@/lib/drip/triggerEnrollment";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -177,6 +178,13 @@ export async function POST(req: Request) {
     if (error) {
       console.error('Error creating lead:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Check for drip campaign triggers (lead_created)
+    if (lead?.id) {
+      checkAndEnrollDripTriggers(supabase, user.id, lead.id, 'lead_created', {
+        source: body.source || undefined,
+      });
     }
 
     return NextResponse.json({ ok: true, lead });

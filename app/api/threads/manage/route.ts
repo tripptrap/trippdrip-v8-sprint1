@@ -174,10 +174,39 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, message: 'Tag removed successfully' });
       }
 
+      case 'toggle_ai': {
+        if (!threadId) {
+          return NextResponse.json({ ok: false, error: 'threadId required' }, { status: 400 });
+        }
+
+        const disable = body.disable === true;
+
+        const { error: toggleError } = await supabase
+          .from('threads')
+          .update({ ai_disabled: disable })
+          .eq('id', threadId)
+          .eq('user_id', user.id);
+
+        if (toggleError) {
+          // Column might not exist yet — try without it
+          if (toggleError.message.includes('ai_disabled')) {
+            return NextResponse.json({ ok: true, message: 'AI toggle not available (column missing)', ai_disabled: false });
+          }
+          console.error('Error toggling AI:', toggleError);
+          return NextResponse.json({ ok: false, error: toggleError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          message: disable ? 'AI disabled — you have taken over this conversation' : 'AI re-enabled for this conversation',
+          ai_disabled: disable,
+        });
+      }
+
       default:
         return NextResponse.json({
           ok: false,
-          error: `Unknown action: ${action}. Valid actions: archive, unarchive, bulk_archive, add_tag, remove_tag`
+          error: `Unknown action: ${action}. Valid actions: archive, unarchive, bulk_archive, add_tag, remove_tag, toggle_ai`
         }, { status: 400 });
     }
 

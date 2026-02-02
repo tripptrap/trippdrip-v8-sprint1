@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
-import { Search, Tag, X, Archive, ArchiveRestore, CheckSquare, Square } from 'lucide-react';
+import { Search, Tag, X, Archive, ArchiveRestore, CheckSquare, Square, Bot } from 'lucide-react';
 import type { Thread, ThreadCounts } from '@/lib/hooks/useTextsState';
 
 interface TagItem {
@@ -30,6 +30,11 @@ interface ThreadListProps {
   onArchiveThread: (id: string) => void;
   onUnarchiveThread: (id: string) => void;
   onBulkArchive: (ids: string[]) => void;
+  onBulkToggleAI?: (ids: string[], disable: boolean) => void;
+  flowAiActive?: boolean;
+  receptionistActive?: boolean;
+  onToggleFlowAI?: (enable: boolean) => void;
+  onToggleReceptionist?: (enable: boolean) => void;
 }
 
 function relativeTime(dateStr: string): string {
@@ -76,6 +81,11 @@ export default function ThreadList({
   onArchiveThread,
   onUnarchiveThread,
   onBulkArchive,
+  onBulkToggleAI,
+  flowAiActive = false,
+  receptionistActive = false,
+  onToggleFlowAI,
+  onToggleReceptionist,
 }: ThreadListProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<TagItem[]>([]);
@@ -198,17 +208,45 @@ export default function ThreadList({
             {showArchived ? 'Archived' : 'Archive'}
           </button>
           {!showArchived && (
-            <button
-              onClick={() => onToggleSelectMode(!selectMode)}
-              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
-                selectMode
-                  ? 'bg-sky-100 dark:bg-sky-900/20 text-sky-600 border border-sky-200 dark:border-sky-800'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'
-              }`}
-            >
-              <CheckSquare className="w-3 h-3" />
-              Select
-            </button>
+            <>
+              <button
+                onClick={() => onToggleSelectMode(!selectMode)}
+                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+                  selectMode
+                    ? 'bg-sky-100 dark:bg-sky-900/20 text-sky-600 border border-sky-200 dark:border-sky-800'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'
+                }`}
+              >
+                <CheckSquare className="w-3 h-3" />
+                Select
+              </button>
+              {tab === 'leads' && onToggleFlowAI && (
+                <button
+                  onClick={() => onToggleFlowAI(!flowAiActive)}
+                  className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors border ${
+                    flowAiActive
+                      ? 'bg-sky-100 dark:bg-sky-900/20 text-sky-500 border-sky-200 dark:border-sky-800'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-transparent'
+                  }`}
+                >
+                  <Bot className="w-3 h-3" />
+                  AI Flow
+                </button>
+              )}
+              {tab === 'clients' && onToggleReceptionist && (
+                <button
+                  onClick={() => onToggleReceptionist(!receptionistActive)}
+                  className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors border ${
+                    receptionistActive
+                      ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-500 border-emerald-200 dark:border-emerald-800'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border-transparent'
+                  }`}
+                >
+                  <Bot className="w-3 h-3" />
+                  Receptionist
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -356,6 +394,19 @@ export default function ThreadList({
                             Lead
                           </span>
                         )}
+                        {/* AI active indicator */}
+                        {!thread.ai_disabled && (
+                          (isClient && receptionistActive) || (!isClient && flowAiActive)
+                        ) && (
+                          <span className={`inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+                            isClient
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800'
+                              : 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800'
+                          }`}>
+                            <Bot className="w-2.5 h-2.5" />
+                            AI
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">
@@ -443,6 +494,22 @@ export default function ThreadList({
             >
               Cancel
             </button>
+            {onBulkToggleAI && (
+              <>
+                <button
+                  onClick={() => onBulkToggleAI(Array.from(selectedThreadIds), false)}
+                  className="px-3 py-1.5 text-xs font-medium bg-sky-500 hover:bg-sky-600 text-white rounded-lg transition-colors"
+                >
+                  AI On
+                </button>
+                <button
+                  onClick={() => onBulkToggleAI(Array.from(selectedThreadIds), true)}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                >
+                  AI Off
+                </button>
+              </>
+            )}
             <button
               onClick={() => onBulkArchive(Array.from(selectedThreadIds))}
               className="px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"

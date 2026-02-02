@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkAndEnrollDripTriggers } from "@/lib/drip/triggerEnrollment";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,14 @@ export async function PATCH(
 
     updateData.updated_at = new Date().toISOString();
 
+    // Fetch old lead data for trigger comparison
+    const { data: oldLead } = await supabase
+      .from('leads')
+      .select('tags, status')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .single();
+
     const { data: lead, error } = await supabase
       .from('leads')
       .update(updateData)
@@ -81,6 +90,21 @@ export async function PATCH(
     if (error) {
       console.error('Error updating lead:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    // Check drip triggers for tag additions
+    if (body.tags && oldLead) {
+      const oldTags: string[] = oldLead.tags || [];
+      const newTags: string[] = body.tags || [];
+      const addedTags = newTags.filter(t => !oldTags.includes(t));
+      for (const tag of addedTags) {
+        checkAndEnrollDripTriggers(supabase, user.id, params.id, 'tag_added', { tag });
+      }
+    }
+
+    // Check drip triggers for status changes
+    if (body.status && oldLead && body.status !== oldLead.status) {
+      checkAndEnrollDripTriggers(supabase, user.id, params.id, 'status_change', { status: body.status });
     }
 
     return NextResponse.json({ ok: true, lead });
