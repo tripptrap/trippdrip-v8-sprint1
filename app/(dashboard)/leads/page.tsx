@@ -441,15 +441,15 @@ export default function LeadsPage() {
       const data = await res.json();
 
       if (data.ok) {
-        setToast(`Lead disposition updated to: ${disposition}`);
+        setToast(`Lead outcome updated to: ${disposition}`);
         setTimeout(()=>setToast(''), 2500);
         await fetchLeads();
       } else {
-        setToast(`Error: ${data.error || 'Failed to update disposition'}`);
+        setToast(`Error: ${data.error || 'Failed to update outcome'}`);
         setTimeout(()=>setToast(''), 3500);
       }
     } catch (e: any) {
-      setToast(`Error: ${e?.message || 'Failed to update disposition'}`);
+      setToast(`Error: ${e?.message || 'Failed to update outcome'}`);
       setTimeout(()=>setToast(''), 3500);
     }
   }
@@ -627,6 +627,56 @@ export default function LeadsPage() {
     }
   }
 
+  async function exportAllLeads() {
+    try {
+      const res = await fetch('/api/leads?pageSize=10000');
+      const data = await res.json();
+      const allLeads = data.items || data.leads || [];
+
+      if (allLeads.length === 0) {
+        setToast('No leads to export');
+        setTimeout(() => setToast(''), 2500);
+        return;
+      }
+
+      // Build CSV
+      const headers = ['First Name', 'Last Name', 'Phone', 'Email', 'State', 'Zip Code', 'Status', 'Tags', 'Created At'];
+      const rows = allLeads.map((l: any) => [
+        l.first_name || '',
+        l.last_name || '',
+        l.phone || '',
+        l.email || '',
+        l.state || '',
+        l.zip_code || '',
+        l.status || '',
+        Array.isArray(l.tags) ? l.tags.join('; ') : '',
+        l.created_at ? new Date(l.created_at).toLocaleDateString() : '',
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row: string[]) =>
+          row.map((cell: string) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ),
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setToast(`Exported ${allLeads.length} leads to CSV`);
+      setTimeout(() => setToast(''), 2500);
+    } catch (e: any) {
+      setToast(`Error: ${e?.message || 'Failed to export leads'}`);
+      setTimeout(() => setToast(''), 3500);
+    }
+  }
+
   async function recalculateLeadScores() {
     setRecalculatingScores(true);
     try {
@@ -677,13 +727,14 @@ export default function LeadsPage() {
         setLeadActivities(activitiesData.activities || []);
       }
 
-      // Fetch messages for this lead (by phone number)
-      if (phone) {
-        const messagesRes = await fetch(`/api/messages/by-phone?phone=${encodeURIComponent(phone)}`);
-        const messagesData = await messagesRes.json();
-        if (messagesData.ok) {
-          setLeadMessages(messagesData.messages || []);
-        }
+      // Fetch messages for this lead (by lead_id first, then phone as fallback)
+      const msgParams = new URLSearchParams();
+      msgParams.set('leadId', leadId);
+      if (phone) msgParams.set('phone', phone);
+      const messagesRes = await fetch(`/api/messages/by-phone?${msgParams.toString()}`);
+      const messagesData = await messagesRes.json();
+      if (messagesData.ok) {
+        setLeadMessages(messagesData.messages || []);
       }
     } catch (error) {
       console.error('Error fetching lead details:', error);
@@ -1456,7 +1507,6 @@ export default function LeadsPage() {
             >
               Run Campaign
             </button>
-
             {/* Divider */}
             <div className="h-8 w-px bg-slate-300 dark:bg-slate-600"></div>
 
@@ -1598,7 +1648,7 @@ export default function LeadsPage() {
                     Bulk Actions ({selectedIds.size})
                   </button>
                   {bulkActionsOpen && (
-                    <div className="absolute right-0 mt-1 w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white shadow-lg z-10">
+                    <div className="absolute right-0 mt-1 w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-lg z-50 max-h-[70vh] overflow-y-auto">
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('status'); setBulkActionsOpen(false); }}
@@ -1609,7 +1659,7 @@ export default function LeadsPage() {
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('disposition'); setBulkActionsOpen(false); }}
                       >
-                        Update Disposition
+                        Update Outcome
                       </button>
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -1652,21 +1702,21 @@ export default function LeadsPage() {
                       <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       {showArchived ? (
                         <button
-                          className="w-full text-left px-3 py-2 text-sm text-sky-600 hover:bg-sky-50"
+                          className="w-full text-left px-3 py-2 text-sm text-sky-600 hover:bg-sky-50 dark:hover:bg-slate-700"
                           onClick={() => { bulkUpdate({ status: 'new' }); setBulkActionsOpen(false); }}
                         >
                           📤 Unarchive Selected
                         </button>
                       ) : (
                         <button
-                          className="w-full text-left px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800"
+                          className="w-full text-left px-3 py-2 text-sm text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                           onClick={() => { bulkUpdate({ status: 'archived' }); setBulkActionsOpen(false); }}
                         >
                           📦 Archive Selected
                         </button>
                       )}
                       <button
-                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-50 dark:bg-red-900/30"
+                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30"
                         onClick={() => { setBulkActionModal('delete'); setBulkActionsOpen(false); }}
                       >
                         Delete Selected
@@ -1674,12 +1724,6 @@ export default function LeadsPage() {
                     </div>
                   )}
                 </div>
-                <button
-                  className="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-500 hover:bg-red-100 dark:bg-red-900/40"
-                  onClick={deleteSelectedLeads}
-                >
-                  Delete Selected ({selectedIds.size})
-                </button>
               </>
             )}
           </div>
@@ -1832,6 +1876,16 @@ export default function LeadsPage() {
                           >
                             ✓ Mark as Sold
                           </button>
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateDisposition(id, 'not_interested');
+                              setDispositionMenuOpen({});
+                            }}
+                          >
+                            ✗ Not Interested
+                          </button>
                           <div className="border-t border-slate-200 dark:border-slate-700" />
                           {/* Pipeline (Tags) */}
                           <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">Pipeline Stage</div>
@@ -1965,7 +2019,7 @@ export default function LeadsPage() {
       {/* Upload modal */}
       {open && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
-          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Upload Leads</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={()=>setOpen(false)}>Close</button>
@@ -2300,7 +2354,7 @@ export default function LeadsPage() {
         const presetColors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={backdropClick}>
-          <div className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+          <div className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Run Campaign</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={()=>{ setRunOpen(false); setRunTagsDropdownOpen(false); }}>Close</button>
@@ -2619,7 +2673,7 @@ export default function LeadsPage() {
       {/* Bulk Action Modals */}
       {bulkActionModal === 'status' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[400px] flex-col" onClick={stop}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[400px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Update Status</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
@@ -2656,37 +2710,45 @@ export default function LeadsPage() {
       )}
 
       {bulkActionModal === 'disposition' && (
-        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[400px] flex-col" onClick={stop}>
+        <div className="fixed inset-0 md:left-64 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setBulkActionModal(null)}>
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
-              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Update Disposition</div>
-              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
+              <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Update Outcome</div>
+              <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" onClick={() => setBulkActionModal(null)}>Close</button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
-              <select
-                value={bulkDisposition}
-                onChange={(e) => setBulkDisposition(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
+            <div className="p-4 space-y-2">
+              <button
+                onClick={() => setBulkDisposition('sold')}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition ${
+                  bulkDisposition === 'sold'
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
               >
-                <option value="">Select disposition...</option>
-                <option value="sold">Sold</option>
-                <option value="not_interested">Not Interested</option>
-                <option value="callback">Callback</option>
-                <option value="qualified">Qualified</option>
-                <option value="nurture">Nurture</option>
-              </select>
+                ✓ Sold
+              </button>
+              <button
+                onClick={() => setBulkDisposition('not_interested')}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition ${
+                  bulkDisposition === 'not_interested'
+                    ? 'bg-red-500/20 text-red-600 dark:text-red-400 ring-1 ring-red-500'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+              >
+                ✗ Not Interested
+              </button>
             </div>
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
               <button
                 onClick={() => bulkUpdate({ disposition: bulkDisposition })}
                 disabled={!bulkDisposition}
-                className="rounded-md border border-sky-300 bg-sky-50 px-4 py-2 text-sm text-sky-600 hover:bg-sky-100 disabled:opacity-50"
+                className="rounded-md bg-sky-500 px-4 py-2 text-sm text-white hover:bg-sky-600 disabled:opacity-50"
               >
                 Update
               </button>
@@ -2704,7 +2766,7 @@ export default function LeadsPage() {
         });
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[10vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Add Tags</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
@@ -2891,7 +2953,7 @@ export default function LeadsPage() {
 
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Manage Tags</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); }}>Close</button>
@@ -3156,7 +3218,7 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'createFollowUps' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-slate-600 dark:text-slate-400">Create Follow-ups</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
@@ -3229,7 +3291,7 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'reDrip' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[500px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-purple-500 dark:text-purple-400">🔄 Re-Drip to Campaign</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
@@ -3321,7 +3383,7 @@ export default function LeadsPage() {
 
       {bulkActionModal === 'delete' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[300px] flex-col" onClick={stop}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[300px] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="text-sm uppercase tracking-[.18em] text-red-500">Delete Leads</div>
               <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
@@ -3358,7 +3420,7 @@ export default function LeadsPage() {
         const leadName = selectedLead ? [selectedLead.first_name, selectedLead.last_name].filter(Boolean).join(' ') || 'Unknown' : 'Unknown';
         return (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[8vh] pb-[8vh]" onClick={() => setSelectedLeadDetails(null)}>
-          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
+          <div className="w-full max-w-5xl rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[84vh] flex-col" onClick={stop}>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-600 font-semibold">
@@ -3523,22 +3585,28 @@ export default function LeadsPage() {
                         </div>
                       ) : (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                          {leadMessages.map((msg, i) => (
-                            <div key={msg.id || i} className={`flex ${msg.direction === 'out' || msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
-                                msg.direction === 'out' || msg.sender === 'agent'
-                                  ? 'bg-blue-600 text-gray-900'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-gray-900'
-                              }`}>
-                                <div className="text-sm whitespace-pre-wrap">{msg.body}</div>
-                                <div className={`text-xs mt-1 ${
-                                  msg.direction === 'out' || msg.sender === 'agent' ? 'text-blue-200' : 'text-slate-600 dark:text-slate-400'
+                          {leadMessages.map((msg, i) => {
+                            const isOutbound = msg.direction === 'outbound' || msg.direction === 'out' || msg.sender === 'agent';
+                            return (
+                              <div key={msg.id || i} className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                                  isOutbound
+                                    ? 'bg-sky-500 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100'
                                 }`}>
-                                  {new Date(msg.created_at).toLocaleString()}
+                                  <div className="text-[10px] font-semibold mb-0.5 opacity-80">
+                                    {isOutbound ? 'You' : (selectedLead?.first_name || 'Lead')}
+                                  </div>
+                                  <div className="text-sm whitespace-pre-wrap">{msg.body}</div>
+                                  <div className={`text-[10px] mt-1 ${
+                                    isOutbound ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
+                                  }`}>
+                                    {new Date(msg.created_at).toLocaleString()}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

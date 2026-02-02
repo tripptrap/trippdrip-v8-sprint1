@@ -360,7 +360,7 @@ Lead Info:
 Return JSON:
 {
   "suggestedTags": [array of 2-4 relevant tags like "enterprise", "price-sensitive", "technical", etc],
-  "suggestedDisposition": "qualified" | "callback" | "nurture" | "not_interested" | "neutral",
+  "suggestedDisposition": "sold" | "not_interested" | "neutral",
   "confidence": number 0-1,
   "reasoning": "brief explanation"
 }`;

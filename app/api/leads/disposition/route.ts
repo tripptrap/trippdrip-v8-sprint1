@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate disposition values
-    const validDispositions = ['sold', 'not_interested', 'callback', 'qualified', 'nurture', null];
+    const validDispositions = ['sold', 'not_interested', null];
     if (!validDispositions.includes(disposition)) {
       return NextResponse.json(
         { ok: false, error: 'Invalid disposition value' },

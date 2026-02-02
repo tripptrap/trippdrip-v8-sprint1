@@ -76,6 +76,13 @@ export default function Dashboard(){
   const [pipelineTags, setPipelineTags] = useState<PipelineTag[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(true);
 
+  // Campaign performance & conversion funnel
+  const [campaignPerf, setCampaignPerf] = useState<Array<{ id: string; name: string; totalLeads: number; messagesSent: number; responseRate: number; conversionRate: number }>>([]);
+  const [campaignPerfLoading, setCampaignPerfLoading] = useState(true);
+  const [funnelStages, setFunnelStages] = useState<Array<{ name: string; count: number; percentage: number }>>([]);
+  const [funnelMetrics, setFunnelMetrics] = useState<{ avg_messages_before_sale: number; overall: number } | null>(null);
+  const [funnelLoading, setFunnelLoading] = useState(true);
+
   useEffect(() => {
     fetchAnalytics();
     fetchRecentLeads();
@@ -84,6 +91,8 @@ export default function Dashboard(){
     fetchAppointments();
     fetchUnreadThreads();
     fetchPipelineTags();
+    fetchCampaignPerformance();
+    fetchConversionFunnel();
   }, []);
 
   useEffect(() => {
@@ -225,6 +234,36 @@ export default function Dashboard(){
       console.error('Failed to fetch pipeline tags:', error);
     } finally {
       setPipelineLoading(false);
+    }
+  }
+
+  async function fetchCampaignPerformance() {
+    try {
+      const res = await fetch('/api/analytics/campaign-performance');
+      const data = await res.json();
+      setCampaignPerf((data.data || []).slice(0, 5));
+    } catch (error) {
+      console.error('Failed to fetch campaign performance:', error);
+    } finally {
+      setCampaignPerfLoading(false);
+    }
+  }
+
+  async function fetchConversionFunnel() {
+    try {
+      const res = await fetch('/api/analytics/conversion-funnel');
+      const data = await res.json();
+      if (data.ok && data.funnel) {
+        setFunnelStages(data.funnel.stages || []);
+        setFunnelMetrics({
+          avg_messages_before_sale: data.funnel.metrics?.avg_messages_before_sale || 0,
+          overall: data.funnel.conversion_rates?.overall || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversion funnel:', error);
+    } finally {
+      setFunnelLoading(false);
     }
   }
 
@@ -456,6 +495,137 @@ export default function Dashboard(){
           </>
         )}
       </motion.div>
+
+      {/* Conversion Funnel & Campaign Performance Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Conversion Funnel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.47 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-sky-500" />
+              Conversion Funnel
+            </h2>
+            {funnelMetrics && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {funnelMetrics.overall.toFixed(1)}% overall
+              </span>
+            )}
+          </div>
+
+          {funnelLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded" style={{ width: `${100 - i * 15}%` }} />
+                </div>
+              ))}
+            </div>
+          ) : funnelStages.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No funnel data yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {funnelStages.map((stage, i) => {
+                const colors = ['bg-sky-500', 'bg-sky-400', 'bg-cyan-500', 'bg-emerald-400', 'bg-emerald-500'];
+                return (
+                  <div key={stage.name}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">{stage.name}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{stage.count} ({stage.percentage.toFixed(0)}%)</span>
+                    </div>
+                    <div className="h-7 bg-slate-100 dark:bg-slate-700 rounded-md overflow-hidden">
+                      <div
+                        className={`h-full ${colors[i] || 'bg-sky-500'} rounded-md transition-all duration-500 flex items-center pl-2`}
+                        style={{ width: `${Math.max(stage.percentage, 2)}%` }}
+                      >
+                        {stage.percentage > 15 && (
+                          <span className="text-white text-[10px] font-medium">{stage.count}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {funnelMetrics && funnelMetrics.avg_messages_before_sale > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  Avg {funnelMetrics.avg_messages_before_sale.toFixed(0)} messages before conversion
+                </p>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Campaign Performance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.48 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Send className="w-5 h-5 text-sky-500" />
+              Top Campaigns
+            </h2>
+            <Link href="/campaigns" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {campaignPerfLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : campaignPerf.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <Send className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No campaign data yet</p>
+              <Link href="/campaigns" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
+                Create a campaign
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Campaign</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Leads</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Sent</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Response</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Conv.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {campaignPerf.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <td className="py-2 text-slate-900 dark:text-slate-100 font-medium truncate max-w-[140px]">{c.name}</td>
+                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.totalLeads}</td>
+                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.messagesSent}</td>
+                      <td className="py-2 text-center text-sky-600 dark:text-sky-400 font-medium">{c.responseRate}%</td>
+                      <td className="py-2 text-center text-emerald-600 dark:text-emerald-400 font-medium">{c.conversionRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </motion.div>
+      </div>
 
       {/* Appointments & Unread Messages Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

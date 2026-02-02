@@ -47,15 +47,13 @@ export async function GET(req: NextRequest) {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
-    // Filter by archive status
-    query = query.eq('is_archived', archived);
-
     // Filter by channel if specified
     if (channel) {
       query = query.eq('channel', channel);
     }
 
-    const { data: threads, error } = await query;
+    // First attempt: fetch threads (no archive filter on base query)
+    let { data: threads, error } = await query;
 
     if (error) {
       console.error('Error fetching threads:', error);
@@ -63,6 +61,14 @@ export async function GET(req: NextRequest) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // Filter by archive status in JS to avoid column-not-found errors
+    // (is_archived column may not exist in DB yet)
+    if (archived) {
+      threads = (threads || []).filter((t: any) => t.is_archived === true);
+    } else {
+      threads = (threads || []).filter((t: any) => !t.is_archived);
     }
 
     // Normalize phone for matching

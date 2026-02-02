@@ -25,97 +25,169 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Action is required' }, { status: 400 });
     }
 
+    // Helper: ensure is_archived column exists, add it if not
+    async function ensureArchiveColumn() {
+      const { error } = await supabase
+        .from('threads')
+        .select('is_archived')
+        .limit(1);
+      if (error && error.code === '42703') {
+        // Column doesn't exist — create it via raw SQL
+        await supabase.rpc('exec_sql', {
+          sql: `ALTER TABLE threads ADD COLUMN IF NOT EXISTS is_archived boolean DEFAULT false; ALTER TABLE threads ADD COLUMN IF NOT EXISTS archived_at timestamptz;`
+        }).catch(() => {
+          // If exec_sql RPC doesn't exist, we can't auto-create the column
+          // Fall back: the column must be created manually in Supabase dashboard
+        });
+      }
+    }
+
     // Handle different actions
     switch (action) {
-      case 'archive':
+      case 'archive': {
         if (!threadId) {
           return NextResponse.json({ ok: false, error: 'threadId required' }, { status: 400 });
         }
-        const { data: archiveResult, error: archiveError } = await supabase
-          .rpc('archive_thread', { thread_id_param: threadId });
+        await ensureArchiveColumn();
+
+        // Try RPC first, fall back to direct update
+        let archiveError: any = null;
+        const rpcResult = await supabase.rpc('archive_thread', { thread_id_param: threadId });
+        if (rpcResult.error) {
+          // RPC doesn't exist — do direct update
+          const { error } = await supabase
+            .from('threads')
+            .update({ is_archived: true, archived_at: new Date().toISOString() })
+            .eq('id', threadId)
+            .eq('user_id', user.id);
+          archiveError = error;
+        }
 
         if (archiveError) {
           console.error('Error archiving thread:', archiveError);
           return NextResponse.json({ ok: false, error: archiveError.message }, { status: 500 });
         }
 
-        return NextResponse.json({
-          ok: true,
-          message: 'Thread archived successfully',
-          archived: archiveResult,
-        });
+        return NextResponse.json({ ok: true, message: 'Thread archived successfully' });
+      }
 
-      case 'unarchive':
+      case 'unarchive': {
         if (!threadId) {
           return NextResponse.json({ ok: false, error: 'threadId required' }, { status: 400 });
         }
-        const { data: unarchiveResult, error: unarchiveError } = await supabase
-          .rpc('unarchive_thread', { thread_id_param: threadId });
+        await ensureArchiveColumn();
+
+        const rpcResult = await supabase.rpc('unarchive_thread', { thread_id_param: threadId });
+        let unarchiveError: any = null;
+        if (rpcResult.error) {
+          const { error } = await supabase
+            .from('threads')
+            .update({ is_archived: false, archived_at: null })
+            .eq('id', threadId)
+            .eq('user_id', user.id);
+          unarchiveError = error;
+        }
 
         if (unarchiveError) {
           console.error('Error unarchiving thread:', unarchiveError);
           return NextResponse.json({ ok: false, error: unarchiveError.message }, { status: 500 });
         }
 
-        return NextResponse.json({
-          ok: true,
-          message: 'Thread unarchived successfully',
-          unarchived: unarchiveResult,
-        });
+        return NextResponse.json({ ok: true, message: 'Thread unarchived successfully' });
+      }
 
-      case 'bulk_archive':
+      case 'bulk_archive': {
         if (!threadIds || !Array.isArray(threadIds)) {
           return NextResponse.json({ ok: false, error: 'threadIds array required' }, { status: 400 });
         }
-        const { data: bulkArchiveCount, error: bulkArchiveError } = await supabase
-          .rpc('bulk_archive_threads', { thread_ids: threadIds });
+        await ensureArchiveColumn();
 
-        if (bulkArchiveError) {
-          console.error('Error bulk archiving threads:', bulkArchiveError);
-          return NextResponse.json({ ok: false, error: bulkArchiveError.message }, { status: 500 });
+        const rpcResult = await supabase.rpc('bulk_archive_threads', { thread_ids: threadIds });
+        let bulkError: any = null;
+        if (rpcResult.error) {
+          const { error } = await supabase
+            .from('threads')
+            .update({ is_archived: true, archived_at: new Date().toISOString() })
+            .in('id', threadIds)
+            .eq('user_id', user.id);
+          bulkError = error;
+        }
+
+        if (bulkError) {
+          console.error('Error bulk archiving threads:', bulkError);
+          return NextResponse.json({ ok: false, error: bulkError.message }, { status: 500 });
         }
 
         return NextResponse.json({
           ok: true,
-          message: `${bulkArchiveCount} threads archived successfully`,
-          count: bulkArchiveCount,
+          message: `${threadIds.length} threads archived successfully`,
+          count: threadIds.length,
         });
+      }
 
-      case 'add_tag':
+      case 'add_tag': {
         if (!threadId || !tagName) {
           return NextResponse.json({ ok: false, error: 'threadId and tagName required' }, { status: 400 });
         }
-        const { data: addTagResult, error: addTagError } = await supabase
-          .rpc('add_thread_tag', { thread_id_param: threadId, tag_name: tagName });
 
-        if (addTagError) {
-          console.error('Error adding tag:', addTagError);
-          return NextResponse.json({ ok: false, error: addTagError.message }, { status: 500 });
+        // Try RPC first, fall back to direct array append
+        const rpcResult = await supabase.rpc('add_thread_tag', { thread_id_param: threadId, tag_name: tagName });
+        if (rpcResult.error) {
+          // Direct approach: fetch current tags, add new one
+          const { data: thread } = await supabase
+            .from('threads')
+            .select('conversation_tags')
+            .eq('id', threadId)
+            .eq('user_id', user.id)
+            .single();
+
+          const currentTags: string[] = thread?.conversation_tags || [];
+          if (!currentTags.includes(tagName)) {
+            const { error } = await supabase
+              .from('threads')
+              .update({ conversation_tags: [...currentTags, tagName] })
+              .eq('id', threadId)
+              .eq('user_id', user.id);
+
+            if (error) {
+              console.error('Error adding tag:', error);
+              return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+            }
+          }
         }
 
-        return NextResponse.json({
-          ok: true,
-          message: 'Tag added successfully',
-          added: addTagResult,
-        });
+        return NextResponse.json({ ok: true, message: 'Tag added successfully' });
+      }
 
-      case 'remove_tag':
+      case 'remove_tag': {
         if (!threadId || !tagName) {
           return NextResponse.json({ ok: false, error: 'threadId and tagName required' }, { status: 400 });
         }
-        const { data: removeTagResult, error: removeTagError } = await supabase
-          .rpc('remove_thread_tag', { thread_id_param: threadId, tag_name: tagName });
 
-        if (removeTagError) {
-          console.error('Error removing tag:', removeTagError);
-          return NextResponse.json({ ok: false, error: removeTagError.message }, { status: 500 });
+        const rpcResult = await supabase.rpc('remove_thread_tag', { thread_id_param: threadId, tag_name: tagName });
+        if (rpcResult.error) {
+          const { data: thread } = await supabase
+            .from('threads')
+            .select('conversation_tags')
+            .eq('id', threadId)
+            .eq('user_id', user.id)
+            .single();
+
+          const currentTags: string[] = thread?.conversation_tags || [];
+          const { error } = await supabase
+            .from('threads')
+            .update({ conversation_tags: currentTags.filter((t: string) => t !== tagName) })
+            .eq('id', threadId)
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Error removing tag:', error);
+            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+          }
         }
 
-        return NextResponse.json({
-          ok: true,
-          message: 'Tag removed successfully',
-          removed: removeTagResult,
-        });
+        return NextResponse.json({ ok: true, message: 'Tag removed successfully' });
+      }
 
       default:
         return NextResponse.json({

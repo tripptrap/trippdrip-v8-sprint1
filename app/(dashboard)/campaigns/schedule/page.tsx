@@ -44,6 +44,8 @@ export default function ScheduleCampaignPage() {
   const [percentage, setPercentage] = useState(20);
   const [intervalHours, setIntervalHours] = useState(24);
   const [autoRepeat, setAutoRepeat] = useState(true);
+  const [maxPerHour, setMaxPerHour] = useState(0); // 0 = unlimited
+  const [maxPerDay, setMaxPerDay] = useState(0); // 0 = unlimited
 
   // Filter state
   const [filterTag, setFilterTag] = useState("");
@@ -143,6 +145,8 @@ export default function ScheduleCampaignPage() {
             percentage,
             intervalHours,
             repeat: autoRepeat,
+            maxPerHour: maxPerHour > 0 ? maxPerHour : undefined,
+            maxPerDay: maxPerDay > 0 ? maxPerDay : undefined,
           },
           tags: filterTag ? [filterTag] : [],
         }),
@@ -361,6 +365,50 @@ export default function ScheduleCampaignPage() {
             />
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
               {totalBatches} total batches • Estimated completion in {Math.ceil((totalBatches * intervalHours) / 24)} days
+            </p>
+          </div>
+
+          {/* Send Limits */}
+          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Send Limits</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
+                  Max Messages Per Hour
+                </label>
+                <input
+                  type="number"
+                  value={maxPerHour || ''}
+                  onChange={(e) => setMaxPerHour(Number(e.target.value) || 0)}
+                  placeholder="Unlimited"
+                  min="0"
+                  max="1000"
+                  className="input-dark w-full px-4 py-2 rounded-lg"
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  {maxPerHour > 0 ? `Max ${maxPerHour}/hr` : 'No hourly limit'}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
+                  Max Messages Per Day
+                </label>
+                <input
+                  type="number"
+                  value={maxPerDay || ''}
+                  onChange={(e) => setMaxPerDay(Number(e.target.value) || 0)}
+                  placeholder="Unlimited"
+                  min="0"
+                  max="10000"
+                  className="input-dark w-full px-4 py-2 rounded-lg"
+                />
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  {maxPerDay > 0 ? `Max ${maxPerDay}/day` : 'No daily limit'}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Leave at 0 for unlimited. Limits help protect sender reputation and stay within carrier guidelines.
             </p>
           </div>
 

@@ -65,15 +65,6 @@ export function calculateLeadScore(lead: LeadData): LeadScore {
 
   // 4. Disposition (20 points)
   switch (lead.disposition?.toLowerCase()) {
-    case 'qualified':
-      dispositionScore = 20;
-      break;
-    case 'callback':
-      dispositionScore = 15;
-      break;
-    case 'nurture':
-      dispositionScore = 10;
-      break;
     case 'sold':
       dispositionScore = 0; // Already converted
       break;

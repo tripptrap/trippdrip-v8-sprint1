@@ -486,6 +486,44 @@ export default function CampaignsPage() {
     }
   }
 
+  async function cloneCampaign(campaign: Campaign) {
+    try {
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${campaign.name} (Copy)`,
+          flowId: campaign.flow_id || undefined,
+          tags: campaign.tags?.length ? campaign.tags : undefined,
+        }),
+      });
+      const data = await response.json();
+      if (data.ok) {
+        await loadCampaigns();
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Success',
+          message: `Campaign "${campaign.name}" cloned successfully!`,
+        });
+      } else {
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to clone campaign',
+        });
+      }
+    } catch (error: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'Failed to clone campaign',
+      });
+    }
+  }
+
   async function deleteCampaign(id: string, name: string) {
     setModal({
       isOpen: true,
@@ -713,6 +751,12 @@ export default function CampaignsPage() {
                           className="text-sky-600 hover:text-sky-300 text-sm font-medium"
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={() => cloneCampaign(campaign)}
+                          className="text-emerald-500 hover:text-emerald-300 text-sm font-medium"
+                        >
+                          Clone
                         </button>
                         <button
                           onClick={() => deleteCampaign(campaign.id, campaign.name)}

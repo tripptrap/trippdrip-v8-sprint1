@@ -85,6 +85,16 @@ export default function Page() {
   const [quietHoursEnd, setQuietHoursEnd] = useState('20:00');
   const [userTimezone, setUserTimezone] = useState('America/New_York');
 
+  // Profile editing
+  const [profileName, setProfileName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
   // Account deletion
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -157,6 +167,17 @@ export default function Page() {
       setFromName(data.email.fromName || '');
       setReplyTo(data.email.replyTo || '');
       }
+
+      // Load user profile
+      try {
+        const profileRes = await fetch('/api/user/profile');
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setProfileName(profileData.full_name || '');
+          setProfileEmail(profileData.email || '');
+          setProfilePhone(profileData.phone || '');
+        }
+      } catch (e) { /* silent */ }
 
       // Load quiet hours settings
       const quietHoursRes = await fetch('/api/settings/quiet-hours');
@@ -556,6 +577,66 @@ export default function Page() {
       }
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: profileName.trim(),
+          phone: profilePhone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Profile updated');
+      } else {
+        toast.error(data.error || 'Failed to update profile');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Please enter your current password');
+      return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('Password updated');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error(data.error || 'Failed to change password');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to change password');
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -1155,6 +1236,94 @@ export default function Page() {
       {/* Account Management Tab */}
       {activeTab === 'account' && (
         <div className="space-y-6">
+          {/* Profile Info */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Profile</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={profileEmail}
+                  disabled
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Email cannot be changed. Contact support if you need to update it.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Your phone number"
+                />
+              </div>
+              <button
+                onClick={handleSaveProfile}
+                disabled={savingProfile}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingProfile ? 'Saving...' : 'Save Profile'}
+              </button>
+            </div>
+          </div>
+
+          {/* Change Password */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Change Password</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Min 8 characters"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Confirm password"
+                />
+              </div>
+              <button
+                onClick={handleChangePassword}
+                disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingPassword ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
+          </div>
+
           {/* Appearance */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">🌓 Appearance</h2>

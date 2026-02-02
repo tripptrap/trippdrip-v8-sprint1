@@ -352,8 +352,7 @@ export default function AppointmentsPage() {
                     {apt.leads?.status && (
                       <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          apt.leads.disposition === 'qualified' ? 'bg-sky-500/20 text-sky-600' :
-                          apt.leads.disposition === 'callback' ? 'bg-blue-500/20 text-blue-400' :
+                          apt.leads.disposition === 'sold' ? 'bg-emerald-500/20 text-emerald-600' :
                           apt.leads.disposition === 'not_interested' ? 'bg-red-500/20 text-red-400' :
                           'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                         }`}>
