@@ -296,6 +296,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // User takeover: pause any active drip enrollments for this lead
+    if (leadId && !isAutomated) {
+      try {
+        const { data: paused } = await supabase
+          .from('drip_campaign_enrollments')
+          .update({ status: 'paused', paused_at: new Date().toISOString() })
+          .eq('lead_id', leadId)
+          .eq('status', 'active')
+          .select('id');
+
+        if (paused?.length) {
+          console.log(`⏸️ Paused ${paused.length} drip enrollment(s) for lead ${leadId} — user takeover`);
+        }
+      } catch (err) {
+        // Non-critical — don't fail the send
+        console.error('Error pausing drip enrollments:', err);
+      }
+    }
+
     // Log activity for lead if leadId provided
     if (leadId && smsMessage) {
       await supabase.from('lead_activities').insert({

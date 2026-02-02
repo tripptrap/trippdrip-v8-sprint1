@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle, Sparkles, MessageSquarePlus, Wand2, ShieldCheck, Loader2 } from 'lucide-react';
 import { calculateSMSCredits, getCharacterWarning } from '@/lib/creditCalculator';
 import ScheduleMessagePopover from './ScheduleMessagePopover';
 import type { Thread } from '@/lib/hooks/useTextsState';
@@ -14,6 +14,7 @@ interface ComposerProps {
   channel: 'sms' | 'whatsapp';
   onSend: (body: string, options?: { mediaUrls?: string[]; scheduledFor?: string }) => Promise<void>;
   disabled?: boolean;
+  leadId?: string;
 }
 
 export default function Composer({
@@ -23,6 +24,7 @@ export default function Composer({
   channel,
   onSend,
   disabled,
+  leadId,
 }: ComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -32,6 +34,9 @@ export default function Composer({
   const [uploading, setUploading] = useState(false);
   const [isDncBlocked, setIsDncBlocked] = useState(false);
   const [checkingDnc, setCheckingDnc] = useState(false);
+  const [showAiMenu, setShowAiMenu] = useState(false);
+  const [smartReplies, setSmartReplies] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState<string | null>(null); // 'smart' | 'followup' | 'compose' | 'spam'
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,6 +128,109 @@ export default function Composer({
 
     setUploading(false);
     return urls;
+  }
+
+  async function fetchSmartReplies() {
+    if (!leadId || aiLoading) return;
+    setAiLoading('smart');
+    try {
+      const res = await fetch('/api/ai/smart-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId }),
+      });
+      const data = await res.json();
+      if (data.ok && data.suggestions) {
+        setSmartReplies(data.suggestions);
+      } else {
+        toast.error(data.error || 'Failed to get suggestions');
+      }
+    } catch {
+      toast.error('Failed to get smart replies');
+    }
+    setAiLoading(null);
+  }
+
+  async function fetchFollowUp() {
+    if (!leadId || aiLoading) return;
+    setAiLoading('followup');
+    try {
+      const res = await fetch('/api/ai/generate-follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId }),
+      });
+      const data = await res.json();
+      if (data.ok && data.message) {
+        setText(data.message);
+        setShowAiMenu(false);
+        toast.success('Follow-up generated');
+      } else {
+        toast.error(data.error || 'Failed to generate follow-up');
+      }
+    } catch {
+      toast.error('Failed to generate follow-up');
+    }
+    setAiLoading(null);
+  }
+
+  async function handleAiCompose() {
+    if (!text.trim() || aiLoading) return;
+    setAiLoading('compose');
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: 'You are an SMS writing assistant. Rewrite the user\'s draft message to be more professional, concise, and effective for SMS. Keep it under 160 characters if possible. Only return the rewritten message, nothing else.' },
+            { role: 'user', content: text },
+          ],
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.reply) {
+        setText(data.reply);
+        setShowAiMenu(false);
+        toast.success('Message improved');
+      } else {
+        toast.error(data.error || 'Failed to compose');
+      }
+    } catch {
+      toast.error('Failed to compose with AI');
+    }
+    setAiLoading(null);
+  }
+
+  async function handleSpamCheck() {
+    if (!text.trim() || aiLoading) return;
+    setAiLoading('spam');
+    try {
+      const res = await fetch('/api/ai/spam-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, rewrite: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const { analysis } = data;
+        if (analysis.spamWords?.length === 0 && analysis.patterns?.length === 0) {
+          toast.success('No spam triggers detected');
+        } else {
+          toast(`Spam triggers: ${[...(analysis.spamWords || []), ...(analysis.patterns || [])].join(', ')}`, { icon: '⚠️' });
+          if (data.rewrittenMessage) {
+            setText(data.rewrittenMessage);
+            toast.success('Message rewritten to avoid spam filters');
+          }
+        }
+        setShowAiMenu(false);
+      } else {
+        toast.error(data.error || 'Spam check failed');
+      }
+    } catch {
+      toast.error('Failed to check spam');
+    }
+    setAiLoading(null);
   }
 
   async function handleSend() {
@@ -220,6 +328,82 @@ export default function Composer({
             <span className="text-amber-500">
               {charWarning.remaining} chars to next segment
             </span>
+          )}
+        </div>
+      )}
+
+      {/* AI Assist */}
+      {leadId && (
+        <div className="px-3 pt-1">
+          <div className="flex items-center gap-1 flex-wrap">
+            <button
+              onClick={() => { setShowAiMenu(!showAiMenu); setSmartReplies([]); }}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                showAiMenu
+                  ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              AI Assist
+            </button>
+
+            {showAiMenu && (
+              <>
+                <button
+                  onClick={fetchSmartReplies}
+                  disabled={!!aiLoading}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 disabled:opacity-50"
+                >
+                  {aiLoading === 'smart' ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquarePlus className="w-3 h-3" />}
+                  Replies
+                </button>
+                <button
+                  onClick={fetchFollowUp}
+                  disabled={!!aiLoading}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 disabled:opacity-50"
+                >
+                  {aiLoading === 'followup' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                  Follow-up
+                </button>
+                {text.trim() && (
+                  <>
+                    <button
+                      onClick={handleAiCompose}
+                      disabled={!!aiLoading}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 disabled:opacity-50"
+                    >
+                      {aiLoading === 'compose' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Improve
+                    </button>
+                    <button
+                      onClick={handleSpamCheck}
+                      disabled={!!aiLoading}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 dark:hover:bg-rose-900/30 disabled:opacity-50"
+                    >
+                      {aiLoading === 'spam' ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                      Spam Check
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Smart reply suggestions */}
+          {smartReplies.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {smartReplies.map((reply, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setText(reply); setSmartReplies([]); setShowAiMenu(false); }}
+                  className="px-2.5 py-1 text-xs bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 rounded-full hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors truncate max-w-[200px]"
+                  title={reply}
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}

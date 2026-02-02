@@ -289,37 +289,6 @@ async function handleInboundSMS(payload: any) {
   } else {
     console.log('✅ Telnyx inbound message saved:', insertedMsg);
 
-    // Stop any active AI drip for this phone number (client replied)
-    try {
-      const { data: stoppedDrips, error: dripError } = await supabaseAdmin
-        .from('ai_drips')
-        .update({
-          status: 'completed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('phone_number', from)
-        .eq('status', 'active')
-        .select('id');
-
-      if (stoppedDrips && stoppedDrips.length > 0) {
-        console.log(`🛑 Stopped ${stoppedDrips.length} AI drip(s) for ${from} - client replied`);
-
-        // Cancel remaining scheduled messages for all stopped drips
-        for (const drip of stoppedDrips) {
-          await supabaseAdmin
-            .from('ai_drip_messages')
-            .update({
-              status: 'cancelled',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('drip_id', drip.id)
-            .eq('status', 'scheduled');
-        }
-      }
-    } catch (dripErr) {
-      console.error('Error stopping AI drip:', dripErr);
-    }
-
     // Handle opt-out: add to DNC list, update lead, skip receptionist
     if (optOut) {
       console.log(`🚫 Opt-out detected from ${from}: "${messageBody}"`);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle, Archive, Tag, X, Bot, UserCog } from 'lucide-react';
+import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle, Archive, Tag, X, Bot, UserCog, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { Thread, Message } from '@/lib/hooks/useTextsState';
 
 interface ConvTagItem {
@@ -115,6 +115,33 @@ export default function ConversationView({ thread, messages, loading, children, 
     });
   }
 
+  // Sentiment analysis
+  const [sentiment, setSentiment] = useState<{ sentiment: string; score: number; summary?: string } | null>(null);
+  const lastSentimentLeadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const leadId = thread.lead_id || (thread as any).leads?.id;
+    if (!leadId || lastSentimentLeadRef.current === leadId) return;
+    // Only fetch if there are inbound messages
+    const hasInbound = messages.some(m => isInbound(m.direction));
+    if (!hasInbound) return;
+
+    lastSentimentLeadRef.current = leadId;
+    setSentiment(null);
+    fetch('/api/ai/analyze-sentiment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.analysis) {
+          setSentiment(data.analysis);
+        }
+      })
+      .catch(() => {});
+  }, [thread.id]);
+
   // AI takeover state
   const [aiDisabled, setAiDisabled] = useState(thread.ai_disabled || false);
   const [togglingAi, setTogglingAi] = useState(false);
@@ -175,6 +202,28 @@ export default function ConversationView({ thread, messages, loading, children, 
               ) : (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800">
                   Lead
+                </span>
+              )}
+              {/* Sentiment badge */}
+              {sentiment && (
+                <span
+                  className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full cursor-default ${
+                    sentiment.sentiment === 'positive' || sentiment.score > 0.3
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800'
+                      : sentiment.sentiment === 'negative' || sentiment.score < -0.3
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 border border-red-200 dark:border-red-800'
+                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 border border-amber-200 dark:border-amber-800'
+                  }`}
+                  title={sentiment.summary || `Sentiment: ${sentiment.sentiment}`}
+                >
+                  {sentiment.sentiment === 'positive' || sentiment.score > 0.3 ? (
+                    <TrendingUp className="w-2.5 h-2.5" />
+                  ) : sentiment.sentiment === 'negative' || sentiment.score < -0.3 ? (
+                    <TrendingDown className="w-2.5 h-2.5" />
+                  ) : (
+                    <Minus className="w-2.5 h-2.5" />
+                  )}
+                  {sentiment.sentiment || 'Neutral'}
                 </span>
               )}
             </div>

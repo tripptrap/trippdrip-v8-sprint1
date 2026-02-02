@@ -181,6 +181,16 @@ export async function POST(req: NextRequest) {
         message = message.replace(/\{\{last\}\}/gi, lead.last_name || '');
         message = message.replace(/\{\{phone\}\}/gi, lead.phone || '');
 
+        // Apply guardrails
+        const { applyGuardrails, DEFAULT_GUARDRAILS } = await import('@/lib/ai/guardrails');
+        const guardrailResult = applyGuardrails(message, DEFAULT_GUARDRAILS);
+        if (!guardrailResult.passed) {
+          console.warn(`Drip message blocked by guardrails for enrollment ${enrollment.id}:`, guardrailResult.violations);
+          errors++;
+          continue;
+        }
+        message = guardrailResult.message;
+
         // Get user's Telnyx number for sending
         const { data: userSettings } = await supabaseAdmin
           .from('user_settings')
@@ -260,6 +270,21 @@ export async function POST(req: NextRequest) {
               next_send_at: null,
             })
             .eq('id', enrollment.id);
+
+          // Log flow completion
+          try {
+            await supabaseAdmin.from('flow_completion_log').insert({
+              user_id: enrollment.user_id,
+              lead_id: enrollment.lead_id,
+              campaign_id: enrollment.campaign_id,
+              steps_completed: newStep,
+              total_steps: steps.length,
+              completed_at: new Date().toISOString(),
+            });
+          } catch (logErr) {
+            console.warn('Could not log flow completion:', logErr);
+          }
+
           completed++;
         } else {
           await supabaseAdmin

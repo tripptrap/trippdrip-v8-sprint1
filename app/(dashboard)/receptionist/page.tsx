@@ -149,78 +149,11 @@ export default function ReceptionistPage() {
     );
   }
 
-  // Non-premium upgrade prompt
-  if (!isPremium) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">AI Receptionist</h1>
-          <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full">
-            Premium
-          </span>
-        </div>
-
-        <div className="card">
-          <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-sky-500 to-teal-500 flex items-center justify-center">
-              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-3">
-              Upgrade to Professional
-            </h2>
-
-            <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto mb-6">
-              AI Receptionist automatically responds to incoming messages from sold clients and new contacts.
-              Let AI handle support questions and schedule appointments 24/7.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div className="text-sky-500 font-semibold mb-1">Auto-Reply</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                  AI responds to sold clients & new contacts
-                </div>
-              </div>
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div className="text-sky-500 font-semibold mb-1">Scheduling</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                  Help contacts book appointments
-                </div>
-              </div>
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                <div className="text-sky-500 font-semibold mb-1">Business Hours</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                  Automatic after-hours messages
-                </div>
-              </div>
-            </div>
-
-            <a
-              href="/points"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-teal-500 text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Upgrade to Professional
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">AI Receptionist</h1>
-          <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full">
-            Premium
-          </span>
         </div>
         <button
           onClick={saveSettings}

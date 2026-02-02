@@ -97,14 +97,30 @@ async function processScheduledMessages(supabase: any) {
   // Process each message
   for (const message of readyMessages) {
     try {
-      // Get user's credits
-      const { data: user } = await supabase
+      // Check quiet hours for this user
+      const { data: userSettings } = await supabase
         .from('users')
-        .select('credits')
+        .select('credits, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone')
         .eq('id', message.user_id)
         .single();
 
-      if (!user || user.credits < message.credits_cost) {
+      if (userSettings?.quiet_hours_enabled) {
+        const now = new Date();
+        const userTz = userSettings.timezone || 'America/New_York';
+        const userTime = new Date(now.toLocaleString('en-US', { timeZone: userTz }));
+        const currentHour = userTime.getHours();
+        const currentMinute = userTime.getMinutes();
+        const currentTimeStr = `${String(currentHour).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}`;
+        const start = (userSettings.quiet_hours_start || '08:00').substring(0, 5);
+        const end = (userSettings.quiet_hours_end || '20:00').substring(0, 5);
+
+        if (currentTimeStr < start || currentTimeStr >= end) {
+          console.log(`Skipping scheduled message ${message.id} - outside quiet hours for user ${message.user_id}`);
+          continue;
+        }
+      }
+
+      if (!userSettings || userSettings.credits < message.credits_cost) {
         // Not enough credits - mark as failed
         await supabase
           .from('scheduled_messages')
@@ -149,7 +165,7 @@ async function processScheduledMessages(supabase: any) {
           // Deduct credits
           await supabase
             .from('users')
-            .update({ credits: user.credits - message.credits_cost })
+            .update({ credits: userSettings.credits - message.credits_cost })
             .eq('id', message.user_id);
 
           // Create message record with automation tracking
@@ -207,7 +223,7 @@ async function processScheduledMessages(supabase: any) {
           // Similar process as SMS
           await supabase
             .from('users')
-            .update({ credits: user.credits - message.credits_cost })
+            .update({ credits: userSettings.credits - message.credits_cost })
             .eq('id', message.user_id);
 
           await supabase

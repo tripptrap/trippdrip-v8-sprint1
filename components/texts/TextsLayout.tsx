@@ -280,6 +280,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
                     channel={'sms'}
                     onSend={handleSendMessage}
                     disabled={false}
+                    leadId={activeThread.lead_id || activeThread.leads?.id || undefined}
                   />
                 </ConversationView>
               </div>

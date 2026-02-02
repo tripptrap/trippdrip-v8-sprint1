@@ -39,9 +39,14 @@ const navItems: NavItem[] = [
   { href: "/clients",   label: "Clients", color: 'green' },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
-  { href: "/templates", label: "AI Flows" },
+  {
+    href: "/templates",
+    label: "Your AI",
+    children: [
+      { href: "/receptionist", label: "Receptionist" },
+    ]
+  },
   { href: "/quoting",   label: "Quoting" },
-  { href: "/receptionist", label: "Receptionist", badge: 'premium' },
   { href: "/points",    label: "Points" },
   { href: "/roadmap",   label: "Roadmap" },
   { href: "/settings",  label: "Settings" },
@@ -224,7 +229,12 @@ export default function Sidebar(){
                       whileHover={{ x: 2 }}
                       transition={{ type: "spring", stiffness: 400 }}
                     >
-                      {it.label}
+                      {it.label === 'Your AI' ? (
+                        <>
+                          Your{' '}
+                          <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent font-bold italic">AI</span>
+                        </>
+                      ) : it.label}
                     </motion.span>
                   </Link>
                   <motion.span
@@ -253,18 +263,8 @@ export default function Sidebar(){
                     className="flex items-center justify-between"
                   >
                     <span>
-                      {it.label === 'AI Flows' ? (
-                        <>
-                          <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent font-bold italic">AI</span>
-                          {' '}Flows
-                        </>
-                      ) : it.label}
+                      {it.label}
                     </span>
-                    {it.badge === 'premium' && (
-                      <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded">
-                        PRO
-                      </span>
-                    )}
                   </motion.span>
                 </Link>
               )}

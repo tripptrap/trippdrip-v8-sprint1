@@ -112,6 +112,18 @@ export async function POST(req: NextRequest) {
         .eq('id', userId);
     }
 
+    // Apply AI guardrails before sending
+    const { applyGuardrails, DEFAULT_GUARDRAILS } = await import('@/lib/ai/guardrails');
+    const guardrailResult = applyGuardrails(result.response || '', DEFAULT_GUARDRAILS);
+    if (!guardrailResult.passed) {
+      console.warn('AI response blocked by guardrails:', guardrailResult.violations);
+      return NextResponse.json({
+        success: false,
+        error: 'AI response blocked by safety guardrails',
+        violations: guardrailResult.violations,
+      }, { status: 422 });
+    }
+
     // Send the SMS response using Telnyx
     const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telnyx/send-sms`, {
       method: 'POST',
@@ -119,7 +131,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         to: phoneNumber,
         from: toPhoneNumber,
-        body: result.response,
+        body: guardrailResult.message,
         userId,
         threadId,
         leadId,
