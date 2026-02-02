@@ -63,21 +63,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Calculate funnel stages
-    const totalLeads = leads.length;
-    const newLeads = leads.filter(l => l.status === 'new').length;
-    const contacted = leads.filter(l => l.status === 'contacted' || l.status === 'engaged' || l.last_contacted).length;
-    const engaged = leads.filter(l => l.status === 'engaged').length;
-    const qualified = leads.filter(l => l.disposition === 'qualified' || l.disposition === 'callback').length;
-    const sold = leads.filter(l => l.disposition === 'sold').length;
-
-    // Calculate conversion rates (percentage that move to next stage)
-    const contactedRate = totalLeads > 0 ? (contacted / totalLeads) * 100 : 0;
-    const engagedRate = contacted > 0 ? (engaged / contacted) * 100 : 0;
-    const qualifiedRate = engaged > 0 ? (qualified / engaged) * 100 : 0;
-    const soldRate = qualified > 0 ? (sold / qualified) * 100 : 0;
-    const overallConversionRate = totalLeads > 0 ? (sold / totalLeads) * 100 : 0;
-
     // Get threads data for engagement metrics
     const leadIds = leads.map(l => l.id);
     const { data: threads } = await supabase
@@ -85,6 +70,33 @@ export async function GET(req: NextRequest) {
       .select('lead_id, messages_from_user, messages_from_lead')
       .eq('user_id', user.id)
       .in('lead_id', leadIds);
+
+    // Build thread lookup for engagement signals
+    const threadsMap = new Map(threads?.map(t => [t.lead_id, t]) || []);
+
+    // Calculate funnel stages based on real data signals
+    const totalLeads = leads.length;
+
+    // Contacted = we sent them at least one message, or status indicates contact
+    const contacted = leads.filter(l => {
+      const t = threadsMap.get(l.id);
+      return (t && t.messages_from_user > 0) || l.status === 'contacted' || l.status === 'engaged' || l.last_contacted;
+    }).length;
+
+    // Engaged = lead replied at least once
+    const engaged = leads.filter(l => {
+      const t = threadsMap.get(l.id);
+      return (t && t.messages_from_lead > 0) || l.status === 'engaged';
+    }).length;
+
+    // Sold = disposition is sold, or converted flag, or status is sold
+    const sold = leads.filter(l => l.disposition === 'sold' || l.converted === true || l.status === 'sold').length;
+
+    // Calculate conversion rates
+    const contactedRate = totalLeads > 0 ? (contacted / totalLeads) * 100 : 0;
+    const engagedRate = contacted > 0 ? (engaged / contacted) * 100 : 0;
+    const soldRate = engaged > 0 ? (sold / engaged) * 100 : 0;
+    const overallConversionRate = totalLeads > 0 ? (sold / totalLeads) * 100 : 0;
 
     // Calculate average time in each stage (using lead_notes for status changes)
     const { data: notes } = await supabase
@@ -95,9 +107,8 @@ export async function GET(req: NextRequest) {
       .in('lead_id', leadIds);
 
     // Calculate average messages before conversion
-    const threadsMap = new Map(threads?.map(t => [t.lead_id, t]) || []);
     const soldLeadThreads = leads
-      .filter(l => l.disposition === 'sold')
+      .filter(l => l.disposition === 'sold' || l.converted === true || l.status === 'sold')
       .map(l => threadsMap.get(l.id))
       .filter(Boolean);
 
@@ -123,12 +134,6 @@ export async function GET(req: NextRequest) {
         name: 'Engaged',
         count: engaged,
         percentage: totalLeads > 0 ? (engaged / totalLeads) * 100 : 0,
-        conversion_to_next: qualifiedRate,
-      },
-      {
-        name: 'Qualified',
-        count: qualified,
-        percentage: totalLeads > 0 ? (qualified / totalLeads) * 100 : 0,
         conversion_to_next: soldRate,
       },
       {
@@ -147,15 +152,14 @@ export async function GET(req: NextRequest) {
           total: 0,
           contacted: 0,
           engaged: 0,
-          qualified: 0,
           sold: 0,
         };
       }
       acc[src].total++;
-      if (lead.status === 'contacted' || lead.status === 'engaged' || lead.last_contacted) acc[src].contacted++;
-      if (lead.status === 'engaged') acc[src].engaged++;
-      if (lead.disposition === 'qualified' || lead.disposition === 'callback') acc[src].qualified++;
-      if (lead.disposition === 'sold') acc[src].sold++;
+      const t = threadsMap.get(lead.id);
+      if ((t && t.messages_from_user > 0) || lead.status === 'contacted' || lead.status === 'engaged' || lead.last_contacted) acc[src].contacted++;
+      if ((t && t.messages_from_lead > 0) || lead.status === 'engaged') acc[src].engaged++;
+      if (lead.disposition === 'sold' || lead.converted === true || lead.status === 'sold') acc[src].sold++;
       return acc;
     }, {});
 
@@ -164,7 +168,7 @@ export async function GET(req: NextRequest) {
       source,
       total_leads: stats.total,
       conversion_rate: stats.total > 0 ? (stats.sold / stats.total) * 100 : 0,
-      qualified_rate: stats.total > 0 ? (stats.qualified / stats.total) * 100 : 0,
+      engaged_rate: stats.total > 0 ? (stats.engaged / stats.total) * 100 : 0,
     })).sort((a, b) => b.conversion_rate - a.conversion_rate);
 
     // Time-based analysis (leads by creation date)
@@ -174,7 +178,7 @@ export async function GET(req: NextRequest) {
         acc[date] = { total: 0, sold: 0 };
       }
       acc[date].total++;
-      if (lead.disposition === 'sold') acc[date].sold++;
+      if (lead.disposition === 'sold' || lead.converted === true || lead.status === 'sold') acc[date].sold++;
       return acc;
     }, {});
 
@@ -195,14 +199,12 @@ export async function GET(req: NextRequest) {
         conversion_rates: {
           contacted: contactedRate,
           engaged: engagedRate,
-          qualified: qualifiedRate,
           sold: soldRate,
           overall: overallConversionRate,
         },
         metrics: {
           avg_messages_before_sale: avgMessagesBeforeSale,
           total_sold: sold,
-          total_qualified: qualified,
         },
         by_source: sourceStats,
         time_series: timeSeriesData,
