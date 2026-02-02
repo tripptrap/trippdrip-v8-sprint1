@@ -335,7 +335,7 @@ export default function ContactInfoPanel({
                         backgroundColor: selected ? `${tag.color}20` : `${tag.color}10`,
                         color: tag.color,
                         borderColor: selected ? tag.color : 'transparent',
-                        ringColor: selected ? tag.color : undefined,
+                        boxShadow: selected ? `0 0 0 1px ${tag.color}` : undefined,
                       }}
                     >
                       <span

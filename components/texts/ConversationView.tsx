@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
-import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, CheckCheck, Clock, AlertCircle, Image as ImageIcon, UserCircle, Archive, Tag, X } from 'lucide-react';
 import type { Thread, Message } from '@/lib/hooks/useTextsState';
+
+interface ConvTagItem {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface ConversationViewProps {
   thread: Thread;
@@ -11,6 +17,7 @@ interface ConversationViewProps {
   children: React.ReactNode; // Composer slot
   showInfoPanel?: boolean;
   onToggleInfoPanel?: () => void;
+  onArchiveThread?: (id: string) => void;
 }
 
 function getTimezoneFromPhone(phone: string | undefined): string {
@@ -62,9 +69,51 @@ function isInbound(direction: string): boolean {
   return direction === 'inbound' || direction === 'in';
 }
 
-export default function ConversationView({ thread, messages, loading, children, showInfoPanel, onToggleInfoPanel }: ConversationViewProps) {
+export default function ConversationView({ thread, messages, loading, children, showInfoPanel, onToggleInfoPanel, onArchiveThread }: ConversationViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [convTags, setConvTags] = useState<ConvTagItem[]>([]);
+  const [threadTags, setThreadTags] = useState<string[]>(thread.conversation_tags || []);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync thread tags when thread changes
+  useEffect(() => {
+    setThreadTags(thread.conversation_tags || []);
+  }, [thread.id, thread.conversation_tags]);
+
+  // Fetch conversation tags when dropdown opens
+  useEffect(() => {
+    if (!showTagDropdown) return;
+    fetch('/api/conversation-tags')
+      .then(r => r.json())
+      .then(d => { if (d.ok) setConvTags(d.tags || []); })
+      .catch(() => {});
+  }, [showTagDropdown]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showTagDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTagDropdown]);
+
+  async function toggleConvTag(tagName: string) {
+    const has = threadTags.includes(tagName);
+    const action = has ? 'remove_tag' : 'add_tag';
+    const updated = has ? threadTags.filter(t => t !== tagName) : [...threadTags, tagName];
+    setThreadTags(updated);
+    await fetch('/api/threads/manage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, threadId: thread.id, tagName }),
+    });
+  }
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -115,6 +164,24 @@ export default function ConversationView({ thread, messages, loading, children, 
                 </>
               )}
             </div>
+            {/* Conversation tags */}
+            {threadTags.length > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                {threadTags.map(tagName => {
+                  const tagInfo = convTags.find(t => t.name === tagName);
+                  const color = tagInfo?.color || '#3b82f6';
+                  return (
+                    <span
+                      key={tagName}
+                      className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: `${color}20`, color }}
+                    >
+                      {tagName}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* AI Mode Indicator */}
@@ -138,6 +205,59 @@ export default function ConversationView({ thread, messages, loading, children, 
               >
                 <UserCircle className="w-4 h-4" />
                 Info
+              </button>
+            )}
+            {/* Conversation Tag Toggle */}
+            <div className="relative" ref={tagDropdownRef}>
+              <button
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  showTagDropdown
+                    ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Tag className="w-4 h-4" />
+                Tags
+              </button>
+              {showTagDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 p-2">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5 px-1">Conversation Tags</p>
+                  {convTags.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic px-1 py-2">No conversation tags yet.</p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {convTags.map(tag => {
+                        const active = threadTags.includes(tag.name);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => toggleConvTag(tag.name)}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${
+                              active
+                                ? 'bg-sky-50 dark:bg-sky-900/20'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                            }`}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                            <span className="flex-1 text-left text-slate-700 dark:text-slate-300">{tag.name}</span>
+                            {active && <Check className="w-3.5 h-3.5 text-sky-500" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Archive button */}
+            {onArchiveThread && (
+              <button
+                onClick={() => onArchiveThread(thread.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 border border-slate-200 dark:border-slate-700"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
               </button>
             )}
           </div>

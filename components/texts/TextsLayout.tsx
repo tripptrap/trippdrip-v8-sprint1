@@ -8,6 +8,7 @@ import ThreadList from './ThreadList';
 import ConversationView from './ConversationView';
 import Composer from './Composer';
 import ContactInfoPanel from './ContactInfoPanel';
+import SessionsPanel from './SessionsPanel';
 import SendSMSModal from '@/components/SendSMSModal';
 import toast from 'react-hot-toast';
 
@@ -26,17 +27,27 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
     loading,
     messagesLoading,
     counts,
+    showArchived,
+    selectMode,
+    selectedThreadIds,
     setChannel,
     setTab,
     setSearchQuery,
+    setShowArchived,
+    setSelectMode,
+    toggleThreadSelection,
     selectThread,
     refreshThreads,
     refreshMessages,
     refreshActiveThread,
+    archiveThread,
+    unarchiveThread,
+    bulkArchiveThreads,
   } = useTextsState();
 
   const [showSendModal, setShowSendModal] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const [showSessionsPanel, setShowSessionsPanel] = useState(false);
 
   // Determine if this is the first outbound message in the active thread
   const isFirstMessage = useMemo(() => {
@@ -52,7 +63,6 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
     const leadId = activeThread.lead_id || activeThread.leads?.id;
 
     if (options?.scheduledFor) {
-      // Schedule message
       try {
         const res = await fetch('/api/messages/schedule', {
           method: 'POST',
@@ -74,7 +84,6 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
       return;
     }
 
-    // Send immediately via /api/sms/send
     try {
       const res = await fetch('/api/sms/send', {
         method: 'POST',
@@ -97,11 +106,15 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
         throw new Error(data.error || 'Failed to send message');
       }
 
-      // Refresh messages and threads
       await Promise.all([refreshMessages(), refreshThreads()]);
     } catch (err: any) {
       throw err;
     }
+  }
+
+  function handleArchiveFromConversation(threadId: string) {
+    archiveThread(threadId);
+    toast.success('Conversation archived');
   }
 
   return (
@@ -139,10 +152,19 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
             onSearchChange={setSearchQuery}
             counts={counts}
             loading={loading}
+            showArchived={showArchived}
+            onToggleArchived={setShowArchived}
+            selectMode={selectMode}
+            onToggleSelectMode={setSelectMode}
+            selectedThreadIds={selectedThreadIds}
+            onToggleThreadSelection={toggleThreadSelection}
+            onArchiveThread={(id) => { archiveThread(id); toast.success('Archived'); }}
+            onUnarchiveThread={(id) => { unarchiveThread(id); toast.success('Unarchived'); }}
+            onBulkArchive={(ids) => { bulkArchiveThreads(ids); toast.success(`${ids.length} conversations archived`); }}
           />
         </div>
 
-        {/* Right: Conversation + Info Panel */}
+        {/* Right: Conversation + Panels */}
         <div className="col-span-12 md:col-span-7 flex gap-0">
           {!activeThread ? (
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 h-[calc(100vh-12rem)] flex items-center justify-center flex-1">
@@ -169,13 +191,14 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
             </div>
           ) : (
             <>
-              <div className={`flex-1 min-w-0 ${showInfoPanel ? '' : ''}`}>
+              <div className="flex-1 min-w-0">
                 <ConversationView
                   thread={activeThread}
                   messages={messages}
                   loading={messagesLoading}
                   showInfoPanel={showInfoPanel}
-                  onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+                  onToggleInfoPanel={() => { setShowInfoPanel(!showInfoPanel); setShowSessionsPanel(false); }}
+                  onArchiveThread={handleArchiveFromConversation}
                 >
                   <Composer
                     thread={activeThread}
@@ -194,6 +217,12 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
                   contactType={activeThread.contact_type}
                   onClose={() => setShowInfoPanel(false)}
                   onSaved={refreshActiveThread}
+                />
+              )}
+              {showSessionsPanel && (activeThread.lead_id || activeThread.leads?.id) && (
+                <SessionsPanel
+                  leadId={activeThread.lead_id || activeThread.leads?.id || ''}
+                  onClose={() => setShowSessionsPanel(false)}
                 />
               )}
             </>

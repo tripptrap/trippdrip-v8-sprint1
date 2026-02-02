@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const channel = searchParams.get('channel') || null; // 'sms' | 'whatsapp' | null (all)
     const tab = searchParams.get('tab') || 'all'; // 'leads' | 'clients' | 'all'
     const search = searchParams.get('search') || '';
+    const archived = searchParams.get('archived') === 'true';
 
     const {
       data: { user },
@@ -45,6 +46,9 @@ export async function GET(req: NextRequest) {
       `)
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
+
+    // Filter by archive status
+    query = query.eq('is_archived', archived);
 
     // Filter by channel if specified
     if (channel) {

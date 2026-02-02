@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
-import { Search, Tag, X } from 'lucide-react';
+import { Search, Tag, X, Archive, ArchiveRestore, CheckSquare, Square } from 'lucide-react';
 import type { Thread, ThreadCounts } from '@/lib/hooks/useTextsState';
 
 interface TagItem {
@@ -21,6 +21,15 @@ interface ThreadListProps {
   onSearchChange: (q: string) => void;
   counts: ThreadCounts;
   loading: boolean;
+  showArchived: boolean;
+  onToggleArchived: (v: boolean) => void;
+  selectMode: boolean;
+  onToggleSelectMode: (v: boolean) => void;
+  selectedThreadIds: Set<string>;
+  onToggleThreadSelection: (id: string) => void;
+  onArchiveThread: (id: string) => void;
+  onUnarchiveThread: (id: string) => void;
+  onBulkArchive: (ids: string[]) => void;
 }
 
 function relativeTime(dateStr: string): string {
@@ -58,6 +67,15 @@ export default function ThreadList({
   onSearchChange,
   counts,
   loading,
+  showArchived,
+  onToggleArchived,
+  selectMode,
+  onToggleSelectMode,
+  selectedThreadIds,
+  onToggleThreadSelection,
+  onArchiveThread,
+  onUnarchiveThread,
+  onBulkArchive,
 }: ThreadListProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<TagItem[]>([]);
@@ -79,12 +97,10 @@ export default function ThreadList({
   const allTags = useMemo(() => {
     const tagMap = new Map<string, { name: string; color: string }>();
 
-    // Add tags from the tags table first
     availableTags.forEach(t => {
       tagMap.set(t.name, { name: t.name, color: t.color });
     });
 
-    // Also pick up any tags from thread leads (in case they aren't in the tags table)
     if (tab === 'leads') {
       threads.forEach(t => {
         const tags = t.leads?.tags;
@@ -110,11 +126,12 @@ export default function ThreadList({
     });
   }, [threads, selectedTag]);
 
-  // Reset tag filter when switching tabs
   const handleTabChange = (newTab: 'leads' | 'clients') => {
     setSelectedTag(null);
     onTabChange(newTab);
   };
+
+  const selectedCount = selectedThreadIds.size;
 
   return (
     <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 flex flex-col h-[calc(100vh-12rem)]">
@@ -123,14 +140,14 @@ export default function ThreadList({
         <button
           onClick={() => handleTabChange('leads')}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-            tab === 'leads'
+            tab === 'leads' && !showArchived
               ? 'text-sky-600 border-b-2 border-sky-600 bg-sky-50/50 dark:bg-sky-900/10'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Leads
           <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-            tab === 'leads'
+            tab === 'leads' && !showArchived
               ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600'
               : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
           }`}>
@@ -140,14 +157,14 @@ export default function ThreadList({
         <button
           onClick={() => handleTabChange('clients')}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
-            tab === 'clients'
+            tab === 'clients' && !showArchived
               ? 'text-sky-600 border-b-2 border-sky-600 bg-sky-50/50 dark:bg-sky-900/10'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           Clients
           <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
-            tab === 'clients'
+            tab === 'clients' && !showArchived
               ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600'
               : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
           }`}>
@@ -156,8 +173,8 @@ export default function ThreadList({
         </button>
       </div>
 
-      {/* Search */}
-      <div className="p-2 border-b border-slate-200 dark:border-slate-700">
+      {/* Search + Archive toggle + Select mode */}
+      <div className="p-2 border-b border-slate-200 dark:border-slate-700 space-y-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -168,10 +185,36 @@ export default function ThreadList({
             className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
           />
         </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onToggleArchived(!showArchived)}
+            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+              showArchived
+                ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-600 border border-amber-200 dark:border-amber-800'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'
+            }`}
+          >
+            <Archive className="w-3 h-3" />
+            {showArchived ? 'Archived' : 'Archive'}
+          </button>
+          {!showArchived && (
+            <button
+              onClick={() => onToggleSelectMode(!selectMode)}
+              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+                selectMode
+                  ? 'bg-sky-100 dark:bg-sky-900/20 text-sky-600 border border-sky-200 dark:border-sky-800'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-transparent'
+              }`}
+            >
+              <CheckSquare className="w-3 h-3" />
+              Select
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Tag filter (leads tab only) */}
-      {tab === 'leads' && (
+      {/* Tag filter (leads tab only, not in archived view) */}
+      {tab === 'leads' && !showArchived && (
         <div className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-700 flex items-center gap-1.5 overflow-x-auto">
           <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           {allTags.length === 0 ? (
@@ -227,16 +270,20 @@ export default function ThreadList({
         ) : filteredThreads.length === 0 ? (
           <div className="px-3 py-8 text-center">
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {selectedTag
-                ? `No conversations with tag "${selectedTag}".`
-                : `No ${tab === 'leads' ? 'lead' : 'client'} conversations yet.`}
+              {showArchived
+                ? 'No archived conversations.'
+                : selectedTag
+                  ? `No conversations with tag "${selectedTag}".`
+                  : `No ${tab === 'leads' ? 'lead' : 'client'} conversations yet.`}
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              {selectedTag
-                ? 'Try a different tag or clear the filter.'
-                : tab === 'leads'
-                  ? 'Import leads and send your first message to get started.'
-                  : 'Mark leads as sold to create client conversations.'}
+              {showArchived
+                ? 'Archived conversations will appear here.'
+                : selectedTag
+                  ? 'Try a different tag or clear the filter.'
+                  : tab === 'leads'
+                    ? 'Import leads and send your first message to get started.'
+                    : 'Mark leads as sold to create client conversations.'}
             </p>
           </div>
         ) : (
@@ -244,23 +291,41 @@ export default function ThreadList({
             const active = thread.id === activeThreadId;
             const isClient = thread.contact_type === 'client';
             const leadTags = thread.leads?.tags;
+            const isSelected = selectedThreadIds.has(thread.id);
             return (
-              <button
+              <div
                 key={thread.id}
-                className={`w-full text-left px-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${
+                className={`group w-full text-left px-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer ${
                   active ? 'bg-sky-50 dark:bg-sky-900/15 border-l-2 border-sky-500' : ''
                 }`}
-                onClick={() => onSelectThread(thread)}
+                onClick={() => {
+                  if (selectMode) {
+                    onToggleThreadSelection(thread.id);
+                  } else {
+                    onSelectThread(thread);
+                  }
+                }}
               >
                 <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0 ${
-                    isClient
-                      ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                      : 'bg-gradient-to-br from-sky-400 to-sky-600'
-                  }`}>
-                    {getInitials(thread.display_name)}
-                  </div>
+                  {/* Checkbox in select mode */}
+                  {selectMode ? (
+                    <div className="shrink-0">
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-sky-500" />
+                      ) : (
+                        <Square className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                      )}
+                    </div>
+                  ) : (
+                    /* Avatar */
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0 ${
+                      isClient
+                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                        : 'bg-gradient-to-br from-sky-400 to-sky-600'
+                    }`}>
+                      {getInitials(thread.display_name)}
+                    </div>
+                  )}
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
@@ -275,9 +340,32 @@ export default function ThreadList({
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 ml-2">
-                        {relativeTime(thread.updated_at)}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                          {relativeTime(thread.updated_at)}
+                        </span>
+                        {/* Archive/Unarchive button on hover */}
+                        {!selectMode && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (showArchived) {
+                                onUnarchiveThread(thread.id);
+                              } else {
+                                onArchiveThread(thread.id);
+                              }
+                            }}
+                            className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                            title={showArchived ? 'Unarchive' : 'Archive'}
+                          >
+                            {showArchived ? (
+                              <ArchiveRestore className="w-3.5 h-3.5" />
+                            ) : (
+                              <Archive className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Tags row (leads only) */}
@@ -319,11 +407,35 @@ export default function ThreadList({
                     </div>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {selectMode && selectedCount > 0 && (
+        <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {selectedCount} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onToggleSelectMode(false)}
+              className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onBulkArchive(Array.from(selectedThreadIds))}
+              className="px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"
+            >
+              <Archive className="w-3 h-3" />
+              Archive ({selectedCount})
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
