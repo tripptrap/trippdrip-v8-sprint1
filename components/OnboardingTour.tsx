@@ -26,7 +26,7 @@ const tourSteps: TourStep[] = [
     position: 'right',
   },
   {
-    target: '[href="/messages"]',
+    target: '[href="/texts"]',
     title: 'Messages',
     description: 'Your conversation inbox. View and respond to lead and client conversations, send individual SMS, and let AI handle replies.',
     position: 'right',

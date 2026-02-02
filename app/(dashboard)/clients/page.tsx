@@ -490,7 +490,7 @@ export default function ClientsPage() {
               <div className="flex items-center gap-2">
                 {selectedClient.phone && (
                   <button
-                    onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedClient.phone)}&name=${encodeURIComponent([selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(" "))}`)}
+                    onClick={() => router.push(`/texts?phone=${encodeURIComponent(selectedClient.phone)}&name=${encodeURIComponent([selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(" "))}`)}
                     className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 transition"
                   >
                     Send Message
@@ -584,7 +584,7 @@ export default function ClientsPage() {
                     <p className="text-sm text-slate-400 mb-3">No messages yet</p>
                     {selectedClient.phone && (
                       <button
-                        onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedClient.phone)}&name=${encodeURIComponent([selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(" "))}`)}
+                        onClick={() => router.push(`/texts?phone=${encodeURIComponent(selectedClient.phone)}&name=${encodeURIComponent([selectedClient.first_name, selectedClient.last_name].filter(Boolean).join(" "))}`)}
                         className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 transition"
                       >
                         Start Conversation

@@ -542,7 +542,7 @@ export default function Dashboard(){
                 </span>
               )}
             </h2>
-            <Link href="/messages" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+            <Link href="/texts" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
               View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -575,7 +575,7 @@ export default function Dashboard(){
                     {unreadThreads.filter(t => !t.isClient).slice(0, 5).map((thread) => (
                       <Link
                         key={thread.id}
-                        href={`/messages?thread=${thread.id}`}
+                        href={`/texts?thread=${thread.id}`}
                         className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
                       >
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
@@ -607,7 +607,7 @@ export default function Dashboard(){
                     {unreadThreads.filter(t => t.isClient).slice(0, 5).map((thread) => (
                       <Link
                         key={thread.id}
-                        href={`/messages?thread=${thread.id}`}
+                        href={`/texts?thread=${thread.id}`}
                         className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
                       >
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
@@ -666,7 +666,7 @@ export default function Dashboard(){
             </div>
             <div><div className="text-sm font-medium text-slate-900 dark:text-slate-100">Campaigns</div><div className="text-xs text-slate-500 dark:text-slate-400">Bulk messaging</div></div>
           </Link>
-          <Link href="/messages" className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors">
+          <Link href="/texts" className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors">
             <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
               <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>

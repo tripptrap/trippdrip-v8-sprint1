@@ -25,6 +25,7 @@ interface SendSMSRequest {
   templateId?: string;
   isAutomated?: boolean;
   channel?: 'sms' | 'rcs'; // Channel type
+  mediaUrls?: string[]; // MMS media attachment URLs
 }
 
 export async function POST(req: NextRequest) {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     const toPhone = body.toPhone || body.to;
     const messageBody = body.messageBody || body.message;
     const fromPhone = body.from; // Telnyx will use number from messaging profile if not provided
-    const { leadId, campaignId, templateId, isAutomated = false, isBulk = false, channel = 'sms' } = body;
+    const { leadId, campaignId, templateId, isAutomated = false, isBulk = false, channel = 'sms', mediaUrls } = body;
 
     // Validate inputs
     if (!toPhone || !messageBody) {
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest) {
       to: toPhone,
       message: messageToSend,
       from: fromPhone,
+      mediaUrls: mediaUrls,
     });
 
     if (!result.success) {
@@ -289,6 +291,8 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         lead_id: leadId || null,
         provider: 'telnyx',
+        media_urls: mediaUrls || null,
+        num_media: mediaUrls?.length || 0,
       });
     }
 

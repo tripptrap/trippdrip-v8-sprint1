@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
     ]
   },
   {
-    href: "/messages",
+    href: "/texts",
     label: "Messages",
     children: [
       { href: "/bulk-sms", label: "Bulk SMS" },

@@ -1726,7 +1726,7 @@ export default function LeadsPage() {
                 <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-sky-600 hover:underline">Flows</a> page to set up AI conversation templates. <span className="text-slate-600 dark:text-slate-400">Flows qualify your leads by gathering required info and booking appointments automatically.</span>
               </li>
               <li>
-                <strong>Send Messages:</strong> Send individual SMS, bulk messages, or let your AI Flows handle conversations. <span className="text-slate-600 dark:text-slate-400">Visit <a href="/messages" className="text-sky-600 hover:underline">Messages</a> to view and manage all conversations.</span>
+                <strong>Send Messages:</strong> Send individual SMS, bulk messages, or let your AI Flows handle conversations. <span className="text-slate-600 dark:text-slate-400">Visit <a href="/texts" className="text-sky-600 hover:underline">Messages</a> to view and manage all conversations.</span>
               </li>
             </ol>
           </div>
@@ -3378,7 +3378,7 @@ export default function LeadsPage() {
                 </button>
                 {selectedLead?.phone && (
                   <button
-                    onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
+                    onClick={() => router.push(`/texts?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
                     className="px-3 py-1.5 rounded-md bg-blue-600 text-slate-900 dark:text-slate-100 text-sm hover:bg-blue-700 transition"
                   >
                     Send Message
@@ -3514,7 +3514,7 @@ export default function LeadsPage() {
                           <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">No messages yet</p>
                           {selectedLead?.phone && (
                             <button
-                              onClick={() => router.push(`/messages?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
+                              onClick={() => router.push(`/texts?phone=${encodeURIComponent(selectedLead.phone!)}&name=${encodeURIComponent(leadName)}`)}
                               className="px-4 py-2 rounded-md bg-blue-600 text-slate-900 dark:text-slate-100 text-sm hover:bg-blue-700 transition"
                             >
                               Start Conversation
