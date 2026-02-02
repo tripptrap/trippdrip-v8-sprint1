@@ -118,7 +118,7 @@ export default function CustomModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-white border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
+        <div className="bg-slate-100 dark:bg-[#1a1a1a] border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
           {type === 'confirm' && onConfirm ? (
             <>
               <button

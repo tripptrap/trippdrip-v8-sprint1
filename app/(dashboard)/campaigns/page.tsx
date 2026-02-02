@@ -865,7 +865,14 @@ export default function CampaignsPage() {
                 <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Lead Type / Category</label>
                 <select
                   value={newLeadType}
-                  onChange={(e) => setNewLeadType(e.target.value)}
+                  onChange={(e) => {
+                    const lt = e.target.value;
+                    setNewLeadType(lt);
+                    if (lt && !selectedFlowId) {
+                      const match = flows.find(f => flowMatchesLeadType(f, lt));
+                      if (match) setSelectedFlowId(match.id);
+                    }
+                  }}
                   className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                 >
                   <option value="">Select lead type...</option>
@@ -1052,7 +1059,14 @@ export default function CampaignsPage() {
                     <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Lead Type / Category</label>
                     <select
                       value={editLeadType}
-                      onChange={(e) => setEditLeadType(e.target.value)}
+                      onChange={(e) => {
+                        const lt = e.target.value;
+                        setEditLeadType(lt);
+                        if (lt && !editFlowId) {
+                          const match = flows.find(f => flowMatchesLeadType(f, lt));
+                          if (match) setEditFlowId(match.id);
+                        }
+                      }}
                       className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                     >
                       <option value="">Select lead type...</option>

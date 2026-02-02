@@ -147,13 +147,28 @@ export async function PUT(req: NextRequest) {
     if (tags !== undefined) updateData.tags = tags;
     if (lead_type !== undefined) updateData.lead_type = lead_type;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('campaigns')
       .update(updateData)
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single();
+
+    // If lead_type column doesn't exist, retry without it
+    if (error && error.message.includes('lead_type')) {
+      console.log('lead_type column not found, retrying without it');
+      delete updateData.lead_type;
+      const { data: retryData, error: retryError } = await supabase
+        .from('campaigns')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      data = retryData;
+      error = retryError;
+    }
 
     if (error) {
       console.error('Error updating campaign:', error);
