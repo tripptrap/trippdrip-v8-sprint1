@@ -9,7 +9,7 @@ export async function GET() {
     if (authError || !user) {
       return NextResponse.json({
         ok: false,
-        planType: 'basic',
+        planType: 'unpaid',
         error: 'Not authenticated'
       }, { status: 401 });
     }
@@ -24,19 +24,19 @@ export async function GET() {
       console.error('Error fetching user plan:', error);
       return NextResponse.json({
         ok: true,
-        planType: 'basic'
+        planType: 'unpaid'
       });
     }
 
     return NextResponse.json({
       ok: true,
-      planType: userData?.plan_type || 'basic'
+      planType: userData?.plan_type || 'unpaid'
     });
   } catch (error: any) {
     console.error('Error in GET /api/user/plan:', error);
     return NextResponse.json({
       ok: true,
-      planType: 'basic'
+      planType: 'unpaid'
     });
   }
 }

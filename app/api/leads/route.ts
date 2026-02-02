@@ -34,6 +34,10 @@ export async function GET(req: Request) {
   const sortBy = url.searchParams.get("sortBy") || "created_at";
   const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
+  // Pagination
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "25", 10)));
+
   try {
     const supabase = await createClient();
 
@@ -43,10 +47,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Build query
+    // Build query with exact count for pagination
     let query = supabase
       .from('leads')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('user_id', user.id);
 
     // Apply search filter (searches across multiple fields)
@@ -89,28 +93,28 @@ export async function GET(req: Request) {
       query = query.lte('created_at', dateTo);
     }
 
+    // Filter by tags at the database level using Supabase array contains
+    if (tags.length > 0) {
+      query = query.contains('tags', tags);
+    }
+
     // Apply sorting
     const ascending = sortOrder === 'asc';
     query = query.order(sortBy, { ascending });
 
+    // Apply pagination
+    const offset = (page - 1) * pageSize;
+    query = query.range(offset, offset + pageSize - 1);
+
     // Execute query
-    const { data: items, error } = await query;
+    const { data: items, error, count } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);
       return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });
     }
 
-    // Filter by tags in memory (since Supabase doesn't support array filtering easily in this way)
-    let filteredItems = items || [];
-    if (tags.length > 0) {
-      filteredItems = filteredItems.filter(lead => {
-        const leadTags = Array.isArray(lead.tags) ? lead.tags : [];
-        return tags.every(tag => leadTags.includes(tag));
-      });
-    }
-
-    return NextResponse.json({ ok: true, items: filteredItems });
+    return NextResponse.json({ ok: true, items: items || [], total: count || 0, page, pageSize });
   } catch (error: any) {
     console.error('Error in GET /api/leads:', error);
     return NextResponse.json({ ok: false, items: [], error: error.message }, { status: 500 });

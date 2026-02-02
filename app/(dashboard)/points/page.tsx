@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { addPoints as addPointsSupabase, getRecentTransactions as getRecentTransactionsSupabase } from "@/lib/pointsSupabase";
-import { type PointTransaction, type PlanType } from "@/lib/pointsStore";
+import { type PointTransaction } from "@/lib/pointsStore";
 import { getDaysUntilRenewal } from "@/lib/renewalSystem";
 import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscriptionFeatures";
 import CustomModal from "@/components/CustomModal";
@@ -54,25 +54,25 @@ const POINT_PACKS: PointPack[] = [
 ];
 
 // Helper function to get plan details
-function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: number; name: string } {
-  if (planType === 'premium') {
+function getPlanDetails(planType: SubscriptionTier): { price: number; monthlyPoints: number; name: string } {
+  if (planType === 'scale') {
     return {
       price: 98,
       monthlyPoints: 10000,
-      name: 'Premium Plan'
+      name: 'Scale Plan'
     };
   }
   return {
     price: 30,
     monthlyPoints: 3000,
-    name: 'Basic Plan'
+    name: 'Growth Plan'
   };
 }
 
 export default function PointsPage() {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
-  const [currentPlan, setCurrentPlan] = useState<PlanType>('basic');
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionTier>('growth');
   const [showCelebration, setShowCelebration] = useState(false);
   const [daysUntilRenewal, setDaysUntilRenewal] = useState<number | null>(null);
   const [stats, setStats] = useState({
@@ -147,7 +147,8 @@ export default function PointsPage() {
 
     if (!error && userData) {
       setBalance(userData.credits || 0);
-      setCurrentPlan((userData.subscription_tier as PlanType) || 'basic');
+      const tier = userData.subscription_tier as SubscriptionTier;
+      setCurrentPlan(tier === 'scale' ? 'scale' : 'growth');
     }
 
     // Fetch transactions from Supabase
@@ -176,7 +177,7 @@ export default function PointsPage() {
     });
   }
 
-  async function handlePlanSwitch(planType: PlanType) {
+  async function handlePlanSwitch(planType: SubscriptionTier) {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -187,13 +188,13 @@ export default function PointsPage() {
 
     const oldPlan = currentPlan;
 
-    // Confirm downgrade if going from premium to basic
-    if (oldPlan === 'premium' && planType === 'basic') {
+    // Confirm downgrade if going from scale to growth
+    if (oldPlan === 'scale' && planType === 'growth') {
       setModal({
         isOpen: true,
         type: 'confirm',
         title: 'Confirm Downgrade',
-        message: 'Are you sure you want to downgrade to Basic plan? You will lose Premium discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.',
+        message: 'Are you sure you want to downgrade to Growth plan? You will lose Scale discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.',
         onConfirm: async () => {
           await performPlanSwitch(planType, oldPlan, supabase, user.id);
         }
@@ -204,9 +205,9 @@ export default function PointsPage() {
     await performPlanSwitch(planType, oldPlan, supabase, user.id);
   }
 
-  async function performPlanSwitch(planType: PlanType, oldPlan: PlanType, supabase: any, userId: string) {
+  async function performPlanSwitch(planType: SubscriptionTier, oldPlan: SubscriptionTier, supabase: any, userId: string) {
     // Update subscription tier in Supabase
-    const newMonthlyCredits = planType === 'premium' ? 10000 : 3000;
+    const newMonthlyCredits = planType === 'scale' ? 10000 : 3000;
 
     // Only reset credits if upgrading - preserve existing balance when downgrading
     const updateData: any = {
@@ -214,8 +215,8 @@ export default function PointsPage() {
       monthly_credits: newMonthlyCredits
     };
 
-    // If upgrading to premium, grant the new monthly credits immediately
-    if (planType === 'premium' && oldPlan === 'basic') {
+    // If upgrading to scale, grant the new monthly credits immediately
+    if (planType === 'scale' && oldPlan === 'growth') {
       updateData.credits = newMonthlyCredits;
     }
 
@@ -231,23 +232,23 @@ export default function PointsPage() {
 
     // Dispatch custom event for components listening to plan changes
     window.dispatchEvent(new CustomEvent('planTypeChanged', {
-      detail: { planType: planType === 'premium' ? 'premium' : 'basic' }
+      detail: { planType }
     }));
 
     // Refresh data
     await refreshData();
 
-    // Show celebration if upgrading to premium
-    if (planType === 'premium' && oldPlan === 'basic') {
+    // Show celebration if upgrading to scale
+    if (planType === 'scale' && oldPlan === 'growth') {
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 5000);
     }
 
-    setModal({isOpen: true, type: 'success', title: 'Plan Changed', message: `Successfully switched to ${planType === 'premium' ? 'Premium' : 'Basic'} plan!`});
+    setModal({isOpen: true, type: 'success', title: 'Plan Changed', message: `Successfully switched to ${planType === 'scale' ? 'Scale' : 'Growth'} plan!`});
   }
 
   async function handlePurchase(pack: PointPack) {
-    const price = currentPlan === 'premium' ? pack.premiumPrice : pack.basePrice;
+    const price = currentPlan === 'scale' ? pack.premiumPrice : pack.basePrice;
     console.log('Purchase initiated:', {
       currentPlan,
       pack: pack.name,
@@ -333,23 +334,23 @@ export default function PointsPage() {
           <div className="text-right">
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
               {getPlanDetails(currentPlan).name}
-              {currentPlan === 'basic' && (
+              {currentPlan === 'growth' && (
                 <button
-                  onClick={() => handlePlanSwitch('premium')}
+                  onClick={() => handlePlanSwitch('scale')}
                   className="ml-2 text-xs bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 px-3 py-1 rounded-full hover:opacity-80 transition-opacity font-semibold"
                 >
-                  Upgrade to Premium
+                  Upgrade to Scale
                 </button>
               )}
             </div>
             <div className="text-2xl font-bold">${getPlanDetails(currentPlan).price}/mo</div>
             <div className="text-xs text-slate-600 dark:text-slate-400">+{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts monthly</div>
-            {currentPlan === 'premium' && (
+            {currentPlan === 'scale' && (
               <button
-                onClick={() => handlePlanSwitch('basic')}
+                onClick={() => handlePlanSwitch('growth')}
                 className="mt-2 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors underline"
               >
-                Downgrade to Basic
+                Downgrade to Growth
               </button>
             )}
           </div>
@@ -404,8 +405,8 @@ export default function PointsPage() {
         <h2 className="text-lg font-semibold mb-4">Buy More Points</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {POINT_PACKS.map((pack) => {
-            const price = currentPlan === 'premium' ? pack.premiumPrice : pack.basePrice;
-            const discount = currentPlan === 'premium' ? pack.premiumDiscount : pack.baseDiscount;
+            const price = currentPlan === 'scale' ? pack.premiumPrice : pack.basePrice;
+            const discount = currentPlan === 'scale' ? pack.premiumDiscount : pack.baseDiscount;
             return (
             <div
               key={pack.name}
@@ -493,34 +494,30 @@ export default function PointsPage() {
       <div>
         <h2 className="text-lg font-semibold mb-4">Choose Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-          {/* Starter Plan */}
-          <div className={`card relative ${currentPlan === 'basic' ? 'ring-2 ring-sky-500 bg-sky-500/10' : 'bg-white'}`}>
-            {currentPlan === 'basic' && (
+          {/* Growth Plan */}
+          <div className={`card relative ${currentPlan === 'growth' ? 'ring-2 ring-sky-500 bg-sky-500/10' : 'bg-white'}`}>
+            {currentPlan === 'growth' && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-sky-500 text-white text-xs font-bold px-3 py-1 rounded-full">
                 CURRENT PLAN
               </div>
             )}
             <div className="text-center mb-4">
-              <h3 className="text-xl font-bold mb-2">Starter</h3>
+              <h3 className="text-xl font-bold mb-2">Growth</h3>
               <div className="text-3xl font-bold mb-1">$30</div>
               <div className="text-xs text-slate-600 dark:text-slate-400">per month</div>
             </div>
             <div className="space-y-3 text-sm mb-6">
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span className="font-semibold text-sky-600">{SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()} credits/month</span>
+                <span className="font-semibold text-sky-600">{SUBSCRIPTION_FEATURES.growth.monthlyCredits.toLocaleString()} credits/month</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span>Up to {SUBSCRIPTION_FEATURES.starter.maxContacts.toLocaleString()} contacts</span>
+                <span>Unlimited contacts</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span>{SUBSCRIPTION_FEATURES.starter.maxCampaigns} campaigns</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>{SUBSCRIPTION_FEATURES.starter.maxFlows} AI flows</span>
+                <span>Unlimited campaigns</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
@@ -528,72 +525,11 @@ export default function PointsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
+                <span>AI Receptionist</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
                 <span>Bulk messaging</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Email integration</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>{SUBSCRIPTION_FEATURES.starter.pointPackDiscount}% off point packs</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Individual account</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 dark:text-slate-500">·</span>
-                <span className="text-slate-600 dark:text-slate-400">Email support</span>
-              </div>
-            </div>
-            {currentPlan !== 'basic' && (
-              <button
-                onClick={() => handlePlanSwitch('basic')}
-                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 rounded transition-colors"
-              >
-                {currentPlan === 'premium' ? 'Downgrade' : 'Select Plan'}
-              </button>
-            )}
-          </div>
-
-          {/* Professional Plan */}
-          <div className={`card relative ${currentPlan === 'premium' ? 'ring-2 ring-sky-400 bg-sky-500/10' : 'bg-gradient-to-br from-sky-50 to-sky-500/10'}`}>
-            {currentPlan === 'premium' && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1 rounded-full">
-                CURRENT PLAN
-              </div>
-            )}
-            {currentPlan !== 'premium' && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1 rounded-full">
-                BEST VALUE
-              </div>
-            )}
-            <div className="text-center mb-4">
-              <h3 className="text-xl font-bold mb-2">Professional</h3>
-              <div className="text-3xl font-bold mb-1">$98</div>
-              <div className="text-xs text-slate-600 dark:text-slate-400">per month</div>
-            </div>
-            <div className="space-y-3 text-sm mb-6">
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span className="font-semibold text-sky-600">{SUBSCRIPTION_FEATURES.professional.monthlyCredits.toLocaleString()} credits/month</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span className="font-semibold">Unlimited contacts</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span className="font-semibold">Unlimited campaigns</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span className="font-semibold">Unlimited AI flows</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Advanced AI (GPT-4)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
@@ -601,39 +537,87 @@ export default function PointsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span>Custom branding</span>
+                <span>Up to {SUBSCRIPTION_FEATURES.growth.pointPackDiscount}% off point packs</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span>API & Webhooks</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>{SUBSCRIPTION_FEATURES.professional.pointPackDiscount}% off point packs</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Unlimited team members</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Priority delivery</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sky-600">✓</span>
-                <span>Dedicated phone number</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 dark:text-slate-500">·</span>
-                <span className="text-slate-600 dark:text-slate-400 font-semibold">Priority support</span>
+                <span>Priority support</span>
               </div>
             </div>
-            {currentPlan !== 'premium' && (
+            {currentPlan !== 'growth' && (
               <button
-                onClick={() => handlePlanSwitch('premium')}
+                onClick={() => handlePlanSwitch('growth')}
+                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 rounded transition-colors"
+              >
+                {currentPlan === 'scale' ? 'Downgrade' : 'Select Plan'}
+              </button>
+            )}
+          </div>
+
+          {/* Scale Plan */}
+          <div className={`card relative ${currentPlan === 'scale' ? 'ring-2 ring-sky-400 bg-sky-500/10' : 'bg-gradient-to-br from-sky-50 to-sky-500/10'}`}>
+            {currentPlan === 'scale' && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1 rounded-full">
+                CURRENT PLAN
+              </div>
+            )}
+            {currentPlan !== 'scale' && (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-sky-400 to-sky-400 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1 rounded-full">
+                BEST VALUE
+              </div>
+            )}
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-bold mb-2">Scale</h3>
+              <div className="text-3xl font-bold mb-1">$98</div>
+              <div className="text-xs text-slate-600 dark:text-slate-400">per month</div>
+            </div>
+            <div className="space-y-3 text-sm mb-6">
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span className="font-semibold text-sky-600">{SUBSCRIPTION_FEATURES.scale.monthlyCredits.toLocaleString()} credits/month</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>Unlimited contacts</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>Unlimited campaigns</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>AI responses & generation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>AI Receptionist</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>Bulk messaging</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>Advanced analytics</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <div>
+                  <span className="font-semibold">Up to {SUBSCRIPTION_FEATURES.scale.pointPackDiscount}% off point packs</span>
+                  <div className="text-xs text-sky-600 mt-0.5">Best rates on additional credits</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-600">✓</span>
+                <span>Priority support</span>
+              </div>
+            </div>
+            {currentPlan !== 'scale' && (
+              <button
+                onClick={() => handlePlanSwitch('scale')}
                 className="w-full bg-gradient-to-r from-sky-400 to-sky-400 hover:from-sky-600 hover:to-sky-600 text-slate-900 dark:text-slate-100 font-medium py-2 rounded transition-colors"
               >
-                Upgrade to Professional
+                Upgrade to Scale
               </button>
             )}
           </div>
@@ -687,7 +671,7 @@ export default function PointsPage() {
               <div className="text-6xl mb-4">🎉</div>
               <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">Thank You!</h2>
               <p className="text-lg text-gray-900/90 mb-4">
-                Welcome to Premium! Enjoy better pricing on all point packs.
+                Welcome to Scale! Enjoy better pricing on all point packs.
               </p>
               <div className="flex items-center justify-center gap-2 text-slate-700 dark:text-slate-300">
                 <span className="text-4xl">✨</span>

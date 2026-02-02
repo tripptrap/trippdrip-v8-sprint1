@@ -14,6 +14,7 @@ type NavItem = {
   label: string;
   children?: { href: string; label: string }[];
   badge?: 'premium';
+  color?: 'green';
 };
 
 const navItems: NavItem[] = [
@@ -33,14 +34,9 @@ const navItems: NavItem[] = [
       { href: "/scheduled", label: "Scheduled" },
     ]
   },
-  {
-    href: "/email",
-    label: "Calendar",
-    children: [
-      { href: "/appointments", label: "Appointments" },
-    ]
-  },
+  { href: "/appointments", label: "Appointments" },
   { href: "/leads",     label: "Leads" },
+  { href: "/clients",   label: "Clients", color: 'green' },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
   { href: "/templates", label: "AI Flows" },
@@ -56,7 +52,7 @@ function findLead(id:number, leads:any[]){ return (leads||[]).find((l:any)=> l.i
 export default function Sidebar(){
   const path = usePathname();
   const [store, setStore] = useState<any>({ leads:[], threads:[] });
-  const [userPlan, setUserPlan] = useState<string>('basic');
+  const [userPlan, setUserPlan] = useState<string>('growth');
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -132,7 +128,7 @@ export default function Sidebar(){
   }, [smsThreads]);
 
   // Determine which logo to show
-  const logoSrc = userPlan === 'premium' || userPlan === 'professional'
+  const logoSrc = userPlan === 'scale'
     ? '/logo-premium.png'
     : '/logo-basic.png';
 
@@ -244,8 +240,12 @@ export default function Sidebar(){
                 <Link href={it.href}
                   className={`block px-3 py-2 rounded-lg transition-all duration-150 ${
                     active
-                      ? "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30"
-                      : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
+                      ? it.color === 'green'
+                        ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30"
+                        : "bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/30"
+                      : it.color === 'green'
+                        ? "hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}>
                   <motion.span
                     whileHover={{ x: 2 }}

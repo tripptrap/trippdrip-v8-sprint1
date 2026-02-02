@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isPremium = userData?.subscription_tier === 'professional' || userData?.subscription_tier === 'premium';
+    const isPaid = userData?.subscription_tier === 'growth' || userData?.subscription_tier === 'scale';
 
     // Get receptionist settings
     const { data: settings, error } = await supabase
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     // Return settings or defaults
     return NextResponse.json({
       success: true,
-      isPremium,
+      isPremium: isPaid,
       settings: settings || {
         ...DEFAULT_RECEPTIONIST_SETTINGS,
         user_id: user.id,
@@ -70,11 +70,11 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const isPremium = userData?.subscription_tier === 'professional' || userData?.subscription_tier === 'premium';
+    const isPaid = userData?.subscription_tier === 'growth' || userData?.subscription_tier === 'scale';
 
-    if (!isPremium) {
+    if (!isPaid) {
       return NextResponse.json({
-        error: 'Receptionist Mode is a premium feature. Please upgrade to Professional plan.',
+        error: 'Receptionist Mode requires a paid subscription. Please upgrade to Growth or Scale plan.',
         upgradeRequired: true
       }, { status: 403 });
     }

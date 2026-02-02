@@ -18,18 +18,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    // Load theme from localStorage on mount
+
+    // 1. Check localStorage first for instant load (no flash)
     const savedTheme = localStorage.getItem('theme') as Theme;
     if (savedTheme) {
       setThemeState(savedTheme);
       document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     }
+
+    // 2. Then fetch from DB and sync
+    const fetchThemeFromDB = async () => {
+      try {
+        const res = await fetch('/api/user/settings');
+        const data = await res.json();
+        if (data.ok && data.settings?.preferences?.theme) {
+          const dbTheme = data.settings.preferences.theme as Theme;
+          setThemeState(dbTheme);
+          localStorage.setItem('theme', dbTheme);
+          document.documentElement.classList.toggle('dark', dbTheme === 'dark');
+        }
+      } catch {
+        // Keep localStorage/default value
+      }
+    };
+    fetchThemeFromDB();
   }, []);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
+
+    // Save to DB
+    fetch('/api/user/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preferences: { theme: newTheme } }),
+    }).catch(() => {});
 
     // Dispatch event for other components to listen
     window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: newTheme } }));

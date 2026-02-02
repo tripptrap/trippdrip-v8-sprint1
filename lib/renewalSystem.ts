@@ -37,7 +37,7 @@ export async function checkAndRenewCredits(): Promise<{
   }
 
   // Time to renew!
-  const monthlyCredits = userData.monthly_credits || (userData.subscription_tier === 'premium' ? 10000 : 3000);
+  const monthlyCredits = userData.monthly_credits || (userData.subscription_tier === 'scale' ? 10000 : 3000);
   const currentCredits = userData.credits || 0;
   const newBalance = currentCredits + monthlyCredits;
 
@@ -62,7 +62,7 @@ export async function checkAndRenewCredits(): Promise<{
   }
 
   // Record transaction
-  const planName = userData.subscription_tier === 'premium' ? 'Premium Plan' : 'Basic Plan';
+  const planName = userData.subscription_tier === 'scale' ? 'Scale Plan' : 'Growth Plan';
   const { error: transactionError } = await supabase
     .from('points_transactions')
     .insert({

@@ -12,3 +12,11 @@ out
 # mac
 .DS_Store
 .vercel
+
+# build info
+tsconfig.tsbuildinfo
+
+# backup files
+*.backup
+*.bak
+*.bak2

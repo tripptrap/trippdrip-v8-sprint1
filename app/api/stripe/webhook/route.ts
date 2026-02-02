@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         const userId = session.client_reference_id || session.metadata?.user_id;
         const points = parseInt(session.metadata?.points || '0');
         const packName = session.metadata?.packName || 'Unknown';
-        const planType = session.metadata?.planType || 'basic';
+        const planType = session.metadata?.planType || 'growth';
         const sessionId = session.id;
 
         console.log('Payment successful!', {
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         // Check if this is a subscription or one-time payment
         if (session.mode === 'subscription') {
           // Handle subscription creation
-          const monthlyCredits = planType === 'premium' ? 10000 : 3000;
+          const monthlyCredits = planType === 'scale' ? 10000 : 3000;
 
           // Check if user row exists
           const { data: existingUser } = await supabaseAdmin
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
                 id: userId,
                 email: session.customer_email,
                 subscription_tier: planType,
+                plan_type: planType,
                 monthly_credits: monthlyCredits,
                 credits: monthlyCredits,
                 account_status: 'active',
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
               .from('users')
               .update({
                 subscription_tier: planType,
+                plan_type: planType,
                 monthly_credits: monthlyCredits,
                 credits: monthlyCredits,
                 account_status: 'active',
@@ -142,7 +144,7 @@ export async function POST(req: NextRequest) {
             user_id: userId,
             points_amount: monthlyCredits,
             action_type: 'subscription',
-            description: `${planType === 'premium' ? 'Premium' : 'Basic'} subscription - monthly credits`,
+            description: `${planType === 'scale' ? 'Scale' : 'Growth'} subscription - monthly credits`,
             amount_paid: subscriptionAmountCents,
             created_at: new Date().toISOString()
           });

@@ -30,15 +30,15 @@ export async function GET(req: NextRequest) {
       .from('users')
       .select('*');
 
-    const planCounts: Record<string, number> = { basic: 0, premium: 0, none: 0 };
+    const planCounts: Record<string, number> = { growth: 0, scale: 0, none: 0 };
     usersData?.forEach((u: any) => {
       const tier = u.subscription_tier || null;
-      if (tier === 'premium' || tier === 'professional') {
-        planCounts.premium += 1;
-      } else if (tier === 'basic' || tier === 'starter') {
-        planCounts.basic += 1;
+      if (tier === 'scale') {
+        planCounts.scale += 1;
+      } else if (tier === 'growth') {
+        planCounts.growth += 1;
       } else {
-        // "free", null, or anything else = no plan
+        // "unpaid", null, or anything else = no plan
         planCounts.none += 1;
       }
     });

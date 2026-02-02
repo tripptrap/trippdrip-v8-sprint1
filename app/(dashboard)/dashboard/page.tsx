@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import dynamic from 'next/dynamic';
-import { POINT_COSTS } from "@/lib/pointsSupabase";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
-import { MessageSquare, Users, Send, Plus, Clock, ArrowRight } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { MessageSquare, Users, Send, Plus, Clock, ArrowRight, Wallet, Calendar, Mail, BarChart3, CheckCircle, UserCheck } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -28,6 +27,33 @@ interface ChartDataPoint {
   received: number;
 }
 
+interface PipelineTag {
+  id: string;
+  name: string;
+  color: string;
+  count: number;
+}
+
+interface Appointment {
+  id: string;
+  summary: string;
+  start_time: string;
+  end_time?: string;
+  attendee_name?: string;
+  lead_id?: string;
+  leads?: { id: string; first_name: string; last_name: string; phone?: string };
+}
+
+interface UnreadThread {
+  id: string;
+  lead_id: string;
+  lead_name: string;
+  lead_phone: string;
+  last_message_body: string;
+  last_message_at: string;
+  isClient: boolean;
+}
+
 export default function Dashboard(){
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,12 +61,29 @@ export default function Dashboard(){
   const [chartLoading, setChartLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30');
   const [showSendModal, setShowSendModal] = useState(false);
-  const [recentLeads, setRecentLeads] = useState<Array<{ id: string; name: string; phone?: string; created_at: string; status?: string }>>([]);
+  const [recentLeads, setRecentLeads] = useState<Array<{ id: string; name: string; phone?: string; created_at: string; status?: string; disposition?: string }>>([]);
+  const [recentClients, setRecentClients] = useState<Array<{ id: string; name: string; phone?: string; created_at: string; converted_at?: string; disposition?: string }>>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [clientsLoading, setClientsLoading] = useState(true);
+
+  // New state
+  const [userCredits, setUserCredits] = useState<{ credits: number; monthly_credits: number } | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  const [unreadThreads, setUnreadThreads] = useState<UnreadThread[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadLoading, setUnreadLoading] = useState(true);
+  const [pipelineTags, setPipelineTags] = useState<PipelineTag[]>([]);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
 
   useEffect(() => {
     fetchAnalytics();
     fetchRecentLeads();
+    fetchRecentClients();
+    fetchCredits();
+    fetchAppointments();
+    fetchUnreadThreads();
+    fetchPipelineTags();
   }, []);
 
   useEffect(() => {
@@ -49,15 +92,37 @@ export default function Dashboard(){
 
   async function fetchRecentLeads() {
     try {
-      const res = await fetch('/api/leads?limit=5&sort=created_at&order=desc');
+      const res = await fetch('/api/leads?page=1&pageSize=10');
       const data = await res.json();
-      if (data.leads) {
-        setRecentLeads(data.leads.slice(0, 5));
-      }
+      const leads = data.items || data.leads || [];
+      // Filter out sold/converted leads — those go in the clients section
+      const activeLeads = leads.filter((l: any) => l.disposition !== 'sold');
+      setRecentLeads(activeLeads.slice(0, 5));
     } catch (error) {
       console.error('Failed to fetch recent leads:', error);
     } finally {
       setRecentLoading(false);
+    }
+  }
+
+  async function fetchRecentClients() {
+    try {
+      const res = await fetch('/api/clients?page=1&pageSize=5');
+      const data = await res.json();
+      if (data.items) {
+        setRecentClients(data.items.map((c: any) => ({
+          id: c.id,
+          name: [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unknown',
+          phone: c.phone,
+          created_at: c.created_at,
+          converted_at: c.converted_from_lead_at,
+          disposition: 'sold',
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch recent clients:', error);
+    } finally {
+      setClientsLoading(false);
     }
   }
 
@@ -87,6 +152,88 @@ export default function Dashboard(){
     }
   }
 
+  async function fetchCredits() {
+    try {
+      const res = await fetch('/api/user/profile');
+      const data = await res.json();
+      if (data) {
+        setUserCredits({
+          credits: data.credits || 0,
+          monthly_credits: data.monthly_credits || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch credits:', error);
+    }
+  }
+
+  async function fetchAppointments() {
+    try {
+      const res = await fetch('/api/appointments?filter=upcoming&limit=5');
+      const data = await res.json();
+      if (data.ok && data.appointments) {
+        setAppointments(data.appointments.slice(0, 5));
+      }
+    } catch (error) {
+      console.error('Failed to fetch appointments:', error);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }
+
+  async function fetchUnreadThreads() {
+    try {
+      // Fetch threads and sold lead IDs in parallel
+      const [threadsRes, clientsRes] = await Promise.all([
+        fetch('/api/messages/threads'),
+        fetch('/api/leads?disposition=sold&limit=1000'),
+      ]);
+      const threadsData = await threadsRes.json();
+      const clientsData = await clientsRes.json();
+
+      const soldLeadIds = new Set(
+        (clientsData.leads || []).map((l: any) => l.id)
+      );
+
+      const threads = threadsData.threads || threadsData || [];
+      const unread = threads.filter((t: any) => t.last_message_from === 'lead');
+      setUnreadCount(unread.length);
+      setUnreadThreads(unread.slice(0, 10).map((t: any) => ({
+        id: t.id,
+        lead_id: t.lead_id,
+        lead_name: t.lead_name || (t.leads?.first_name ? `${t.leads.first_name} ${t.leads.last_name || ''}`.trim() : 'Unknown'),
+        lead_phone: t.lead_phone || t.phone || '',
+        last_message_body: t.last_message_body || t.last_message || '',
+        last_message_at: t.last_message_at || t.updated_at || '',
+        isClient: soldLeadIds.has(t.lead_id),
+      })));
+    } catch (error) {
+      console.error('Failed to fetch unread threads:', error);
+    } finally {
+      setUnreadLoading(false);
+    }
+  }
+
+  async function fetchPipelineTags() {
+    try {
+      const res = await fetch('/api/tags');
+      const data = await res.json();
+      if (data.ok && data.items) {
+        setPipelineTags(data.items);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pipeline tags:', error);
+    } finally {
+      setPipelineLoading(false);
+    }
+  }
+
+  const creditPercent = userCredits
+    ? Math.min(100, Math.round((userCredits.credits / Math.max(userCredits.monthly_credits, 1)) * 100))
+    : 0;
+
+  const totalPipelineLeads = pipelineTags.reduce((sum, t) => sum + t.count, 0);
+
   return (
     <div className="space-y-4 md:space-y-6">
       <motion.h1
@@ -98,8 +245,39 @@ export default function Dashboard(){
         Dashboard
       </motion.h1>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* Key Metrics - 5 cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        {/* Credit Balance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          whileHover={{ scale: 1.05, y: -5 }}
+          className="card bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-700/50 p-4"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Credits</div>
+            <Wallet className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-2xl md:text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+            {userCredits ? userCredits.credits.toLocaleString() : '...'}
+          </div>
+          {userCredits && (
+            <div className="mt-2">
+              <div className="h-1.5 bg-emerald-200 dark:bg-emerald-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${creditPercent}%` }}
+                />
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                of {userCredits.monthly_credits.toLocaleString()} monthly
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Total Leads */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,6 +291,7 @@ export default function Dashboard(){
           </div>
         </motion.div>
 
+        {/* Response Rate */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -126,6 +305,7 @@ export default function Dashboard(){
           </div>
         </motion.div>
 
+        {/* Conversion Rate */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -139,6 +319,7 @@ export default function Dashboard(){
           </div>
         </motion.div>
 
+        {/* Active Campaigns */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -153,7 +334,7 @@ export default function Dashboard(){
         </motion.div>
       </div>
 
-      {/* Additional Stats */}
+      {/* Additional Stats - 3 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         <div className="card p-4">
           <div className="flex items-center justify-between">
@@ -163,9 +344,7 @@ export default function Dashboard(){
                 {loading ? '...' : (analytics?.totalMessagesSent || 0).toLocaleString()}
               </div>
             </div>
-            <svg className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
+            <Send className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
           </div>
         </div>
 
@@ -177,102 +356,337 @@ export default function Dashboard(){
                 {loading ? '...' : (analytics?.totalMessagesReceived || 0).toLocaleString()}
               </div>
             </div>
-            <svg className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-            </svg>
+            <Mail className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
           </div>
         </div>
 
         <div className="card p-4">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Leads Sold</div>
-              <div className="text-xl md:text-2xl font-bold text-sky-600 dark:text-sky-400 truncate">
-                {loading ? '...' : (analytics?.soldLeads || 0).toLocaleString()}
+              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Leads vs Clients</div>
+              <div className="flex items-center gap-3">
+                <div>
+                  <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    {loading ? '...' : ((analytics?.totalLeads || 0) - (analytics?.soldLeads || 0)).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Active</div>
+                </div>
+                <div className="text-slate-300 dark:text-slate-600 text-lg">/</div>
+                <div>
+                  <div className="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {loading ? '...' : (analytics?.soldLeads || 0).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400">Converted</div>
+                </div>
               </div>
             </div>
-            <svg className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <UserCheck className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 dark:text-emerald-400 flex-shrink-0 ml-2" />
           </div>
         </div>
       </div>
 
-      {/* Quick Actions & Recent Activity Row */}
+      {/* Pipeline Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.45 }}
+        className="card p-4 md:p-6"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-sky-500" />
+            Pipeline Overview
+          </h2>
+          <Link href="/tags" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+            Manage tags <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {pipelineLoading ? (
+          <div className="h-16 flex items-center justify-center">
+            <div className="animate-pulse flex gap-2 w-full">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex-1" />
+              ))}
+            </div>
+          </div>
+        ) : pipelineTags.length === 0 ? (
+          <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+            <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No pipeline stages with leads yet</p>
+            <Link href="/tags" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
+              Set up your pipeline in Tags
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* Horizontal segmented bar */}
+            <div className="flex rounded-lg overflow-hidden h-10 mb-3">
+              {pipelineTags.map((tag) => {
+                const percent = totalPipelineLeads > 0 ? (tag.count / totalPipelineLeads) * 100 : 0;
+                return (
+                  <Link
+                    key={tag.id}
+                    href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                    className="relative group flex items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ width: `${Math.max(percent, 5)}%`, backgroundColor: tag.color || '#3b82f6' }}
+                    title={`${tag.name}: ${tag.count} leads`}
+                  >
+                    {percent > 12 && (
+                      <span className="text-white text-xs font-medium truncate px-1">{tag.count}</span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3">
+              {pipelineTags.map((tag) => (
+                <Link
+                  key={tag.id}
+                  href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
+                  <span>{tag.name}</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{tag.count}</span>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </motion.div>
+
+      {/* Appointments & Unread Messages Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Quick Actions */}
+        {/* Upcoming Appointments */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
           className="card p-4 md:p-6"
         >
-          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-sky-500" />
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Link
-              href="/leads"
-              className="flex items-center gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded-lg transition-colors group"
-            >
-              <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center">
-                <Users className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">View Leads</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Manage contacts</div>
-              </div>
-            </Link>
-            <button
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 rounded-lg transition-colors group text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
-                <Send className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Send SMS</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Quick message</div>
-              </div>
-            </button>
-            <Link
-              href="/campaigns"
-              className="flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors group"
-            >
-              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Campaigns</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Bulk messaging</div>
-              </div>
-            </Link>
-            <Link
-              href="/messages"
-              className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors group"
-            >
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Messages</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">View inbox</div>
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-sky-500" />
+              Upcoming Appointments
+            </h2>
+            <Link href="/appointments" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
+
+          {appointmentsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : appointments.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No upcoming appointments</p>
+              <p className="text-xs mt-1">Appointments booked via AI Flows will show here</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {appointments.map((apt) => (
+                <Link
+                  key={apt.id}
+                  href={apt.lead_id ? `/leads?selected=${apt.lead_id}` : '/scheduled'}
+                  className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-900/30 flex flex-col items-center justify-center">
+                    <div className="text-[10px] font-medium text-sky-600 dark:text-sky-400 leading-none">
+                      {format(new Date(apt.start_time), 'MMM')}
+                    </div>
+                    <div className="text-sm font-bold text-sky-700 dark:text-sky-300 leading-none">
+                      {format(new Date(apt.start_time), 'd')}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {apt.attendee_name || apt.leads?.first_name ? `${apt.leads?.first_name || ''} ${apt.leads?.last_name || ''}`.trim() : apt.summary || 'Appointment'}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {format(new Date(apt.start_time), 'h:mm a')}
+                      {apt.summary && apt.attendee_name ? ` — ${apt.summary}` : ''}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Recent Activity */}
+        {/* Unread Messages */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.6 }}
+          transition={{ duration: 0.4, delay: 0.55 }}
           className="card p-4 md:p-6"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-sky-500" />
+              <Mail className="w-5 h-5 text-sky-500" />
+              Unread Messages
+              {unreadCount > 0 && (
+                <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+                  {unreadCount}
+                </span>
+              )}
+            </h2>
+            <Link href="/messages" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {unreadLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-40" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : unreadThreads.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-50 text-emerald-500" />
+              <p className="text-sm">All caught up!</p>
+              <p className="text-xs mt-1">No unread messages</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Lead messages */}
+              {unreadThreads.filter(t => !t.isClient).length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 dark:text-slate-500 mb-1.5 px-2">Leads</div>
+                  <div className="space-y-1">
+                    {unreadThreads.filter(t => !t.isClient).slice(0, 5).map((thread) => (
+                      <Link
+                        key={thread.id}
+                        href={`/messages?thread=${thread.id}`}
+                        className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+                          {thread.lead_name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                            {thread.lead_name || 'Unknown'}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {thread.last_message_body || 'New message'}
+                          </div>
+                        </div>
+                        {thread.last_message_at && (
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            {formatDistanceToNow(new Date(thread.last_message_at), { addSuffix: true })}
+                          </div>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Client messages */}
+              {unreadThreads.filter(t => t.isClient).length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-semibold text-emerald-500 dark:text-emerald-400 mb-1.5 px-2">Clients</div>
+                  <div className="space-y-1">
+                    {unreadThreads.filter(t => t.isClient).slice(0, 5).map((thread) => (
+                      <Link
+                        key={thread.id}
+                        href={`/messages?thread=${thread.id}`}
+                        className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+                          {thread.lead_name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                            {thread.lead_name || 'Unknown'}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                            {thread.last_message_body || 'New message'}
+                          </div>
+                        </div>
+                        {thread.last_message_at && (
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            {formatDistanceToNow(new Date(thread.last_message_at), { addSuffix: true })}
+                          </div>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
+        className="card p-4 md:p-6"
+      >
+        <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+          <Plus className="w-5 h-5 text-sky-500" />
+          Quick Actions
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Link href="/leads" className="flex items-center gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
+            <div className="w-10 h-10 rounded-full bg-sky-500/20 flex items-center justify-center">
+              <Users className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div><div className="text-sm font-medium text-slate-900 dark:text-slate-100">View Leads</div><div className="text-xs text-slate-500 dark:text-slate-400">Manage contacts</div></div>
+          </Link>
+          <button onClick={() => setShowSendModal(true)} className="flex items-center gap-3 p-3 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 rounded-lg transition-colors text-left">
+            <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
+              <Send className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            </div>
+            <div><div className="text-sm font-medium text-slate-900 dark:text-slate-100">Send SMS</div><div className="text-xs text-slate-500 dark:text-slate-400">Quick message</div></div>
+          </button>
+          <Link href="/campaigns" className="flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg transition-colors">
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div><div className="text-sm font-medium text-slate-900 dark:text-slate-100">Campaigns</div><div className="text-xs text-slate-500 dark:text-slate-400">Bulk messaging</div></div>
+          </Link>
+          <Link href="/messages" className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors">
+            <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div><div className="text-sm font-medium text-slate-900 dark:text-slate-100">Messages</div><div className="text-xs text-slate-500 dark:text-slate-400">View inbox</div></div>
+          </Link>
+        </div>
+      </motion.div>
+
+      {/* Recent Leads & Recent Clients — Distinct Sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Leads (Active) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.65 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Users className="w-5 h-5 text-sky-500" />
               Recent Leads
             </h2>
             <Link href="/leads" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
@@ -295,7 +709,7 @@ export default function Dashboard(){
           ) : recentLeads.length === 0 ? (
             <div className="text-center py-8 text-slate-500 dark:text-slate-400">
               <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No leads yet</p>
+              <p className="text-sm">No active leads yet</p>
               <Link href="/leads" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
                 Add your first lead
               </Link>
@@ -308,7 +722,7 @@ export default function Dashboard(){
                   href={`/leads?selected=${lead.id}`}
                   className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-teal-400 flex items-center justify-center text-white text-xs font-medium">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
                     {lead.name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -334,15 +748,79 @@ export default function Dashboard(){
             </div>
           )}
         </motion.div>
+
+        {/* Recent Clients (Converted) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.7 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-emerald-500" />
+              Recent Clients
+            </h2>
+            <Link href="/clients" className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {clientsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentClients.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <UserCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No clients yet</p>
+              <p className="text-xs mt-1">Leads marked as &quot;sold&quot; will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentClients.map((client) => (
+                <Link
+                  key={client.id}
+                  href="/clients"
+                  className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-medium">
+                    {client.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {client.name || 'Unknown'}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      {client.converted_at
+                        ? `Converted ${format(new Date(client.converted_at), 'MMM d')}`
+                        : format(new Date(client.created_at), 'MMM d, h:mm a')
+                      }
+                    </div>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                    sold
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </motion.div>
       </div>
 
       {/* Messages Over Time Chart */}
       <div className="card bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 p-4 md:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+            <BarChart3 className="w-4 h-4 md:w-5 md:h-5" />
             <span className="text-sm md:text-base">Messages Over Time</span>
           </h2>
 
@@ -377,9 +855,7 @@ export default function Dashboard(){
         ) : chartData.length === 0 ? (
           <div className="h-[300px] md:h-[400px] flex items-center justify-center text-slate-600 dark:text-slate-400">
             <div className="text-center">
-              <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+              <BarChart3 className="w-16 h-16 mx-auto mb-3 opacity-50" />
               <p className="text-sm">No message data available</p>
             </div>
           </div>
@@ -440,70 +916,6 @@ export default function Dashboard(){
         )}
       </div>
 
-      {/* Points Cost Guide */}
-      <div className="card bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 p-4 md:p-6">
-        <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
-          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-sm md:text-base">Points Cost Guide</span>
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
-          <div className="flex items-center justify-between p-2 md:p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <svg className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span className="text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate">Single Text Message</span>
-            </div>
-            <span className="text-xs md:text-sm font-bold text-sky-600 dark:text-sky-400 ml-2 flex-shrink-0">{POINT_COSTS.sms_sent} pt</span>
-          </div>
-
-          <div className="flex items-center justify-between p-2 md:p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <svg className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              <span className="text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate">AI Response / Smart Reply</span>
-            </div>
-            <span className="text-xs md:text-sm font-bold text-sky-600 dark:text-sky-400 ml-2 flex-shrink-0">{POINT_COSTS.ai_response} pts</span>
-          </div>
-
-          <div className="flex items-center justify-between p-2 md:p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <svg className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate">Document Upload w/ AI</span>
-            </div>
-            <span className="text-xs md:text-sm font-bold text-sky-600 dark:text-sky-400 ml-2 flex-shrink-0">{POINT_COSTS.document_upload} pts</span>
-          </div>
-
-          <div className="flex items-center justify-between p-2 md:p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <svg className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-              </svg>
-              <span className="text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate">Bulk Message (per contact)</span>
-            </div>
-            <span className="text-xs md:text-sm font-bold text-sky-600 dark:text-sky-400 ml-2 flex-shrink-0">{POINT_COSTS.bulk_message} pts</span>
-          </div>
-
-          <div className="flex items-center justify-between p-2 md:p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <svg className="w-4 h-4 text-orange-500 dark:text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-xs md:text-sm text-slate-900 dark:text-slate-100 truncate">AI Flow Creation</span>
-            </div>
-            <span className="text-xs md:text-sm font-bold text-orange-500 dark:text-orange-400 ml-2 flex-shrink-0">{POINT_COSTS.flow_creation} pts</span>
-          </div>
-        </div>
-        <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mt-3">
-          Credits automatically renew every 30 days based on your subscription plan. Unused credits roll over.
-        </p>
-      </div>
-
       {/* Floating Send Message Button */}
       <motion.button
         onClick={() => setShowSendModal(true)}
@@ -523,7 +935,6 @@ export default function Dashboard(){
         isOpen={showSendModal}
         onClose={() => setShowSendModal(false)}
         onSuccess={() => {
-          // Optionally refresh analytics after sending
           fetchAnalytics();
         }}
       />

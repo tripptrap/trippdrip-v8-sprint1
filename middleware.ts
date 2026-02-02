@@ -53,8 +53,8 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // If no plan selected or on preview, redirect to onboarding
-    if (!userData || !userData.subscription_tier || userData.subscription_tier === 'preview') {
+    // If no plan selected or unpaid, redirect to onboarding
+    if (!userData || !userData.subscription_tier || userData.subscription_tier === 'unpaid') {
       const url = new URL('/auth/onboarding', request.url)
       return NextResponse.redirect(url)
     }

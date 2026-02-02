@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
       .eq('id', userId)
       .single();
 
-    const isPremium = userData?.subscription_tier === 'professional' || userData?.subscription_tier === 'premium';
-    if (!isPremium) {
+    const isPaid = userData?.subscription_tier === 'growth' || userData?.subscription_tier === 'scale';
+    if (!isPaid) {
       return NextResponse.json({
         success: false,
-        error: 'Premium subscription required',
+        error: 'Paid subscription required',
       }, { status: 403 });
     }
 

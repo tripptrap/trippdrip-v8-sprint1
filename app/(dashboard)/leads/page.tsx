@@ -104,6 +104,11 @@ export default function LeadsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [recalculatingScores, setRecalculatingScores] = useState(false);
 
+  /* Pagination */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+
   /* Campaigns/Tags sources for dropdowns */
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tagsList, setTagsList] = useState<{ id?: string; name: string; color?: string; count: number }[]>([]);
@@ -213,13 +218,16 @@ export default function LeadsPage() {
         const demoLeads = getDemoLeads();
         setLeads(demoLeads);
       } else {
-        // Fetch real data
+        // Fetch real data with pagination
         const params = new URLSearchParams();
         if (q.trim()) params.set("q", q.trim());
         if (selectedTags.length) params.set("tags", selectedTags.join(","));
+        params.set("page", String(currentPage));
+        params.set("pageSize", String(pageSize));
         const res = await fetch(`/api/leads?${params.toString()}`);
         const data = await res.json();
         setLeads(Array.isArray(data?.items) ? data.items : []);
+        setTotalCount(data?.total || 0);
       }
     } catch {
       setLeads([]);
@@ -685,7 +693,9 @@ export default function LeadsPage() {
   }
 
   useEffect(() => { fetchLeads(); fetchCampaigns(); fetchTags(); }, []);
-  useEffect(() => { fetchLeads(); }, [q, selectedTags]);
+  useEffect(() => { fetchLeads(); }, [q, selectedTags, currentPage, pageSize]);
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [q, selectedTags]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -1217,27 +1227,46 @@ export default function LeadsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Tags (comma-separated)</label>
-                <input
-                  type="text"
-                  value={newLead.tags}
-                  onChange={(e) => setNewLead({ ...newLead, tags: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-sky-500"
-                  placeholder="facebook, interested, warm"
-                />
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Pipeline Tags</label>
+                <div className="flex flex-wrap gap-2 p-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 min-h-[38px]">
+                  {tagsList.length === 0 && (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">No tags created yet</span>
+                  )}
+                  {tagsList.map(tag => {
+                    const selected = (newLead.tags || "").split(",").filter(Boolean).includes(tag.name);
+                    return (
+                      <button
+                        key={tag.name}
+                        type="button"
+                        onClick={() => {
+                          const current = (newLead.tags || "").split(",").filter(Boolean);
+                          const updated = selected ? current.filter(t => t !== tag.name) : [...current, tag.name];
+                          setNewLead({ ...newLead, tags: updated.join(",") });
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                          selected
+                            ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 ring-1 ring-sky-400'
+                            : 'bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-500'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#94a3b8' }} />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div>
-                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Status</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Campaign</label>
                 <select
-                  value={newLead.status}
-                  onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
+                  value={newLead.campaign_id || ""}
+                  onChange={(e) => setNewLead({ ...newLead, campaign_id: e.target.value })}
                   className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                 >
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="converted">Converted</option>
-                  <option value="lost">Lost</option>
+                  <option value="">No Campaign</option>
+                  {campaigns.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1263,10 +1292,10 @@ export default function LeadsPage() {
       {/* Edit Lead Modal */}
       {editLeadOpen && editingLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Edit Lead</h3>
-              <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-xl">&times;</button>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Edit Lead</h3>
+              <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -1276,7 +1305,7 @@ export default function LeadsPage() {
                     type="text"
                     value={editingLead.first_name}
                     onChange={(e) => setEditingLead({ ...editingLead, first_name: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                     placeholder="John"
                   />
                 </div>
@@ -1286,7 +1315,7 @@ export default function LeadsPage() {
                     type="text"
                     value={editingLead.last_name}
                     onChange={(e) => setEditingLead({ ...editingLead, last_name: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                     placeholder="Doe"
                   />
                 </div>
@@ -1297,7 +1326,7 @@ export default function LeadsPage() {
                   type="tel"
                   value={editingLead.phone}
                   onChange={(e) => setEditingLead({ ...editingLead, phone: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -1307,7 +1336,7 @@ export default function LeadsPage() {
                   type="email"
                   value={editingLead.email}
                   onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
-                  className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                   placeholder="john@example.com"
                 />
               </div>
@@ -1318,7 +1347,7 @@ export default function LeadsPage() {
                     type="text"
                     value={editingLead.state}
                     onChange={(e) => setEditingLead({ ...editingLead, state: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                     placeholder="CA"
                     maxLength={2}
                   />
@@ -1329,112 +1358,53 @@ export default function LeadsPage() {
                     type="text"
                     value={editingLead.zip_code}
                     onChange={(e) => setEditingLead({ ...editingLead, zip_code: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                    className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
                     placeholder="90210"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Tags</label>
-                <div className="relative">
-                  <div
-                    className="w-full min-h-[38px] rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm cursor-pointer flex flex-wrap gap-1 items-center"
-                    onClick={() => setEditTagsDropdownOpen(!editTagsDropdownOpen)}
-                  >
-                    {editingLead.tags && editingLead.tags.split(',').filter((t: string) => t.trim()).length > 0 ? (
-                      editingLead.tags.split(',').filter((t: string) => t.trim()).map((tag: string, idx: number) => (
-                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 text-xs">
-                          {tag.trim()}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const currentTags = editingLead.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
-                              const newTags = currentTags.filter((t: string) => t !== tag.trim());
-                              setEditingLead({ ...editingLead, tags: newTags.join(', ') });
-                            }}
-                            className="hover:text-gray-900"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-slate-400 dark:text-slate-500">Select tags...</span>
-                    )}
-                    <span className="ml-auto text-slate-400 dark:text-slate-500">▼</span>
-                  </div>
-                  {editTagsDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700 bg-[#1a2332] z-50 shadow-lg">
-                      {availableTags.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">No saved tags yet. Create tags on the Tags page.</div>
-                      ) : (
-                        availableTags.map((tagName) => {
-                          const currentTags = editingLead.tags ? editingLead.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [];
-                          const isSelected = currentTags.includes(tagName);
-                          const tagInfo = tagsList.find(t => t.name === tagName);
-                          return (
-                            <div
-                              key={tagName}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isSelected) {
-                                  const newTags = currentTags.filter((tag: string) => tag !== tagName);
-                                  setEditingLead({ ...editingLead, tags: newTags.join(', ') });
-                                } else {
-                                  const newTags = [...currentTags, tagName];
-                                  setEditingLead({ ...editingLead, tags: newTags.join(', ') });
-                                }
-                                setEditTagsDropdownOpen(false);
-                              }}
-                              className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:bg-slate-800 flex items-center justify-between ${isSelected ? 'bg-sky-500/10 text-sky-600' : ''}`}
-                            >
-                              <span className="flex items-center gap-2">
-                                {tagInfo?.color && (
-                                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tagInfo.color }} />
-                                )}
-                                {tagName}
-                              </span>
-                              {isSelected && <span className="text-sky-600">✓</span>}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Pipeline Tags</label>
+                <div className="flex flex-wrap gap-2 p-2 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 min-h-[38px]">
+                  {tagsList.length === 0 && (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">No tags created yet</span>
                   )}
+                  {tagsList.map(tag => {
+                    const currentTags = editingLead.tags ? editingLead.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+                    const selected = currentTags.includes(tag.name);
+                    return (
+                      <button
+                        key={tag.name}
+                        type="button"
+                        onClick={() => {
+                          const updated = selected ? currentTags.filter((t: string) => t !== tag.name) : [...currentTags, tag.name];
+                          setEditingLead({ ...editingLead, tags: updated.join(', ') });
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                          selected
+                            ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 ring-1 ring-sky-400'
+                            : 'bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-500'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color || '#94a3b8' }} />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Status</label>
-                  <select
-                    value={editingLead.status}
-                    onChange={(e) => setEditingLead({ ...editingLead, status: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                  >
-                    <option value="new">New</option>
-                    <option value="active">Active</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="qualified">Qualified</option>
-                    <option value="converted">Converted</option>
-                    <option value="lost">Lost</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Disposition</label>
-                  <select
-                    value={editingLead.disposition}
-                    onChange={(e) => setEditingLead({ ...editingLead, disposition: e.target.value })}
-                    className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                  >
-                    <option value="">None</option>
-                    <option value="sold">Sold</option>
-                    <option value="not_interested">Not Interested</option>
-                    <option value="callback">Callback</option>
-                    <option value="qualified">Qualified</option>
-                    <option value="nurture">Nurture</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Campaign</label>
+                <select
+                  value={editingLead.campaign_id || ""}
+                  onChange={(e) => setEditingLead({ ...editingLead, campaign_id: e.target.value })}
+                  className="w-full rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-sky-500"
+                >
+                  <option value="">No Campaign</option>
+                  {campaigns.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
@@ -1488,7 +1458,7 @@ export default function LeadsPage() {
             </button>
 
             {/* Divider */}
-            <div className="h-8 w-px bg-[#223246]"></div>
+            <div className="h-8 w-px bg-slate-300 dark:bg-slate-600"></div>
 
             {/* Filter Buttons Group - muted styling */}
             <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-1">
@@ -1505,7 +1475,7 @@ export default function LeadsPage() {
                 {campaignMenuOpen && (
                   <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                       onClick={()=>{ setActiveCampaignId(null); setCampaignMenuOpen(false); }}
                     >
                       All campaigns
@@ -1519,7 +1489,7 @@ export default function LeadsPage() {
                         return (
                           <button
                             key={c.id}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                             onClick={()=>{ setActiveCampaignId(c.id); setCampaignMenuOpen(false); }}
                           >
                             {c.name} <span className="text-slate-600 dark:text-slate-400">({leadCount})</span>
@@ -1542,7 +1512,7 @@ export default function LeadsPage() {
                 {tagsMenuOpen && (
                   <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                       onClick={()=>{ setActiveTagFilter(null); setTagsMenuOpen(false); }}
                     >
                       All tags
@@ -1554,7 +1524,7 @@ export default function LeadsPage() {
                       {tagsList.map(t=>(
                         <button
                           key={t.name}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
                           onClick={()=>{ setActiveTagFilter(t.name); setTagsMenuOpen(false); }}
                         >
                           {t.color && <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />}
@@ -1579,7 +1549,7 @@ export default function LeadsPage() {
                 <input
                   type="file"
                   className="hidden"
-                  accept=".csv,.txt,.json,.pdf,.doc,.docx"
+                  accept=".csv,.txt,.json,.pdf,.doc,.docx,.xlsx,.xls"
                   onChange={handleAIParse}
                 />
               </label>
@@ -1622,7 +1592,7 @@ export default function LeadsPage() {
               <>
                 <div className="relative" data-bulk-actions-menu>
                   <button
-                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm hover:bg-[#101b2a]"
+                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                     onClick={() => setBulkActionsOpen(v => !v)}
                   >
                     Bulk Actions ({selectedIds.size})
@@ -1630,51 +1600,51 @@ export default function LeadsPage() {
                   {bulkActionsOpen && (
                     <div className="absolute right-0 mt-1 w-[220px] rounded-md border border-slate-200 dark:border-slate-700 bg-white shadow-lg z-10">
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('status'); setBulkActionsOpen(false); }}
                       >
                         Update Status
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('disposition'); setBulkActionsOpen(false); }}
                       >
                         Update Disposition
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('addTags'); setBulkActionsOpen(false); }}
                       >
                         Add Tags
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('removeTags'); setBulkActionsOpen(false); }}
                       >
                         Remove Tags
                       </button>
                       <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { setBulkActionModal('createFollowUps'); setBulkActionsOpen(false); }}
                       >
                         Create Follow-ups
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a] text-sky-600"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-sky-600"
                         onClick={() => { setBulkActionModal('reDrip'); setBulkActionsOpen(false); }}
                       >
                         🔄 Re-Drip to Campaign
                       </button>
                       <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { exportLeads('csv'); setBulkActionsOpen(false); }}
                       >
                         Export to CSV
                       </button>
                       <button
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                         onClick={() => { exportLeads('json'); setBulkActionsOpen(false); }}
                       >
                         Export to JSON
@@ -1724,7 +1694,7 @@ export default function LeadsPage() {
                 <button
                   key={tag}
                   onClick={()=>toggleTagChip(tag)}
-                  className={`px-2 py-1 rounded-full text-xs border ${active ? "bg-[#1a2f52] border-[#4876ff]" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-[#101b2a]"}`}
+                  className={`px-2 py-1 rounded-full text-xs border ${active ? "bg-sky-100 dark:bg-sky-900/30 border-sky-500" : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"}`}
                 >
                   {tag}
                 </button>
@@ -1733,7 +1703,7 @@ export default function LeadsPage() {
             {selectedTags.length > 0 && (
               <button
                 onClick={()=>setSelectedTags([])}
-                className="px-2 py-1 rounded-full text-xs border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-[#101b2a]"
+                className="px-2 py-1 rounded-full text-xs border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Clear chips
               </button>
@@ -1743,20 +1713,20 @@ export default function LeadsPage() {
 
         {/* Getting Started Tips */}
         {filtered.length === 0 && !q && !activeCampaignId && !activeTagFilter && (
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white p-6">
+          <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
             <h3 className="text-lg font-semibold mb-3 text-sky-500 dark:text-sky-400">💡 Getting Started</h3>
             <ol className="text-sm text-slate-900 dark:text-slate-100 space-y-2 list-decimal list-inside">
               <li>
-                <strong>Upload Leads:</strong> Click "Upload Leads" to import your contact list. <span className="text-slate-600 dark:text-slate-400">Campaigns represent where you got the leads from (e.g., "Facebook Ads", "Trade Show 2024").</span>
+                <strong>Upload Leads:</strong> Click "Upload Leads" to import your contact list. <span className="text-slate-600 dark:text-slate-400">Add leads manually, import from CSV, or capture them automatically.</span>
               </li>
               <li>
-                <strong>Create Campaigns & Tags:</strong> During upload, assign a campaign name. <span className="text-slate-600 dark:text-slate-400">Tags are used for disposition or to mark where the lead is at in the prospecting process (e.g., "contacted", "interested", "cold").</span>
+                <strong>Assign Campaigns & Tags:</strong> Campaigns categorize what kind of lead they are (e.g., "Health", "Auto", "Solar"). <span className="text-slate-600 dark:text-slate-400">Tags track where the lead is in your pipeline (e.g., "New", "Contacted", "Quoted", "Appointment Set").</span>
               </li>
               <li>
-                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-sky-600 hover:underline">Flow</a> page to create a flow. <span className="text-slate-600 dark:text-slate-400">This teaches the AI how to talk to selected campaigns with specific messaging strategies.</span>
+                <strong>Create a Flow:</strong> Visit the <a href="/templates" className="text-sky-600 hover:underline">Flows</a> page to set up AI conversation templates. <span className="text-slate-600 dark:text-slate-400">Flows qualify your leads by gathering required info and booking appointments automatically.</span>
               </li>
               <li>
-                <strong>Start Bulk SMS:</strong> Once you have leads and a flow configured, go to <a href="/bulk-sms" className="text-sky-600 hover:underline">Bulk SMS</a> to send messages to your leads at scale.
+                <strong>Send Messages:</strong> Send individual SMS, bulk messages, or let your AI Flows handle conversations. <span className="text-slate-600 dark:text-slate-400">Visit <a href="/messages" className="text-sky-600 hover:underline">Messages</a> to view and manage all conversations.</span>
               </li>
             </ol>
           </div>
@@ -1770,7 +1740,7 @@ export default function LeadsPage() {
                 <th className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
-                {["Score","Name","Campaign","Email","Phone","State","Tags","Status","Disposition","Actions"].map(h => (
+                {["Score","Name","Campaign","Email","Phone","State","Tags","Status",""].map(h => (
                   <th key={h} className="border-b border-slate-200 dark:border-slate-700 px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
@@ -1786,7 +1756,6 @@ export default function LeadsPage() {
                 const name = [l.first_name, l.last_name].filter(Boolean).join(" ") || "—";
                 const id = String(l.id ?? i);
                 const checked = selectedIds.has(id);
-                const disposition = (l as any).disposition || "—";
                 const isMenuOpen = dispositionMenuOpen[id] || false;
                 const score = l.score ?? null;
                 const temperature = l.temperature || null;
@@ -1822,7 +1791,23 @@ export default function LeadsPage() {
                     <td className="px-3 py-2">{l.email || "—"}</td>
                     <td className="px-3 py-2">{l.phone || "—"}</td>
                     <td className="px-3 py-2">{l.state || "—"}</td>
-                    <td className="px-3 py-2">{Array.isArray(l.tags) && l.tags.length ? l.tags.join(", ") : "—"}</td>
+                    <td className="px-3 py-2">
+                      {Array.isArray(l.tags) && l.tags.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {l.primary_tag && l.tags.includes(l.primary_tag) && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700">
+                              {l.primary_tag}
+                            </span>
+                          )}
+                          {l.tags.filter((t: string) => t !== l.primary_tag).length > 0 && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              {l.primary_tag ? `+${l.tags.length - 1}` : l.tags.join(", ")}
+                            </span>
+                          )}
+                          {!l.primary_tag && l.tags.length === 0 && "—"}
+                        </div>
+                      ) : "—"}
+                    </td>
                     <td className="px-3 py-2">{l.status || "—"}</td>
                     <td className="px-3 py-2 relative" onClick={(e) => e.stopPropagation()} data-disposition-menu>
                       <button
@@ -1832,33 +1817,92 @@ export default function LeadsPage() {
                           setDispositionMenuOpen(prev => ({ ...prev, [id]: !prev[id] }));
                         }}
                       >
-                        {disposition === "—" ? "Set" : disposition.replace(/_/g, ' ')}
+                        ···
                       </button>
                       {isMenuOpen && (
-                        <div className="absolute left-0 mt-1 w-[160px] rounded-md border border-slate-200 dark:border-slate-700 bg-white shadow-lg z-10">
-                          {['sold', 'not_interested', 'callback', 'qualified', 'nurture'].map(disp => (
+                        <div className="absolute right-0 mt-1 w-[200px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
+                          {/* Mark as Sold */}
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateDisposition(id, 'sold');
+                              setDispositionMenuOpen({});
+                            }}
+                          >
+                            ✓ Mark as Sold
+                          </button>
+                          <div className="border-t border-slate-200 dark:border-slate-700" />
+                          {/* Pipeline (Tags) */}
+                          <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">Pipeline Stage</div>
+                          {tagsList.slice(0, 6).map(tag => (
                             <button
-                              key={disp}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-[#101b2a]"
-                              onClick={(e) => {
+                              key={tag.name}
+                              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                updateDisposition(id, disp);
+                                const currentTags = Array.isArray(l.tags) ? l.tags : [];
+                                if (!currentTags.includes(tag.name)) {
+                                  await fetch(`/api/leads/${id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ tags: [...currentTags, tag.name], primary_tag: tag.name }),
+                                  });
+                                  setToast(`Added to "${tag.name}"`);
+                                  setTimeout(() => setToast(''), 2500);
+                                  fetchLeads();
+                                } else {
+                                  setToast(`Already tagged "${tag.name}"`);
+                                  setTimeout(() => setToast(''), 2500);
+                                }
                                 setDispositionMenuOpen({});
                               }}
                             >
-                              {disp.replace(/_/g, ' ')}
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
+                              {tag.name}
+                              {Array.isArray(l.tags) && l.tags.includes(tag.name) && <span className="ml-auto text-xs text-sky-500">✓</span>}
                             </button>
                           ))}
+                          {campaigns.length > 0 && (
+                            <>
+                              <div className="border-t border-slate-200 dark:border-slate-700" />
+                              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500">Campaign</div>
+                              {campaigns.slice(0, 5).map(c => (
+                                <button
+                                  key={c.id}
+                                  className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    await fetch(`/api/leads/${id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ campaign_id: c.id }),
+                                    });
+                                    setToast(`Assigned to campaign "${c.name}"`);
+                                    setTimeout(() => setToast(''), 2500);
+                                    fetchLeads();
+                                    setDispositionMenuOpen({});
+                                  }}
+                                >
+                                  {c.name}
+                                  {l.campaign_id === c.id && <span className="ml-1 text-xs text-sky-500">✓</span>}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                          <div className="border-t border-slate-200 dark:border-slate-700" />
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteLead(id, name);
+                              setDispositionMenuOpen({});
+                            }}
+                          >
+                            Delete
+                          </button>
                         </div>
                       )}
-                    </td>
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => deleteLead(id, name)}
-                        className="text-sm text-red-400 hover:text-red-300"
-                      >
-                        Delete
-                      </button>
                     </td>
                   </tr>
                 );
@@ -1866,6 +1910,45 @@ export default function LeadsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)}–{Math.min(currentPage * pageSize, totalCount)} of {totalCount.toLocaleString()} leads
+            </div>
+            <div className="flex items-center gap-3">
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="text-sm border border-slate-300 dark:border-slate-600 rounded-md px-2 py-1 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+              >
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="px-3 py-1 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600 dark:text-slate-400 px-2">
+                  Page {currentPage} of {Math.max(1, Math.ceil(totalCount / pageSize))}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+                  disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                  className="px-3 py-1 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {lastSummary?.ok && (
           <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
@@ -2266,7 +2349,7 @@ export default function LeadsPage() {
                   <button
                     type="button"
                     onClick={() => setRunTagsDropdownOpen(!runTagsDropdownOpen)}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between"
                   >
                     <span className="text-slate-600 dark:text-slate-400">{runTags.length > 0 ? `${runTags.length} tag(s) selected` : 'Select or create tags...'}</span>
                     <span className="text-slate-600 dark:text-slate-400">{runTagsDropdownOpen ? '▲' : '▼'}</span>
@@ -2369,7 +2452,7 @@ export default function LeadsPage() {
                                     setRunTags([...runTags, t.name]);
                                   }
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-[#101b2a]'}`}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                               >
                                 <div className="flex items-center gap-2">
                                   {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
@@ -2393,7 +2476,7 @@ export default function LeadsPage() {
                     <button
                       type="button"
                       onClick={() => setRunStatesDropdownOpen(!runStatesDropdownOpen)}
-                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between"
                     >
                       <span className="text-slate-600 dark:text-slate-400 truncate">
                         {runStates.length > 0 ? runStates.join(', ') : 'All states'}
@@ -2408,7 +2491,7 @@ export default function LeadsPage() {
                           <button
                             type="button"
                             onClick={() => { setRunStates([]); setRunStatesDropdownOpen(false); }}
-                            className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] ${runStates.length === 0 ? 'bg-sky-500/10 text-sky-600' : ''}`}
+                            className={`w-full px-3 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700 ${runStates.length === 0 ? 'bg-sky-500/10 text-sky-600' : ''}`}
                           >
                             All states
                           </button>
@@ -2426,7 +2509,7 @@ export default function LeadsPage() {
                                     setRunStates([...runStates, state as string]);
                                   }
                                 }}
-                                className={`w-full px-3 py-2 text-sm text-left hover:bg-[#101b2a] flex items-center justify-between ${isSelected ? 'bg-sky-500/10' : ''}`}
+                                className={`w-full px-3 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between ${isSelected ? 'bg-sky-500/10' : ''}`}
                               >
                                 <span>{state}</span>
                                 <span className="flex items-center gap-2">
@@ -2493,9 +2576,9 @@ export default function LeadsPage() {
                       {previewLeads.length > 0 && (
                         <div className="max-h-[200px] overflow-y-auto">
                           {displayLeads.map(l => (
-                            <div key={l.id} className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0 flex items-center justify-between text-sm hover:bg-[#101b2a]">
+                            <div key={l.id} className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0 flex items-center justify-between text-sm hover:bg-slate-100 dark:hover:bg-slate-700">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-[#223246] flex items-center justify-center text-xs font-medium">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-medium">
                                   {(l.first_name?.[0] || '?').toUpperCase()}
                                 </div>
                                 <div>
@@ -2556,7 +2639,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -2596,7 +2679,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -2782,7 +2865,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => { setBulkActionModal(null); setBulkAddTagsDropdownOpen(false); }}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -2886,7 +2969,7 @@ export default function LeadsPage() {
                   <button
                     type="button"
                     onClick={() => setBulkRemoveTagsDropdownOpen(!bulkRemoveTagsDropdownOpen)}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-[#101b2a] flex items-center justify-between"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between"
                   >
                     <span className="text-slate-600 dark:text-slate-400">Select or create tags...</span>
                     <span className="text-slate-600 dark:text-slate-400">{bulkRemoveTagsDropdownOpen ? '▲' : '▼'}</span>
@@ -2991,7 +3074,7 @@ export default function LeadsPage() {
                                     setBulkReplaceTags([...bulkReplaceTags, t.name]);
                                   }
                                 }}
-                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-[#101b2a]'}`}
+                                className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 justify-between ${isSelected ? 'bg-sky-500/10' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                               >
                                 <div className="flex items-center gap-2">
                                   {t.color && <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />}
@@ -3047,7 +3130,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => { setBulkActionModal(null); setBulkRemoveTagsDropdownOpen(false); setBulkReplaceTags([]); }}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -3128,7 +3211,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -3193,7 +3276,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -3254,7 +3337,7 @@ export default function LeadsPage() {
             <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
               <button
                 onClick={() => setBulkActionModal(null)}
-                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-[#101b2a]"
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Cancel
               </button>
@@ -3338,24 +3421,48 @@ export default function LeadsPage() {
                           <div className="text-slate-900 dark:text-slate-100">{selectedLead?.state || '—'}</div>
                         </div>
                         <div>
-                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Status</div>
-                          <div className="text-slate-900 dark:text-slate-100 capitalize">{selectedLead?.status || '—'}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Disposition</div>
-                          <div className="text-slate-900 dark:text-slate-100 capitalize">{(selectedLead as any)?.disposition?.replace(/_/g, ' ') || '—'}</div>
+                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-1">Campaign</div>
+                          <div className="text-slate-900 dark:text-slate-100">{campaigns.find(c => c.id === (selectedLead as any)?.campaign_id)?.name || '—'}</div>
                         </div>
                       </div>
-                      {selectedLead?.tags && selectedLead.tags.length > 0 && (
-                        <div className="mt-3">
-                          <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-2">Tags</div>
-                          <div className="flex flex-wrap gap-1">
-                            {selectedLead.tags.map((tag, i) => (
-                              <span key={i} className="px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700 text-gray-900">{tag}</span>
-                            ))}
-                          </div>
+                      <div className="mt-3">
+                        <div className="text-slate-600 dark:text-slate-400 text-xs uppercase mb-2">Pipeline Tags <span className="normal-case font-normal">(click to set primary)</span></div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedLead?.tags && selectedLead.tags.length > 0 ? (
+                            selectedLead.tags.map((tag: string, i: number) => {
+                              const tagInfo = tagsList.find(t => t.name === tag);
+                              return (
+                                <button
+                                  key={i}
+                                  onClick={async () => {
+                                    const newPrimary = selectedLead.primary_tag === tag ? null : tag;
+                                    try {
+                                      await fetch(`/api/leads/${selectedLead.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ primary_tag: newPrimary }),
+                                      });
+                                      setLeads(prev => prev.map(l => String(l.id) === String(selectedLead.id) ? { ...l, primary_tag: newPrimary } : l));
+                                      fetchLeads();
+                                    } catch {}
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                    selectedLead.primary_tag === tag
+                                      ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 ring-1 ring-sky-400'
+                                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                  }`}
+                                  title={selectedLead.primary_tag === tag ? 'Primary tag (click to unset)' : 'Click to set as primary'}
+                                >
+                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tagInfo?.color || '#94a3b8' }} />
+                                  {selectedLead.primary_tag === tag && '★ '}{tag}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <span className="text-xs text-slate-400 dark:text-slate-500">No tags assigned</span>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Activity Timeline */}

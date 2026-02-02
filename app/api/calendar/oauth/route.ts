@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Check if coming from onboarding flow
+    const from = request.nextUrl.searchParams.get('from');
+    const statePayload = JSON.stringify({ userId: user.id, from: from || '' });
+    const stateEncoded = Buffer.from(statePayload).toString('base64');
+
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
         'https://www.googleapis.com/auth/calendar',
         'https://www.googleapis.com/auth/calendar.events'
       ],
-      state: user.id, // Pass user ID to callback
+      state: stateEncoded, // Pass user ID + origin to callback
       prompt: 'consent' // Force consent to get refresh token
     });
 

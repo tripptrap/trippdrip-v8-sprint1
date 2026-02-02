@@ -18,7 +18,6 @@ import {
   XCircle,
   Loader2,
   MoreVertical,
-  Ban,
   Pause,
   Play,
   Trash2,
@@ -166,7 +165,7 @@ export default function AdminPage() {
           userId,
           userEmail: email,
           ...(action === 'suspend' ? { duration: suspendDuration === 'indefinite' ? null : Number(suspendDuration) } : {}),
-          ...((action === 'suspend' || action === 'ban') && actionReason ? { reason: actionReason } : {}),
+          ...(action === 'suspend' && actionReason ? { reason: actionReason } : {}),
         }),
       });
       const data = await res.json();
@@ -316,12 +315,12 @@ export default function AdminPage() {
             </h3>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Premium</span>
-                <span className="text-sm font-medium text-purple-600 dark:text-purple-400">{stats.planBreakdown.premium || 0}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Scale</span>
+                <span className="text-sm font-medium text-purple-600 dark:text-purple-400">{stats.planBreakdown.scale || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Basic</span>
-                <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{stats.planBreakdown.basic || 0}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Growth</span>
+                <span className="text-sm font-medium text-sky-600 dark:text-sky-400">{stats.planBreakdown.growth || 0}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-600 dark:text-slate-400">No Plan</span>
@@ -393,8 +392,8 @@ export default function AdminPage() {
                 className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
               >
                 <option value="all">All Plans</option>
-                <option value="premium">Premium</option>
-                <option value="basic">Basic</option>
+                <option value="scale">Scale</option>
+                <option value="growth">Growth</option>
                 <option value="none">No Plan</option>
               </select>
             </div>
@@ -449,13 +448,13 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      user.plan_type === 'premium'
+                      user.plan_type === 'scale'
                         ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                        : user.plan_type === 'basic'
+                        : user.plan_type === 'growth'
                         ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300'
                         : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                     }`}>
-                      {user.plan_type === 'none' ? 'No Plan' : user.plan_type}
+                      {user.plan_type === 'none' ? 'No Plan' : user.plan_type === 'scale' ? 'Scale' : user.plan_type === 'growth' ? 'Growth' : user.plan_type}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -495,12 +494,7 @@ export default function AdminPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {user.account_status === 'banned' ? (
-                      <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                        <Ban className="w-4 h-4" />
-                        <span className="text-xs">Banned</span>
-                      </div>
-                    ) : user.account_status === 'suspended' ? (
+                    {user.account_status === 'suspended' ? (
                       <div className="flex items-center gap-1 text-orange-500">
                         <Pause className="w-4 h-4" />
                         <span className="text-xs">Suspended</span>
@@ -547,21 +541,6 @@ export default function AdminPage() {
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 dark:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-600"
                             >
                               <Pause className="w-4 h-4" /> Suspend
-                            </button>
-                          )}
-                          {user.account_status === 'banned' ? (
-                            <button
-                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'unban', label: 'unban' }); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-slate-100 dark:hover:bg-slate-600"
-                            >
-                              <Play className="w-4 h-4" /> Unban
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'ban', label: 'ban' }); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-600"
-                            >
-                              <Ban className="w-4 h-4" /> Ban
                             </button>
                           )}
                           <div className="border-t border-slate-200 dark:border-slate-600 my-1" />
@@ -703,11 +682,10 @@ export default function AdminPage() {
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                 confirmAction.action === 'delete' ? 'bg-red-100 dark:bg-red-900/30' :
-                confirmAction.action === 'ban' ? 'bg-red-100 dark:bg-red-900/30' :
                 'bg-orange-100 dark:bg-orange-900/30'
               }`}>
                 <AlertTriangle className={`w-5 h-5 ${
-                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
+                  confirmAction.action === 'delete'
                     ? 'text-red-600 dark:text-red-400'
                     : 'text-orange-600 dark:text-orange-400'
                 }`} />
@@ -720,11 +698,10 @@ export default function AdminPage() {
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
               Are you sure you want to <strong>{confirmAction.label}</strong> this account?
               {confirmAction.action === 'delete' && ' This action cannot be undone.'}
-              {confirmAction.action === 'ban' && ' The user will be permanently blocked from signing in.'}
               {confirmAction.action === 'suspend' && ' The user will be temporarily blocked from signing in.'}
             </p>
 
-            {(confirmAction.action === 'suspend' || confirmAction.action === 'ban') && (
+            {confirmAction.action === 'suspend' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Reason (sent to user via email)
@@ -773,9 +750,9 @@ export default function AdminPage() {
                 onClick={() => handleUserAction(confirmAction.userId, confirmAction.email, confirmAction.action)}
                 disabled={actionLoading}
                 className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 ${
-                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
+                  confirmAction.action === 'delete'
                     ? 'bg-red-600 hover:bg-red-700'
-                    : confirmAction.action === 'unsuspend' || confirmAction.action === 'unban'
+                    : confirmAction.action === 'unsuspend'
                     ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-orange-600 hover:bg-orange-700'
                 }`}

@@ -72,6 +72,13 @@ export default function Page() {
   const [areaCode, setAreaCode] = useState('');
   const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
 
+  // Free number pool
+  const [poolNumbers, setPoolNumbers] = useState<Array<{ id: string; phone_number: string; friendly_name: string | null; number_type: string; region: string | null }>>([]);
+  const [poolLoading, setPoolLoading] = useState(false);
+  const [claimingNumber, setClaimingNumber] = useState(false);
+  const [myTelnyxNumbers, setMyTelnyxNumbers] = useState<Array<{ phone_number: string; friendly_name: string | null; status: string; is_primary: boolean }>>([]);
+  const [telnyxLoading, setTelnyxLoading] = useState(true);
+
   // Quiet hours settings
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
   const [quietHoursStart, setQuietHoursStart] = useState('08:00');
@@ -173,6 +180,74 @@ export default function Page() {
 
     loadData();
   }, []);
+
+  // Fetch Telnyx numbers + pool numbers when numbers tab is active
+  useEffect(() => {
+    if (activeTab === 'numbers') {
+      fetchTelnyxNumbers();
+      fetchPoolNumbers();
+    }
+  }, [activeTab]);
+
+  async function fetchTelnyxNumbers() {
+    setTelnyxLoading(true);
+    try {
+      const res = await fetch('/api/telnyx/numbers');
+      const data = await res.json();
+      if (data.success || data.numbers) {
+        setMyTelnyxNumbers(data.numbers || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch telnyx numbers:', e);
+    } finally {
+      setTelnyxLoading(false);
+    }
+  }
+
+  async function fetchPoolNumbers() {
+    setPoolLoading(true);
+    try {
+      const res = await fetch('/api/number-pool/available');
+      const data = await res.json();
+      if (data.success && data.numbers?.length > 0) {
+        setPoolNumbers(data.numbers);
+      }
+    } catch (e) {
+      console.error('Failed to fetch pool numbers:', e);
+    } finally {
+      setPoolLoading(false);
+    }
+  }
+
+  async function handleClaimPoolNumber(numberId: string) {
+    setClaimingNumber(true);
+    try {
+      const res = await fetch('/api/number-pool/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numberId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Number claimed! You can start sending messages now.');
+        await fetchTelnyxNumbers();
+        await fetchPoolNumbers();
+      } else {
+        toast.error(data.error || 'Failed to claim number');
+      }
+    } catch (e) {
+      toast.error('Failed to claim number');
+    } finally {
+      setClaimingNumber(false);
+    }
+  }
+
+  const formatPhoneNumber = (phone: string) => {
+    const d = phone.replace(/\D/g, '');
+    if (d.length === 11 && d.startsWith('1')) return `+1 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+    return phone;
+  };
 
   const handleCreateTwilioAccount = async () => {
     setCreatingAccount(true);
@@ -692,110 +767,101 @@ export default function Page() {
       {/* Phone Numbers Tab */}
       {activeTab === 'numbers' && (
         <div className="space-y-6">
-          {!hasTwilioAccount ? (
-            <div className="card">
-              <div className="p-6 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                <p className="text-slate-700 dark:text-slate-300">
-                  Please create a Twilio account first in the SMS Provider tab.
-                </p>
-                <button
-                  onClick={() => setActiveTab('sms')}
-                  className="mt-4 bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-4 py-2 rounded-lg hover:opacity-90"
-                >
-                  Go to SMS Provider
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Your Numbers */}
-              <div className="card space-y-4">
-                <h2 className="text-xl font-semibold">Your Phone Numbers</h2>
-                {settings.twilio?.purchasedNumbers && settings.twilio.purchasedNumbers.length > 0 ? (
-                  <div className="space-y-2">
-                    {settings.twilio.purchasedNumbers.map((number) => (
-                      <div
-                        key={number.phoneNumber}
-                        className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-                      >
-                        <div>
-                          <div className="font-mono font-semibold text-lg text-slate-900 dark:text-slate-100">{number.phoneNumber}</div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">
-                            {number.friendlyName} • Added {new Date(number.dateCreated || '').toLocaleDateString()}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleReleaseNumber(number.phoneNumber)}
-                          className="text-red-400 hover:text-red-300 text-sm font-medium px-4 py-2 border border-red-500/50 rounded-lg hover:bg-red-500/10"
-                        >
-                          Release Number
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-6 bg-white dark:bg-slate-800 rounded-lg text-center text-slate-600 dark:text-slate-400">
-                    No phone numbers yet. Search and purchase numbers below.
-                  </div>
-                )}
-              </div>
-
-              {/* Search & Purchase */}
-              <div className="card space-y-4">
-                <h2 className="text-xl font-semibold">Purchase New Numbers</h2>
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={areaCode}
-                    onChange={(e) => setAreaCode(e.target.value)}
-                    placeholder="Area code (optional, e.g., 415)"
-                    className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    maxLength={3}
-                  />
-                  <button
-                    onClick={handleSearchNumbers}
-                    disabled={searchingNumbers}
-                    className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+          {/* Your Numbers */}
+          <div className="card space-y-4">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Your Phone Numbers</h2>
+            {telnyxLoading ? (
+              <div className="p-6 text-center text-slate-500 dark:text-slate-400">Loading numbers...</div>
+            ) : myTelnyxNumbers.length > 0 ? (
+              <div className="space-y-2">
+                {myTelnyxNumbers.map((num) => (
+                  <div
+                    key={num.phone_number}
+                    className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
                   >
-                    {searchingNumbers ? 'Searching...' : 'Search Available Numbers'}
-                  </button>
-                </div>
-
-                {availableNumbers.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Available Numbers ({availableNumbers.length})</h3>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {availableNumbers.map((number) => (
-                        <div
-                          key={number.phoneNumber}
-                          className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-[var(--accent)]"
-                        >
-                          <div>
-                            <div className="font-mono font-semibold">{number.phoneNumber}</div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              {number.locality}, {number.region}
-                              {' • '}
-                              {number.capabilities.sms && 'SMS '}
-                              {number.capabilities.mms && 'MMS '}
-                              {number.capabilities.voice && 'Voice'}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handlePurchaseNumber(number.phoneNumber)}
-                            disabled={purchasingNumber === number.phoneNumber}
-                            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 text-sm font-medium"
-                          >
-                            {purchasingNumber === number.phoneNumber ? 'Purchasing...' : 'Purchase (~$1/mo)'}
-                          </button>
-                        </div>
-                      ))}
+                    <div>
+                      <div className="font-mono font-semibold text-lg text-slate-900 dark:text-slate-100">
+                        {formatPhoneNumber(num.phone_number)}
+                      </div>
+                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                        {num.friendly_name || 'Toll-Free'} • {num.status || 'Active'}
+                        {num.is_primary && <span className="ml-2 text-sky-600 font-medium">★ Primary</span>}
+                      </div>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
-            </>
+            ) : (
+              <div className="p-6 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/50 text-center">
+                <p className="text-slate-700 dark:text-slate-300 font-medium mb-1">No phone number selected</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">You need a phone number to send and receive messages. Claim a free one below!</p>
+              </div>
+            )}
+          </div>
+
+          {/* Free Number Pool */}
+          {myTelnyxNumbers.length === 0 && (
+            <div className="card space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">FREE</span>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Claim a Phone Number</h2>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Select a toll-free number included with your plan. No extra cost.
+                </p>
+              </div>
+
+              {poolLoading ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  <div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                  Searching for available numbers...
+                </div>
+              ) : poolNumbers.length > 0 ? (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {poolNumbers.map((num) => (
+                    <div
+                      key={num.id}
+                      className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-sky-300 dark:hover:border-sky-600 transition-colors"
+                    >
+                      <div>
+                        <div className="font-mono font-semibold text-lg text-slate-900 dark:text-slate-100">
+                          {formatPhoneNumber(num.phone_number)}
+                        </div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {num.number_type === 'tollfree' ? 'Toll-Free' : 'Local'}
+                          {num.region && ` • ${num.region}`}
+                          <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">Free with plan</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleClaimPoolNumber(num.id)}
+                        disabled={claimingNumber}
+                        className="bg-sky-500 hover:bg-sky-600 text-white px-5 py-2 rounded-lg disabled:opacity-50 text-sm font-medium transition-colors"
+                      >
+                        {claimingNumber ? 'Claiming...' : 'Claim'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  <p className="mb-2">No pool numbers available right now.</p>
+                  <p className="text-sm">Visit the <a href="/phone-numbers" className="text-sky-600 dark:text-sky-400 hover:underline">Phone Numbers</a> page to search and purchase a number.</p>
+                </div>
+              )}
+            </div>
           )}
+
+          {/* Link to full phone numbers page */}
+          <div className="text-center">
+            <a
+              href="/phone-numbers"
+              className="text-sm text-sky-600 dark:text-sky-400 hover:underline"
+            >
+              Need more options? Go to the full Phone Numbers page →
+            </a>
+          </div>
         </div>
       )}
 

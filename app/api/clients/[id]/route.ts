@@ -3,52 +3,46 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-// GET a single lead by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient();
-
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
     }
 
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+    const { data: client, error } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("id", params.id)
+      .eq("user_id", user.id)
       .single();
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true, lead });
+    return NextResponse.json({ ok: true, client });
   } catch (error: any) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }
 
-// PATCH (update) a lead by ID
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient();
-
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await req.json();
-
-    // Build update object with only provided fields
     const updateData: any = {};
 
     if (body.first_name !== undefined) updateData.first_name = body.first_name;
@@ -57,66 +51,69 @@ export async function PATCH(
     if (body.email !== undefined) updateData.email = body.email;
     if (body.state !== undefined) updateData.state = body.state;
     if (body.zip_code !== undefined) updateData.zip_code = body.zip_code;
-    if (body.tags !== undefined) {
-      console.log('Saving tags:', body.tags, 'type:', typeof body.tags, 'isArray:', Array.isArray(body.tags));
-      updateData.tags = body.tags;
-    }
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.disposition !== undefined) updateData.disposition = body.disposition;
-    if (body.temperature !== undefined) updateData.temperature = body.temperature;
-    if (body.source !== undefined) updateData.source = body.source;
+    if (body.tags !== undefined) updateData.tags = body.tags;
     if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.primary_tag !== undefined) updateData.primary_tag = body.primary_tag;
+    if (body.campaign_id !== undefined) updateData.campaign_id = body.campaign_id;
 
-    updateData.updated_at = new Date().toISOString();
-
-    const { data: lead, error } = await supabase
-      .from('leads')
+    const { data: client, error } = await supabase
+      .from("clients")
       .update(updateData)
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq("id", params.id)
+      .eq("user_id", user.id)
       .select()
       .single();
 
     if (error) {
-      console.error('Error updating lead:', error);
+      console.error("Error updating client:", error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, lead });
+    return NextResponse.json({ ok: true, client });
   } catch (error: any) {
-    console.error('Error in PATCH /api/leads/[id]:', error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }
 
-// DELETE a lead by ID
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const supabase = await createClient();
-
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Get client to find original lead
+    const { data: client } = await supabase
+      .from("clients")
+      .select("original_lead_id")
+      .eq("id", params.id)
+      .eq("user_id", user.id)
+      .single();
+
+    // Clear client_id on original lead if it exists
+    if (client?.original_lead_id) {
+      await supabase
+        .from("leads")
+        .update({ client_id: null })
+        .eq("id", client.original_lead_id)
+        .eq("user_id", user.id);
     }
 
     const { error } = await supabase
-      .from('leads')
+      .from("clients")
       .delete()
-      .eq('id', params.id)
-      .eq('user_id', user.id);
+      .eq("id", params.id)
+      .eq("user_id", user.id);
 
     if (error) {
-      console.error('Error deleting lead:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, message: 'Lead deleted successfully' });
+    return NextResponse.json({ ok: true, message: "Client deleted" });
   } catch (error: any) {
-    console.error('Error in DELETE /api/leads/[id]:', error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

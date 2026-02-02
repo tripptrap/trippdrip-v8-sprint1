@@ -7,17 +7,17 @@ import Stripe from 'stripe';
 // Stripe Price IDs
 const STRIPE_PRICES = {
   subscriptions: {
-    basic: 'price_1SQtYHFyk0lZUopFNa0lT81K',
-    premium: 'price_1SQtaUFyk0lZUopFRJnuLftL'
+    growth: 'price_1SQtYHFyk0lZUopFNa0lT81K',
+    scale: 'price_1SQtaUFyk0lZUopFRJnuLftL'
   },
   pointPacks: {
-    basic: {
+    growth: {
       starter: 'price_1SQtbMFyk0lZUopFleqbdgVZ',
       pro: 'price_1SQtbuFyk0lZUopFbBFafou0',
       business: 'price_1SQtciFyk0lZUopFP2ATsGyR',
       enterprise: 'price_1SQtdJFyk0lZUopFuSaGfzU3'
     },
-    premium: {
+    scale: {
       starter: 'price_1SQtduFyk0lZUopFApnLorDd',
       pro: 'price_1SQteQFyk0lZUopF63RURC72',
       business: 'price_1SQteyFyk0lZUopFH9S2ebtD',
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
     if (subscriptionType) {
       // Handle subscription checkout
       mode = 'subscription';
-      successUrl = `${baseUrl}/leads?success=true&session_id={CHECKOUT_SESSION_ID}`;
-      priceId = subscriptionType === 'premium'
-        ? STRIPE_PRICES.subscriptions.premium
-        : STRIPE_PRICES.subscriptions.basic;
+      successUrl = `${baseUrl}/auth/onboarding?step=2&success=true&session_id={CHECKOUT_SESSION_ID}`;
+      priceId = subscriptionType === 'scale'
+        ? STRIPE_PRICES.subscriptions.scale
+        : STRIPE_PRICES.subscriptions.growth;
     } else {
       // Handle point pack checkout
-      const userPlan = planType === 'premium' ? 'premium' : 'basic';
+      const userPlan = planType === 'scale' ? 'scale' : 'growth';
       const packType = packName.toLowerCase();
 
       if (packType.includes('starter')) {
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         points: points?.toString() || '0',
         packName: packName || subscriptionType,
-        planType: planType || subscriptionType || 'basic'
+        planType: planType || subscriptionType || 'growth'
       }
     });
 

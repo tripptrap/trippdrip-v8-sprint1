@@ -8,12 +8,14 @@ import ThemeSelectionModal from "@/components/ThemeSelectionModal"
 import OnboardingTour from "@/components/OnboardingTour"
 import OnboardingCongratsModal from "@/components/OnboardingCongratsModal"
 import { ThemeProvider } from "@/lib/ThemeContext"
+import { OnboardingProvider } from "@/lib/OnboardingContext"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <ThemeProvider>
+    <OnboardingProvider>
       <div className="min-h-screen flex bg-white dark:bg-slate-900 relative text-slate-900 dark:text-slate-100 transition-colors duration-200">
         {/* Demo Mode Banner */}
         <DemoModeBanner />
@@ -74,6 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* 4. Congratulations Modal - final step */}
         <OnboardingCongratsModal />
       </div>
+    </OnboardingProvider>
     </ThemeProvider>
   )
 }

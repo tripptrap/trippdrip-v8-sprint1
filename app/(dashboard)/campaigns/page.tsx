@@ -650,7 +650,7 @@ export default function CampaignsPage() {
                   <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#223246]">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredCampaigns.map((campaign) => (
                   <tr key={campaign.id} className="hover:bg-slate-50 dark:bg-slate-800/50">
                     <td className="px-4 py-3">

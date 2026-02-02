@@ -4,49 +4,32 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '@/lib/ThemeContext';
 import { Sun, Moon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const THEME_SELECTED_KEY = 'theme_selection_shown';
-const PHONE_SELECTED_KEY = 'onboarding_phone_selected';
+import { useOnboarding } from '@/lib/OnboardingContext';
 
 export default function ThemeSelectionModal() {
   const [isOpen, setIsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { state, loading, updateState } = useOnboarding();
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark'>(theme);
 
   useEffect(() => {
-    // Check if user has already seen the theme selection
-    const hasSeenModal = localStorage.getItem(THEME_SELECTED_KEY);
-    if (!hasSeenModal) {
-      // Wait for phone selection to be completed first
-      const checkPhoneSelection = () => {
-        const phoneComplete = localStorage.getItem(PHONE_SELECTED_KEY);
-        if (phoneComplete) {
-          setIsOpen(true);
-          return true;
-        }
-        return false;
-      };
-
-      // Check immediately, then poll if not ready
-      if (!checkPhoneSelection()) {
-        const interval = setInterval(() => {
-          if (checkPhoneSelection()) {
-            clearInterval(interval);
-          }
-        }, 500);
-        return () => clearInterval(interval);
-      }
+    if (loading) return;
+    // Show when phone is done but theme hasn't been selected yet
+    if (state.phone_selected && !state.theme_selected) {
+      const timer = setTimeout(() => setIsOpen(true), 500);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [loading, state.phone_selected, state.theme_selected]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setTheme(selectedTheme);
-    localStorage.setItem(THEME_SELECTED_KEY, 'true');
+    await updateState({ theme_selected: true });
     setIsOpen(false);
   };
 
-  const handleSkip = () => {
-    localStorage.setItem(THEME_SELECTED_KEY, 'true');
+  const handleSkip = async () => {
+    setTheme('light'); // Default to light on skip
+    await updateState({ theme_selected: true });
     setIsOpen(false);
   };
 

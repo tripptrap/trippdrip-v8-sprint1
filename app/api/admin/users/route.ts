@@ -143,10 +143,10 @@ export async function GET(req: NextRequest) {
     // Format user data
     const users = authUsers.users.map((authUser) => {
       const userData = userDataByEmail[(authUser.email || '').toLowerCase()];
-      // Map subscription_tier: "premium" -> premium, "basic" -> basic, "free"/null -> none
+      // Map subscription_tier to display names
       const tier = userData?.subscription_tier || userData?.plan_type || null;
-      const planType = tier === 'premium' || tier === 'professional' ? 'premium' :
-                       tier === 'basic' || tier === 'starter' ? 'basic' : 'none';
+      const planType = tier === 'scale' ? 'scale' :
+                       tier === 'growth' ? 'growth' : 'none';
       // Credits from users table
       const credits = userData?.credits || 0;
       return {
@@ -160,7 +160,9 @@ export async function GET(req: NextRequest) {
         created_at: authUser.created_at,
         last_sign_in: authUser.last_sign_in_at,
         email_confirmed: authUser.email_confirmed_at ? true : false,
-        account_status: userData?.account_status || ((authUser as any).banned_until ? 'suspended' : 'active'),
+        account_status: userData?.account_status || (
+          (authUser as any).banned_until && new Date((authUser as any).banned_until) > new Date() ? 'banned' : 'active'
+        ),
         plan_type: planType,
         points_balance: credits,
         total_spent: totalSpentByUser[authUser.id] || 0,

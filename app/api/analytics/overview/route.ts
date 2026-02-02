@@ -63,12 +63,11 @@ export async function GET(req: NextRequest) {
       ? parseFloat(((threadsWithResponses / (threads?.length || 1)) * 100).toFixed(1))
       : 0;
 
-    // Get sold leads count
+    // Get clients count from clients table
     const { count: soldLeads } = await supabase
-      .from('leads')
+      .from('clients')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('disposition', 'sold');
+      .eq('user_id', user.id);
 
     // Conversion rate: % of leads marked as "sold"
     const conversionRate = totalLeads && totalLeads > 0

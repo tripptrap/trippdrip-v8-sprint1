@@ -27,10 +27,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=not_authenticated`);
     }
 
+    // Decode state payload (supports both new JSON format and legacy plain user ID)
+    let stateUserId = state;
+    let stateFrom = '';
+    if (state) {
+      try {
+        const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
+        stateUserId = decoded.userId;
+        stateFrom = decoded.from || '';
+      } catch {
+        // Legacy format: state is just the user ID
+        stateUserId = state;
+      }
+    }
+
     // Validate state matches authenticated user (optional security check)
-    if (state && state !== user.id) {
+    if (stateUserId && stateUserId !== user.id) {
       console.error('OAuth state mismatch - possible CSRF attempt');
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=invalid_state`);
+      const errorRedirect = stateFrom === 'onboarding'
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=5&calendar_error=invalid_state`
+        : `${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=invalid_state`;
+      return NextResponse.redirect(errorRedirect);
     }
 
     const oauth2Client = new google.auth.OAuth2(
@@ -62,7 +79,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=save_error`);
     }
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_connected=true`);
+    const successRedirect = stateFrom === 'onboarding'
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=5&calendar_connected=true`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_connected=true`;
+    return NextResponse.redirect(successRedirect);
   } catch (error: any) {
     console.error('OAuth callback error:', error);
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=unexpected`);

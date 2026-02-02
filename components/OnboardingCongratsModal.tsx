@@ -4,11 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PartyPopper, Check, Phone, CreditCard, Zap, ArrowRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const ONBOARDING_COMPLETED_KEY = 'onboarding_completed';
-const PHONE_SELECTED_KEY = 'onboarding_phone_selected';
-const THEME_SELECTED_KEY = 'theme_selection_shown';
-const TOUR_COMPLETED_KEY = 'onboarding_tour_completed';
+import { useOnboarding } from '@/lib/OnboardingContext';
 
 interface UserInfo {
   plan: string | null;
@@ -18,33 +14,17 @@ interface UserInfo {
 
 export default function OnboardingCongratsModal() {
   const router = useRouter();
+  const { state, loading, updateState } = useOnboarding();
   const [isOpen, setIsOpen] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   useEffect(() => {
-    // Check if all previous steps are complete and this hasn't been shown
-    const checkAndShow = () => {
-      const phoneComplete = localStorage.getItem(PHONE_SELECTED_KEY);
-      const themeComplete = localStorage.getItem(THEME_SELECTED_KEY);
-      const tourComplete = localStorage.getItem(TOUR_COMPLETED_KEY);
-      const alreadyShown = localStorage.getItem(ONBOARDING_COMPLETED_KEY);
-
-      // Only show if:
-      // 1. Phone selection is done (selected or skipped)
-      // 2. Theme selection is done
-      // 3. Tour is complete
-      // 4. This modal hasn't been shown yet
-      if (phoneComplete && themeComplete && tourComplete && !alreadyShown) {
-        fetchUserInfo();
-      }
-    };
-
-    // Check on mount and set up interval to check for tour completion
-    const interval = setInterval(checkAndShow, 1000);
-    checkAndShow();
-
-    return () => clearInterval(interval);
-  }, []);
+    if (loading) return;
+    // Show when all steps done but not yet completed
+    if (state.phone_selected && state.theme_selected && state.tour_completed && !state.completed) {
+      fetchUserInfo();
+    }
+  }, [loading, state.phone_selected, state.theme_selected, state.tour_completed, state.completed]);
 
   const fetchUserInfo = async () => {
     try {
@@ -76,20 +56,20 @@ export default function OnboardingCongratsModal() {
     }
   };
 
-  const handleGetStarted = () => {
-    localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+  const handleGetStarted = async () => {
+    await updateState({ completed: true });
     setIsOpen(false);
   };
 
   const getPlanName = (tier: string | null | undefined) => {
-    if (tier === 'premium') return 'Premium';
-    if (tier === 'basic') return 'Basic';
+    if (tier === 'scale') return 'Scale';
+    if (tier === 'growth') return 'Growth';
     return 'Free';
   };
 
   const getPlanCredits = (tier: string | null | undefined) => {
-    if (tier === 'premium') return '10,000';
-    if (tier === 'basic') return '3,000';
+    if (tier === 'scale') return '10,000';
+    if (tier === 'growth') return '3,000';
     return '0';
   };
 
@@ -247,8 +227,8 @@ export default function OnboardingCongratsModal() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.6 }}
-                    onClick={() => {
-                      localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+                    onClick={async () => {
+                      await updateState({ completed: true });
                       setIsOpen(false);
                       router.push('/phone-numbers');
                     }}

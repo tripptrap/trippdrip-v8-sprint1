@@ -34,24 +34,20 @@ export default function LoginPage() {
       })
 
       if (error) {
-        // Check if the error is related to a banned/suspended user
-        const errorMsg = error.message.toLowerCase()
-        if (errorMsg.includes('banned') || errorMsg.includes('suspended')) {
-          // Fetch account status details
-          try {
-            const statusRes = await fetch('/api/auth/account-status', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email }),
-            })
-            const statusData = await statusRes.json()
-            if (statusData.status === 'banned' || statusData.status === 'suspended') {
-              setAccountStatus(statusData)
-              return
-            }
-          } catch {
-            // Fall through to generic error
+        // Check if user is banned/suspended — Supabase may return generic errors for banned users
+        try {
+          const statusRes = await fetch('/api/auth/account-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          })
+          const statusData = await statusRes.json()
+          if (statusData.status === 'banned' || statusData.status === 'suspended') {
+            setAccountStatus(statusData)
+            return
           }
+        } catch {
+          // Fall through to generic error
         }
         toast.error(error.message)
         return
@@ -69,13 +65,13 @@ export default function LoginPage() {
           console.error('Error checking user plan:', userError)
         }
 
-        // If no plan selected or on free, redirect to onboarding
-        if (!userData || !userData.subscription_tier || userData.subscription_tier === 'free') {
+        // If no plan selected or unpaid, redirect to onboarding
+        if (!userData || !userData.subscription_tier || userData.subscription_tier === 'unpaid') {
           toast.success('Welcome! Please select your plan.')
           router.push('/auth/onboarding')
         } else {
           toast.success('Successfully logged in!')
-          router.push('/leads')
+          router.push('/dashboard')
         }
         router.refresh()
       }

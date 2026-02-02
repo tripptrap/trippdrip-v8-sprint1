@@ -58,17 +58,21 @@ export async function POST(req: NextRequest) {
         }
 
         // Update users table account_status, reason, and suspended_until
-        if (userEmail) {
-          await adminClient
-            .from('users')
-            .update({
-              account_status: 'suspended',
-              suspension_reason: reason || 'Violation of terms of service',
-              suspended_until: suspendedUntil,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('email', userEmail.toLowerCase());
+        {
+          const updateData = {
+            account_status: 'suspended',
+            suspension_reason: reason || 'Violation of terms of service',
+            suspended_until: suspendedUntil,
+            updated_at: new Date().toISOString(),
+          };
+          // Try by email first, then by id
+          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
+          if (!count || count === 0) {
+            await adminClient.from('users').update(updateData).eq('id', userId);
+          }
+        }
 
+        if (userEmail) {
           // Send notification email
           try {
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
@@ -107,16 +111,17 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: unbanError.message }, { status: 500 });
         }
 
-        if (userEmail) {
-          await adminClient
-            .from('users')
-            .update({
-              account_status: 'active',
-              suspension_reason: null,
-              suspended_until: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('email', userEmail.toLowerCase());
+        {
+          const updateData = {
+            account_status: 'active',
+            suspension_reason: null,
+            suspended_until: null,
+            updated_at: new Date().toISOString(),
+          };
+          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
+          if (!count || count === 0) {
+            await adminClient.from('users').update(updateData).eq('id', userId);
+          }
         }
 
         return NextResponse.json({ ok: true, message: 'User unsuspended' });
@@ -132,17 +137,20 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: banError.message }, { status: 500 });
         }
 
-        if (userEmail) {
-          await adminClient
-            .from('users')
-            .update({
-              account_status: 'banned',
-              suspension_reason: reason || 'Violation of terms of service',
-              suspended_until: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('email', userEmail.toLowerCase());
+        {
+          const updateData = {
+            account_status: 'banned',
+            suspension_reason: reason || 'Violation of terms of service',
+            suspended_until: null,
+            updated_at: new Date().toISOString(),
+          };
+          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
+          if (!count || count === 0) {
+            await adminClient.from('users').update(updateData).eq('id', userId);
+          }
+        }
 
+        if (userEmail) {
           // Send notification email
           try {
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
@@ -179,16 +187,17 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: unbanError.message }, { status: 500 });
         }
 
-        if (userEmail) {
-          await adminClient
-            .from('users')
-            .update({
-              account_status: 'active',
-              suspension_reason: null,
-              suspended_until: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('email', userEmail.toLowerCase());
+        {
+          const updateData = {
+            account_status: 'active',
+            suspension_reason: null,
+            suspended_until: null,
+            updated_at: new Date().toISOString(),
+          };
+          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
+          if (!count || count === 0) {
+            await adminClient.from('users').update(updateData).eq('id', userId);
+          }
         }
 
         return NextResponse.json({ ok: true, message: 'User unbanned' });
@@ -202,12 +211,12 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: deleteError.message }, { status: 500 });
         }
 
-        // Clean up users table row
-        if (userEmail) {
-          await adminClient
-            .from('users')
-            .delete()
-            .eq('email', userEmail.toLowerCase());
+        // Clean up users table row — try email first, then id
+        {
+          const { count } = await adminClient.from('users').delete().eq('email', (userEmail || '').toLowerCase());
+          if (!count || count === 0) {
+            await adminClient.from('users').delete().eq('id', userId);
+          }
         }
 
         return NextResponse.json({ ok: true, message: 'User deleted' });

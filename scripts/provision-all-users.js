@@ -81,7 +81,7 @@ async function provisionAllUsers() {
   const { data: users, error } = await supabase
     .from('users')
     .select('id, email, subscription_tier')
-    .neq('subscription_tier', 'free')
+    .neq('subscription_tier', 'unpaid')
     .order('created_at', { ascending: false });
 
   if (error) {

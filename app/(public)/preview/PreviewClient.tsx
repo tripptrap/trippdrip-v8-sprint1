@@ -7,7 +7,7 @@ import { SUBSCRIPTION_FEATURES } from "@/lib/subscriptionFeatures";
 import TelnyxDiamond from "@/components/preview/TelnyxDiamond";
 
 export default function PreviewClient() {
-  const [selectedPlan, setSelectedPlan] = useState<string>('basic');
+  const [selectedPlan, setSelectedPlan] = useState<string>('growth');
   const [showDemo, setShowDemo] = useState(false);
   const [demoTab, setDemoTab] = useState('dashboard');
   const [selectedConversation, setSelectedConversation] = useState(0);
@@ -186,7 +186,7 @@ export default function PreviewClient() {
               transition={{ duration: 0.6 }}
               className="inline-block mb-4 px-4 py-2 bg-teal-50 border border-teal-200 rounded-full text-teal-600 text-sm font-medium"
             >
-              AI-Powered SMS & Email Marketing
+              AI-Powered SMS Marketing
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 25 }}
@@ -207,7 +207,7 @@ export default function PreviewClient() {
               transition={{ delay: 0.4, duration: 0.8 }}
               className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-2xl"
             >
-              Automate personalized conversations, nurture leads with AI, and close more deals with intelligent SMS and email campaigns.
+              Automate personalized conversations, nurture leads with AI, and close more deals with intelligent SMS campaigns.
             </motion.p>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -309,7 +309,7 @@ export default function PreviewClient() {
             Everything You Need to Dominate Your Market
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-            A complete SMS & email marketing platform built specifically for insurance agents, real estate professionals, and sales teams.
+            A complete SMS marketing platform built specifically for insurance agents, real estate professionals, and sales teams.
           </p>
         </motion.div>
 
@@ -646,7 +646,7 @@ export default function PreviewClient() {
             },
             {
               q: 'What happens if I run out of credits?',
-              a: 'You can purchase additional credit packs anytime at discounted rates (up to 20% off with Professional plan). Your campaigns will pause if you run out, and you\'ll be notified before that happens.'
+              a: 'You can purchase additional credit packs anytime at discounted rates (up to 30% off with Professional plan). Your campaigns will pause if you run out, and you\'ll be notified before that happens.'
             },
             {
               q: 'Can I import my existing leads?',
@@ -836,7 +836,7 @@ export default function PreviewClient() {
         </div>
       </div>
 
-      {/* Comparison Section */}
+      {/* Why HyveWyre Section */}
       <div className="max-w-7xl mx-auto px-6 py-20">
         <motion.div
           initial={{ opacity: 0 }}
@@ -849,240 +849,11 @@ export default function PreviewClient() {
             Why Choose HyveWyre™?
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're not just another marketing platform. Here's how we stack up against the competition.
+            Built from the ground up for insurance agents, real estate pros, and sales teams.
           </p>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="overflow-x-auto"
-        >
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-gray-300">
-                <th className="text-left p-4 text-gray-600 font-medium">Feature</th>
-                <th className="p-4 text-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-lg">
-                    <div className="w-8 h-8 bg-gradient-to-br from-teal-600 to-cyan-600 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-xs">HW</span>
-                    </div>
-                    <span className="text-gray-900 font-bold">HyveWyre™</span>
-                  </div>
-                </th>
-                <th className="p-4 text-center text-gray-600 font-medium">Competitor A</th>
-                <th className="p-4 text-center text-gray-600 font-medium">Competitor B</th>
-                <th className="p-4 text-center text-gray-600 font-medium">Competitor C</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">AI-Powered Responses</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Basic</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-xl">✗</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Limited</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">SMS + Email Combined</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-sm">SMS Only</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Instant Number Access</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-sm">1-7 days</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-sm">1-7 days</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-gray-500/20 rounded-full">
-                    <span className="text-gray-400 text-sm">N/A</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Built-in CRM</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Basic</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Sentiment Analysis</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-xl">✗</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-xl">✗</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-xl">✗</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Smart Auto-Replies</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Basic</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Basic</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-sm">Basic</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Drag & Drop Campaigns</td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500/20 rounded-full">
-                    <span className="text-yellow-400 text-xl">✓</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
-                    <span className="text-red-400 text-xl">✗</span>
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="inline-flex items-center justify-center w-8 h-8 bg-teal-100 rounded-full">
-                    <span className="text-teal-600 text-xl">✓</span>
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="border-b border-gray-200 hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Starting Price</td>
-                <td className="p-4 text-center">
-                  <span className="text-teal-600 font-bold">$30/mo</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">$25-$100/mo</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">$109/mo</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">$29-$259/mo</span>
-                </td>
-              </tr>
-
-              <tr className="hover:bg-white transition-colors">
-                <td className="p-4 text-gray-900">Setup Time</td>
-                <td className="p-4 text-center">
-                  <span className="text-teal-600 font-bold">5 minutes</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">1-2 hours</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">30-45 minutes</span>
-                </td>
-                <td className="p-4 text-center">
-                  <span className="text-gray-600">1 hour</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </motion.div>
-
-        {/* Key Differentiators */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1103,7 +874,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Start Messaging Instantly</h3>
             <p className="text-gray-500">
-              Unlike competitors where you wait 1-7 days for A2P verification, claim a pre-verified number from our shared pool and start sending messages in seconds.
+              No waiting days for number verification. Claim a pre-verified number from our shared pool and start sending messages in seconds.
             </p>
           </motion.div>
 
@@ -1127,7 +898,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">True AI Intelligence</h3>
             <p className="text-gray-500">
-              While others offer basic automation, we provide GPT-4 powered responses, sentiment analysis, and smart replies that actually understand context and tone.
+              GPT-4 powered responses, sentiment analysis, and smart replies that actually understand context and tone. Not just basic keyword matching.
             </p>
           </motion.div>
 
@@ -1151,7 +922,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">All-in-One Platform</h3>
             <p className="text-gray-500">
-              Why pay $25-$259/mo for competitors when you get SMS, email, built-in CRM, AI automation, and sentiment analysis in one platform for just $30/mo?
+              SMS, built-in CRM, AI automation, lead scoring, drip campaigns, and sentiment analysis — all in one platform starting at just $30/mo.
             </p>
           </motion.div>
         </div>
@@ -1190,22 +961,22 @@ export default function PreviewClient() {
             className="p-8 bg-white border-2 border-gray-200 rounded-2xl hover:border-teal-400 transition-all"
           >
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Starter</h3>
-              <div className="text-5xl font-bold text-gray-900 mb-2">$30</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Growth</h3>
+              <div className="text-5xl font-bold text-gray-900 mb-2">${SUBSCRIPTION_FEATURES.growth.price}</div>
               <div className="text-gray-600">per month</div>
             </div>
             <div className="space-y-4 mb-8">
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">{SUBSCRIPTION_FEATURES.starter.monthlyCredits.toLocaleString()} credits/month</span>
+                <span className="text-gray-700">{SUBSCRIPTION_FEATURES.growth.monthlyCredits.toLocaleString()} credits/month</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Up to {SUBSCRIPTION_FEATURES.starter.maxContacts.toLocaleString()} contacts</span>
+                <span className="text-gray-700">Unlimited contacts</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">{SUBSCRIPTION_FEATURES.starter.maxCampaigns} campaigns</span>
+                <span className="text-gray-700">Unlimited campaigns</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1213,24 +984,28 @@ export default function PreviewClient() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
+                <span className="text-gray-700">AI Receptionist</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Bulk messaging</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Email integration</span>
+                <span className="text-gray-700">Advanced analytics</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">{SUBSCRIPTION_FEATURES.starter.pointPackDiscount}% off point packs</span>
+                <span className="text-gray-700">Up to {SUBSCRIPTION_FEATURES.growth.pointPackDiscount}% off point packs</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Priority email support</span>
+                <span className="text-gray-700">Priority support</span>
               </div>
             </div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Link
-                href="/auth/register?plan=starter"
+                href="/auth/register?plan=growth"
                 className="block w-full py-3 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-lg text-center transition-all"
               >
                 Get Started
@@ -1248,34 +1023,51 @@ export default function PreviewClient() {
               scale: 1.05,
               rotateX: 5,
               rotateY: 5,
-              boxShadow: "0px 20px 45px rgba(20, 184, 166, 0.4)",
+              boxShadow: "0px 25px 50px rgba(20, 184, 166, 0.45)",
             }}
-            className="relative p-8 bg-gradient-to-br from-teal-50 to-cyan-50 border-2 border-teal-400 rounded-2xl"
+            className="relative p-8 bg-gradient-to-br from-teal-50 via-white to-cyan-50 border-2 border-teal-400 rounded-2xl shadow-xl shadow-teal-500/10"
           >
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold px-4 py-1 rounded-full">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold px-5 py-1.5 rounded-full shadow-lg shadow-teal-500/30">
               MOST POPULAR
             </div>
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Professional</h3>
-              <div className="text-5xl font-bold text-gray-900 mb-2">$98</div>
+
+            {/* Savings callout */}
+            <div className="absolute top-4 right-4">
+              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                SAVE UP TO 30%
+              </span>
+            </div>
+
+            <div className="text-center mb-6 pt-2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Scale</h3>
+              <div className="text-5xl font-bold text-gray-900 mb-1">${SUBSCRIPTION_FEATURES.scale.price}</div>
               <div className="text-gray-600">per month</div>
+              <div className="mt-2 text-sm text-teal-600 font-medium">3.3x more credits than Growth</div>
             </div>
             <div className="space-y-4 mb-8">
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-900 font-semibold">{SUBSCRIPTION_FEATURES.professional.monthlyCredits.toLocaleString()} credits/month</span>
+                <span className="text-gray-900 font-semibold">{SUBSCRIPTION_FEATURES.scale.monthlyCredits.toLocaleString()} credits/month</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-900 font-semibold">Unlimited contacts</span>
+                <span className="text-gray-700">Unlimited contacts</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-900 font-semibold">Unlimited campaigns</span>
+                <span className="text-gray-700">Unlimited campaigns</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Advanced AI (GPT-4)</span>
+                <span className="text-gray-700">AI responses & generation</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-teal-600 text-xl">✓</span>
+                <span className="text-gray-700">AI Receptionist</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-teal-600 text-xl">✓</span>
+                <span className="text-gray-700">Bulk messaging</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1283,19 +1075,10 @@ export default function PreviewClient() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Custom branding</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">API & Webhooks</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">{SUBSCRIPTION_FEATURES.professional.pointPackDiscount}% off point packs</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Dedicated account manager</span>
+                <div>
+                  <span className="text-gray-900 font-semibold">Up to {SUBSCRIPTION_FEATURES.scale.pointPackDiscount}% off point packs</span>
+                  <div className="text-xs text-teal-600 mt-0.5">Best rates on additional credits</div>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1304,8 +1087,8 @@ export default function PreviewClient() {
             </div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Link
-                href="/auth/register?plan=professional"
-                className="block w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-teal-600 text-white font-semibold rounded-lg text-center transition-all"
+                href="/auth/register?plan=scale"
+                className="block w-full py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold rounded-lg text-center transition-all shadow-lg shadow-teal-500/25 text-lg"
               >
                 Get Started
               </Link>

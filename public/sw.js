@@ -40,8 +40,12 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Skip API calls and external requests
-  if (event.request.url.includes('/api/') || !event.request.url.startsWith(self.location.origin)) {
+  // Skip API calls, auth routes, and external requests
+  if (
+    event.request.url.includes('/api/') ||
+    event.request.url.includes('/auth/') ||
+    !event.request.url.startsWith(self.location.origin)
+  ) {
     return;
   }
 

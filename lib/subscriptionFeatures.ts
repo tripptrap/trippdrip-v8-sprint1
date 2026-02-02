@@ -1,7 +1,7 @@
 // Subscription Features and Benefits System
 import { createClient } from "@/lib/supabase/client";
 
-export type SubscriptionTier = 'preview' | 'starter' | 'professional';
+export type SubscriptionTier = 'unpaid' | 'growth' | 'scale';
 
 export interface SubscriptionFeatures {
   // Core Benefits
@@ -51,7 +51,7 @@ export interface SubscriptionFeatures {
 }
 
 export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeatures> = {
-  preview: {
+  unpaid: {
     monthlyCredits: 0,
     price: 0,
     maxContacts: 0,
@@ -81,37 +81,37 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     receptionistMode: false
   },
 
-  starter: {
+  growth: {
     monthlyCredits: 3000,
     price: 30,
-    maxContacts: 5000,
-    maxCampaigns: 20,
-    maxFlows: 10,
-    maxTemplates: 50,
+    maxContacts: -1, // Unlimited
+    maxCampaigns: -1, // Unlimited
+    maxFlows: -1, // Unlimited
+    maxTemplates: -1, // Unlimited
     aiResponses: true,
     aiFlowGeneration: true,
     aiDocumentProcessing: true,
-    advancedAI: false,
+    advancedAI: true,
     bulkMessaging: true,
     scheduledMessages: true,
     automatedFollowUps: true,
     emailIntegration: true,
     basicAnalytics: true,
-    advancedAnalytics: false,
-    customReports: false,
+    advancedAnalytics: true,
+    customReports: true,
     exportData: true,
-    supportLevel: 'email',
-    customBranding: false,
-    apiAccess: false,
-    webhooks: false,
+    supportLevel: 'priority',
+    customBranding: true,
+    apiAccess: true,
+    webhooks: true,
     pointPackDiscount: 10,
-    priorityDelivery: false,
-    dedicatedNumber: false,
-    customIntegrations: false,
-    receptionistMode: false
+    priorityDelivery: true,
+    dedicatedNumber: true,
+    customIntegrations: true,
+    receptionistMode: true
   },
 
-  professional: {
+  scale: {
     monthlyCredits: 10000,
     price: 98,
     maxContacts: -1, // Unlimited
@@ -162,7 +162,7 @@ export async function hasFeatureAccess(feature: keyof SubscriptionFeatures): Pro
 
   if (!userData) return false;
 
-  const tier = (userData.subscription_tier as SubscriptionTier) || 'free';
+  const tier = (userData.subscription_tier as SubscriptionTier) || 'unpaid';
   const features = SUBSCRIPTION_FEATURES[tier];
 
   return Boolean(features[feature]);
@@ -186,7 +186,7 @@ export async function checkResourceLimit(
     .eq('id', user.id)
     .single();
 
-  const tier = (userData?.subscription_tier as SubscriptionTier) || 'preview';
+  const tier = (userData?.subscription_tier as SubscriptionTier) || 'unpaid';
   const features = SUBSCRIPTION_FEATURES[tier];
 
   const limitMap = {
@@ -223,8 +223,8 @@ export async function getUserSubscription(): Promise<{
 
   if (!user) {
     return {
-      tier: 'preview',
-      features: SUBSCRIPTION_FEATURES.preview,
+      tier: 'unpaid',
+      features: SUBSCRIPTION_FEATURES.unpaid,
       daysUntilRenewal: null
     };
   }
@@ -235,7 +235,7 @@ export async function getUserSubscription(): Promise<{
     .eq('id', user.id)
     .single();
 
-  const tier = (userData?.subscription_tier as SubscriptionTier) || 'preview';
+  const tier = (userData?.subscription_tier as SubscriptionTier) || 'unpaid';
 
   let daysUntilRenewal = null;
   if (userData?.next_renewal_date) {

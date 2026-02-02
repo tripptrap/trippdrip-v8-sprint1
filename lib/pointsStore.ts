@@ -15,7 +15,9 @@ export type PointTransaction = {
   campaign_id?: string;
 };
 
-export type PlanType = 'basic' | 'premium';
+import { SubscriptionTier } from './subscriptionFeatures';
+
+export type PlanType = SubscriptionTier;
 
 export type PointsData = {
   balance: number;
@@ -71,7 +73,7 @@ export function getDefaultPoints(): PointsData {
     autoTopUp: false,
     autoTopUpThreshold: 100,
     autoTopUpAmount: 500,
-    planType: 'basic'
+    planType: 'growth'
   };
 }
 
@@ -202,7 +204,7 @@ export async function checkMonthlyRenewal(): Promise<void> {
 // Get current plan type
 export async function getCurrentPlan(): Promise<PlanType> {
   const data = await loadPoints();
-  return data.planType || 'basic';
+  return data.planType || 'growth';
 }
 
 // Switch plan type - would need API endpoint
@@ -213,16 +215,16 @@ export async function switchPlan(planType: PlanType): Promise<PointsData> {
 
 // Get plan details
 export function getPlanDetails(planType: PlanType): { price: number; monthlyPoints: number; name: string } {
-  if (planType === 'premium') {
+  if (planType === 'scale') {
     return {
-      price: 98.99,
+      price: 98,
       monthlyPoints: 10000,
-      name: 'Premium Plan'
+      name: 'Scale Plan'
     };
   }
   return {
     price: 30,
-    monthlyPoints: 1000,
-    name: 'Basic Plan'
+    monthlyPoints: 3000,
+    name: 'Growth Plan'
   };
 }
