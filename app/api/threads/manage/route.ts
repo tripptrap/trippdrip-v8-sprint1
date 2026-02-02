@@ -25,22 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Action is required' }, { status: 400 });
     }
 
-    // Helper: ensure is_archived column exists, add it if not
-    async function ensureArchiveColumn() {
-      const { error } = await supabase
-        .from('threads')
-        .select('is_archived')
-        .limit(1);
-      if (error && error.code === '42703') {
-        // Column doesn't exist — create it via raw SQL
-        await supabase.rpc('exec_sql', {
-          sql: `ALTER TABLE threads ADD COLUMN IF NOT EXISTS is_archived boolean DEFAULT false; ALTER TABLE threads ADD COLUMN IF NOT EXISTS archived_at timestamptz;`
-        }).catch(() => {
-          // If exec_sql RPC doesn't exist, we can't auto-create the column
-          // Fall back: the column must be created manually in Supabase dashboard
-        });
-      }
-    }
+    // Columns is_archived and archived_at are expected to exist on threads table
 
     // Handle different actions
     switch (action) {
@@ -48,7 +33,7 @@ export async function POST(req: NextRequest) {
         if (!threadId) {
           return NextResponse.json({ ok: false, error: 'threadId required' }, { status: 400 });
         }
-        await ensureArchiveColumn();
+
 
         // Try RPC first, fall back to direct update
         let archiveError: any = null;
@@ -75,7 +60,7 @@ export async function POST(req: NextRequest) {
         if (!threadId) {
           return NextResponse.json({ ok: false, error: 'threadId required' }, { status: 400 });
         }
-        await ensureArchiveColumn();
+
 
         const rpcResult = await supabase.rpc('unarchive_thread', { thread_id_param: threadId });
         let unarchiveError: any = null;
@@ -100,7 +85,7 @@ export async function POST(req: NextRequest) {
         if (!threadIds || !Array.isArray(threadIds)) {
           return NextResponse.json({ ok: false, error: 'threadIds array required' }, { status: 400 });
         }
-        await ensureArchiveColumn();
+
 
         const rpcResult = await supabase.rpc('bulk_archive_threads', { thread_ids: threadIds });
         let bulkError: any = null;
