@@ -290,13 +290,18 @@ export default function ThreadList({
           filteredThreads.map((thread) => {
             const active = thread.id === activeThreadId;
             const isClient = thread.contact_type === 'client';
+            const isSold = thread.leads?.converted === true || thread.leads?.status === 'sold';
+            const isNewInbound = !isClient && !isSold && (!thread.lead_id || thread.leads?.status === 'new') && thread.messages_from_lead > 0 && thread.messages_from_user === 0;
+            const hasUnread = thread.unread && thread.messages_from_lead > 0;
             const leadTags = thread.leads?.tags;
             const isSelected = selectedThreadIds.has(thread.id);
             return (
               <div
                 key={thread.id}
                 className={`group w-full text-left px-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer ${
-                  active ? 'bg-sky-50 dark:bg-sky-900/15 border-l-2 border-sky-500' : ''
+                  active ? 'bg-sky-50 dark:bg-sky-900/15 border-l-2 border-sky-500'
+                  : hasUnread ? 'bg-sky-50/50 dark:bg-sky-900/10 border-l-2 border-sky-400'
+                  : ''
                 }`}
                 onClick={() => {
                   if (selectMode) {
@@ -334,9 +339,21 @@ export default function ThreadList({
                         <span className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate">
                           {thread.display_name}
                         </span>
-                        {isClient && (
+                        {isClient ? (
                           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800 shrink-0">
                             Client
+                          </span>
+                        ) : isSold ? (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                            Sold
+                          </span>
+                        ) : isNewInbound ? (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 border border-amber-200 dark:border-amber-800 shrink-0 animate-pulse">
+                            New
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800 shrink-0">
+                            Lead
                           </span>
                         )}
                       </div>

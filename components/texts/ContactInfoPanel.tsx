@@ -188,9 +188,21 @@ export default function ContactInfoPanel({
   }
 
   async function handleMarkSold() {
-    const success = await patchLead({ status: 'sold', converted: true } as any);
-    if (success) {
-      toast.success('Marked as sold');
+    try {
+      const res = await fetch('/api/leads/disposition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, disposition: 'sold' }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success('Lead converted to client');
+        onSaved();
+      } else {
+        toast.error(data.error || 'Failed to convert');
+      }
+    } catch {
+      toast.error('Failed to convert lead');
     }
   }
 

@@ -128,6 +128,7 @@ export default function ConversationView({ thread, messages, loading, children, 
   const timezone = getTimezoneFromPhone(phone);
   const currentTime = getCurrentTimeInTimezone(timezone);
   const isClient = thread.contact_type === 'client';
+  const isSold = thread.leads?.converted === true || thread.leads?.status === 'sold';
 
   return (
     <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 flex flex-col h-[calc(100vh-12rem)]">
@@ -142,6 +143,10 @@ export default function ConversationView({ thread, messages, loading, children, 
               {isClient ? (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
                   Client
+                </span>
+              ) : isSold ? (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800">
+                  Sold
                 </span>
               ) : (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800">

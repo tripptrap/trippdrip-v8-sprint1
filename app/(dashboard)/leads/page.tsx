@@ -462,6 +462,27 @@ export default function LeadsPage() {
     }
 
     try {
+      // If marking as sold, use the disposition endpoint per lead to ensure client conversion
+      if (updates.disposition === 'sold') {
+        const ids = Array.from(selectedIds);
+        let successCount = 0;
+        for (const id of ids) {
+          const res = await fetch('/api/leads/disposition', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, disposition: 'sold' }),
+          });
+          const data = await res.json();
+          if (data.ok) successCount++;
+        }
+        setToast(`${successCount} lead(s) converted to clients`);
+        setTimeout(()=>setToast(''), 2500);
+        setBulkActionModal(null);
+        setBulkDisposition("");
+        await fetchLeads();
+        return;
+      }
+
       const res = await fetch('/api/leads/bulk-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
