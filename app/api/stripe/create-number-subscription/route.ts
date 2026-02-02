@@ -90,15 +90,39 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      // Mark the number as purchased
+      // Order the number from Telnyx
+      const apiKey = process.env.TELNYX_API_KEY;
+      const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
+
+      if (apiKey) {
+        try {
+          await fetch('https://api.telnyx.com/v2/number_orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              phone_numbers: [{ phone_number: phoneNumber }],
+              messaging_profile_id: messagingProfileId,
+              customer_reference: user.id,
+            }),
+          });
+        } catch (telnyxError) {
+          console.error('Telnyx order error (non-fatal):', telnyxError);
+        }
+      }
+
+      // Mark the number as purchased (pending until webhook confirms)
       await supabase
         .from('user_telnyx_numbers')
         .upsert({
           user_id: user.id,
           phone_number: phoneNumber,
-          status: 'active',
+          status: 'pending',
           payment_method: 'stripe',
-          stripe_subscription_id: subscription.id
+          stripe_subscription_id: subscription.id,
+          messaging_profile_id: messagingProfileId || undefined,
         }, {
           onConflict: 'user_id,phone_number'
         });

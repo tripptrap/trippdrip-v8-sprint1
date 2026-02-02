@@ -60,15 +60,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 });
     }
 
-    // Add the number to user's account
+    // Order the number from Telnyx
+    const apiKey = process.env.TELNYX_API_KEY;
+    const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
+
+    if (apiKey) {
+      try {
+        const orderResponse = await fetch('https://api.telnyx.com/v2/number_orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            phone_numbers: [{ phone_number: phoneNumber }],
+            messaging_profile_id: messagingProfileId,
+            customer_reference: user.id,
+          }),
+        });
+
+        if (!orderResponse.ok) {
+          const orderError = await orderResponse.json().catch(() => ({}));
+          console.error('Telnyx order error:', orderError);
+          // Rollback credits
+          await supabase
+            .from('users')
+            .update({ credits: currentCredits })
+            .eq('id', user.id);
+          return NextResponse.json(
+            { error: orderError.errors?.[0]?.detail || 'Failed to order number from Telnyx. Credits refunded.' },
+            { status: 500 }
+          );
+        }
+      } catch (telnyxError) {
+        console.error('Telnyx API call failed:', telnyxError);
+        // Rollback credits
+        await supabase
+          .from('users')
+          .update({ credits: currentCredits })
+          .eq('id', user.id);
+        return NextResponse.json(
+          { error: 'Failed to reach Telnyx. Credits refunded.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Add the number to user's account (pending until webhook confirms)
     const { error: numberError } = await supabase
       .from('user_telnyx_numbers')
       .upsert({
         user_id: user.id,
         phone_number: phoneNumber,
-        status: 'active',
+        status: 'pending',
         payment_method: 'credits',
         credits_charged: requiredCredits,
+        messaging_profile_id: messagingProfileId,
         next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
       }, {
         onConflict: 'user_id,phone_number'

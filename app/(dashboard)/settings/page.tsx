@@ -181,9 +181,9 @@ export default function Page() {
     loadData();
   }, []);
 
-  // Fetch Telnyx numbers + pool numbers when numbers tab is active
+  // Fetch Telnyx numbers + pool numbers when numbers or sms tab is active
   useEffect(() => {
-    if (activeTab === 'numbers') {
+    if (activeTab === 'numbers' || activeTab === 'sms') {
       fetchTelnyxNumbers();
       fetchPoolNumbers();
     }
@@ -211,6 +211,26 @@ export default function Page() {
       const data = await res.json();
       if (data.success && data.numbers?.length > 0) {
         setPoolNumbers(data.numbers);
+        return;
+      }
+
+      // Pool is empty — fall back to Telnyx search for toll-free numbers
+      const telnyxRes = await fetch('/api/telnyx/search-numbers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tollFree: true, countryCode: 'US', limit: 10 }),
+      });
+      const telnyxData = await telnyxRes.json();
+
+      if (telnyxData.success && telnyxData.numbers?.length > 0) {
+        const converted = telnyxData.numbers.map((n: any, i: number) => ({
+          id: `telnyx-${i}`,
+          phone_number: n.phoneNumber,
+          friendly_name: n.friendlyName,
+          number_type: 'tollfree',
+          region: n.region || null,
+        }));
+        setPoolNumbers(converted);
       }
     } catch (e) {
       console.error('Failed to fetch pool numbers:', e);
@@ -222,6 +242,28 @@ export default function Page() {
   async function handleClaimPoolNumber(numberId: string) {
     setClaimingNumber(true);
     try {
+      // If it's a Telnyx search result, purchase directly
+      if (numberId.startsWith('telnyx-')) {
+        const num = poolNumbers.find(n => n.id === numberId);
+        if (!num) { toast.error('Number not found'); return; }
+
+        const res = await fetch('/api/telnyx/purchase-number', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: num.phone_number }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast.success('Number claimed! It will be ready shortly.');
+          await fetchTelnyxNumbers();
+          await fetchPoolNumbers();
+        } else {
+          toast.error(data.error || 'Failed to claim number');
+        }
+        return;
+      }
+
+      // Standard pool claim
       const res = await fetch('/api/number-pool/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -548,8 +590,6 @@ export default function Page() {
 
   if (!settings) return <div>Loading...</div>;
 
-  const hasTwilioAccount = !!settings.twilio?.accountSid;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -691,46 +731,53 @@ export default function Page() {
           <div>
             <h2 className="text-xl font-semibold mb-2">SMS Account Status</h2>
             <p className="text-slate-700 dark:text-slate-300 mb-4">
-              Your SMS account is automatically created when you purchase your first point pack.
+              HyveWyre uses Telnyx for reliable SMS delivery. Your messaging is ready as soon as you claim or purchase a phone number.
             </p>
           </div>
 
-          {!hasTwilioAccount ? (
+          {myTelnyxNumbers.length === 0 && !telnyxLoading ? (
             <div className="space-y-4">
               <div className="p-6 bg-sky-500/10 rounded-lg border-2 border-sky-200">
-                <h3 className="text-lg font-semibold mb-2 text-sky-600">SMS Account Not Active</h3>
+                <h3 className="text-lg font-semibold mb-2 text-sky-600">Get Started with SMS</h3>
                 <p className="text-slate-700 dark:text-slate-300 mb-4">
-                  Purchase any point pack to automatically activate your SMS account and start sending messages!
+                  Claim a free phone number or purchase one to start sending messages!
                 </p>
-                <a
-                  href="/points"
-                  className="inline-block bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:opacity-90 font-medium"
-                >
-                  Buy Points & Activate SMS →
-                </a>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveTab('numbers')}
+                    className="inline-block bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:opacity-90 font-medium"
+                  >
+                    Get a Phone Number →
+                  </button>
+                  <a
+                    href="/points"
+                    className="inline-block bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 font-medium"
+                  >
+                    Buy Points
+                  </a>
+                </div>
               </div>
 
               <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                <h3 className="font-medium mb-2 text-slate-900 dark:text-slate-100">What's included with your first purchase?</h3>
+                <h3 className="font-medium mb-2 text-slate-900 dark:text-slate-100">What's included?</h3>
                 <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
-                  <li>• Points for sending messages and using AI</li>
-                  <li>• Dedicated SMS account (Twilio subaccount)</li>
-                  <li>• Account SID and Auth Token (auto-configured)</li>
-                  <li>• Ability to purchase phone numbers</li>
-                  <li>• Start sending SMS immediately</li>
-                  <li>• No separate account creation needed</li>
+                  <li>• Dedicated SMS & voice via Telnyx</li>
+                  <li>• Toll-free numbers work immediately</li>
+                  <li>• $1/month per additional number or use points</li>
+                  <li>• Geo-routing to match closest area code</li>
+                  <li>• AI-powered spam detection</li>
+                  <li>• Port your existing number anytime</li>
                 </ul>
               </div>
 
               <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
                 <h3 className="font-medium text-yellow-400 mb-2">How It Works</h3>
                 <ol className="text-sm text-slate-700 dark:text-slate-300 space-y-1 list-decimal list-inside">
-                  <li>Choose a point pack (Starter, Pro, Business, or Enterprise)</li>
-                  <li>Complete payment via Stripe</li>
-                  <li>Your SMS account is created automatically</li>
-                  <li>Points are added to your balance</li>
-                  <li>Go to Phone Numbers tab to purchase numbers</li>
-                  <li>Start sending SMS right away!</li>
+                  <li>Claim a free toll-free number or purchase one</li>
+                  <li>Start sending SMS and MMS right away</li>
+                  <li>Use points to send messages (1 point per SMS)</li>
+                  <li>Buy more points or upgrade your plan as you grow</li>
+                  <li>Add additional numbers for $1/mo or 100 points/mo</li>
                 </ol>
               </div>
             </div>
@@ -739,9 +786,9 @@ export default function Page() {
               <div className="p-4 bg-sky-500/10 rounded-lg border border-sky-200">
                 <h3 className="font-semibold text-sky-600 mb-2">SMS Account Active</h3>
                 <div className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
-                  <p><strong>Account SID:</strong> {settings.twilio?.accountSid}</p>
+                  <p><strong>Provider:</strong> Telnyx</p>
                   <p><strong>Status:</strong> Active & Ready</p>
-                  <p><strong>Phone Numbers:</strong> {settings.twilio?.purchasedNumbers?.length || 0} purchased</p>
+                  <p><strong>Phone Numbers:</strong> {myTelnyxNumbers.length} active</p>
                 </div>
               </div>
 
@@ -754,7 +801,7 @@ export default function Page() {
                 </button>
                 <a
                   href="/points"
-                  className="bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:bg-white dark:bg-slate-800/20 border border-slate-200 dark:border-slate-700"
+                  className="bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
                 >
                   Buy More Points
                 </a>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard } from 'lucide-react';
+import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard, ArrowRightLeft, Mail } from 'lucide-react';
 import PurchaseNumberModal from '@/components/PurchaseNumberModal';
 
 interface TwilioNumber {
@@ -75,7 +75,7 @@ export default function PhoneNumbersPage() {
   // Fetch user's phone numbers
   const fetchMyNumbers = async () => {
     try {
-      const response = await fetch('/api/twilio/numbers');
+      const response = await fetch('/api/telnyx/numbers');
       const data = await response.json();
 
       if (data.success) {
@@ -103,7 +103,7 @@ export default function PhoneNumbersPage() {
     setAvailableNumbers([]);
 
     try {
-      const response = await fetch('/api/twilio/search-numbers', {
+      const response = await fetch('/api/telnyx/search-numbers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -139,7 +139,7 @@ export default function PhoneNumbersPage() {
     setPurchasing(phoneNumber);
 
     try {
-      const response = await fetch('/api/twilio/purchase-number', {
+      const response = await fetch('/api/telnyx/purchase-number', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber }),
@@ -163,16 +163,16 @@ export default function PhoneNumbersPage() {
   };
 
   // Release/delete a number
-  const releaseNumber = async (phoneSid: string, phoneNumber: string) => {
+  const releaseNumber = async (phoneNumber: string) => {
     if (!confirm(`Are you sure you want to release ${phoneNumber}? This cannot be undone.`)) {
       return;
     }
 
     try {
-      const response = await fetch('/api/twilio/release-number', {
+      const response = await fetch('/api/telnyx/release-number', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneSid }),
+        body: JSON.stringify({ phoneNumber }),
       });
 
       const data = await response.json();
@@ -189,15 +189,39 @@ export default function PhoneNumbersPage() {
     }
   };
 
-  // Load available pool numbers
+  // Load available pool numbers, fall back to Telnyx search if pool is empty
   const loadPoolNumbers = async () => {
     try {
       setLoadingPool(true);
       const response = await fetch('/api/number-pool/available');
       const data = await response.json();
 
-      if (data.success) {
-        setPoolNumbers(data.numbers || []);
+      if (data.success && data.numbers && data.numbers.length > 0) {
+        setPoolNumbers(data.numbers);
+        return;
+      }
+
+      // Pool is empty — search Telnyx for toll-free numbers as fallback
+      const telnyxResponse = await fetch('/api/telnyx/search-numbers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tollFree: true, countryCode: 'US', limit: 10 }),
+      });
+      const telnyxData = await telnyxResponse.json();
+
+      if (telnyxData.success && telnyxData.numbers && telnyxData.numbers.length > 0) {
+        // Convert Telnyx search results to pool-like format for the UI
+        const converted: PoolNumber[] = telnyxData.numbers.map((n: any, i: number) => ({
+          id: `telnyx-${i}`,
+          phone_number: n.phoneNumber,
+          phone_sid: '',
+          friendly_name: n.friendlyName,
+          number_type: 'tollfree',
+          capabilities: n.capabilities || { sms: true, mms: true, voice: true },
+          is_verified: true,
+          monthly_cost: 1,
+        }));
+        setPoolNumbers(converted);
       }
     } catch (error) {
       console.error('Error loading pool numbers:', error);
@@ -206,11 +230,38 @@ export default function PhoneNumbersPage() {
     }
   };
 
-  // Claim a number from the pool
+  // Claim a number from the pool or purchase from Telnyx
   const claimPoolNumber = async (numberId: string) => {
     setClaimingPool(true);
 
     try {
+      // If it's a Telnyx search result (not from pool), purchase directly
+      if (numberId.startsWith('telnyx-')) {
+        const poolNum = poolNumbers.find(n => n.id === numberId);
+        if (!poolNum) {
+          showMessage('error', 'Number not found');
+          return;
+        }
+
+        const response = await fetch('/api/telnyx/purchase-number', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: poolNum.phone_number }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage('success', `Number ${poolNum.phone_number} claimed! It will be ready shortly.`);
+          await fetchMyNumbers();
+          await loadPoolNumbers();
+        } else {
+          showMessage('error', data.error || 'Failed to claim number');
+        }
+        return;
+      }
+
+      // Standard pool claim
       const response = await fetch('/api/number-pool/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,7 +273,7 @@ export default function PhoneNumbersPage() {
       if (data.success) {
         showMessage('success', data.message || 'Number claimed successfully! You can start sending messages immediately.');
         await fetchMyNumbers();
-        await loadPoolNumbers(); // Refresh pool
+        await loadPoolNumbers();
       } else {
         showMessage('error', data.error || 'Failed to claim number');
       }
@@ -365,14 +416,58 @@ export default function PhoneNumbersPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400 dark:text-slate-500" />
               </div>
             ) : myNumbers.length === 0 ? (
-              <div className="text-center py-12">
-                <Phone className="h-12 w-12 mx-auto text-slate-600 dark:text-slate-400 mb-4" />
-                <p className="text-slate-400 dark:text-slate-500 mb-4">
-                  You don't have any phone numbers yet.
-                </p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Search and purchase numbers from the panel on the right.
-                </p>
+              <div className="space-y-4">
+                {/* Claim free number from pool */}
+                {loadingPool ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400 mb-2" />
+                    <p className="text-sm text-slate-500">Searching for available numbers...</p>
+                  </div>
+                ) : poolNumbers.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">FREE</span>
+                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">Claim a Phone Number</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                      Select a toll-free number included with your plan — no extra cost!
+                    </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {poolNumbers.map((poolNum) => (
+                        <div key={poolNum.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600 rounded-lg hover:border-sky-300 dark:hover:border-sky-600 transition-colors">
+                          <div>
+                            <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">{poolNum.phone_number}</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • ${poolNum.monthly_cost}/mo
+                              <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">Free with plan</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => claimPoolNumber(poolNum.id)}
+                            disabled={claimingPool}
+                            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                          >
+                            {claimingPool ? (
+                              <><Loader2 className="h-3 w-3 animate-spin" /> Claiming...</>
+                            ) : (
+                              <><Plus className="h-3 w-3" /> Claim</>
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Phone className="h-12 w-12 mx-auto text-slate-600 dark:text-slate-400 mb-4" />
+                    <p className="text-slate-400 dark:text-slate-500 mb-2">
+                      You don't have any phone numbers yet.
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Search and purchase a number from the panel on the right, or purchase a point pack to unlock free numbers.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -399,7 +494,7 @@ export default function PhoneNumbersPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => releaseNumber(number.phone_sid, number.phone_number)}
+                        onClick={() => releaseNumber(number.phone_number)}
                         className="p-2 hover:bg-red-900/30 text-red-400 rounded transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -610,6 +705,43 @@ export default function PhoneNumbersPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Number Porting Section */}
+      <div className="mt-6 bg-gray-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5" />
+            Port Your Number
+          </h2>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+            Bring your existing phone number to HyveWyre
+          </p>
+        </div>
+        <div className="p-6">
+          <div className="text-center py-8">
+            <ArrowRightLeft className="h-12 w-12 mx-auto text-slate-500 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+              Want to keep your current number?
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md mx-auto">
+              We can port your existing phone number from any carrier to HyveWyre. The process typically
+              takes 1-2 weeks and your number will continue working during the transfer.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href="mailto:support@hyvewyre.com?subject=Number%20Porting%20Request&body=Hi%2C%20I%27d%20like%20to%20port%20my%20existing%20phone%20number%20to%20HyveWyre.%0A%0AMy%20current%20number%3A%20%0AMy%20current%20carrier%3A%20%0A"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors"
+              >
+                <Mail className="h-4 w-4" />
+                Contact Us to Port
+              </a>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
+              You'll need: your current phone number, carrier name, and account PIN/password.
+            </p>
           </div>
         </div>
       </div>
