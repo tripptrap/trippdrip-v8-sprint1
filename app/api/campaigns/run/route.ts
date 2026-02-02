@@ -177,6 +177,7 @@ export async function POST(req: Request) {
       }
 
       // Send SMS to each lead
+      let dncSkipped = 0;
       for (const lead of targetLeads) {
         if (!lead.phone) {
           sendResults.push({
@@ -186,6 +187,42 @@ export async function POST(req: Request) {
             error: 'No phone number'
           });
           continue;
+        }
+
+        // Check DNC list before sending
+        const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
+          p_user_id: user.id,
+          p_phone_number: lead.phone
+        });
+
+        if (!dncError && dncCheck) {
+          const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
+          if (dncResult.on_dnc_list) {
+            console.log(`🚫 Campaign skip - ${lead.phone} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list)`);
+            // Log blocked attempt
+            await supabase.from('dnc_history').insert({
+              user_id: user.id,
+              phone_number: lead.phone,
+              normalized_phone: dncResult.normalized_phone,
+              action: 'blocked',
+              list_type: dncResult.on_user_list ? 'user' : 'global',
+              result: true,
+              metadata: {
+                reason: dncResult.reason,
+                source: dncResult.source,
+                campaign_id: campaignId,
+                campaign_name: campaignName
+              }
+            });
+            sendResults.push({
+              leadId: String(lead.id),
+              phone: lead.phone,
+              success: false,
+              error: `Skipped: On DNC list (${dncResult.reason || 'opted out'})`
+            });
+            dncSkipped++;
+            continue;
+          }
         }
 
         // Personalize message
@@ -427,6 +464,7 @@ export async function POST(req: Request) {
 
     const successCount = sendResults.filter(r => r.success).length;
     const failCount = sendResults.filter(r => !r.success).length;
+    const dncSkippedCount = sendResults.filter(r => !r.success && r.error?.startsWith('Skipped: On DNC')).length;
 
     return NextResponse.json({
       ok: true,
@@ -437,6 +475,7 @@ export async function POST(req: Request) {
         total: sendResults.length,
         success: successCount,
         failed: failCount,
+        dncSkipped: dncSkippedCount,
         details: sendResults
       },
       pointsUsed,

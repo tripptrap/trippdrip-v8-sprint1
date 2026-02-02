@@ -18,12 +18,42 @@ type Tag = {
   color: string;
 };
 
+const LEAD_TYPES = [
+  'Health Insurance', 'Life Insurance', 'Auto Insurance', 'Home Insurance',
+  'Real Estate', 'Solar', 'Roofing', 'HVAC', 'Financial Services',
+  'Home Services', 'Legal', 'Mortgage', 'Medicare', 'Final Expense',
+  'Other',
+] as const;
+
+// Sort flows by relevance to a lead type (matching keywords in name/description)
+function sortFlowsByLeadType(flows: any[], leadType: string) {
+  if (!leadType) return flows;
+  const lower = leadType.toLowerCase();
+  const keywords = lower.split(/\s+/);
+  return [...flows].sort((a, b) => {
+    const aText = `${a.name || ''} ${a.description || ''}`.toLowerCase();
+    const bText = `${b.name || ''} ${b.description || ''}`.toLowerCase();
+    const aMatch = keywords.some((kw: string) => aText.includes(kw)) ? 1 : 0;
+    const bMatch = keywords.some((kw: string) => bText.includes(kw)) ? 1 : 0;
+    return bMatch - aMatch;
+  });
+}
+
+function flowMatchesLeadType(flow: any, leadType: string): boolean {
+  if (!leadType) return false;
+  const lower = leadType.toLowerCase();
+  const keywords = lower.split(/\s+/);
+  const text = `${flow.name || ''} ${flow.description || ''}`.toLowerCase();
+  return keywords.some((kw: string) => text.includes(kw));
+}
+
 type Campaign = {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
   flow_id?: string;
+  lead_type?: string;
   status?: string;
   // Computed/display fields
   tags: string[];
@@ -57,6 +87,7 @@ export default function CampaignsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [selectedFlowId, setSelectedFlowId] = useState('');
+  const [newLeadType, setNewLeadType] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Edit campaign modal state
@@ -64,6 +95,7 @@ export default function CampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [editCampaignName, setEditCampaignName] = useState('');
   const [editFlowId, setEditFlowId] = useState('');
+  const [editLeadType, setEditLeadType] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Flows state
@@ -192,7 +224,8 @@ export default function CampaignsPage() {
         body: JSON.stringify({
           name: newCampaignName.trim(),
           flowId: selectedFlowId || undefined,
-          tags: selectedTags.length > 0 ? selectedTags : undefined
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
+          lead_type: newLeadType || undefined,
         })
       });
 
@@ -202,6 +235,7 @@ export default function CampaignsPage() {
         setCreateOpen(false);
         setNewCampaignName('');
         setSelectedFlowId('');
+        setNewLeadType('');
         setSelectedTags([]);
         await loadCampaigns();
         setModal({
@@ -428,6 +462,7 @@ export default function CampaignsPage() {
     setEditingCampaign(campaign);
     setEditCampaignName(campaign.name);
     setEditFlowId(campaign.flow_id || '');
+    setEditLeadType(campaign.lead_type || '');
     setEditTags(campaign.tags || []);
     setEditTab('details');
     setLeadSearchQuery('');
@@ -449,6 +484,7 @@ export default function CampaignsPage() {
           id: editingCampaign.id,
           name: editCampaignName.trim(),
           flow_id: editFlowId || null,
+          lead_type: editLeadType || null,
           tags: editTags
         })
       });
@@ -678,6 +714,7 @@ export default function CampaignsPage() {
               <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Campaign Name</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Lead Type</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Flow</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Tags Applied</th>
                   <th className="text-center px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400">Leads</th>
@@ -694,6 +731,15 @@ export default function CampaignsPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 dark:text-white">{campaign.name}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">{campaign.id}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {campaign.lead_type ? (
+                        <span className="inline-block px-2 py-1 text-xs bg-violet-900/30 text-violet-300 border border-violet-700 rounded">
+                          {campaign.lead_type}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 dark:text-slate-400 text-sm">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {campaign.flow_id ? (
@@ -775,7 +821,7 @@ export default function CampaignsPage() {
       </div>
 
       {/* Help */}
-      <div className="card bg-blue-50 border-sky-700/50">
+      <div className="card bg-blue-50 dark:bg-slate-800/50 border-sky-700/50">
         <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">💡 Campaign Tips</h3>
         <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Tag your leads to organize them into campaigns</li>
@@ -788,7 +834,7 @@ export default function CampaignsPage() {
       {/* Create Campaign Modal */}
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Campaign</h2>
               <button
@@ -816,6 +862,20 @@ export default function CampaignsPage() {
               </div>
 
               <div>
+                <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Lead Type / Category</label>
+                <select
+                  value={newLeadType}
+                  onChange={(e) => setNewLeadType(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="">Select lead type...</option>
+                  {LEAD_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow (Optional)</label>
                 {flows.length > 0 ? (
                   <select
@@ -824,9 +884,9 @@ export default function CampaignsPage() {
                     className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                   >
                     <option value="">No flow selected</option>
-                    {flows.map((flow) => (
+                    {sortFlowsByLeadType(flows, newLeadType).map((flow) => (
                       <option key={flow.id} value={flow.id}>
-                        {flow.name}
+                        {flow.name}{flowMatchesLeadType(flow, newLeadType) ? ' ★' : ''}
                       </option>
                     ))}
                   </select>
@@ -989,6 +1049,20 @@ export default function CampaignsPage() {
                   </div>
 
                   <div>
+                    <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Lead Type / Category</label>
+                    <select
+                      value={editLeadType}
+                      onChange={(e) => setEditLeadType(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
+                    >
+                      <option value="">Select lead type...</option>
+                      {LEAD_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">AI Flow</label>
                     {flows.length > 0 ? (
                       <select
@@ -997,9 +1071,9 @@ export default function CampaignsPage() {
                         className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500"
                       >
                         <option value="">No flow selected</option>
-                        {flows.map((flow) => (
+                        {sortFlowsByLeadType(flows, editLeadType).map((flow) => (
                           <option key={flow.id} value={flow.id}>
-                            {flow.name}
+                            {flow.name}{flowMatchesLeadType(flow, editLeadType) ? ' ★' : ''}
                           </option>
                         ))}
                       </select>

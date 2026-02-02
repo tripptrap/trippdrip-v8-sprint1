@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, flowId, tags } = body;
+    const { name, flowId, tags, lead_type } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Campaign name is required' }, { status: 400 });
@@ -77,6 +77,11 @@ export async function POST(req: NextRequest) {
     // Add tags if provided
     if (tags && Array.isArray(tags)) {
       insertData.tags = tags;
+    }
+
+    // Add lead type/category if provided
+    if (lead_type) {
+      insertData.lead_type = lead_type;
     }
 
     // First try with flow_id
@@ -124,7 +129,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags } = body;
+    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags, lead_type } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Campaign ID is required' }, { status: 400 });
@@ -140,6 +145,7 @@ export async function PUT(req: NextRequest) {
     if (stats !== undefined) updateData.stats = stats;
     if (flow_id !== undefined) updateData.flow_id = flow_id;
     if (tags !== undefined) updateData.tags = tags;
+    if (lead_type !== undefined) updateData.lead_type = lead_type;
 
     const { data, error } = await supabase
       .from('campaigns')
