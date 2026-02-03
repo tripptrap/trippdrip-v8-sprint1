@@ -90,26 +90,32 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - Configurable business hours, after-hours message, greeting, system prompt
 - User can take over at any time
 
-### Flows
-- AI conversation templates used for LEADS (prospects)
-- Purpose: gather required info from a lead before booking an appointment
-- Required info before booking: industry defaults (insurance = DOB/household/income, real estate = budget/area, etc.) + user can add/remove required fields
+### Flows (AI Templates)
+- AI conversation templates used to **prospect leads and gather information**
+- The AI asks questions defined in the flow and **saves the answers to the lead record**
+- Required questions: industry defaults (insurance = DOB/household/income, real estate = budget/area, etc.)
+- User can customize which questions the flow asks
 - Industry-specific presets available + user can build custom flows from scratch
-- When a Flow completes → appointment booked → lead auto-tagged "appointment set" → shows on dashboard + Google Calendar
-- User can configure AI autonomy per flow: full auto, suggest replies, or manual
-- User can jump in and take over any conversation at any time; AI stops or switches to suggest mode (user's choice in settings)
+- Flow steps guide the conversation: introduction → qualifying questions → objection handling → appointment booking
+- When all required info is gathered → appointment booked → lead auto-tagged "appointment set"
+- Gathered info is stored on the lead for the user to review
+- User can configure AI autonomy: full auto, suggest replies, or manual
+- User can jump in and take over any conversation at any time
 
 ### Campaigns
-- Categorize what KIND of lead a person is (health, life, auto, home, solar, roofing, etc.)
-- Used to segment leads by product/industry type
-- Independent from tags — a "health" campaign lead can be tagged "quoted"
+- A **group of leads** that you work together for bulk outreach
+- Add leads to a campaign → send bulk messages → track stats
+- Campaign stats: lead count, messages sent, credits used
+- Can apply tags to all leads in a campaign at once
+- Example: "January Solar Leads" campaign with 500 leads to message
 
 ### Tags
-- Track where a lead is in the PROSPECTING stage
+- Mark where a lead is in the **prospecting pipeline**
 - Multiple tags per lead, with one PRIMARY tag showing current stage
-- Preset tags per industry (e.g., insurance: income, household size, quoted, appointment set)
+- Preset tags per industry (e.g., insurance: new, contacted, qualified, quoted, appointment set)
 - User can customize their own pipeline stages
 - Examples: new → contacted → qualified → quoted → appointment set → sold
+- Tags are independent from campaigns — a lead in any campaign can have any tag
 
 ### Pipeline Stages (Dashboard)
 - Industry-specific presets loaded during onboarding
@@ -346,11 +352,13 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 ### Campaigns & Tags
 
 #### `campaigns`
-- Lead type categories (health, life, auto, solar, etc.)
-- `name` TEXT - Campaign name
-- `lead_ids` UUID[] - Leads in campaign
-- `tags_applied` TEXT[] - Tags applied to leads
-- `messages_sent`, `credits_used` INTEGER - Stats
+- Groups of leads for bulk outreach
+- `name` TEXT - Campaign name (e.g., "January Solar Leads")
+- `lead_ids` UUID[] - Array of leads in this campaign
+- `lead_count` INTEGER - Number of leads
+- `tags_applied` TEXT[] - Tags applied to leads in campaign
+- `messages_sent` INTEGER - Total messages sent
+- `credits_used` INTEGER - Total credits spent
 
 #### `tags`
 - User-defined tags
@@ -369,12 +377,13 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 ### AI & Flows
 
 #### `conversation_flows`
-- AI conversation templates
-- `name` TEXT - Flow name
-- `steps` JSONB - Conversation steps
-- `context` JSONB - Flow context/settings
-- `required_questions` TEXT[] - Questions to gather
-- `requires_call` BOOLEAN - Needs phone call
+- AI conversation templates for prospecting leads
+- `name` TEXT - Flow name (e.g., "Insurance Qualification")
+- `steps` JSONB - Conversation steps with messages and responses
+- `context` JSONB - Flow context (what you're offering, target audience)
+- `required_questions` TEXT[] - Questions AI must ask and save answers for
+- `requires_call` BOOLEAN - Whether booking requires a phone call
+- Answers gathered are saved to the lead record
 
 #### `user_preferences`
 - User settings
