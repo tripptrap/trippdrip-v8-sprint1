@@ -108,15 +108,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fetch user's opt-out keyword
+    // Fetch user's settings (opt-out keyword + spam protection)
     let optOutKeyword: string | null = null;
+    let spamProtection = {
+      enabled: true,
+      blockOnHighRisk: true,
+      maxHourlyMessages: 100,
+      maxDailyMessages: 1000
+    };
     if (userId && supabaseAdmin) {
       const { data: userSettings } = await supabaseAdmin
         .from('user_settings')
-        .select('opt_out_keyword')
+        .select('opt_out_keyword, spam_protection')
         .eq('user_id', userId)
         .single();
       optOutKeyword = userSettings?.opt_out_keyword || null;
+      if (userSettings?.spam_protection) {
+        spamProtection = { ...spamProtection, ...userSettings.spam_protection };
+      }
     }
 
     if (!optOutKeyword) {
@@ -124,6 +133,66 @@ export async function POST(req: NextRequest) {
         { error: 'Opt-out keyword not configured. Please set one in Settings > DNC List.' },
         { status: 400 }
       );
+    }
+
+    // Check spam risk using full detector
+    if (spamProtection.enabled && userId && supabaseAdmin) {
+      const spamResult = detectSpam(message);
+
+      // Block if high risk and blockOnHighRisk is enabled
+      if (spamProtection.blockOnHighRisk && spamResult.isSpammy) {
+        return NextResponse.json({
+          error: `Message blocked: High spam risk detected (score: ${spamResult.spamScore}/100). Please revise your message.`,
+          spamRisk: true,
+          spamScore: spamResult.spamScore,
+          detectedWords: spamResult.detectedWords.map(w => w.word),
+          suggestions: spamResult.suggestions
+        }, { status: 400 });
+      }
+
+      // Check rate limits
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      // Count messages sent in last hour
+      const { count: hourlyCount } = await supabaseAdmin
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('direction', 'outbound')
+        .gte('created_at', oneHourAgo.toISOString());
+
+      // Count messages sent in last 24 hours
+      const { count: dailyCount } = await supabaseAdmin
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('direction', 'outbound')
+        .gte('created_at', oneDayAgo.toISOString());
+
+      const currentHourly = hourlyCount || 0;
+      const currentDaily = dailyCount || 0;
+
+      // Check hourly limit
+      if (currentHourly >= spamProtection.maxHourlyMessages) {
+        return NextResponse.json({
+          error: `Rate limit exceeded: You can send ${spamProtection.maxHourlyMessages} messages per hour. Currently sent: ${currentHourly}. Please wait.`,
+          rateLimited: true,
+          currentHourly,
+          maxHourly: spamProtection.maxHourlyMessages
+        }, { status: 429 });
+      }
+
+      // Check daily limit
+      if (currentDaily >= spamProtection.maxDailyMessages) {
+        return NextResponse.json({
+          error: `Rate limit exceeded: You can send ${spamProtection.maxDailyMessages} messages per day. Currently sent: ${currentDaily}. Please wait until tomorrow.`,
+          rateLimited: true,
+          currentDaily,
+          maxDaily: spamProtection.maxDailyMessages
+        }, { status: 429 });
+      }
     }
 
     // Check if this is the first message to this lead (new thread)

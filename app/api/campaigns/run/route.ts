@@ -115,13 +115,19 @@ export async function POST(req: Request) {
       campaignId = newCampaign ? String(newCampaign.id) : '';
     }
 
-    // Fetch user's opt-out keyword
+    // Fetch user's settings (opt-out keyword + spam protection)
     const { data: userSettings } = await supabase
       .from('user_settings')
-      .select('opt_out_keyword')
+      .select('opt_out_keyword, spam_protection')
       .eq('user_id', user.id)
       .single();
     const optOutKeyword = userSettings?.opt_out_keyword || null;
+    const spamProtection = userSettings?.spam_protection || {
+      enabled: true,
+      blockOnHighRisk: true,
+      maxHourlyMessages: 100,
+      maxDailyMessages: 1000
+    };
 
     // SMS sending logic
     const sendResults: SendResult[] = [];
@@ -150,21 +156,71 @@ export async function POST(req: Request) {
         }, { status: 402 });
       }
 
-      // Check spam risk if enabled
-      if (checkSpam) {
-        const spamIndicators = [
-          'free money', 'click here', 'act now', 'limited time',
-          'congratulations', 'you won', 'claim now'
-        ];
-        const lowerMessage = messageTemplate.toLowerCase();
-        const hasSpam = spamIndicators.some(keyword => lowerMessage.includes(keyword));
+      // Check spam risk using full detector
+      if (spamProtection.enabled) {
+        const spamResult = detectSpam(messageTemplate);
 
-        if (hasSpam) {
+        // Block if high risk and blockOnHighRisk is enabled
+        if (spamProtection.blockOnHighRisk && spamResult.isSpammy) {
           return NextResponse.json({
             ok: false,
-            error: 'Message blocked: High spam risk detected. Please revise your message.',
-            spamRisk: true
+            error: `Message blocked: High spam risk detected (score: ${spamResult.spamScore}/100). Detected words: ${spamResult.detectedWords.map(w => w.word).join(', ')}. Please revise your message.`,
+            spamRisk: true,
+            spamScore: spamResult.spamScore,
+            detectedWords: spamResult.detectedWords,
+            suggestions: spamResult.suggestions
           }, { status: 400 });
+        }
+      }
+
+      // Check rate limits
+      if (spamProtection.enabled) {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        // Count messages sent in last hour
+        const { count: hourlyCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('direction', 'outbound')
+          .gte('created_at', oneHourAgo.toISOString());
+
+        // Count messages sent in last 24 hours
+        const { count: dailyCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('direction', 'outbound')
+          .gte('created_at', oneDayAgo.toISOString());
+
+        const currentHourly = hourlyCount || 0;
+        const currentDaily = dailyCount || 0;
+        const newMessageCount = targetLeads.length;
+
+        // Check hourly limit
+        if (currentHourly + newMessageCount > spamProtection.maxHourlyMessages) {
+          return NextResponse.json({
+            ok: false,
+            error: `Rate limit exceeded: You can send ${spamProtection.maxHourlyMessages} messages per hour. Currently sent: ${currentHourly}. Trying to send: ${newMessageCount}. Please wait or reduce batch size.`,
+            rateLimited: true,
+            currentHourly,
+            maxHourly: spamProtection.maxHourlyMessages,
+            availableThisHour: Math.max(0, spamProtection.maxHourlyMessages - currentHourly)
+          }, { status: 429 });
+        }
+
+        // Check daily limit
+        if (currentDaily + newMessageCount > spamProtection.maxDailyMessages) {
+          return NextResponse.json({
+            ok: false,
+            error: `Rate limit exceeded: You can send ${spamProtection.maxDailyMessages} messages per day. Currently sent: ${currentDaily}. Trying to send: ${newMessageCount}. Please wait until tomorrow or increase your daily limit in Settings.`,
+            rateLimited: true,
+            currentDaily,
+            maxDaily: spamProtection.maxDailyMessages,
+            availableToday: Math.max(0, spamProtection.maxDailyMessages - currentDaily)
+          }, { status: 429 });
         }
       }
 
