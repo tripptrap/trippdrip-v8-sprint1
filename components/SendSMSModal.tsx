@@ -185,6 +185,9 @@ export default function SendSMSModal({
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
 
+  // Credits state
+  const [userCredits, setUserCredits] = useState<number | null>(null);
+
   // Analyze message for spam as user types (debounced)
   useEffect(() => {
     if (!message.trim()) {
@@ -204,6 +207,7 @@ export default function SendSMSModal({
   useEffect(() => {
     if (isOpen) {
       loadTelnyxNumbers();
+      loadUserCredits();
       // Set or reset toPhone based on leadPhone prop, auto-format to E.164
       setToPhone(leadPhone ? formatPhoneE164(leadPhone) : '');
       setMessage('');
@@ -217,6 +221,18 @@ export default function SendSMSModal({
       setGeneratingAI(false);
     }
   }, [isOpen, leadPhone]);
+
+  const loadUserCredits = async () => {
+    try {
+      const res = await fetch('/api/user/credits');
+      const data = await res.json();
+      if (data.ok) {
+        setUserCredits(data.credits);
+      }
+    } catch {
+      // Silently fail - credits will remain null
+    }
+  };
 
   const loadTelnyxNumbers = async () => {
     try {
@@ -483,6 +499,11 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
       return;
     }
 
+    if (!hasEnoughCredits) {
+      setError(`Insufficient credits. Need ${creditCost}, have ${userCredits || 0}`);
+      return;
+    }
+
     setSending(true);
     setError('');
 
@@ -521,6 +542,8 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
 
   const characterCount = message.length;
   const smsCount = Math.ceil(characterCount / 160) || 1;
+  const creditCost = smsCount; // 1 credit per SMS segment
+  const hasEnoughCredits = userCredits === null || userCredits >= creditCost;
 
   const timezone = getTimezoneFromPhone(toPhone);
   const localTime = getLocalTime(timezone);
@@ -910,8 +933,21 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
 
             <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
               <span>{characterCount} characters</span>
-              <span>{smsCount} SMS</span>
+              <div className="flex items-center gap-3">
+                <span>{smsCount} SMS</span>
+                {userCredits !== null && (
+                  <span className={!hasEnoughCredits ? 'text-red-500 font-medium' : ''}>
+                    {creditCost} credit{creditCost !== 1 ? 's' : ''} · {userCredits} available
+                  </span>
+                )}
+              </div>
             </div>
+            {!hasEnoughCredits && userCredits !== null && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-red-500">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Insufficient credits to send this message
+              </div>
+            )}
           </div>
         </div>
 
@@ -926,8 +962,9 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
           </button>
           <button
             onClick={handleSend}
-            disabled={sending || !message.trim() || success}
+            disabled={sending || !message.trim() || success || !hasEnoughCredits}
             className="px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-md hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title={!hasEnoughCredits ? 'Insufficient credits' : undefined}
           >
             {sending ? (
               <>

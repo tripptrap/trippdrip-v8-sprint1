@@ -39,6 +39,7 @@ export default function Composer({
   const [showAiMenu, setShowAiMenu] = useState(false);
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState<string | null>(null); // 'smart' | 'followup' | 'compose' | 'spam'
+  const [userCredits, setUserCredits] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -46,6 +47,27 @@ export default function Composer({
   const mediaCount = attachedFiles.length;
   const creditCalc = useMemo(() => calculateSMSCredits(text, mediaCount), [text, mediaCount]);
   const charWarning = useMemo(() => getCharacterWarning(text.length), [text.length]);
+  const hasEnoughCredits = userCredits === null || userCredits >= creditCalc.credits;
+
+  // Fetch user credits on mount and periodically
+  useEffect(() => {
+    const fetchCredits = async () => {
+      try {
+        const res = await fetch('/api/user/credits');
+        const data = await res.json();
+        if (data.credits !== undefined) {
+          setUserCredits(data.credits);
+        }
+      } catch {
+        // Silently fail - credits will remain null and button stays enabled
+      }
+    };
+
+    fetchCredits();
+    // Refresh credits every 30 seconds
+    const interval = setInterval(fetchCredits, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Check DNC status when thread changes
   useEffect(() => {
@@ -236,7 +258,7 @@ export default function Composer({
   }
 
   async function handleSend() {
-    if ((!text.trim() && attachedFiles.length === 0) || sending || disabled || isDncBlocked) return;
+    if ((!text.trim() && attachedFiles.length === 0) || sending || disabled || isDncBlocked || !hasEnoughCredits) return;
 
     setSending(true);
     try {
@@ -323,9 +345,17 @@ export default function Composer({
       {/* Credit display */}
       {(text.length > 0 || mediaCount > 0) && (
         <div className="px-3 pt-2 flex items-center justify-between text-xs">
-          <span className={`font-medium ${creditCalc.credits > 1 ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'}`}>
-            {creditCalc.breakdown}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-medium ${creditCalc.credits > 1 ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'}`}>
+              {creditCalc.breakdown}
+            </span>
+            {!hasEnoughCredits && (
+              <span className="flex items-center gap-1 text-red-500 font-medium">
+                <AlertTriangle className="w-3 h-3" />
+                Insufficient credits ({userCredits} available)
+              </span>
+            )}
+          </div>
           {text.length > 0 && charWarning.remaining > 0 && charWarning.remaining <= 20 && (
             <span className="text-amber-500">
               {charWarning.remaining} chars to next segment
@@ -483,9 +513,9 @@ export default function Composer({
         {/* Send button */}
         <button
           onClick={handleSend}
-          disabled={(!text.trim() && attachedFiles.length === 0) || sending || uploading}
+          disabled={(!text.trim() && attachedFiles.length === 0) || sending || uploading || !hasEnoughCredits}
           className="p-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-          title={`Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`}
+          title={!hasEnoughCredits ? 'Insufficient credits' : `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`}
         >
           {sending || uploading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

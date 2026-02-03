@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   LineChart,
   Line,
@@ -16,7 +16,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, Zap, MessageSquare, Users, Activity, Clock } from 'lucide-react';
+import { TrendingUp, Zap, MessageSquare, Users, Activity, Clock, Download, ChevronDown } from 'lucide-react';
 
 interface OverviewData {
   totalLeads: number;
@@ -107,6 +107,50 @@ export default function AnalyticsPage() {
   const [automationLoading, setAutomationLoading] = useState(true);
   const [daysBack, setDaysBack] = useState(30);
 
+  // Export state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleExport = async (type: 'overview' | 'campaigns' | 'messages', format: 'csv' | 'json') => {
+    setExporting(true);
+    setShowExportMenu(false);
+    try {
+      const response = await fetch(`/api/analytics/export?type=${type}&format=${format}`);
+      if (format === 'csv') {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${type}-export-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+      } else {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${type}-export-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'overview') {
       fetchOverviewAnalytics();
@@ -172,18 +216,73 @@ export default function AnalyticsPage() {
             <p className="text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500">Track your campaign performance and automation metrics</p>
           </div>
 
-          {activeTab === 'automation' && (
-            <select
-              value={daysBack}
-              onChange={(e) => setDaysBack(parseInt(e.target.value))}
-              className="px-4 py-2 bg-white dark:bg-[#1a1f2e] border border-slate-200 dark:border-slate-700 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 dark:text-gray-100 focus:outline-none focus:border-sky-500"
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={60}>Last 60 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-          )}
+          <div className="flex items-center gap-3">
+            {activeTab === 'automation' && (
+              <select
+                value={daysBack}
+                onChange={(e) => setDaysBack(parseInt(e.target.value))}
+                className="px-4 py-2 bg-white dark:bg-[#1a1f2e] border border-slate-200 dark:border-slate-700 dark:border-white/10 rounded-lg text-slate-900 dark:text-slate-100 dark:text-gray-100 focus:outline-none focus:border-sky-500"
+              >
+                <option value={7}>Last 7 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={60}>Last 60 days</option>
+                <option value={90}>Last 90 days</option>
+              </select>
+            )}
+
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exporting}
+                className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50"
+              >
+                <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
+                Export
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
+                  <div className="p-2">
+                    <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Export as CSV</p>
+                    <button
+                      onClick={() => handleExport('overview', 'csv')}
+                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                    >
+                      Overview Summary
+                    </button>
+                    <button
+                      onClick={() => handleExport('campaigns', 'csv')}
+                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                    >
+                      Campaign Performance
+                    </button>
+                    <button
+                      onClick={() => handleExport('messages', 'csv')}
+                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                    >
+                      Message History
+                    </button>
+                    <div className="border-t border-slate-200 dark:border-slate-700 my-2" />
+                    <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Export as JSON</p>
+                    <button
+                      onClick={() => handleExport('overview', 'json')}
+                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                    >
+                      Overview Summary
+                    </button>
+                    <button
+                      onClick={() => handleExport('campaigns', 'json')}
+                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                    >
+                      Campaign Performance
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}

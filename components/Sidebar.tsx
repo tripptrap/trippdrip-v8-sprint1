@@ -23,6 +23,9 @@ const navItems: NavItem[] = [
     label: "Dashboard",
     children: [
       { href: "/analytics", label: "Analytics" },
+      { href: "/sms-analytics", label: "SMS Delivery" },
+      { href: "/analytics-automation", label: "Automation" },
+      { href: "/best-times", label: "Best Times" },
       { href: "/follow-ups", label: "Follow-ups" },
     ]
   },
@@ -41,7 +44,13 @@ const navItems: NavItem[] = [
   { href: "/tags",      label: "Tags" },
   { href: "/templates", label: "Your AI" },
   { href: "/quoting",   label: "Quoting" },
-  { href: "/points",    label: "Points" },
+  {
+    href: "/points",
+    label: "Points",
+    children: [
+      { href: "/credit-history", label: "Usage History" },
+    ]
+  },
   { href: "/roadmap",   label: "Roadmap" },
   { href: "/settings",  label: "Settings" },
 ];

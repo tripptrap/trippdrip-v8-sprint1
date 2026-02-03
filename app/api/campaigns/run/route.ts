@@ -126,7 +126,14 @@ export async function POST(req: Request) {
       enabled: true,
       blockOnHighRisk: true,
       maxHourlyMessages: 100,
-      maxDailyMessages: 1000
+      maxDailyMessages: 1000,
+      maxMessagesPerMinute: 10,
+      maxMessagesPerContact: 5,
+      cooldownMinutes: 30,
+      maxCampaignMessagesPerHour: 200,
+      maxBulkRecipients: 500,
+      enableWeekendLimits: false,
+      weekendLimitPercent: 50
     };
 
     // SMS sending logic
@@ -178,6 +185,29 @@ export async function POST(req: Request) {
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const newMessageCount = targetLeads.length;
+
+        // Check bulk recipients limit
+        const maxBulk = spamProtection.maxBulkRecipients || 500;
+        if (newMessageCount > maxBulk) {
+          return NextResponse.json({
+            ok: false,
+            error: `Bulk limit exceeded: Maximum ${maxBulk} recipients per send. You're trying to send to ${newMessageCount}. Please reduce your selection or increase the limit in Settings.`,
+            rateLimited: true,
+            maxBulkRecipients: maxBulk,
+            attempted: newMessageCount
+          }, { status: 429 });
+        }
+
+        // Calculate effective limits (apply weekend reduction if enabled)
+        const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+        const weekendMultiplier = (spamProtection.enableWeekendLimits && isWeekend)
+          ? (spamProtection.weekendLimitPercent || 50) / 100
+          : 1;
+
+        const effectiveHourlyLimit = Math.round(spamProtection.maxHourlyMessages * weekendMultiplier);
+        const effectiveDailyLimit = Math.round(spamProtection.maxDailyMessages * weekendMultiplier);
+        const effectiveCampaignHourlyLimit = Math.round((spamProtection.maxCampaignMessagesPerHour || 200) * weekendMultiplier);
 
         // Count messages sent in last hour
         const { count: hourlyCount } = await supabase
@@ -197,29 +227,41 @@ export async function POST(req: Request) {
 
         const currentHourly = hourlyCount || 0;
         const currentDaily = dailyCount || 0;
-        const newMessageCount = targetLeads.length;
 
         // Check hourly limit
-        if (currentHourly + newMessageCount > spamProtection.maxHourlyMessages) {
+        if (currentHourly + newMessageCount > effectiveHourlyLimit) {
           return NextResponse.json({
             ok: false,
-            error: `Rate limit exceeded: You can send ${spamProtection.maxHourlyMessages} messages per hour. Currently sent: ${currentHourly}. Trying to send: ${newMessageCount}. Please wait or reduce batch size.`,
+            error: `Rate limit exceeded: You can send ${effectiveHourlyLimit} messages per hour${isWeekend && spamProtection.enableWeekendLimits ? ' (weekend limit)' : ''}. Currently sent: ${currentHourly}. Trying to send: ${newMessageCount}. Please wait or reduce batch size.`,
             rateLimited: true,
             currentHourly,
-            maxHourly: spamProtection.maxHourlyMessages,
-            availableThisHour: Math.max(0, spamProtection.maxHourlyMessages - currentHourly)
+            maxHourly: effectiveHourlyLimit,
+            availableThisHour: Math.max(0, effectiveHourlyLimit - currentHourly),
+            isWeekendLimit: isWeekend && spamProtection.enableWeekendLimits
           }, { status: 429 });
         }
 
         // Check daily limit
-        if (currentDaily + newMessageCount > spamProtection.maxDailyMessages) {
+        if (currentDaily + newMessageCount > effectiveDailyLimit) {
           return NextResponse.json({
             ok: false,
-            error: `Rate limit exceeded: You can send ${spamProtection.maxDailyMessages} messages per day. Currently sent: ${currentDaily}. Trying to send: ${newMessageCount}. Please wait until tomorrow or increase your daily limit in Settings.`,
+            error: `Rate limit exceeded: You can send ${effectiveDailyLimit} messages per day${isWeekend && spamProtection.enableWeekendLimits ? ' (weekend limit)' : ''}. Currently sent: ${currentDaily}. Trying to send: ${newMessageCount}. Please wait until tomorrow or increase your daily limit in Settings.`,
             rateLimited: true,
             currentDaily,
-            maxDaily: spamProtection.maxDailyMessages,
-            availableToday: Math.max(0, spamProtection.maxDailyMessages - currentDaily)
+            maxDaily: effectiveDailyLimit,
+            availableToday: Math.max(0, effectiveDailyLimit - currentDaily),
+            isWeekendLimit: isWeekend && spamProtection.enableWeekendLimits
+          }, { status: 429 });
+        }
+
+        // Check campaign-specific hourly limit
+        if (newMessageCount > effectiveCampaignHourlyLimit) {
+          return NextResponse.json({
+            ok: false,
+            error: `Campaign limit exceeded: Maximum ${effectiveCampaignHourlyLimit} messages per campaign per hour${isWeekend && spamProtection.enableWeekendLimits ? ' (weekend limit)' : ''}. You're trying to send ${newMessageCount}. Please reduce batch size or split into multiple sends.`,
+            rateLimited: true,
+            maxCampaignHourly: effectiveCampaignHourlyLimit,
+            attempted: newMessageCount
           }, { status: 429 });
         }
       }

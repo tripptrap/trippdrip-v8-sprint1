@@ -32,6 +32,14 @@ export default function Page() {
   const [blockOnHighRisk, setBlockOnHighRisk] = useState(true);
   const [maxHourly, setMaxHourly] = useState(100);
   const [maxDaily, setMaxDaily] = useState(1000);
+  // Advanced rate limiting
+  const [maxPerMinute, setMaxPerMinute] = useState(10);
+  const [maxPerContact, setMaxPerContact] = useState(5);
+  const [cooldownMinutes, setCooldownMinutes] = useState(30);
+  const [maxCampaignHourly, setMaxCampaignHourly] = useState(200);
+  const [maxBulkRecipients, setMaxBulkRecipients] = useState(500);
+  const [enableWeekendLimits, setEnableWeekendLimits] = useState(false);
+  const [weekendLimitPercent, setWeekendLimitPercent] = useState(50);
 
   // Auto refill form
   const [autoRefillEnabled, setAutoRefillEnabled] = useState(false);
@@ -127,6 +135,14 @@ export default function Page() {
       setBlockOnHighRisk(data.spamProtection.blockOnHighRisk);
       setMaxHourly(data.spamProtection.maxHourlyMessages);
       setMaxDaily(data.spamProtection.maxDailyMessages);
+      // Advanced rate limiting
+      setMaxPerMinute(data.spamProtection.maxMessagesPerMinute || 10);
+      setMaxPerContact(data.spamProtection.maxMessagesPerContact || 5);
+      setCooldownMinutes(data.spamProtection.cooldownMinutes || 30);
+      setMaxCampaignHourly(data.spamProtection.maxCampaignMessagesPerHour || 200);
+      setMaxBulkRecipients(data.spamProtection.maxBulkRecipients || 500);
+      setEnableWeekendLimits(data.spamProtection.enableWeekendLimits || false);
+      setWeekendLimitPercent(data.spamProtection.weekendLimitPercent || 50);
 
       setAutoRefillEnabled(data.autoRefill.enabled);
       setAutoRefillThreshold(data.autoRefill.threshold);
@@ -295,7 +311,14 @@ export default function Page() {
       enabled: spamEnabled,
       blockOnHighRisk,
       maxHourlyMessages: maxHourly,
-      maxDailyMessages: maxDaily
+      maxDailyMessages: maxDaily,
+      maxMessagesPerMinute: maxPerMinute,
+      maxMessagesPerContact: maxPerContact,
+      cooldownMinutes: cooldownMinutes,
+      maxCampaignMessagesPerHour: maxCampaignHourly,
+      maxBulkRecipients: maxBulkRecipients,
+      enableWeekendLimits: enableWeekendLimits,
+      weekendLimitPercent: weekendLimitPercent
     });
     showSaveMessage('Spam protection settings saved!');
   };
@@ -781,13 +804,18 @@ export default function Page() {
       {activeTab === 'spam' && (
         <div className="card space-y-6">
           <div>
-            <h2 className="text-xl font-semibold mb-2">Spam Protection</h2>
+            <h2 className="text-xl font-semibold mb-2">Spam Protection & Rate Limiting</h2>
             <p className="text-slate-700 dark:text-slate-300 mb-4">
-              Configure spam detection and rate limiting to protect your sender reputation.
+              Configure spam detection and rate limiting to protect your sender reputation and ensure compliance.
             </p>
           </div>
 
+          {/* Spam Detection Section */}
           <div className="space-y-4">
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+              Spam Detection
+            </h3>
+
             <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
               <div>
                 <h3 className="font-medium">Enable Spam Protection</h3>
@@ -802,7 +830,7 @@ export default function Page() {
                   onChange={(e) => setSpamEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-white dark:bg-slate-800/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
               </label>
             </div>
 
@@ -810,7 +838,7 @@ export default function Page() {
               <div>
                 <h3 className="font-medium">Block High Risk Messages</h3>
                 <p className="text-sm text-slate-700 dark:text-slate-300">
-                  Prevent sending of messages with critical spam scores
+                  Prevent sending of messages with critical spam scores (60+)
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -820,45 +848,232 @@ export default function Page() {
                   onChange={(e) => setBlockOnHighRisk(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-white dark:bg-slate-800/20 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--accent)]/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-800 after:border-white/30 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
+                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
               </label>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Messages Per Hour: {maxHourly}
-              </label>
-              <input
-                type="range"
-                min="10"
-                max="500"
-                value={maxHourly}
-                onChange={(e) => setMaxHourly(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Messages Per Day: {maxDaily}
-              </label>
-              <input
-                type="range"
-                min="100"
-                max="5000"
-                value={maxDaily}
-                onChange={(e) => setMaxDaily(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-
-            <button
-              onClick={saveSpamSettings}
-              className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90"
-            >
-              Save Spam Settings
-            </button>
           </div>
+
+          {/* Global Rate Limits Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+              Global Rate Limits
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Set overall limits for all outbound messages across your account.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Max Messages Per Minute
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={maxPerMinute}
+                    onChange={(e) => setMaxPerMinute(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">msgs/min</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Burst protection (1-60)</p>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Max Messages Per Hour
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="10"
+                    max="1000"
+                    value={maxHourly}
+                    onChange={(e) => setMaxHourly(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">msgs/hour</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Hourly limit (10-1000)</p>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Max Messages Per Day
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="100"
+                    max="10000"
+                    value={maxDaily}
+                    onChange={(e) => setMaxDaily(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">msgs/day</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Daily limit (100-10000)</p>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Campaign Messages Per Hour
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="10"
+                    max="500"
+                    value={maxCampaignHourly}
+                    onChange={(e) => setMaxCampaignHourly(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">msgs/hour</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Per campaign limit (10-500)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact-Level Limits Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+              Contact-Level Limits
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Prevent over-messaging individual contacts to maintain engagement.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Max Messages Per Contact (Daily)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={maxPerContact}
+                    onChange={(e) => setMaxPerContact(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">msgs/day</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Messages to same contact per day (1-20)</p>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Cooldown Between Messages
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    max="1440"
+                    value={cooldownMinutes}
+                    onChange={(e) => setCooldownMinutes(Number(e.target.value))}
+                    className="w-24 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                  />
+                  <span className="text-sm text-slate-500">minutes</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Min time between messages to same contact (0-1440)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bulk Messaging Limits Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+              Bulk Messaging Limits
+            </h3>
+
+            <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <label className="block text-sm font-medium mb-2">
+                Max Bulk Recipients
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="10"
+                  max="5000"
+                  value={maxBulkRecipients}
+                  onChange={(e) => setMaxBulkRecipients(Number(e.target.value))}
+                  className="w-32 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                />
+                <span className="text-sm text-slate-500">recipients per send</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Maximum recipients in a single bulk send operation (10-5000)</p>
+            </div>
+          </div>
+
+          {/* Weekend Limits Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+              Weekend Limits
+            </h3>
+
+            <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div>
+                <h3 className="font-medium">Enable Weekend Limits</h3>
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  Automatically reduce message limits on Saturdays and Sundays
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableWeekendLimits}
+                  onChange={(e) => setEnableWeekendLimits(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+              </label>
+            </div>
+
+            {enableWeekendLimits && (
+              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                <label className="block text-sm font-medium mb-2">
+                  Weekend Limit Percentage: {weekendLimitPercent}%
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="10"
+                  value={weekendLimitPercent}
+                  onChange={(e) => setWeekendLimitPercent(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                  <span>10%</span>
+                  <span>Weekend: {Math.round(maxHourly * weekendLimitPercent / 100)}/hr, {Math.round(maxDaily * weekendLimitPercent / 100)}/day</span>
+                  <span>100%</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Info Box */}
+          <div className="p-4 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg">
+            <h4 className="font-medium text-sky-800 dark:text-sky-200 mb-2">About Rate Limiting</h4>
+            <ul className="text-sm text-sky-700 dark:text-sky-300 space-y-1 list-disc list-inside">
+              <li>Rate limits protect your sender reputation and prevent carrier blocking</li>
+              <li>Contact-level limits prevent individual contacts from being over-messaged</li>
+              <li>Cooldown periods ensure natural conversation pacing</li>
+              <li>Weekend limits help maintain compliance and respect contact preferences</li>
+            </ul>
+          </div>
+
+          <button
+            onClick={saveSpamSettings}
+            className="bg-sky-600 text-white px-6 py-2 rounded-lg hover:bg-sky-700 transition-colors"
+          >
+            Save Rate Limit Settings
+          </button>
         </div>
       )}
 

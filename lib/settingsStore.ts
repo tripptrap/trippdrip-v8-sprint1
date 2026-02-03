@@ -33,6 +33,14 @@ export type Settings = {
     blockOnHighRisk: boolean;
     maxHourlyMessages: number;
     maxDailyMessages: number;
+    // Advanced rate limiting
+    maxMessagesPerMinute: number;        // Burst protection
+    maxMessagesPerContact: number;       // Per-contact daily limit
+    cooldownMinutes: number;             // Min time between messages to same contact
+    maxCampaignMessagesPerHour: number;  // Campaign-specific hourly limit
+    maxBulkRecipients: number;           // Max recipients per bulk send
+    enableWeekendLimits: boolean;        // Reduce limits on weekends
+    weekendLimitPercent: number;         // Percentage of normal limits on weekends
   };
   autoRefill: {
     enabled: boolean;
@@ -82,7 +90,15 @@ export function getDefaultSettings(): Settings {
       enabled: true,
       blockOnHighRisk: true,
       maxHourlyMessages: 100,
-      maxDailyMessages: 1000
+      maxDailyMessages: 1000,
+      // Advanced rate limiting defaults
+      maxMessagesPerMinute: 10,
+      maxMessagesPerContact: 5,
+      cooldownMinutes: 30,
+      maxCampaignMessagesPerHour: 200,
+      maxBulkRecipients: 500,
+      enableWeekendLimits: false,
+      weekendLimitPercent: 50
     },
     autoRefill: {
       enabled: false,
