@@ -1,5 +1,11 @@
 # HyveWyre - Project Context
 
+## QA Communication Guidelines
+When the user provides a QA checklist with categories:
+- If a category is marked **"Undefined"**, everything listed under that category (until the next category) represents items that need to be **asked about or clarified** before implementation
+- These are features/functionality that may be missing, unclear, or need definition
+- Always confirm requirements for "Undefined" items before building
+
 ## What Is This
 HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for any industry with outreach needs — insurance, real estate, solar, roofing, financial services, home services, etc. Users can also port/add numbers to simply manage existing client communications.
 

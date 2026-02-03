@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, Plus, Trash2, Upload, Download, Search, AlertTriangle } from 'lucide-react';
+import { Shield, Plus, Trash2, Upload, Download, Search, AlertTriangle, Clock, History } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type DNCEntry = {
@@ -14,6 +14,17 @@ type DNCEntry = {
   created_at: string;
 };
 
+type DNCHistoryEntry = {
+  id: string;
+  phone_number: string;
+  normalized_phone: string;
+  action: 'added' | 'removed' | 'checked' | 'blocked' | 'updated';
+  list_type: 'user' | 'global';
+  result: boolean | null;
+  metadata: Record<string, any> | null;
+  created_at: string;
+};
+
 type DNCStats = {
   total_user_dnc: number;
   total_global_dnc: number;
@@ -23,7 +34,10 @@ type DNCStats = {
   blocked_last_30_days: number;
 };
 
+type Tab = 'list' | 'history';
+
 export default function DNCPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('list');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DNCStats | null>(null);
   const [entries, setEntries] = useState<DNCEntry[]>([]);
@@ -42,9 +56,60 @@ export default function DNCPage() {
   const [bulkReason, setBulkReason] = useState('manual');
   const [bulkAdding, setBulkAdding] = useState(false);
 
+  // History state
+  const [historyEntries, setHistoryEntries] = useState<DNCHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<string>('all');
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const HISTORY_PAGE_SIZE = 50;
+
   useEffect(() => {
     loadDNCData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadHistory();
+    }
+  }, [activeTab, historyFilter, historyPage]);
+
+  const loadHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const params = new URLSearchParams({
+        limit: HISTORY_PAGE_SIZE.toString(),
+        offset: (historyPage * HISTORY_PAGE_SIZE).toString(),
+      });
+      if (historyFilter !== 'all') {
+        params.set('action', historyFilter);
+      }
+      if (historySearch) {
+        params.set('phone', historySearch);
+      }
+
+      const res = await fetch(`/api/dnc/history?${params}`);
+      const data = await res.json();
+
+      if (data.ok) {
+        setHistoryEntries(data.entries);
+        setHistoryTotal(data.total);
+      } else {
+        toast.error(data.error || 'Failed to load history');
+      }
+    } catch (error: any) {
+      console.error('Error loading history:', error);
+      toast.error('Failed to load history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleHistorySearch = () => {
+    setHistoryPage(0);
+    loadHistory();
+  };
 
   const loadDNCData = async () => {
     try {
@@ -224,6 +289,22 @@ export default function DNCPage() {
     );
   }
 
+  const getActionBadge = (action: string) => {
+    const styles: Record<string, string> = {
+      added: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      removed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      checked: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      blocked: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+      updated: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    };
+    return styles[action] || 'bg-gray-100 text-gray-700';
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -234,6 +315,178 @@ export default function DNCPage() {
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-slate-200 dark:border-slate-700">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'list'
+                ? 'border-sky-500 text-sky-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              DNC List
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'history'
+                ? 'border-sky-500 text-sky-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Activity History
+            </div>
+          </button>
+        </nav>
+      </div>
+
+      {/* History Tab Content */}
+      {activeTab === 'history' && (
+        <>
+          {/* History Filters */}
+          <div className="card">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleHistorySearch()}
+                    placeholder="Search phone numbers..."
+                    className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 items-center">
+                <select
+                  value={historyFilter}
+                  onChange={(e) => {
+                    setHistoryFilter(e.target.value);
+                    setHistoryPage(0);
+                  }}
+                  className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                >
+                  <option value="all">All Actions</option>
+                  <option value="added">Added</option>
+                  <option value="removed">Removed</option>
+                  <option value="checked">Checked</option>
+                  <option value="blocked">Blocked</option>
+                  <option value="updated">Updated</option>
+                </select>
+                <button
+                  onClick={handleHistorySearch}
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* History Table */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Activity Log ({historyTotal} entries)
+              </h3>
+              {historyTotal > HISTORY_PAGE_SIZE && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHistoryPage(p => Math.max(0, p - 1))}
+                    disabled={historyPage === 0}
+                    className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded disabled:opacity-50 text-slate-900 dark:text-slate-100"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    Page {historyPage + 1} of {Math.ceil(historyTotal / HISTORY_PAGE_SIZE)}
+                  </span>
+                  <button
+                    onClick={() => setHistoryPage(p => p + 1)}
+                    disabled={(historyPage + 1) * HISTORY_PAGE_SIZE >= historyTotal}
+                    className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded disabled:opacity-50 text-slate-900 dark:text-slate-100"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {historyLoading ? (
+              <div className="text-center py-8 text-slate-600 dark:text-slate-400">Loading history...</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Date/Time</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Phone Number</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Action</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">List</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-slate-600 dark:text-slate-400">
+                          No history entries found
+                        </td>
+                      </tr>
+                    ) : (
+                      historyEntries.map((entry) => (
+                        <tr key={entry.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
+                            {formatDate(entry.created_at)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-mono text-slate-900 dark:text-slate-100">{entry.phone_number}</div>
+                            <div className="text-xs text-slate-500">{entry.normalized_phone}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${getActionBadge(entry.action)}`}>
+                              {entry.action}
+                            </span>
+                            {entry.action === 'checked' && entry.result !== null && (
+                              <span className={`ml-2 px-2 py-1 rounded text-xs ${entry.result ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                                {entry.result ? 'On List' : 'Clear'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-sm text-slate-600 dark:text-slate-400 capitalize">{entry.list_type}</span>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-600 dark:text-slate-400">
+                            {entry.metadata?.reason && (
+                              <span className="mr-2">Reason: {entry.metadata.reason}</span>
+                            )}
+                            {entry.metadata?.source && (
+                              <span>Source: {entry.metadata.source}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* List Tab Content */}
+      {activeTab === 'list' && (
+        <>
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="card">
@@ -383,6 +636,8 @@ export default function DNCPage() {
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* Add Number Dialog */}
       {showAddDialog && (

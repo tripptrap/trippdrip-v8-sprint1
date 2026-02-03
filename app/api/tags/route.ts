@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -14,11 +14,16 @@ export async function GET() {
       return NextResponse.json({ ok: false, items: [], error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Fetch tags from tags table
+    // Check for sort preference
+    const { searchParams } = new URL(req.url);
+    const sortBy = searchParams.get('sort') || 'position'; // 'position' or 'name'
+
+    // Fetch tags from tags table - order by position first, then name as fallback
     const { data: tags, error: tagsError } = await supabase
       .from('tags')
       .select('*')
       .eq('user_id', user.id)
+      .order(sortBy === 'name' ? 'name' : 'position', { ascending: true })
       .order('name', { ascending: true });
 
     if (tagsError) {
@@ -51,6 +56,7 @@ export async function GET() {
       id: tag.id,
       name: tag.name,
       color: tag.color,
+      position: tag.position ?? 0,
       count: tagCounts.get(tag.name) || 0,
       created_at: tag.created_at,
       updated_at: tag.updated_at,
@@ -80,6 +86,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Tag name is required' }, { status: 400 });
     }
 
+    // Get max position for new tag
+    const { data: maxPos } = await supabase
+      .from('tags')
+      .select('position')
+      .eq('user_id', user.id)
+      .order('position', { ascending: false })
+      .limit(1)
+      .single();
+
+    const newPosition = (maxPos?.position ?? 0) + 1;
+
     // Create tag
     const { data, error } = await supabase
       .from('tags')
@@ -87,6 +104,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         name: name.trim(),
         color: color || '#3b82f6',
+        position: newPosition,
       })
       .select()
       .single();
@@ -177,6 +195,42 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error('Error in DELETE /api/tags:', error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+}
+
+// PATCH - Reorder tags (update positions)
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { orderedIds } = body;
+
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      return NextResponse.json({ ok: false, error: 'orderedIds array is required' }, { status: 400 });
+    }
+
+    // Update positions for each tag
+    const updates = orderedIds.map((id: string, index: number) =>
+      supabase
+        .from('tags')
+        .update({ position: index + 1 })
+        .eq('id', id)
+        .eq('user_id', user.id)
+    );
+
+    await Promise.all(updates);
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error('Error in PATCH /api/tags:', error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }
