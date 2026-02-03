@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/process-ai-drips",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-buy",
+      "schedule": "0 * * * *"
     }
   ],
   "headers": [

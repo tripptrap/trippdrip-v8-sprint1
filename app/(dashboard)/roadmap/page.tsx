@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Search, Gift, Lock } from 'lucide-react';
+import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Gift, Lock } from 'lucide-react';
 
 type RoadmapStatus = 'completed' | 'in-progress' | 'planned';
 
@@ -77,7 +77,7 @@ const roadmapItems: RoadmapItem[] = [
   {
     id: 'integrations-hub',
     title: 'Integrations Hub',
-    description: 'Connect with Landline Remover, Google Maps Scraper, Google Calendar, and more third-party tools.',
+    description: 'Connect with Landline Remover, Google Calendar, CRM tools, and more third-party integrations.',
     status: 'planned',
     category: 'integrations',
     quarter: 'Q1 2025',
@@ -118,15 +118,6 @@ const roadmapItems: RoadmapItem[] = [
     category: 'compliance',
     quarter: 'Q2 2025',
     icon: Shield
-  },
-  {
-    id: 'lead-scraper',
-    title: 'Premium Lead Scraper',
-    description: 'Automatically extract leads from Zillow, Realtor.com, Yelp, Google Maps, and other business directories with premium Apify integration.',
-    status: 'planned',
-    category: 'integrations',
-    quarter: 'Q2 2025',
-    icon: Search
   },
 ];
 

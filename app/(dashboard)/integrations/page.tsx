@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Zap, Calendar, Map, Phone, Mail, Shield, CheckCircle, ExternalLink, Settings, AlertCircle } from 'lucide-react';
+import { Zap, Calendar, Phone, Mail, Shield, CheckCircle, ExternalLink, Settings, AlertCircle } from 'lucide-react';
 
 interface Integration {
   id: string;
@@ -18,22 +18,6 @@ interface Integration {
 
 const integrations: Integration[] = [
   // Data & Lead Generation
-  {
-    id: 'google-maps-scraper',
-    name: 'Google Maps Scraper',
-    description: 'Extract business leads directly from Google Maps with phone numbers, addresses, and business details.',
-    category: 'data',
-    icon: Map,
-    status: 'available',
-    features: [
-      'Search by location and business type',
-      'Extract phone numbers and emails',
-      'Get business hours and ratings',
-      'Export directly to leads database'
-    ],
-    setupUrl: '/lead-scraper',
-    color: 'text-sky-600 bg-sky-100 dark:bg-sky-100 dark:bg-sky-900/20 border-sky-500/30'
-  },
   {
     id: 'landline-remover',
     name: 'Landline Remover',

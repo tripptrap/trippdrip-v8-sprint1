@@ -3,7 +3,7 @@
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-export type ActionType = 'sms_sent' | 'ai_response' | 'document_upload' | 'bulk_message' | 'flow_creation' | 'scraper_run';
+export type ActionType = 'sms_sent' | 'ai_response' | 'document_upload' | 'bulk_message' | 'flow_creation';
 
 // Cost configuration for different actions
 export const POINT_COSTS: Record<ActionType, number> = {
@@ -11,8 +11,7 @@ export const POINT_COSTS: Record<ActionType, number> = {
   ai_response: 2,           // 2 points per AI response / smart reply
   document_upload: 5,       // 3-8 points for document upload with AI processing (default 5)
   bulk_message: 2,          // 2 points per bulk/mass message (per contact)
-  flow_creation: 15,        // 15 points for flow creation
-  scraper_run: 50           // 50 points per scraper run
+  flow_creation: 15         // 15 points for flow creation
 };
 
 // Spend points for a specific action (SERVER-SIDE)
@@ -28,8 +27,7 @@ export async function spendPointsForAction(
     ai_response: `AI response generated (${count}x)`,
     document_upload: `Document uploaded with AI processing (${count}x)`,
     bulk_message: `Bulk message sent to ${count} contact(s)`,
-    flow_creation: `Flow created (${count}x)`,
-    scraper_run: `Lead scraper run (${count}x)`
+    flow_creation: `Flow created (${count}x)`
   };
 
   return await spendPoints(totalCost, actionDescriptions[actionType], actionType);
