@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CustomModal from "@/components/CustomModal";
+import BulkComposeDrawer from "@/components/BulkComposeDrawer";
 
 type Flow = {
   id: string;
@@ -76,6 +77,8 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [composeDrawerOpen, setComposeDrawerOpen] = useState(false);
+  const [composeForCampaignId, setComposeForCampaignId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({
     isOpen: false,
     type: 'info',
@@ -144,9 +147,12 @@ export default function CampaignsPage() {
       const data = await response.json();
       if (data.ok) {
         setFlows(data.items || []);
+      } else {
+        console.error('Error loading flows:', data.error);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading flows:', error);
+      // Flows are optional, don't show modal for this
     } finally {
       setLoadingFlows(false);
     }
@@ -158,9 +164,12 @@ export default function CampaignsPage() {
       const data = await response.json();
       if (data.ok) {
         setAvailableTags(data.items || []);
+      } else {
+        console.error('Error loading tags:', data.error);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading tags:', error);
+      // Tags are optional, don't show modal for this
     }
   }
 
@@ -304,10 +313,23 @@ export default function CampaignsPage() {
             credits_used: c.credits_used || 0,
           }));
           setCampaigns(transformedCampaigns);
+        } else {
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: data.error || 'Failed to load campaigns',
+          });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading campaigns:', error);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: error?.message || 'Failed to load campaigns',
+      });
     } finally {
       setLoading(false);
     }
@@ -531,6 +553,7 @@ export default function CampaignsPage() {
           name: `${campaign.name} (Copy)`,
           flowId: campaign.flow_id || undefined,
           tags: campaign.tags?.length ? campaign.tags : undefined,
+          lead_type: campaign.lead_type || undefined,
         }),
       });
       const data = await response.json();
@@ -622,7 +645,7 @@ export default function CampaignsPage() {
         <div className="flex gap-2">
           <Link
             href="/campaigns/schedule"
-            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-500 flex items-center gap-2"
+            className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -803,6 +826,15 @@ export default function CampaignsPage() {
                           className="text-emerald-500 hover:text-emerald-300 text-sm font-medium"
                         >
                           Clone
+                        </button>
+                        <button
+                          onClick={() => {
+                            setComposeForCampaignId(campaign.id);
+                            setComposeDrawerOpen(true);
+                          }}
+                          className="text-amber-500 hover:text-amber-300 text-sm font-medium"
+                        >
+                          Message
                         </button>
                         <button
                           onClick={() => deleteCampaign(campaign.id, campaign.name)}
@@ -1291,6 +1323,16 @@ export default function CampaignsPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk Compose Drawer */}
+      <BulkComposeDrawer
+        isOpen={composeDrawerOpen}
+        onClose={() => {
+          setComposeDrawerOpen(false);
+          setComposeForCampaignId(null);
+        }}
+        preSelectedCampaignId={composeForCampaignId || undefined}
+      />
     </div>
   );
 }

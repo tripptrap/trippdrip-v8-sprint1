@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle, Sparkles, MessageSquarePlus, Wand2, ShieldCheck, Loader2 } from 'lucide-react';
+import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle, Sparkles, MessageSquarePlus, Wand2, ShieldCheck, Loader2, Zap } from 'lucide-react';
 import { calculateSMSCredits, getCharacterWarning } from '@/lib/creditCalculator';
 import ScheduleMessagePopover from './ScheduleMessagePopover';
 import type { Thread } from '@/lib/hooks/useTextsState';
@@ -15,6 +15,7 @@ interface ComposerProps {
   onSend: (body: string, options?: { mediaUrls?: string[]; scheduledFor?: string }) => Promise<void>;
   disabled?: boolean;
   leadId?: string;
+  onOpenAIDrip?: () => void;
 }
 
 export default function Composer({
@@ -25,6 +26,7 @@ export default function Composer({
   onSend,
   disabled,
   leadId,
+  onOpenAIDrip,
 }: ComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -453,14 +455,25 @@ export default function Composer({
           />
         </div>
 
+        {/* AI Drip button */}
+        {onOpenAIDrip && (
+          <button
+            onClick={onOpenAIDrip}
+            className="p-2 rounded-lg transition-colors text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+            title="AI Drip - automatic follow-ups"
+          >
+            <Zap className="w-5 h-5" />
+          </button>
+        )}
+
         {/* Schedule button */}
         <button
           onClick={() => setShowSchedule(!showSchedule)}
           disabled={sending || !text.trim()}
           className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
             showSchedule
-              ? 'text-sky-600 bg-sky-50 dark:bg-sky-900/20'
-              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+              ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20'
+              : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20'
           }`}
           title="Schedule message"
         >

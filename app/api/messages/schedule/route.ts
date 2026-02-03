@@ -8,6 +8,8 @@ interface ScheduleMessageRequest {
   scheduledFor: string; // ISO datetime string
   channel: 'sms' | 'email';
   subject?: string; // For emails
+  source?: 'manual' | 'drip' | 'campaign' | 'bulk'; // Where the message originated
+  campaignId?: string; // Associated campaign if any
 }
 
 export async function POST(req: NextRequest) {
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: ScheduleMessageRequest = await req.json();
-    const { leadId, body: messageBody, scheduledFor, channel, subject } = body;
+    const { leadId, body: messageBody, scheduledFor, channel, subject, source = 'manual', campaignId } = body;
 
     if (!leadId || !messageBody || !scheduledFor) {
       return NextResponse.json(
@@ -64,6 +66,8 @@ export async function POST(req: NextRequest) {
         scheduled_for: scheduledFor,
         credits_cost: creditsCost,
         segments,
+        source: source,
+        campaign_id: campaignId || null,
       })
       .select()
       .single();
@@ -105,8 +109,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get all scheduled messages for the user
-    const { data: scheduledMessages, error: fetchError } = await supabase
+    // Parse query params
+    const { searchParams } = new URL(req.url);
+    const source = searchParams.get('source'); // Filter by source: manual, drip, campaign, bulk
+    const includeAll = searchParams.get('includeAll') === 'true'; // Include sent/cancelled
+
+    // Build query
+    let query = supabase
       .from('scheduled_messages')
       .select(`
         *,
@@ -118,9 +127,22 @@ export async function GET(req: NextRequest) {
           email
         )
       `)
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'failed'])
-      .order('scheduled_for', { ascending: true });
+      .eq('user_id', user.id);
+
+    // Filter by status
+    if (!includeAll) {
+      query = query.in('status', ['pending', 'failed']);
+    }
+
+    // Filter by source if provided
+    if (source && source !== 'all') {
+      query = query.eq('source', source);
+    }
+
+    // Order by scheduled time
+    query = query.order('scheduled_for', { ascending: true });
+
+    const { data: scheduledMessages, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("Error fetching scheduled messages:", fetchError);
@@ -130,9 +152,25 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Count by source for tabs
+    const { data: sourceCounts } = await supabase
+      .from('scheduled_messages')
+      .select('source')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'failed']);
+
+    const counts = {
+      all: sourceCounts?.length || 0,
+      manual: sourceCounts?.filter(m => m.source === 'manual' || !m.source).length || 0,
+      drip: sourceCounts?.filter(m => m.source === 'drip').length || 0,
+      campaign: sourceCounts?.filter(m => m.source === 'campaign').length || 0,
+      bulk: sourceCounts?.filter(m => m.source === 'bulk').length || 0,
+    };
+
     return NextResponse.json({
       ok: true,
       scheduledMessages: scheduledMessages || [],
+      counts,
     });
   } catch (error) {
     console.error("Error fetching scheduled messages:", error);

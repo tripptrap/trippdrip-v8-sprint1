@@ -132,17 +132,11 @@ export async function PUT(req: NextRequest) {
       if (preferences.enableDuplicateDetection !== undefined) {
         prefUpdates.enable_duplicate_detection = preferences.enableDuplicateDetection;
       }
-
-      // Twilio integration (don't return sensitive data)
-      if (preferences.twilioPhoneNumber !== undefined) {
-        prefUpdates.twilio_phone_number = preferences.twilioPhoneNumber;
+      if (preferences.calendarBookingUrl !== undefined) {
+        prefUpdates.calendar_booking_url = preferences.calendarBookingUrl;
       }
-      if (preferences.twilioAccountSid !== undefined) {
-        prefUpdates.twilio_account_sid = preferences.twilioAccountSid;
-      }
-      if (preferences.twilioAuthToken !== undefined) {
-        // In production, encrypt this before storing
-        prefUpdates.twilio_auth_token_encrypted = preferences.twilioAuthToken;
+      if (preferences.calendarType !== undefined) {
+        prefUpdates.calendar_type = preferences.calendarType;
       }
 
       // Email integration

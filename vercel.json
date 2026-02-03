@@ -6,12 +6,16 @@
   },
   "crons": [
     {
-      "path": "/api/cron/process-twilio-usage",
-      "schedule": "0 2 1 * *"
-    },
-    {
       "path": "/api/cron/process-scheduled-messages",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/process-drips",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/process-ai-drips",
+      "schedule": "*/10 * * * *"
     }
   ],
   "headers": [

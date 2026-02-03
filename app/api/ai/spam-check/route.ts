@@ -51,17 +51,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Check user's points balance for AI usage
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('points_balance')
+    // Check user's credits balance for AI usage
+    const { data: userData } = await supabase
+      .from('users')
+      .select('credits')
       .eq('id', user.id)
       .single();
 
     const pointsCost = 2;
-    if (!profile || profile.points_balance < pointsCost) {
+    if (!userData || userData.credits < pointsCost) {
       return NextResponse.json(
-        { error: 'Insufficient points for AI rewrite', pointsRequired: pointsCost },
+        { error: 'Insufficient credits for AI rewrite', pointsRequired: pointsCost },
         { status: 402 }
       );
     }
@@ -87,10 +87,10 @@ export async function POST(req: NextRequest) {
 
     const rewrittenMessage = completion.choices[0]?.message?.content?.trim() || message;
 
-    // Deduct points
+    // Deduct credits
     await supabase
-      .from('profiles')
-      .update({ points_balance: profile.points_balance - pointsCost })
+      .from('users')
+      .update({ credits: userData.credits - pointsCost })
       .eq('id', user.id);
 
     // Analyze the rewritten message to confirm improvement
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       rewrittenMessage,
       newAnalysis,
       pointsUsed: pointsCost,
-      remainingPoints: profile.points_balance - pointsCost,
+      remainingCredits: userData.credits - pointsCost,
     });
   } catch (error) {
     console.error('Spam check error:', error);

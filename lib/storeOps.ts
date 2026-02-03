@@ -53,7 +53,7 @@ export async function sendOutbound(lead_id:number, channel:"sms"|"email", body:s
     body,
     created_at: nowISO(),
     status: status || "sent" as MessageStatus,
-    messageId: null  // Will be populated with Twilio message ID
+    messageId: null  // Will be populated with Telnyx message ID
   };
   s.messages.push(msg);
   const t = s.threads.find((x:any)=> x.id===th.id)!;
@@ -66,13 +66,13 @@ export async function sendOutbound(lead_id:number, channel:"sms"|"email", body:s
 }
 
 // Update message status (for delivery confirmations)
-export async function updateMessageStatus(messageId: number, status: MessageStatus, twilioMessageId?: string){
+export async function updateMessageStatus(messageId: number, status: MessageStatus, providerMessageId?: string){
   const s = await ensureStoreShape();
   const msg = s.messages.find((m: any) => m.id === messageId);
   if (msg) {
     msg.status = status;
-    if (twilioMessageId) {
-      msg.messageId = twilioMessageId;
+    if (providerMessageId) {
+      msg.messageId = providerMessageId;
     }
     await saveStore(s);
   }

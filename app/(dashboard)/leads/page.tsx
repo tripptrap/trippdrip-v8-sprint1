@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTemperatureDisplay } from "@/lib/leadScoring";
 import CustomModal from "@/components/CustomModal";
+import BulkComposeDrawer from "@/components/BulkComposeDrawer";
 
 type Lead = {
   id?: string | number;
@@ -151,6 +152,14 @@ export default function LeadsPage() {
   const [bulkFollowUpPriority, setBulkFollowUpPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [reDripCampaignId, setReDripCampaignId] = useState("");
   const [reDripResetProgress, setReDripResetProgress] = useState(true);
+
+  /* Bulk Schedule Message */
+  const [bulkScheduleMessage, setBulkScheduleMessage] = useState("");
+  const [bulkScheduleDate, setBulkScheduleDate] = useState("");
+  const [schedulingBulk, setSchedulingBulk] = useState(false);
+
+  /* Bulk Compose Drawer */
+  const [composeDrawerOpen, setComposeDrawerOpen] = useState(false);
 
   /* Add Lead Modal */
   const [addLeadOpen, setAddLeadOpen] = useState(false);
@@ -795,10 +804,21 @@ export default function LeadsPage() {
     }
   }
 
-  useEffect(() => { fetchLeads(); fetchCampaigns(); fetchTags(); }, []);
+  // Initial load - fetch campaigns and tags once
+  useEffect(() => { fetchCampaigns(); fetchTags(); }, []);
+
+  // Fetch leads when filters/pagination change (also handles initial load)
   useEffect(() => { fetchLeads(); }, [q, selectedTags, currentPage, pageSize]);
-  // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [q, selectedTags]);
+
+  // Reset to page 1 when search/tag filters change (but not on mount)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setCurrentPage(1);
+  }, [q, selectedTags]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -889,12 +909,8 @@ export default function LeadsPage() {
     }
   }, [allVisibleSelected, filtered]);
 
-  // Select ALL visible leads (respects archive filter)
-  const allLeadsSelected = useMemo(() => {
-    if (!filtered.length) return false;
-    for (const l of filtered) { if (!selectedIds.has(String(l.id ?? ""))) return false; }
-    return true;
-  }, [filtered, selectedIds]);
+  // allLeadsSelected is the same as allVisibleSelected - use that instead
+  const allLeadsSelected = allVisibleSelected;
 
   const selectAllLeads = useCallback(() => {
     const n = new Set<string>();
@@ -1559,6 +1575,12 @@ export default function LeadsPage() {
             >
               Run Campaign
             </button>
+            <button
+              className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition shadow-sm"
+              onClick={() => setComposeDrawerOpen(true)}
+            >
+              Compose
+            </button>
             {/* Divider */}
             <div className="h-8 w-px bg-slate-300 dark:bg-slate-600"></div>
 
@@ -1731,6 +1753,12 @@ export default function LeadsPage() {
                         onClick={() => { setBulkActionModal('createFollowUps'); setBulkActionsOpen(false); }}
                       >
                         Create Follow-ups
+                      </button>
+                      <button
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-amber-500"
+                        onClick={() => { setBulkActionModal('scheduleMessage'); setBulkActionsOpen(false); }}
+                      >
+                        📅 Schedule Message
                       </button>
                       <button
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-sky-600"
@@ -2496,7 +2524,7 @@ export default function LeadsPage() {
                                   });
                                   const res = await fetch('/api/tags');
                                   const data = await res.json();
-                                  if (data.ok) setTagsList(data.tags || []);
+                                  if (data.ok) setTagsList(data.items || []);
                                 } catch (err) {
                                   console.error('Error saving tag:', err);
                                 }
@@ -2521,7 +2549,7 @@ export default function LeadsPage() {
                                   });
                                   const res = await fetch('/api/tags');
                                   const data = await res.json();
-                                  if (data.ok) setTagsList(data.tags || []);
+                                  if (data.ok) setTagsList(data.items || []);
                                 } catch (err) {
                                   console.error('Error saving tag:', err);
                                 }
@@ -3126,7 +3154,7 @@ export default function LeadsPage() {
                                   // Refresh tags list
                                   const res = await fetch('/api/tags');
                                   const data = await res.json();
-                                  if (data.ok) setTagsList(data.tags || []);
+                                  if (data.ok) setTagsList(data.items || []);
                                 } catch (err) {
                                   console.error('Error saving tag:', err);
                                 }
@@ -3151,7 +3179,7 @@ export default function LeadsPage() {
                                   });
                                   const res = await fetch('/api/tags');
                                   const data = await res.json();
-                                  if (data.ok) setTagsList(data.tags || []);
+                                  if (data.ok) setTagsList(data.items || []);
                                 } catch (err) {
                                   console.error('Error saving tag:', err);
                                 }
@@ -3446,6 +3474,110 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {bulkActionModal === 'scheduleMessage' && (
+        <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[10vh]" onClick={() => setBulkActionModal(null)}>
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[600px] flex-col" onClick={stop}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4 py-3">
+              <div className="text-sm uppercase tracking-[.18em] text-amber-500">📅 Schedule Bulk Message</div>
+              <button className="text-slate-600 dark:text-slate-400 hover:text-gray-900" onClick={() => setBulkActionModal(null)}>Close</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+              <div className="p-3 bg-amber-500/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                  Scheduling message for {selectedIds.size} lead(s)
+                </p>
+                <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">
+                  Each lead will receive this message at the scheduled time
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Message *</label>
+                <textarea
+                  value={bulkScheduleMessage}
+                  onChange={(e) => setBulkScheduleMessage(e.target.value)}
+                  placeholder="Type your message here... Use {{first}}, {{last}}, or {{name}} for personalization"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none resize-none"
+                  rows={4}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  {bulkScheduleMessage.length} characters • ~{Math.ceil(bulkScheduleMessage.length / 160)} SMS segment(s)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-1">Schedule Date & Time *</label>
+                <input
+                  type="datetime-local"
+                  value={bulkScheduleDate}
+                  onChange={(e) => setBulkScheduleDate(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  <strong>Cost:</strong> ~{selectedIds.size * Math.max(1, Math.ceil(bulkScheduleMessage.length / 160)) * 2} credits
+                  ({Math.max(1, Math.ceil(bulkScheduleMessage.length / 160)) * 2} credits per message × {selectedIds.size} leads)
+                </p>
+              </div>
+            </div>
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end gap-2">
+              <button
+                onClick={() => { setBulkActionModal(null); setBulkScheduleMessage(''); setBulkScheduleDate(''); }}
+                className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!bulkScheduleMessage.trim()) {
+                    setToast('Please enter a message');
+                    return;
+                  }
+                  if (!bulkScheduleDate) {
+                    setToast('Please select a date and time');
+                    return;
+                  }
+                  setSchedulingBulk(true);
+                  try {
+                    const response = await fetch('/api/messages/schedule/bulk', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        leadIds: Array.from(selectedIds),
+                        body: bulkScheduleMessage,
+                        scheduledFor: new Date(bulkScheduleDate).toISOString(),
+                        channel: 'sms',
+                      }),
+                    });
+                    const data = await response.json();
+                    if (data.ok) {
+                      setToast(`${data.scheduled} messages scheduled successfully`);
+                      setBulkActionModal(null);
+                      setSelectedIds(new Set());
+                      setBulkScheduleMessage('');
+                      setBulkScheduleDate('');
+                    } else {
+                      setToast(data.error || 'Failed to schedule messages');
+                    }
+                  } catch (error) {
+                    setToast('Error scheduling messages');
+                  } finally {
+                    setSchedulingBulk(false);
+                  }
+                }}
+                disabled={!bulkScheduleMessage.trim() || !bulkScheduleDate || schedulingBulk}
+                className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-500/20 px-4 py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 disabled:opacity-50"
+              >
+                {schedulingBulk ? 'Scheduling...' : `Schedule ${selectedIds.size} Message(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {bulkActionModal === 'delete' && (
         <div className="fixed inset-0 md:left-64 z-[9999] flex justify-center bg-black/60 px-[4vh] pt-[20vh]" onClick={() => setBulkActionModal(null)}>
           <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl flex max-h-[300px] flex-col" onClick={stop}>
@@ -3683,6 +3815,13 @@ export default function LeadsPage() {
         </div>
         );
       })()}
+
+      {/* Bulk Compose Drawer */}
+      <BulkComposeDrawer
+        isOpen={composeDrawerOpen}
+        onClose={() => setComposeDrawerOpen(false)}
+        preSelectedLeadIds={selectedIds.size > 0 ? Array.from(selectedIds) : []}
+      />
     </div>
   );
 }

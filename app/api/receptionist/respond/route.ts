@@ -60,6 +60,26 @@ export async function POST(req: NextRequest) {
       }, { status: 403 });
     }
 
+    // Check credits BEFORE generating AI response (avoid burning OpenAI cost)
+    const currentCredits = userData?.credits || 0;
+    const estimatedCost = 2; // Minimum points for AI response
+    if (currentCredits < estimatedCost) {
+      return NextResponse.json({
+        success: false,
+        error: 'Insufficient credits',
+      }, { status: 402 });
+    }
+
+    // Check rate limits before generating
+    const { applyGuardrails, DEFAULT_GUARDRAILS, checkRateLimit } = await import('@/lib/ai/guardrails');
+    const rateCheck = await checkRateLimit(supabase, userId, DEFAULT_GUARDRAILS);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        success: false,
+        error: rateCheck.reason || 'Rate limit exceeded',
+      }, { status: 429 });
+    }
+
     // Get conversation history from thread
     let conversationHistory: Array<{ direction: string; body: string }> = [];
     if (threadId) {
@@ -96,10 +116,16 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Deduct points if applicable
+    // Deduct points atomically using RPC or re-read to minimize race window
     if (result.pointsUsed && result.pointsUsed > 0) {
-      const currentCredits = userData?.credits || 0;
-      if (currentCredits < result.pointsUsed) {
+      const { data: freshUser } = await supabase
+        .from('users')
+        .select('credits')
+        .eq('id', userId)
+        .single();
+
+      const freshCredits = freshUser?.credits || 0;
+      if (freshCredits < result.pointsUsed) {
         return NextResponse.json({
           success: false,
           error: 'Insufficient credits',
@@ -108,12 +134,11 @@ export async function POST(req: NextRequest) {
 
       await supabase
         .from('users')
-        .update({ credits: currentCredits - result.pointsUsed })
+        .update({ credits: freshCredits - result.pointsUsed })
         .eq('id', userId);
     }
 
     // Apply AI guardrails before sending
-    const { applyGuardrails, DEFAULT_GUARDRAILS } = await import('@/lib/ai/guardrails');
     const guardrailResult = applyGuardrails(result.response || '', DEFAULT_GUARDRAILS);
     if (!guardrailResult.passed) {
       console.warn('AI response blocked by guardrails:', guardrailResult.violations);

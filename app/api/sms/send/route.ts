@@ -13,8 +13,6 @@ interface SendSMSRequest {
   to?: string;
   from?: string;
   message?: string;
-  accountSid?: string;
-  authToken?: string;
   isBulk?: boolean;
 
   // New parameters

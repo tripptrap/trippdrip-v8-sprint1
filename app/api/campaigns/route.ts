@@ -24,21 +24,30 @@ export async function GET() {
       return NextResponse.json({ ok: false, campaigns: [], error: error.message }, { status: 500 });
     }
 
-    // Get lead counts for each campaign
-    const campaignsWithCounts = await Promise.all(
-      (campaigns || []).map(async (campaign) => {
-        const { count } = await supabase
-          .from('leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('campaign_id', campaign.id);
+    // Get lead counts for all campaigns in a single query
+    const campaignIds = (campaigns || []).map(c => c.id);
+    let leadCountMap: Record<string, number> = {};
 
-        return {
-          ...campaign,
-          lead_count: count || 0,
-        };
-      })
-    );
+    if (campaignIds.length > 0) {
+      const { data: leadCounts } = await supabase
+        .from('leads')
+        .select('campaign_id')
+        .eq('user_id', user.id)
+        .in('campaign_id', campaignIds);
+
+      if (leadCounts) {
+        for (const lead of leadCounts) {
+          if (lead.campaign_id) {
+            leadCountMap[lead.campaign_id] = (leadCountMap[lead.campaign_id] || 0) + 1;
+          }
+        }
+      }
+    }
+
+    const campaignsWithCounts = (campaigns || []).map(campaign => ({
+      ...campaign,
+      lead_count: leadCountMap[campaign.id] || 0,
+    }));
 
     return NextResponse.json({ ok: true, campaigns: campaignsWithCounts, items: campaignsWithCounts });
   } catch (error: any) {
@@ -91,15 +100,19 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    // If flow_id column doesn't exist, try without it
+    // If flow_id column doesn't exist, try without it but keep other fields
     if (error && error.message.includes('flow_id')) {
       console.log('flow_id column not found, retrying without it');
+      const retryData2: any = {
+        user_id: user.id,
+        name: name.trim(),
+      };
+      if (tags && Array.isArray(tags)) retryData2.tags = tags;
+      if (lead_type) retryData2.lead_type = lead_type;
+
       const { data: retryData, error: retryError } = await supabase
         .from('campaigns')
-        .insert({
-          user_id: user.id,
-          name: name.trim(),
-        })
+        .insert(retryData2)
         .select()
         .single();
 
@@ -136,7 +149,13 @@ export async function PUT(req: NextRequest) {
     }
 
     const updateData: any = {};
-    if (name !== undefined) updateData.name = name.trim();
+    if (name !== undefined) {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        return NextResponse.json({ ok: false, error: 'Campaign name cannot be empty' }, { status: 400 });
+      }
+      updateData.name = trimmedName;
+    }
     if (status !== undefined) updateData.status = status;
     if (filters !== undefined) updateData.filters = filters;
     if (fromNumbers !== undefined) updateData.from_numbers = fromNumbers;

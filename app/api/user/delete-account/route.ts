@@ -23,6 +23,50 @@ export async function DELETE(req: NextRequest) {
     // Delete all user data using service role client (bypasses RLS)
     // Delete in order respecting foreign key constraints
 
+    // 0. Release phone numbers back to pool and from Telnyx
+    const { data: userNumbers } = await adminClient
+      .from('user_telnyx_numbers')
+      .select('phone_number')
+      .eq('user_id', userId);
+
+    if (userNumbers && userNumbers.length > 0) {
+      const apiKey = process.env.TELNYX_API_KEY;
+
+      for (const num of userNumbers) {
+        // Release from Telnyx API
+        if (apiKey) {
+          try {
+            const listRes = await fetch(
+              `https://api.telnyx.com/v2/phone_numbers?filter[phone_number]=${encodeURIComponent(num.phone_number)}`,
+              { headers: { 'Authorization': `Bearer ${apiKey}` } }
+            );
+            const listData = await listRes.json();
+            const telnyxId = listData.data?.[0]?.id;
+            if (telnyxId) {
+              await fetch(`https://api.telnyx.com/v2/phone_numbers/${telnyxId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${apiKey}` },
+              });
+            }
+          } catch (e) {
+            console.error('Error releasing number from Telnyx:', num.phone_number, e);
+          }
+        }
+
+        // Mark pool numbers as available again
+        await adminClient
+          .from('number_pool')
+          .update({ is_assigned: false, assigned_to_user_id: null, assigned_at: null })
+          .eq('phone_number', num.phone_number);
+      }
+
+      // Delete from user_telnyx_numbers
+      await adminClient
+        .from('user_telnyx_numbers')
+        .delete()
+        .eq('user_id', userId);
+    }
+
     // 1. Delete points transactions
     await adminClient
       .from('points_transactions')

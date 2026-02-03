@@ -642,7 +642,7 @@ export default function PreviewClient() {
             },
             {
               q: 'Can I use my own phone number?',
-              a: 'Yes! You can bring your own Twilio number or purchase a dedicated number through us. Our instant-access pool is great for getting started, and you can upgrade to a dedicated number anytime.'
+              a: 'Yes! You can purchase a dedicated number through us via Telnyx. Our instant-access pool is great for getting started, and you can upgrade to a dedicated number anytime.'
             },
             {
               q: 'What happens if I run out of credits?',

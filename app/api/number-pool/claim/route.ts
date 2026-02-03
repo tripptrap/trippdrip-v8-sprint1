@@ -108,25 +108,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Also add to user_twilio_numbers table for backward compatibility
-    const { error: twilioError } = await supabase
-      .from('user_twilio_numbers')
-      .insert({
-        user_id: user.id,
-        phone_number: poolNumber.phone_number,
-        phone_sid: poolNumber.phone_sid,
-        friendly_name: poolNumber.friendly_name || `Shared ${poolNumber.number_type}`,
-        capabilities: poolNumber.capabilities,
-        is_primary: false,
-        status: 'active',
-        is_from_pool: true,
-        pool_number_id: poolNumber.id
-      });
-
-    if (twilioError) {
-      console.log('Note: user_twilio_numbers insert skipped:', twilioError.message);
-    }
-
     console.log(`✅ Number ${poolNumber.phone_number} claimed by user ${user.id}`);
 
     return NextResponse.json({

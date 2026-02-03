@@ -73,12 +73,35 @@ export async function POST(req: NextRequest) {
       has_timestamp: !!timestamp,
     });
 
-    // Skip signature validation in development or if not configured
-    // In production, you should always validate
+    // Verify webhook authenticity in production
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction && (!signature || !timestamp)) {
+      console.error('❌ Missing Telnyx webhook signature headers');
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
     if (publicKey && signature && timestamp) {
-      // Note: Telnyx uses Ed25519 signatures, for simplicity we'll log but not block
-      // Full Ed25519 verification requires additional libraries
-      console.log('✅ Webhook signature headers present');
+      // Ed25519 verification: validate using Telnyx public key
+      try {
+        const ed25519Sig = Buffer.from(signature, 'base64');
+        const signedPayload = `${timestamp}|${rawBody}`;
+        const publicKeyBuffer = Buffer.from(publicKey, 'base64');
+        const isValid = crypto.verify(
+          null, // Ed25519 doesn't use a digest algorithm
+          Buffer.from(signedPayload),
+          { key: publicKeyBuffer, format: 'der', type: 'spki' },
+          ed25519Sig
+        );
+        if (!isValid) {
+          console.error('❌ Invalid Telnyx webhook signature');
+          return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+        }
+      } catch (verifyErr) {
+        // If verification fails due to key format issues, log but allow in non-production
+        console.warn('⚠️ Webhook signature verification error:', verifyErr);
+        if (isProduction) {
+          return NextResponse.json({ error: 'Signature verification failed' }, { status: 401 });
+        }
+      }
     }
 
     // Handle different Telnyx event types
@@ -236,6 +259,20 @@ async function handleInboundSMS(payload: any) {
     threadId = newThread.id;
   }
 
+  // Deduplicate: check if this message was already processed (webhook retry)
+  if (messageSid) {
+    const { data: existingMsg } = await supabaseAdmin
+      .from('messages')
+      .select('id')
+      .eq('message_sid', messageSid)
+      .single();
+
+    if (existingMsg) {
+      console.log('⚠️ Duplicate webhook for message_sid:', messageSid, '— skipping');
+      return;
+    }
+  }
+
   // Save the message
   console.log('💾 Saving inbound message:', { userId, threadId, from, to, messageBody: messageBody?.substring(0, 50) });
 
@@ -255,7 +292,7 @@ async function handleInboundSMS(payload: any) {
   // If opt-out, boost spam score and add flag
   const spamScore = optOut ? Math.max(spamResult?.spamScore || 0, 50) : (spamResult?.spamScore || 0);
   const spamFlags = [
-    ...(spamResult?.detectedWords || []),
+    ...(spamResult?.detectedWords || []).map((w: any) => typeof w === 'string' ? w : w.word || String(w)),
     ...(optOut ? ['OPT_OUT_REQUEST'] : []),
   ];
 
@@ -340,6 +377,31 @@ async function handleInboundSMS(payload: any) {
 
       // Do NOT trigger receptionist for opt-out messages
       return;
+    }
+
+    // Stop-on-reply: pause any active drip campaign enrollments for this lead
+    try {
+      const { data: replyLead } = await supabaseAdmin
+        .from('leads')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('phone', from)
+        .single();
+
+      if (replyLead) {
+        const { data: pausedEnrollments } = await supabaseAdmin
+          .from('drip_campaign_enrollments')
+          .update({ status: 'paused_reply', paused_at: new Date().toISOString() })
+          .eq('lead_id', replyLead.id)
+          .eq('status', 'active')
+          .select('id');
+
+        if (pausedEnrollments && pausedEnrollments.length > 0) {
+          console.log(`⏸️ Paused ${pausedEnrollments.length} drip enrollment(s) for lead ${replyLead.id} due to reply`);
+        }
+      }
+    } catch (stopErr) {
+      console.error('Error pausing drip enrollments on reply:', stopErr);
     }
 
     // Check and trigger AI Receptionist if enabled

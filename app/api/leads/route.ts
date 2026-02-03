@@ -56,7 +56,11 @@ export async function GET(req: Request) {
 
     // Apply search filter (searches across multiple fields)
     if (q) {
-      query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,state.ilike.%${q}%`);
+      // Escape special PostgREST filter characters to prevent malformed queries
+      const safeQ = q.replace(/[,.()"\\]/g, '');
+      if (safeQ) {
+        query = query.or(`first_name.ilike.%${safeQ}%,last_name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,state.ilike.%${safeQ}%`);
+      }
     }
 
     // Apply status filter
@@ -157,7 +161,7 @@ export async function POST(req: Request) {
       }, { status: 409 });
     }
 
-    // Prepare lead data - only core columns that definitely exist
+    // Prepare lead data
     const leadData: Lead = {
       user_id: user.id,
       first_name: body.first_name?.trim() || null,
@@ -165,6 +169,7 @@ export async function POST(req: Request) {
       phone: phone,
       email: body.email?.trim() || null,
       state: body.state?.trim() || null,
+      zip_code: body.zip_code?.trim() || null,
       tags: Array.isArray(body.tags) ? body.tags : [],
     };
 

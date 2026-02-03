@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate disposition values
-    const validDispositions = ['sold', 'not_interested', null];
+    const validDispositions = ['sold', 'not_interested'];
     if (!validDispositions.includes(disposition)) {
       return NextResponse.json(
         { ok: false, error: 'Invalid disposition value' },
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       status = 'archived';
     }
 
-    const updateData: any = { disposition };
+    const updateData: any = { disposition, updated_at: new Date().toISOString() };
     if (status) {
       updateData.status = status;
     }
@@ -131,8 +131,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Check for drip campaign triggers (status_change)
+    // Pass the actual status value (not the disposition name)
+    const actualStatus = disposition === 'not_interested' ? 'archived' : disposition;
     checkAndEnrollDripTriggers(supabase, user.id, id, 'status_change', {
-      status: disposition,
+      status: actualStatus,
     });
 
     return NextResponse.json({

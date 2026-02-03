@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Plus, Users } from 'lucide-react';
 import { useTextsState } from '@/lib/hooks/useTextsState';
 import type { Thread } from '@/lib/hooks/useTextsState';
 import ThreadList from './ThreadList';
@@ -10,6 +11,8 @@ import Composer from './Composer';
 import ContactInfoPanel from './ContactInfoPanel';
 import SessionsPanel from './SessionsPanel';
 import SendSMSModal from '@/components/SendSMSModal';
+import AIDripModal from '@/components/AIDripModal';
+import BulkComposeDrawer from '@/components/BulkComposeDrawer';
 import toast from 'react-hot-toast';
 
 interface TextsLayoutProps {
@@ -45,9 +48,20 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
     bulkArchiveThreads,
   } = useTextsState();
 
+  const searchParams = useSearchParams();
   const [showSendModal, setShowSendModal] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [showSessionsPanel, setShowSessionsPanel] = useState(false);
+  const [showAIDripModal, setShowAIDripModal] = useState(false);
+  const [showBulkDrawer, setShowBulkDrawer] = useState(false);
+  const [bulkContactType, setBulkContactType] = useState<'leads' | 'clients' | 'both'>('both');
+
+  // Auto-open bulk drawer if URL has ?bulk=true
+  useEffect(() => {
+    if (searchParams?.get('bulk') === 'true') {
+      setShowBulkDrawer(true);
+    }
+  }, [searchParams]);
   const [flowAiActive, setFlowAiActive] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('flowAiActive') === 'true';
     return false;
@@ -180,6 +194,36 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative group">
+            <button
+              onClick={() => setShowBulkDrawer(true)}
+              className="px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 font-medium text-sm"
+            >
+              <Users className="w-4 h-4" />
+              Bulk SMS
+            </button>
+            {/* Contact type selector dropdown */}
+            <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              <button
+                onClick={() => { setBulkContactType('leads'); setShowBulkDrawer(true); }}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-t-lg ${bulkContactType === 'leads' ? 'text-amber-600 font-medium' : 'text-slate-700 dark:text-slate-300'}`}
+              >
+                Leads Only
+              </button>
+              <button
+                onClick={() => { setBulkContactType('clients'); setShowBulkDrawer(true); }}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 ${bulkContactType === 'clients' ? 'text-amber-600 font-medium' : 'text-slate-700 dark:text-slate-300'}`}
+              >
+                Clients Only
+              </button>
+              <button
+                onClick={() => { setBulkContactType('both'); setShowBulkDrawer(true); }}
+                className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded-b-lg ${bulkContactType === 'both' ? 'text-amber-600 font-medium' : 'text-slate-700 dark:text-slate-300'}`}
+              >
+                Both
+              </button>
+            </div>
+          </div>
           <button
             onClick={() => setShowSendModal(true)}
             className="px-4 py-2.5 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center gap-2 font-medium text-sm"
@@ -281,6 +325,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
                     onSend={handleSendMessage}
                     disabled={false}
                     leadId={activeThread.lead_id || activeThread.leads?.id || undefined}
+                    onOpenAIDrip={() => setShowAIDripModal(true)}
                   />
                 </ConversationView>
               </div>
@@ -312,6 +357,26 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
           setShowSendModal(false);
           refreshThreads();
         }}
+      />
+
+      {/* AI Drip Modal */}
+      {activeThread && (
+        <AIDripModal
+          isOpen={showAIDripModal}
+          onClose={() => setShowAIDripModal(false)}
+          threadId={activeThread.id}
+          phoneNumber={activeThread.phone_number || activeThread.leads?.phone || ''}
+          onSuccess={() => {
+            toast.success('AI Drip updated');
+          }}
+        />
+      )}
+
+      {/* Bulk Compose Drawer */}
+      <BulkComposeDrawer
+        isOpen={showBulkDrawer}
+        onClose={() => setShowBulkDrawer(false)}
+        contactType={bulkContactType}
       />
     </div>
   );

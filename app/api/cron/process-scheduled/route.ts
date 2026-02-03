@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { timingSafeEqual } from 'crypto';
+import { sendTelnyxSMS } from "@/lib/telnyx";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -156,10 +157,19 @@ async function processScheduledMessages(supabase: any) {
         continue;
       }
 
+      // Get user's primary Telnyx number
+      const { data: primaryNumber } = await supabase
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', message.user_id)
+        .eq('is_primary', true)
+        .eq('status', 'active')
+        .single();
+
       // Send the message based on channel
       if (message.channel === 'sms') {
-        // Send SMS via your provider (Twilio, etc.)
-        const smsResult = await sendSMS(lead.phone, message.body);
+        // Send SMS via Telnyx
+        const smsResult = await sendSMS(lead.phone, message.body, primaryNumber?.phone_number);
 
         if (smsResult.success) {
           // Deduct credits
@@ -334,6 +344,15 @@ async function processScheduledCampaigns(supabase: any) {
         continue;
       }
 
+      // Get user's primary Telnyx number once for all leads in campaign
+      const { data: campaignPrimaryNumber } = await supabase
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', campaign.user_id)
+        .eq('is_primary', true)
+        .eq('status', 'active')
+        .single();
+
       // Send to each lead in this batch
       let batchProcessed = 0;
       for (const leadId of leadIdsToSend) {
@@ -372,7 +391,7 @@ async function processScheduledCampaigns(supabase: any) {
           }
 
           // Send SMS
-          const smsResult = await sendSMS(lead.phone, campaign.message);
+          const smsResult = await sendSMS(lead.phone, campaign.message, campaignPrimaryNumber?.phone_number);
 
           if (smsResult.success) {
             // Deduct credits
@@ -441,22 +460,20 @@ async function processScheduledCampaigns(supabase: any) {
 }
 
 /**
- * Send SMS via your provider
- * TODO: Integrate with your actual SMS provider (Twilio, Telnyx, etc.)
+ * Send SMS via Telnyx
  */
-async function sendSMS(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  // TODO: Replace with actual SMS provider integration
-  console.log('Sending SMS to:', to, 'Body:', body);
+async function sendSMS(to: string, body: string, from?: string): Promise<{ success: boolean; error?: string; messageSid?: string }> {
+  const result = await sendTelnyxSMS({
+    to,
+    message: body,
+    from,
+  });
 
-  // Example with Twilio:
-  // const client = twilio(accountSid, authToken);
-  // const message = await client.messages.create({
-  //   body,
-  //   to,
-  //   from: process.env.TWILIO_PHONE_NUMBER,
-  // });
-
-  return { success: true };
+  if (result.success) {
+    return { success: true, messageSid: result.messageSid };
+  } else {
+    return { success: false, error: result.error || 'Failed to send SMS' };
+  }
 }
 
 /**

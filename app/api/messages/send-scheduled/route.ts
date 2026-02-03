@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getUserTwilioCredentials } from "@/lib/twilioSubaccounts";
-import { sendSMS } from "@/lib/twilio";
+import { sendTelnyxSMS } from "@/lib/telnyx";
 
 /**
  * Cron job endpoint to send scheduled messages
  * Should be called every 5 minutes via Vercel Cron or external cron service
- *
- * In production, add this to vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/messages/send-scheduled",
- *     "schedule": "*\/5 * * * *"
- *   }]
- * }
  */
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-
-    // This endpoint processes all users' scheduled messages
-    // No user authentication needed for cron job
 
     const now = new Date().toISOString();
 
@@ -32,7 +20,7 @@ export async function GET(req: NextRequest) {
       .eq('status', 'pending')
       .lte('scheduled_for', now)
       .order('scheduled_for', { ascending: true })
-      .limit(100); // Process up to 100 messages per run
+      .limit(100);
 
     if (fetchError) {
       console.error('Error fetching scheduled messages:', fetchError);
@@ -53,10 +41,9 @@ export async function GET(req: NextRequest) {
     let sentCount = 0;
     let failedCount = 0;
 
-    // Process each message
     for (const msg of messagesToSend) {
       try {
-        // Get user's credentials and data
+        // Get user's credits
         const { data: userData } = await supabase
           .from('users')
           .select('credits')
@@ -67,21 +54,13 @@ export async function GET(req: NextRequest) {
           throw new Error('User not found');
         }
 
-        // Check if user has enough credits
         if ((userData.credits || 0) < (msg.credits_cost || 0)) {
           throw new Error('Insufficient credits');
         }
 
-        // Get user's Twilio subaccount credentials
-        const twilioCredentials = await getUserTwilioCredentials(msg.user_id);
-
-        if (!twilioCredentials.success) {
-          throw new Error('User Twilio subaccount not found or inactive');
-        }
-
-        // Get user's primary phone number
+        // Get user's primary phone number from Telnyx numbers
         const { data: primaryNumber } = await supabase
-          .from('user_twilio_numbers')
+          .from('user_telnyx_numbers')
           .select('phone_number')
           .eq('user_id', msg.user_id)
           .eq('is_primary', true)
@@ -103,14 +82,12 @@ export async function GET(req: NextRequest) {
           throw new Error('Lead phone number not found');
         }
 
-        // Send via Twilio using sendSMS helper (supports subaccounts)
+        // Send via Telnyx
         if (msg.channel === 'sms') {
-          const result = await sendSMS({
+          const result = await sendTelnyxSMS({
             to: lead.phone,
             message: msg.body,
             from: primaryNumber.phone_number,
-            userAccountSid: twilioCredentials.accountSid,
-            userAuthToken: twilioCredentials.authToken,
           });
 
           if (result.success) {
@@ -164,7 +141,6 @@ export async function GET(req: NextRequest) {
                 .select()
                 .single();
 
-              // Save message record
               if (newThread) {
                 await supabase
                   .from('messages')
@@ -175,6 +151,7 @@ export async function GET(req: NextRequest) {
                     direction: 'outbound',
                     content: msg.body,
                     status: 'sent',
+                    provider: 'telnyx',
                     created_at: new Date().toISOString()
                   });
               }
@@ -182,10 +159,9 @@ export async function GET(req: NextRequest) {
 
             sentCount++;
           } else {
-            throw new Error(result.error || 'Twilio send failed');
+            throw new Error(result.error || 'Telnyx send failed');
           }
         } else if (msg.channel === 'email') {
-          // TODO: Add email sending logic
           throw new Error('Email sending not yet implemented');
         }
       } catch (error) {

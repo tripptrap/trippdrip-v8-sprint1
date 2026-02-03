@@ -54,12 +54,27 @@ export async function PATCH(
 
     if (body.first_name !== undefined) updateData.first_name = body.first_name;
     if (body.last_name !== undefined) updateData.last_name = body.last_name;
-    if (body.phone !== undefined) updateData.phone = body.phone;
-    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) {
+      // Basic phone validation - strip non-digits and check length
+      const cleanPhone = String(body.phone).replace(/\D/g, '');
+      if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+        return NextResponse.json({ ok: false, error: 'Invalid phone number format' }, { status: 400 });
+      }
+      updateData.phone = body.phone;
+    }
+    if (body.email !== undefined) {
+      // Basic email validation
+      if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+        return NextResponse.json({ ok: false, error: 'Invalid email format' }, { status: 400 });
+      }
+      updateData.email = body.email;
+    }
     if (body.state !== undefined) updateData.state = body.state;
     if (body.zip_code !== undefined) updateData.zip_code = body.zip_code;
     if (body.tags !== undefined) {
-      console.log('Saving tags:', body.tags, 'type:', typeof body.tags, 'isArray:', Array.isArray(body.tags));
+      if (!Array.isArray(body.tags)) {
+        return NextResponse.json({ ok: false, error: 'Tags must be an array' }, { status: 400 });
+      }
       updateData.tags = body.tags;
     }
     if (body.status !== undefined) updateData.status = body.status;
@@ -127,6 +142,44 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
+    // Clean up related records before deleting the lead
+    // Cancel any active drip enrollments
+    await supabase
+      .from('drip_campaign_enrollments')
+      .update({ status: 'cancelled' })
+      .eq('lead_id', params.id)
+      .eq('user_id', user.id);
+
+    // Delete scheduled messages for this lead
+    await supabase
+      .from('scheduled_messages')
+      .delete()
+      .eq('lead_id', params.id)
+      .eq('user_id', user.id);
+
+    // Get threads for this lead to clean up messages
+    const { data: threads } = await supabase
+      .from('threads')
+      .select('id')
+      .eq('lead_id', params.id)
+      .eq('user_id', user.id);
+
+    if (threads && threads.length > 0) {
+      const threadIds = threads.map(t => t.id);
+      // Delete messages in those threads
+      await supabase
+        .from('messages')
+        .delete()
+        .in('thread_id', threadIds);
+
+      // Delete the threads
+      await supabase
+        .from('threads')
+        .delete()
+        .in('id', threadIds);
+    }
+
+    // Finally delete the lead
     const { error } = await supabase
       .from('leads')
       .delete()

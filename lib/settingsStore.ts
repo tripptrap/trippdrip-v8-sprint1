@@ -1,21 +1,6 @@
 // Settings Management System
 
-export type SMSProvider = 'twilio' | 'none';
 export type EmailProvider = 'smtp' | 'sendgrid' | 'none';
-
-export type PurchasedNumber = {
-  phoneNumber: string;
-  sid: string; // Twilio resource SID
-  friendlyName?: string;
-  dateCreated?: string;
-};
-
-export type TwilioConfig = {
-  accountSid: string;
-  authToken: string;
-  phoneNumbers: string[]; // Array of purchased Twilio numbers (legacy)
-  purchasedNumbers: PurchasedNumber[]; // Detailed purchased numbers
-};
 
 export type StripeConfig = {
   publishableKey: string;
@@ -40,8 +25,6 @@ export type EmailConfig = {
 };
 
 export type Settings = {
-  smsProvider: SMSProvider;
-  twilio?: TwilioConfig;
   stripe?: StripeConfig;
   email?: EmailConfig;
   optOutKeyword?: string;
@@ -95,7 +78,6 @@ export async function saveSettings(settings: Settings): Promise<void> {
 
 export function getDefaultSettings(): Settings {
   return {
-    smsProvider: 'none',
     spamProtection: {
       enabled: true,
       blockOnHighRisk: true,
@@ -108,15 +90,6 @@ export function getDefaultSettings(): Settings {
       amount: 500
     }
   };
-}
-
-// Update Twilio configuration
-export async function updateTwilioConfig(config: TwilioConfig): Promise<Settings> {
-  const settings = await loadSettings();
-  settings.smsProvider = 'twilio';
-  settings.twilio = config;
-  await saveSettings(settings);
-  return settings;
 }
 
 // Update Stripe configuration
@@ -141,82 +114,6 @@ export async function updateAutoRefill(config: Partial<Settings['autoRefill']>):
   settings.autoRefill = { ...settings.autoRefill, ...config };
   await saveSettings(settings);
   return settings;
-}
-
-// Add a phone number to Twilio configuration
-export async function addPhoneNumber(phoneNumber: string, sid?: string, friendlyName?: string): Promise<Settings> {
-  const settings = await loadSettings();
-  if (!settings.twilio) {
-    throw new Error('Twilio not configured');
-  }
-
-  // Add to legacy array
-  if (!settings.twilio.phoneNumbers.includes(phoneNumber)) {
-    settings.twilio.phoneNumbers.push(phoneNumber);
-  }
-
-  // Add to detailed array
-  if (!settings.twilio.purchasedNumbers) {
-    settings.twilio.purchasedNumbers = [];
-  }
-
-  const exists = settings.twilio.purchasedNumbers.find(n => n.phoneNumber === phoneNumber);
-  if (!exists && sid) {
-    settings.twilio.purchasedNumbers.push({
-      phoneNumber,
-      sid,
-      friendlyName,
-      dateCreated: new Date().toISOString()
-    });
-  }
-
-  await saveSettings(settings);
-  return settings;
-}
-
-// Remove a phone number from Twilio configuration
-export async function removePhoneNumber(phoneNumber: string): Promise<Settings> {
-  const settings = await loadSettings();
-  if (!settings.twilio) {
-    throw new Error('Twilio not configured');
-  }
-
-  // Remove from legacy array
-  settings.twilio.phoneNumbers = settings.twilio.phoneNumbers.filter(
-    num => num !== phoneNumber
-  );
-
-  // Remove from detailed array
-  if (settings.twilio.purchasedNumbers) {
-    settings.twilio.purchasedNumbers = settings.twilio.purchasedNumbers.filter(
-      num => num.phoneNumber !== phoneNumber
-    );
-  }
-
-  await saveSettings(settings);
-  return settings;
-}
-
-// Get phone number SID (needed for releasing)
-export async function getPhoneNumberSid(phoneNumber: string): Promise<string | null> {
-  const settings = await loadSettings();
-  const number = settings.twilio?.purchasedNumbers?.find(n => n.phoneNumber === phoneNumber);
-  return number?.sid || null;
-}
-
-// Get available phone numbers for sending
-export async function getAvailablePhoneNumbers(): Promise<string[]> {
-  const settings = await loadSettings();
-  return settings.twilio?.phoneNumbers || [];
-}
-
-// Check if SMS sending is properly configured
-export async function isSMSConfigured(): Promise<boolean> {
-  const settings = await loadSettings();
-  return settings.smsProvider === 'twilio' &&
-         !!settings.twilio?.accountSid &&
-         !!settings.twilio?.authToken &&
-         (settings.twilio?.phoneNumbers?.length || 0) > 0;
 }
 
 // Check if Stripe is configured

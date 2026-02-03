@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
 import { detectSpam } from "@/lib/spam/detector";
+import { sendTelnyxSMS } from "@/lib/telnyx";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,7 +51,6 @@ export async function POST(req: Request) {
 
     // Points and settings from client
     const userPoints: number = typeof body?.userPoints === 'number' ? body.userPoints : 0;
-    const twilioConfig = body?.twilioConfig;
     const checkSpam: boolean = body?.checkSpam !== false;
 
     if (!campaignName) {
@@ -150,14 +150,6 @@ export async function POST(req: Request) {
         }, { status: 402 });
       }
 
-      // Check Twilio config
-      if (!twilioConfig || !twilioConfig.accountSid || !twilioConfig.authToken) {
-        return NextResponse.json({
-          ok: false,
-          error: 'Twilio not configured. Please add your Twilio credentials in Settings.'
-        }, { status: 400 });
-      }
-
       // Check spam risk if enabled
       if (checkSpam) {
         const spamIndicators = [
@@ -228,11 +220,11 @@ export async function POST(req: Request) {
         // Personalize message
         const personalizedMessage = personalizeMessage(messageTemplate, lead);
 
-        // Send via Twilio API
+        // Send via Telnyx API
         try {
           // Geo-route: pick closest number to lead's zip code
           const geoFrom = await selectClosestNumber(user.id, lead.zip_code || null, supabase);
-          const effectiveFrom = geoFrom || fromNumber || twilioConfig.phoneNumbers?.[0] || '';
+          const effectiveFrom = geoFrom || fromNumber || '';
 
           // Check if this is the first message to this lead (for opt-out footer)
           let isFirstMessageToLead = true;
@@ -252,24 +244,13 @@ export async function POST(req: Request) {
             ? `${personalizedMessage}\n\nReply ${optOutKeyword} to opt out`
             : personalizedMessage;
 
-          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioConfig.accountSid}/Messages.json`;
-          const params = new URLSearchParams();
-          params.append('To', lead.phone);
-          params.append('From', effectiveFrom);
-          params.append('Body', messageToSend);
-
-          const response = await fetch(twilioUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${twilioConfig.accountSid}:${twilioConfig.authToken}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params
+          const result = await sendTelnyxSMS({
+            to: lead.phone,
+            message: messageToSend,
+            from: effectiveFrom || undefined,
           });
 
-          const result = await response.json();
-
-          if (response.ok) {
+          if (result.success) {
             // Calculate credits for this specific personalized message
             const personalizedCreditCalc = calculateSMSCredits(personalizedMessage, 0);
             const messageCredits = personalizedCreditCalc.credits;
@@ -278,7 +259,7 @@ export async function POST(req: Request) {
               leadId: String(lead.id),
               phone: lead.phone,
               success: true,
-              messageId: result.sid
+              messageId: result.messageSid
             });
             pointsUsed += messageCredits;
             totalCreditsUsed += messageCredits;
@@ -349,8 +330,8 @@ export async function POST(req: Request) {
                   direction: 'outbound',
                   status: 'sent',
                   channel: 'sms',
-                  provider: 'twilio',
-                  message_sid: result.sid,
+                  provider: 'telnyx',
+                  message_sid: result.messageSid,
                   spam_score: spamResult1.spamScore,
                   spam_flags: spamResult1.detectedWords.map(w => w.word),
                   created_at: new Date().toISOString()
@@ -390,8 +371,8 @@ export async function POST(req: Request) {
                     direction: 'outbound',
                     status: 'sent',
                     channel: 'sms',
-                    provider: 'twilio',
-                    message_sid: result.sid,
+                    provider: 'telnyx',
+                    message_sid: result.messageSid,
                     spam_score: spamResult2.spamScore,
                     spam_flags: spamResult2.detectedWords.map(w => w.word),
                     created_at: new Date().toISOString()
@@ -403,7 +384,7 @@ export async function POST(req: Request) {
               leadId: String(lead.id),
               phone: lead.phone,
               success: false,
-              error: result.message || 'Send failed'
+              error: result.error || 'Send failed'
             });
           }
         } catch (error) {

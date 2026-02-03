@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
         .eq('user_id', user.id);
       const clientLeadIds = (clients || []).map(c => c.original_lead_id).filter(Boolean);
       if (clientLeadIds.length > 0) {
-        query = query.not('lead_id', 'in', `(${clientLeadIds.join(',')})`);
+        // Use filter with not.in operator for correct Supabase syntax
+        query = query.filter('lead_id', 'not.in', `(${clientLeadIds.join(',')})`);
       }
     }
 

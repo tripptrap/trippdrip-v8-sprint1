@@ -4,15 +4,10 @@ import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/ThemeContext';
 import {
   loadSettings,
-  updateTwilioConfig,
   updateSpamProtection,
   updateAutoRefill,
   updateEmailConfig,
-  addPhoneNumber,
-  removePhoneNumber,
-  getPhoneNumberSid,
   type Settings,
-  type PurchasedNumber,
   type EmailConfig
 } from '@/lib/settingsStore';
 import { addPoints } from '@/lib/pointsSupabase';
@@ -26,22 +21,11 @@ import IntegrationsPage from '../integrations/page';
 import DNCPage from '../dnc/page';
 import CustomModal from '@/components/CustomModal';
 
-type AvailableNumber = {
-  phoneNumber: string;
-  friendlyName: string;
-  locality: string;
-  region: string;
-  capabilities: { voice: boolean; sms: boolean; mms: boolean };
-};
-
 export default function Page() {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account'>('sms');
   const [saveMessage, setSaveMessage] = useState('');
-
-  // Twilio account creation
-  const [creatingAccount, setCreatingAccount] = useState(false);
 
   // Spam protection form
   const [spamEnabled, setSpamEnabled] = useState(true);
@@ -65,12 +49,6 @@ export default function Page() {
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
   const [replyTo, setReplyTo] = useState('');
-
-  // Phone number search
-  const [searchingNumbers, setSearchingNumbers] = useState(false);
-  const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
-  const [areaCode, setAreaCode] = useState('');
-  const [purchasingNumber, setPurchasingNumber] = useState<string | null>(null);
 
   // Free number pool
   const [poolNumbers, setPoolNumbers] = useState<Array<{ id: string; phone_number: string; friendly_name: string | null; number_type: string; region: string | null }>>([]);
@@ -310,200 +288,6 @@ export default function Page() {
     if (d.length === 11 && d.startsWith('1')) return `+1 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
     if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
     return phone;
-  };
-
-  const handleCreateTwilioAccount = async () => {
-    setCreatingAccount(true);
-
-    try {
-      const response = await fetch('/api/twilio/create-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          friendlyName: 'HyveWyre™ User Account'
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.setup) {
-        showAlert('Twilio integration not configured. Please add TWILIO_MASTER_ACCOUNT_SID and TWILIO_MASTER_AUTH_TOKEN to your .env.local file.', 'Configuration Required');
-        setCreatingAccount(false);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create account');
-      }
-
-      // Save the new account credentials
-      updateTwilioConfig({
-        accountSid: result.accountSid,
-        authToken: result.authToken,
-        phoneNumbers: [],
-        purchasedNumbers: []
-      });
-
-      const updated = await loadSettings();
-      setSettings(updated);
-
-      showSaveMessage('Twilio account created successfully! Now you can purchase phone numbers.');
-      setActiveTab('numbers');
-
-    } catch (error: any) {
-      console.error('Error creating Twilio account:', error);
-      showAlert('Error: ' + error.message, 'Error');
-    } finally {
-      setCreatingAccount(false);
-    }
-  };
-
-  const handleSearchNumbers = async () => {
-    if (!settings?.twilio) {
-      showAlert('Please create a Twilio account first', 'Account Required');
-      return;
-    }
-
-    setSearchingNumbers(true);
-    setAvailableNumbers([]);
-
-    try {
-      const response = await fetch('/api/twilio/search-numbers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountSid: settings.twilio.accountSid,
-          authToken: settings.twilio.authToken,
-          countryCode: 'US',
-          areaCode: areaCode || undefined
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to search numbers');
-      }
-
-      setAvailableNumbers(result.numbers);
-      if (result.numbers.length === 0) {
-        showAlert('No numbers found. Try a different area code.', 'No Results');
-      }
-
-    } catch (error: any) {
-      console.error('Error searching numbers:', error);
-      showAlert('Error: ' + error.message, 'Error');
-    } finally {
-      setSearchingNumbers(false);
-    }
-  };
-
-  const handlePurchaseNumber = async (phoneNumber: string) => {
-    if (!settings?.twilio) {
-      showAlert('Twilio not configured', 'Configuration Error');
-      return;
-    }
-
-    showConfirm(
-      `Purchase ${phoneNumber} for approximately $1/month?`,
-      async () => {
-        await executePurchaseNumber(phoneNumber);
-      },
-      'Purchase Number'
-    );
-  };
-
-  const executePurchaseNumber = async (phoneNumber: string) => {
-    if (!settings?.twilio) return;
-
-    setPurchasingNumber(phoneNumber);
-
-    try {
-      const response = await fetch('/api/twilio/purchase-number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountSid: settings.twilio.accountSid,
-          authToken: settings.twilio.authToken,
-          phoneNumber
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to purchase number');
-      }
-
-      // Add to settings
-      addPhoneNumber(result.phoneNumber, result.sid, result.friendlyName);
-
-      const updated = await loadSettings();
-      setSettings(updated);
-
-      // Remove from available list
-      setAvailableNumbers(prev => prev.filter(n => n.phoneNumber !== phoneNumber));
-
-      showSaveMessage(`Successfully purchased ${phoneNumber}!`);
-
-    } catch (error: any) {
-      console.error('Error purchasing number:', error);
-      showAlert('Error: ' + error.message, 'Error');
-    } finally {
-      setPurchasingNumber(null);
-    }
-  };
-
-  const handleReleaseNumber = async (phoneNumber: string) => {
-    if (!settings?.twilio) return;
-
-    showConfirm(
-      `Release ${phoneNumber}? This will cancel your subscription to this number.`,
-      async () => {
-        await executeReleaseNumber(phoneNumber);
-      },
-      'Release Number'
-    );
-  };
-
-  const executeReleaseNumber = async (phoneNumber: string) => {
-    if (!settings?.twilio) return;
-
-    const sid = getPhoneNumberSid(phoneNumber);
-    if (!sid) {
-      showAlert('Could not find SID for this number', 'Error');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/twilio/release-number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountSid: settings.twilio.accountSid,
-          authToken: settings.twilio.authToken,
-          phoneSid: sid
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to release number');
-      }
-
-      // Remove from settings
-      removePhoneNumber(phoneNumber);
-
-      const updated = await loadSettings();
-      setSettings(updated);
-
-      showSaveMessage(`Released ${phoneNumber} successfully`);
-
-    } catch (error: any) {
-      console.error('Error releasing number:', error);
-      showAlert('Error: ' + error.message, 'Error');
-    }
   };
 
   const saveSpamSettings = () => {

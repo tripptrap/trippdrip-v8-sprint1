@@ -69,21 +69,6 @@ const integrations: Integration[] = [
     color: 'text-sky-600 bg-sky-100 dark:bg-sky-800/50 border-sky-400/30'
   },
   {
-    id: 'twilio-voice',
-    name: 'Twilio Voice',
-    description: 'Make and receive phone calls using the same number as your SMS campaigns for unified communication.',
-    category: 'communication',
-    icon: Phone,
-    status: 'coming_soon',
-    features: [
-      'Unified phone numbers for SMS & calls',
-      'Call recording and transcription',
-      'Voicemail to SMS notifications',
-      'Click-to-call from lead profiles'
-    ],
-    color: 'text-red-400 bg-red-100 dark:bg-red-100 dark:bg-red-900/20 border-red-500/30'
-  },
-  {
     id: 'email-service',
     name: 'Email Integration',
     description: 'Send and receive emails alongside SMS - manage all communication in one unified inbox.',

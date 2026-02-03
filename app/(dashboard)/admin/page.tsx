@@ -40,7 +40,7 @@ interface User {
   email_confirmed: boolean;
   account_status: string;
   plan_type: string;
-  points_balance: number;
+  credits: number;
   total_spent: number;
   message_count: number;
   lead_count: number;
@@ -458,7 +458,7 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-slate-900 dark:text-white">{user.points_balance.toLocaleString()}</span>
+                    <span className="text-sm text-slate-900 dark:text-white">{user.credits.toLocaleString()}</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-sm font-medium ${user.total_spent > 0 ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>

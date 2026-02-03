@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
           (authUser as any).banned_until && new Date((authUser as any).banned_until) > new Date() ? 'banned' : 'active'
         ),
         plan_type: planType,
-        points_balance: credits,
+        credits: credits,
         total_spent: totalSpentByUser[authUser.id] || 0,
         message_count: (messageCounts as Record<string, number>)?.[authUser.id] || 0,
         lead_count: (leadCounts as Record<string, number>)?.[authUser.id] || 0,

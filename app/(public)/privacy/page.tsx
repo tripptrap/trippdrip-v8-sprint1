@@ -41,7 +41,7 @@ export default function PrivacyPolicyPage() {
             We do not sell your personal information. We may share your data with:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li><strong>Service Providers:</strong> Twilio (SMS delivery), Stripe (payments), OpenAI (AI features)</li>
+            <li><strong>Service Providers:</strong> Telnyx (SMS delivery), Stripe (payments), OpenAI (AI features)</li>
             <li><strong>Legal Requirements:</strong> When required by law or to protect our legal rights</li>
             <li><strong>Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets</li>
           </ul>

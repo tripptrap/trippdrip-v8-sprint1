@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard, ArrowRightLeft, Mail } from 'lucide-react';
 import PurchaseNumberModal from '@/components/PurchaseNumberModal';
 
-interface TwilioNumber {
+interface PhoneNumber {
   id: string;
   phone_number: string;
   phone_sid: string;
@@ -48,7 +48,7 @@ interface PoolNumber {
 type NumberType = 'local' | 'tollfree';
 
 export default function PhoneNumbersPage() {
-  const [myNumbers, setMyNumbers] = useState<TwilioNumber[]>([]);
+  const [myNumbers, setMyNumbers] = useState<PhoneNumber[]>([]);
   const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
   const [poolNumbers, setPoolNumbers] = useState<PoolNumber[]>([]);
   const [loading, setLoading] = useState(true);

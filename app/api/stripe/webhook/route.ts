@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
-import { createTwilioSubaccount, userHasSubaccount } from '@/lib/twilioSubaccounts';
 
 // Create Supabase admin client for webhook (bypasses RLS)
 // Only create if keys are available
@@ -148,33 +147,6 @@ export async function POST(req: NextRequest) {
             amount_paid: subscriptionAmountCents,
             created_at: new Date().toISOString()
           });
-
-          // Auto-provision Twilio subaccount for new subscribers
-          console.log(`📱 Checking if user ${userId} needs a Twilio subaccount...`);
-          const hasSubaccount = await userHasSubaccount(userId);
-
-          if (!hasSubaccount) {
-            console.log(`📱 Provisioning Twilio subaccount for user ${userId}...`);
-            const userEmail = session.customer_email || '';
-            const userName = session.customer_details?.name || '';
-
-            const subaccountResult = await createTwilioSubaccount({
-              userId,
-              userEmail,
-              userName,
-            });
-
-            if (subaccountResult.success) {
-              console.log(`✅ Twilio subaccount created for user ${userId}: ${subaccountResult.subaccountSid}`);
-              if (subaccountResult.phoneNumber) {
-                console.log(`✅ Auto-purchased phone number: ${subaccountResult.phoneNumber} (${subaccountResult.phoneSid})`);
-              }
-            } else {
-              console.error(`❌ Failed to create Twilio subaccount for user ${userId}:`, subaccountResult.error);
-            }
-          } else {
-            console.log(`✅ User ${userId} already has a Twilio subaccount`);
-          }
 
         } else if (points > 0) {
           // Handle one-time point pack purchase

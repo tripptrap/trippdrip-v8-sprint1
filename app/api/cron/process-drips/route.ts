@@ -4,44 +4,59 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Quiet hours: 9pm-9am EST
+// Get current hour in US Eastern time (handles EST/EDT automatically)
+function getEasternHour(date: Date = new Date()): number {
+  const eastern = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    hour12: false,
+  }).format(date);
+  return parseInt(eastern, 10);
+}
+
+// Quiet hours: 9pm-9am Eastern
 function isInQuietHours(): boolean {
-  const now = new Date();
-  const estOffset = -5 * 60;
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const estDate = new Date(utcTime + (estOffset * 60000));
-  const estHour = estDate.getHours();
-  return estHour >= 21 || estHour < 9;
+  const hour = getEasternHour();
+  return hour >= 21 || hour < 9;
 }
 
 function getNext9amEST(): Date {
   const now = new Date();
-  const estOffset = -5 * 60;
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const estDate = new Date(utcTime + (estOffset * 60000));
-  const estHour = estDate.getHours();
+  const hour = getEasternHour(now);
 
-  const nextDay = new Date(now);
-  if (estHour >= 21) {
-    nextDay.setDate(nextDay.getDate() + 1);
+  // Get today's date in Eastern
+  const easternDate = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+  const [month, day, year] = easternDate.split('/');
+
+  // If past 9pm, target tomorrow; otherwise target today
+  let targetDate = new Date(`${year}-${month}-${day}T09:00:00`);
+  // Convert Eastern 9am to UTC by creating the date in the Eastern timezone
+  const targetStr = hour >= 21
+    ? `${year}-${month}-${String(Number(day) + 1).padStart(2, '0')}`
+    : `${year}-${month}-${day}`;
+
+  // Use a reliable method: set to 9am Eastern
+  const target = new Date(now);
+  if (hour >= 21) {
+    target.setDate(target.getDate() + 1);
   }
-  nextDay.setUTCHours(14, 0, 0, 0); // 9am EST = 14:00 UTC
-  return nextDay;
+  // Find the UTC hour that corresponds to 9am Eastern
+  const testDate = new Date(target.toISOString().split('T')[0] + 'T14:00:00Z');
+  const testHour = getEasternHour(testDate);
+  // Adjust if DST offset differs (14 UTC = 9am EST or 10am EDT)
+  if (testHour !== 9) {
+    testDate.setUTCHours(testDate.getUTCHours() - (testHour - 9));
+  }
+  return testDate;
 }
 
 function adjustForQuietHours(date: Date): Date {
-  const estOffset = -5 * 60;
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const estDate = new Date(utcTime + (estOffset * 60000));
-  const estHour = estDate.getHours();
-
-  if (estHour >= 21 || estHour < 9) {
-    const nextDay = new Date(date);
-    if (estHour >= 21) {
-      nextDay.setDate(nextDay.getDate() + 1);
-    }
-    nextDay.setUTCHours(14, 0, 0, 0);
-    return nextDay;
+  const hour = getEasternHour(date);
+  if (hour >= 21 || hour < 9) {
+    return getNext9amEST();
   }
   return date;
 }
@@ -61,6 +76,15 @@ export async function POST(req: NextRequest) {
   try {
     if (!supabaseAdmin) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
+    }
+
+    // Authenticate cron requests
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     // Enforce quiet hours — reschedule instead of sending
@@ -109,6 +133,57 @@ export async function POST(req: NextRequest) {
       processed++;
 
       try {
+        // Check if the parent campaign is still active
+        const { data: campaign } = await supabaseAdmin
+          .from('drip_campaigns')
+          .select('is_active')
+          .eq('id', enrollment.campaign_id)
+          .single();
+
+        if (!campaign || !campaign.is_active) {
+          await supabaseAdmin
+            .from('drip_campaign_enrollments')
+            .update({ status: 'cancelled' })
+            .eq('id', enrollment.id);
+          continue;
+        }
+
+        // Check stop-on-reply: skip if lead has replied since enrollment
+        const { data: replyCheck } = await supabaseAdmin
+          .from('messages')
+          .select('id')
+          .eq('direction', 'inbound')
+          .gte('created_at', enrollment.created_at || enrollment.enrolled_at || '2000-01-01')
+          .limit(1);
+
+        // Find if the lead has a thread with inbound messages
+        if (enrollment.lead_id) {
+          const { data: leadThreads } = await supabaseAdmin
+            .from('threads')
+            .select('id')
+            .eq('lead_id', enrollment.lead_id)
+            .eq('user_id', enrollment.user_id);
+
+          if (leadThreads && leadThreads.length > 0) {
+            const threadIds = leadThreads.map(t => t.id);
+            const { count: replyCount } = await supabaseAdmin
+              .from('messages')
+              .select('id', { count: 'exact', head: true })
+              .in('thread_id', threadIds)
+              .eq('direction', 'inbound')
+              .gte('created_at', enrollment.enrolled_at || enrollment.created_at || '2000-01-01');
+
+            if (replyCount && replyCount > 0) {
+              console.log(`⏸️ Drip: Lead replied — pausing enrollment ${enrollment.id}`);
+              await supabaseAdmin
+                .from('drip_campaign_enrollments')
+                .update({ status: 'paused_reply', paused_at: new Date().toISOString() })
+                .eq('id', enrollment.id);
+              continue;
+            }
+          }
+        }
+
         // Get campaign steps
         const { data: steps } = await supabaseAdmin
           .from('drip_campaign_steps')
@@ -186,6 +261,25 @@ export async function POST(req: NextRequest) {
         const guardrailResult = applyGuardrails(message, DEFAULT_GUARDRAILS);
         if (!guardrailResult.passed) {
           console.warn(`Drip message blocked by guardrails for enrollment ${enrollment.id}:`, guardrailResult.violations);
+          // Skip this step to avoid infinite retry — advance to next step or complete
+          const skippedStep = nextStepIndex + 1;
+          if (skippedStep >= steps.length) {
+            await supabaseAdmin
+              .from('drip_campaign_enrollments')
+              .update({ current_step: skippedStep, status: 'completed', completed_at: now })
+              .eq('id', enrollment.id);
+            completed++;
+          } else {
+            const nextStepDef = steps[skippedStep];
+            const delayMs = ((nextStepDef.delay_days || 0) * 24 * 60 * 60 * 1000) +
+                            ((nextStepDef.delay_hours || 0) * 60 * 60 * 1000);
+            let nextDate = new Date(Date.now() + delayMs);
+            nextDate = adjustForQuietHours(nextDate);
+            await supabaseAdmin
+              .from('drip_campaign_enrollments')
+              .update({ current_step: skippedStep, next_send_at: nextDate.toISOString() })
+              .eq('id', enrollment.id);
+          }
           errors++;
           continue;
         }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { Calendar, Send, Settings, ExternalLink } from 'lucide-react';
 import CustomModal from "@/components/CustomModal";
 
 type FollowUp = {
@@ -68,10 +69,200 @@ export default function FollowUpsPage() {
     title: '',
     message: '',
   });
+  const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
+  const [calendarType, setCalendarType] = useState<'google' | 'calendly' | 'both'>('calendly');
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [sendingCalendarLink, setSendingCalendarLink] = useState<string | null>(null);
+  const [showCalendarSetup, setShowCalendarSetup] = useState(false);
+  const [newCalendarUrl, setNewCalendarUrl] = useState('');
+  const [newCalendarType, setNewCalendarType] = useState<'google' | 'calendly' | 'both'>('calendly');
+  const [savingCalendarUrl, setSavingCalendarUrl] = useState(false);
 
   useEffect(() => {
     loadFollowUps();
+    loadCalendarUrl();
   }, [statusFilter]);
+
+  async function loadCalendarUrl() {
+    try {
+      // Load preferences
+      const response = await fetch('/api/user/preferences');
+      const data = await response.json();
+      if (data.ok && data.preferences) {
+        if (data.preferences.calendar_booking_url) {
+          setCalendarUrl(data.preferences.calendar_booking_url);
+          setNewCalendarUrl(data.preferences.calendar_booking_url);
+        }
+        if (data.preferences.calendar_type) {
+          setCalendarType(data.preferences.calendar_type);
+          setNewCalendarType(data.preferences.calendar_type);
+        }
+      }
+
+      // Check Google Calendar connection
+      const calResponse = await fetch('/api/calendar/status');
+      const calData = await calResponse.json();
+      setGoogleCalendarConnected(calData.connected || false);
+    } catch (error) {
+      console.error('Error loading calendar settings:', error);
+    }
+  }
+
+  async function saveCalendarSettings() {
+    // Validate based on type
+    if ((newCalendarType === 'calendly' || newCalendarType === 'both') && !newCalendarUrl.trim()) {
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Missing URL',
+        message: 'Please enter your Calendly/booking URL'
+      });
+      return;
+    }
+
+    if ((newCalendarType === 'google' || newCalendarType === 'both') && !googleCalendarConnected) {
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Google Calendar Not Connected',
+        message: 'Please connect your Google Calendar in Settings > Integrations first'
+      });
+      return;
+    }
+
+    setSavingCalendarUrl(true);
+    try {
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          preferences: {
+            calendarBookingUrl: newCalendarUrl.trim() || null,
+            calendarType: newCalendarType
+          }
+        }),
+      });
+
+      const data = await response.json();
+      if (data.ok) {
+        setCalendarUrl(newCalendarUrl.trim() || null);
+        setCalendarType(newCalendarType);
+        setShowCalendarSetup(false);
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Success',
+          message: 'Calendar settings saved!'
+        });
+      } else {
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Error',
+          message: data.error || 'Failed to save calendar settings'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving calendar settings:', error);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to save calendar settings'
+      });
+    } finally {
+      setSavingCalendarUrl(false);
+    }
+  }
+
+  async function sendCalendarLink(followUp: FollowUp) {
+    // Check if calendar is configured
+    const hasCalendly = calendarType === 'calendly' || calendarType === 'both';
+    const hasGoogle = calendarType === 'google' || calendarType === 'both';
+
+    if (hasCalendly && !calendarUrl) {
+      setShowCalendarSetup(true);
+      return;
+    }
+
+    if (hasGoogle && !googleCalendarConnected) {
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Google Calendar Not Connected',
+        message: 'Please connect your Google Calendar in Settings > Integrations'
+      });
+      return;
+    }
+
+    if (!hasCalendly && !hasGoogle) {
+      setShowCalendarSetup(true);
+      return;
+    }
+
+    if (!followUp.leads?.phone) {
+      setModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'No Phone Number',
+        message: 'This lead has no phone number to send the calendar link to.'
+      });
+      return;
+    }
+
+    const calendarTypeLabel = calendarType === 'both' ? 'Google Calendar slots + Calendly link'
+      : calendarType === 'google' ? 'Google Calendar slots'
+      : 'Calendly link';
+
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Send Calendar Link',
+      message: `Send ${calendarTypeLabel} to ${followUp.leads.first_name} ${followUp.leads.last_name} at ${followUp.leads.phone}?`,
+      onConfirm: async () => {
+        setSendingCalendarLink(followUp.id);
+        try {
+          const response = await fetch('/api/follow-ups/send-calendar-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadId: followUp.lead_id,
+              followUpId: followUp.id,
+              calendarType: calendarType,
+            }),
+          });
+
+          const data = await response.json();
+          if (data.ok) {
+            await loadFollowUps();
+            setModal({
+              isOpen: true,
+              type: 'success',
+              title: 'Sent!',
+              message: `Calendar link sent to ${followUp.leads?.first_name}. ${data.creditsCost} credits used.`
+            });
+          } else {
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Error',
+              message: data.error || 'Failed to send calendar link'
+            });
+          }
+        } catch (error) {
+          console.error('Error sending calendar link:', error);
+          setModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to send calendar link'
+          });
+        } finally {
+          setSendingCalendarLink(null);
+        }
+      }
+    });
+  }
 
   async function loadFollowUps() {
     setLoading(true);
@@ -308,6 +499,21 @@ export default function FollowUpsPage() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowCalendarSetup(true)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              (calendarType === 'calendly' && calendarUrl) ||
+              (calendarType === 'google' && googleCalendarConnected) ||
+              (calendarType === 'both' && calendarUrl && googleCalendarConnected)
+                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500/20'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            {calendarType === 'both' ? 'Google + Calendly'
+              : calendarType === 'google' ? 'Google Calendar'
+              : calendarUrl ? 'Calendly Set' : 'Set Calendar'}
+          </button>
+          <button
             onClick={loadSuggestions}
             disabled={loadingSuggestions}
             className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-500 disabled:opacity-50"
@@ -424,12 +630,22 @@ export default function FollowUpsPage() {
                           Complete
                         </button>
                         {followUp.leads && (
-                          <Link
-                            href={`/texts?leadId=${followUp.lead_id}`}
-                            className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-sky-700"
-                          >
-                            Message
-                          </Link>
+                          <>
+                            <button
+                              onClick={() => sendCalendarLink(followUp)}
+                              disabled={sendingCalendarLink === followUp.id}
+                              className="flex items-center gap-1 px-3 py-1 text-sm bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 border border-emerald-700 disabled:opacity-50"
+                            >
+                              <Calendar className="w-3 h-3" />
+                              {sendingCalendarLink === followUp.id ? 'Sending...' : 'Send Calendar'}
+                            </button>
+                            <Link
+                              href={`/texts?leadId=${followUp.lead_id}`}
+                              className="px-3 py-1 text-sm bg-blue-900/30 text-blue-300 rounded hover:bg-blue-900/50 border border-sky-700"
+                            >
+                              Message
+                            </Link>
+                          </>
                         )}
                       </>
                     )}
@@ -526,15 +742,189 @@ export default function FollowUpsPage() {
         </div>
       )}
 
+      {/* Calendar Setup Modal */}
+      {showCalendarSetup && (
+        <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-lg w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Calendar Settings</h2>
+                <p className="text-sm text-slate-500">Choose how to send booking links to leads</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Calendar Type Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                  Calendar Type
+                </label>
+                <div className="space-y-2">
+                  {/* Google Calendar Option */}
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      newCalendarType === 'google'
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calendarType"
+                      value="google"
+                      checked={newCalendarType === 'google'}
+                      onChange={(e) => setNewCalendarType(e.target.value as any)}
+                      className="w-4 h-4 text-sky-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900 dark:text-white">Google Calendar</span>
+                        {googleCalendarConnected ? (
+                          <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-full">Connected</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-500 rounded-full">Not Connected</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Send available time slots from your Google Calendar
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Calendly Option */}
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      newCalendarType === 'calendly'
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calendarType"
+                      value="calendly"
+                      checked={newCalendarType === 'calendly'}
+                      onChange={(e) => setNewCalendarType(e.target.value as any)}
+                      className="w-4 h-4 text-sky-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-900 dark:text-white">Calendly / External Link</div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Send your Calendly, Cal.com, or any booking URL
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Both Option */}
+                  <label
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      newCalendarType === 'both'
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="calendarType"
+                      value="both"
+                      checked={newCalendarType === 'both'}
+                      onChange={(e) => setNewCalendarType(e.target.value as any)}
+                      className="w-4 h-4 text-sky-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-900 dark:text-white">Both</div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Send Google Calendar slots + your booking link
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Calendly URL Input - show if calendly or both */}
+              {(newCalendarType === 'calendly' || newCalendarType === 'both') && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Your Booking URL
+                  </label>
+                  <input
+                    type="url"
+                    value={newCalendarUrl}
+                    onChange={(e) => setNewCalendarUrl(e.target.value)}
+                    placeholder="https://calendly.com/yourname"
+                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-sky-500"
+                  />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Works with Calendly, Cal.com, Acuity, or any booking link
+                  </p>
+                </div>
+              )}
+
+              {/* Google Calendar Warning */}
+              {(newCalendarType === 'google' || newCalendarType === 'both') && !googleCalendarConnected && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Google Calendar is not connected. Go to{' '}
+                    <Link href="/integrations" className="underline font-medium">
+                      Settings → Integrations
+                    </Link>{' '}
+                    to connect it.
+                  </p>
+                </div>
+              )}
+
+              {/* Current Settings Display */}
+              {calendarUrl && (newCalendarType === 'calendly' || newCalendarType === 'both') && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                    <ExternalLink className="w-4 h-4" />
+                    <span className="font-medium">Current booking link:</span>
+                  </div>
+                  <a
+                    href={calendarUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-emerald-500 hover:underline break-all"
+                  >
+                    {calendarUrl}
+                  </a>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowCalendarSetup(false)}
+                  className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveCalendarSettings}
+                  disabled={savingCalendarUrl}
+                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {savingCalendarUrl ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Help */}
-      <div className="card bg-blue-50 border-sky-700/50">
-        <h3 className="font-semibold mb-2 text-gray-900">Smart Follow-up System</h3>
+      <div className="card bg-blue-50 dark:bg-slate-800/50 border-sky-700/50">
+        <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Smart Follow-up System</h3>
         <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
           <li>• Click "Smart Suggestions" to see AI-powered follow-up recommendations</li>
           <li>• Suggestions are based on lead engagement, response times, and disposition</li>
           <li>• Urgent priorities are for hot leads that need immediate attention</li>
           <li>• Complete follow-ups to mark them as done and track your progress</li>
           <li>• Click "Message" to quickly reach out to a lead from their follow-up</li>
+          <li>• <strong>New:</strong> Click "Send Calendar" to send your booking link via SMS</li>
+          <li>• Set up your calendar link (Calendly, Cal.com, etc.) using the button above</li>
         </ul>
       </div>
     </div>

@@ -40,7 +40,7 @@ async function addNumberToPool(phoneNumber, phoneSid, numberType = 'tollfree') {
         verification_status: 'approved',
         verified_at: new Date().toISOString(),
         is_assigned: false,
-        master_account_sid: process.env.TWILIO_ACCOUNT_SID || 'MASTER_SID',
+        master_account_sid: process.env.TELNYX_API_KEY ? 'TELNYX' : 'MANUAL',
         monthly_cost: numberType === 'tollfree' ? 2.00 : 1.00,
         purchase_date: new Date().toISOString()
       })
@@ -79,7 +79,7 @@ Usage:
 
 Arguments:
   phone_number  - Phone number in E.164 format (e.g., +18555551234)
-  phone_sid     - Twilio Phone Number SID (e.g., PN123abc...)
+  phone_sid     - Telnyx Phone Number ID (e.g., 123456789...)
   number_type   - "tollfree" or "local" (default: tollfree)
 
 Examples:

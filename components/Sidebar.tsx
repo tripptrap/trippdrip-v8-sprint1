@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
     href: "/texts",
     label: "Messages",
     children: [
-      { href: "/bulk-sms", label: "Bulk SMS" },
+      { href: "/texts?bulk=true", label: "Bulk SMS" },
       { href: "/scheduled", label: "Scheduled" },
     ]
   },
@@ -39,13 +39,7 @@ const navItems: NavItem[] = [
   { href: "/clients",   label: "Clients", color: 'green' },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
-  {
-    href: "/templates",
-    label: "Your AI",
-    children: [
-      { href: "/receptionist", label: "Receptionist" },
-    ]
-  },
+  { href: "/templates", label: "Your AI" },
   { href: "/quoting",   label: "Quoting" },
   { href: "/points",    label: "Points" },
   { href: "/roadmap",   label: "Roadmap" },
