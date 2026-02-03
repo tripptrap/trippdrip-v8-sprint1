@@ -175,13 +175,323 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - **AI Drips** — AI-generated follow-ups with quiet hours (9pm–9am EST)
 
 ## Important Notes
-- Twilio code is legacy but still wired into API routes — do not delete
+- **Twilio has been completely removed** — all SMS goes through Telnyx only
 - `PROVIDER_NOTE.md` documents the Telnyx migration
 - `scripts/` contains useful one-time utilities — keep
 - `browser-extension/` is a separate feature — keep
-- `public/a66f91bd3e361605821f51895b6d857e.html` is a domain verification file — keep
 - Test pages (`/test-ai`, `/test-points`) are useful for dev — keep
 - Tier naming in code needs standardization: rename all basic/starter → "growth", all premium/professional → "scale"
+
+## Key Files
+
+### API Routes
+- `/api/sms/send` - Send individual SMS
+- `/api/telnyx/sms-webhook` - Inbound SMS webhook
+- `/api/messages/schedule` - Schedule messages (GET/POST/DELETE)
+- `/api/messages/schedule/bulk` - Bulk schedule/cancel/send
+- `/api/cron/process-scheduled` - Cron for scheduled messages + campaigns
+- `/api/cron/process-drips` - Cron for drip campaigns
+- `/api/cron/process-ai-drips` - Cron for AI drips
+- `/api/campaigns/run` - Run bulk campaign
+- `/api/follow-ups` - CRUD for follow-ups
+- `/api/follow-ups/send-calendar-link` - Send calendar booking link
+- `/api/flows` - CRUD for AI conversation flows
+
+### Components
+- `components/BulkComposeDrawer.tsx` - Bulk SMS drawer (used on Texts, Leads, Campaigns)
+- `components/texts/TextsLayout.tsx` - Main texts/messages layout
+- `components/texts/Composer.tsx` - Message composer with scheduling
+- `components/Sidebar.tsx` - Navigation sidebar
+
+### Lib
+- `lib/telnyx.ts` - `sendTelnyxSMS()` function
+- `lib/templateUtils.ts` - Variable extraction and substitution
+- `lib/creditCalculator.ts` - SMS credit calculation
+- `lib/spam/detector.ts` - Spam detection
+- `lib/geo/selectClosestNumber.ts` - Geo-routing for numbers
+
+---
+
+## Database Schema (Supabase PostgreSQL)
+
+All tables use Row Level Security (RLS) with `user_id` filtering. Users can only access their own data.
+
+### Core Tables
+
+#### `users` (via auth.users + public.users)
+- `id` UUID - Primary key (from Supabase Auth)
+- `email` TEXT - User email
+- `full_name` TEXT - Display name
+- `phone_number` TEXT - Personal phone
+- `business_name` TEXT - Business name
+- `credits` INTEGER - Current credit balance
+- `subscription_tier` TEXT - 'growth' or 'scale'
+- `stripe_customer_id` TEXT - Stripe customer ID
+- `timezone` TEXT - User timezone
+- `quiet_hours_enabled` BOOLEAN - Quiet hours on/off
+- `quiet_hours_start` TIME - Start of quiet period
+- `quiet_hours_end` TIME - End of quiet period
+
+#### `leads`
+- `id` UUID - Primary key
+- `user_id` UUID - Owner reference
+- `first_name`, `last_name` TEXT - Name
+- `phone` TEXT - Phone number (required for SMS)
+- `email` TEXT - Email address
+- `tags` TEXT[] - Array of tag names
+- `status` TEXT - Lead status
+- `campaign_id` UUID - Associated campaign
+- `source` TEXT - Lead source
+- `zip_code` TEXT - For geo-routing
+- `last_contacted` TIMESTAMPTZ - Last outreach date
+- `created_at`, `updated_at` TIMESTAMPTZ
+
+#### `clients`
+- Same structure as leads
+- Represents sold/converted customers
+- Uses Receptionist AI instead of Flows
+
+#### `threads`
+- `id` UUID - Primary key
+- `user_id` UUID - Owner reference
+- `lead_id` UUID - Associated lead/client
+- `phone_number` TEXT - Contact phone
+- `channel` TEXT - 'sms' or 'email'
+- `status` TEXT - 'active', 'archived'
+- `contact_type` TEXT - 'lead' or 'client'
+- `campaign_id` UUID - Associated campaign
+- `messages_from_user` INTEGER - Outbound count
+- `messages_from_lead` INTEGER - Inbound count
+- `last_message` TEXT - Preview text
+- `last_message_at` TIMESTAMPTZ
+- `ai_enabled` BOOLEAN - AI auto-respond on/off
+
+#### `messages`
+- `id` UUID - Primary key
+- `user_id` UUID - Owner reference
+- `thread_id` UUID - Parent thread
+- `lead_id` UUID - Associated lead
+- `direction` TEXT - 'inbound' or 'outbound'
+- `body` / `content` TEXT - Message content
+- `status` TEXT - 'sent', 'delivered', 'failed'
+- `channel` TEXT - 'sms' or 'email'
+- `provider` TEXT - 'telnyx'
+- `message_sid` TEXT - Provider message ID
+- `spam_score` INTEGER - Spam detection score
+- `spam_flags` TEXT[] - Detected spam words
+- `is_automated` BOOLEAN - Sent by automation
+- `automation_source` TEXT - 'scheduled', 'drip', 'bulk_campaign', 'ai_drip'
+- `created_at` TIMESTAMPTZ
+
+### Scheduling & Automation Tables
+
+#### `scheduled_messages`
+- `id` UUID - Primary key
+- `user_id` UUID - Owner
+- `lead_id` UUID - Recipient
+- `channel` TEXT - 'sms' or 'email'
+- `body` TEXT - Message content
+- `scheduled_for` TIMESTAMPTZ - When to send
+- `status` TEXT - 'pending', 'sent', 'failed', 'cancelled'
+- `source` TEXT - 'manual', 'drip', 'campaign', 'bulk'
+- `campaign_id` UUID - Associated campaign
+- `credits_cost` INTEGER - Credits needed
+- `segments` INTEGER - SMS segment count
+- `sent_at` TIMESTAMPTZ
+- `error_message` TEXT
+
+#### `scheduled_campaigns`
+- Batch campaigns with progressive sending
+- `lead_ids` UUID[] - Array of leads to message
+- `percentage_per_batch` INTEGER - % to send each batch
+- `interval_hours` INTEGER - Time between batches
+- `next_batch_date` TIMESTAMPTZ
+
+#### `drip_campaigns`
+- Multi-step automated sequences
+- `trigger_type` TEXT - 'manual', 'no_reply', 'tag_added', 'status_change', 'lead_created'
+- `trigger_config` JSONB - Trigger settings
+
+#### `drip_campaign_steps`
+- Individual messages in a drip
+- `delay_days`, `delay_hours` INTEGER - Wait time
+- `content` TEXT - Message template
+
+#### `drip_campaign_enrollments`
+- Tracks lead enrollment in drips
+- `current_step` INTEGER - Progress
+- `next_send_at` TIMESTAMPTZ - Next message time
+
+#### `ai_drips`
+- AI-generated follow-up sequences
+- `interval_hours` INTEGER - Between messages (default 6)
+- `max_messages` INTEGER - Limit (default 5)
+- `next_send_at` TIMESTAMPTZ
+- Auto-stops when lead replies
+
+### Follow-ups & Appointments
+
+#### `follow_ups`
+- `lead_id` UUID - Associated lead
+- `title` TEXT - Follow-up title
+- `due_date` TIMESTAMPTZ - When due
+- `status` TEXT - 'pending', 'completed', 'cancelled'
+- `priority` TEXT - 'low', 'medium', 'high', 'urgent'
+- `reminder_type` TEXT - 'manual', 'auto_no_response', etc.
+
+#### `calendar_events`
+- Appointments booked via Flows
+- Synced with Google Calendar if connected
+
+### Campaigns & Tags
+
+#### `campaigns`
+- Lead type categories (health, life, auto, solar, etc.)
+- `name` TEXT - Campaign name
+- `lead_ids` UUID[] - Leads in campaign
+- `tags_applied` TEXT[] - Tags applied to leads
+- `messages_sent`, `credits_used` INTEGER - Stats
+
+#### `tags`
+- User-defined tags
+- `name` TEXT - Tag name (unique per user)
+- `color` TEXT - Display color
+
+### Phone Numbers
+
+#### `user_telnyx_numbers`
+- `phone_number` TEXT - E.164 format
+- `friendly_name` TEXT - Display name
+- `status` TEXT - 'active', 'inactive', 'pending'
+- `is_primary` BOOLEAN - Default sending number
+- `messaging_profile_id` TEXT - Telnyx profile
+
+### AI & Flows
+
+#### `conversation_flows`
+- AI conversation templates
+- `name` TEXT - Flow name
+- `steps` JSONB - Conversation steps
+- `context` JSONB - Flow context/settings
+- `required_questions` TEXT[] - Questions to gather
+- `requires_call` BOOLEAN - Needs phone call
+
+#### `user_preferences`
+- User settings
+- `calendar_booking_url` TEXT - Calendly/booking link
+- `calendar_type` TEXT - 'calendly', 'google', 'both'
+- `theme` TEXT - UI theme
+- `enable_smart_replies` BOOLEAN
+- `enable_ai_suggestions` BOOLEAN
+
+---
+
+## Key RPC Functions (Supabase)
+
+### Scheduled Messages
+- `get_messages_ready_to_send()` - Returns pending messages where scheduled_for <= NOW()
+- `get_campaigns_ready_for_batch()` - Returns campaigns ready for next batch
+- `schedule_message(user_id, lead_id, body, scheduled_for)` - Creates scheduled message
+
+### Drip Campaigns
+- `get_drip_enrollments_ready_to_send()` - Returns enrollments ready for next step
+
+### AI Drips
+- `get_ai_drips_ready_to_send()` - Returns active drips ready to send
+- `stop_ai_drip_on_reply(phone)` - Stops drip when lead replies
+
+### Credits
+- `deduct_credits(user_id, amount)` - Deducts credits from user
+
+### DNC
+- `check_dnc(user_id, phone)` - Checks if number is on do-not-call list
+
+### Quiet Hours
+- `is_within_quiet_hours(user_id, check_time)` - Checks if time is within business hours
+
+---
+
+## Cron Jobs (Vercel Cron / External)
+
+### `/api/cron/process-scheduled` (every 5 min)
+1. Validates CRON_SECRET header
+2. Calls `get_messages_ready_to_send()` RPC
+3. For each message:
+   - Checks quiet hours
+   - Checks user credits
+   - Gets user's primary Telnyx number
+   - Sends via `sendTelnyxSMS()`
+   - Deducts credits
+   - Creates message record
+   - Updates scheduled_message status
+4. Calls `get_campaigns_ready_for_batch()` RPC
+5. Processes campaign batches similarly
+
+### `/api/cron/process-drips` (every 5 min)
+1. Calls `get_drip_enrollments_ready_to_send()` RPC
+2. For each enrollment:
+   - Gets next step content
+   - Personalizes message with lead data
+   - Sends via Telnyx
+   - Advances enrollment to next step or marks completed
+
+### `/api/cron/process-ai-drips` (every 5 min)
+1. Calls `get_ai_drips_ready_to_send()` RPC
+2. For each drip:
+   - Generates AI follow-up message
+   - Checks quiet hours (9pm-9am EST blocked)
+   - Sends via Telnyx
+   - Updates drip stats
+   - Schedules next send
+
+---
+
+## SMS Flow (Telnyx)
+
+### Outbound
+1. User composes message (individual, bulk, or scheduled)
+2. Credits checked before send
+3. DNC list checked
+4. Spam score calculated
+5. `sendTelnyxSMS()` called with:
+   - `to`: Lead phone
+   - `message`: Content
+   - `from`: User's primary Telnyx number
+6. Message logged to database
+7. Thread updated
+
+### Inbound (Webhook)
+1. Telnyx sends POST to `/api/telnyx/sms-webhook`
+2. Lookup user by `to` number in `user_telnyx_numbers`
+3. Find or create thread
+4. Find or create lead
+5. Save message to database
+6. Stop any active AI drips for this phone
+7. If AI enabled on thread:
+   - Generate AI response
+   - Send reply
+8. Update thread stats
+
+---
+
+## Template Variables
+
+### Campaign Messages
+- `{{first}}` - Lead first name
+- `{{last}}` - Lead last name
+- `{{email}}` - Lead email
+- `{{phone}}` - Lead phone
+- `{{state}}` - Lead state
+
+### Flow Templates
+- `{first_name}`, `{last_name}`, `{full_name}`
+- `{email}`, `{phone}`, `{company}`
+- `{agent_name}`, `{agent_email}`, `{agent_phone}`
+
+### AI System Prompts
+- `{{leadName}}`, `{{leadFirstName}}`
+- `{{leadLocation}}`, `{{leadStatus}}`, `{{leadTags}}`
+- `{{flowGuidance}}` - Current step instructions
 
 ---
 
