@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { createClient } from '@/lib/supabase/server';
 
 export const runtime = "nodejs";
 
@@ -183,8 +184,16 @@ function detectKind(name:string,type:string){
   return "txt";
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try{
+    // Authentication required - prevent unauthorized data extraction
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Authentication required' }, { status: 401 });
+    }
+
     const form=await req.formData();
     const file=form.get("file") as File|null;
     if(!file) return NextResponse.json({ok:false,error:"No file"}, {status:400});

@@ -24,7 +24,7 @@ export interface SubscriptionFeatures {
   bulkMessaging: boolean;
   scheduledMessages: boolean;
   automatedFollowUps: boolean;
-  emailIntegration: boolean;
+  // emailIntegration removed - SMS only platform
 
   // Analytics & Reporting
   basicAnalytics: boolean;
@@ -65,7 +65,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     bulkMessaging: false,
     scheduledMessages: false,
     automatedFollowUps: false,
-    emailIntegration: false,
+    // emailIntegration removed - SMS only platform
     basicAnalytics: false,
     advancedAnalytics: false,
     customReports: false,
@@ -95,7 +95,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     bulkMessaging: true,
     scheduledMessages: true,
     automatedFollowUps: true,
-    emailIntegration: true,
+    // emailIntegration removed - SMS only platform
     basicAnalytics: true,
     advancedAnalytics: true,
     customReports: true,
@@ -125,7 +125,7 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     bulkMessaging: true,
     scheduledMessages: true,
     automatedFollowUps: true,
-    emailIntegration: true,
+    // emailIntegration removed - SMS only platform
     basicAnalytics: true,
     advancedAnalytics: true,
     customReports: true,
@@ -267,7 +267,7 @@ export const FEATURE_NAMES: Record<keyof SubscriptionFeatures, string> = {
   bulkMessaging: 'Bulk Messaging',
   scheduledMessages: 'Scheduled Messages',
   automatedFollowUps: 'Automated Follow-ups',
-  emailIntegration: 'Email Integration',
+  // emailIntegration removed - SMS only platform
   basicAnalytics: 'Basic Analytics',
   advancedAnalytics: 'Advanced Analytics & Insights',
   customReports: 'Custom Reports',

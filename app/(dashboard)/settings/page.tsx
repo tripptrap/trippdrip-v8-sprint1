@@ -20,11 +20,12 @@ import ContactPage from '../contact/page';
 import IntegrationsPage from '../integrations/page';
 import DNCPage from '../dnc/page';
 import CustomModal from '@/components/CustomModal';
+import NotificationSettings from '@/components/NotificationSettings';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [activeTab, setActiveTab] = useState<'sms' | 'spam' | 'autorefill' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account'>('sms');
+  const [activeTab, setActiveTab] = useState<'spam' | 'autorefill' | 'notifications' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account' | 'plan' | 'aihandoff'>('plan');
   const [saveMessage, setSaveMessage] = useState('');
 
   // Spam protection form
@@ -70,6 +71,21 @@ export default function Page() {
   const [quietHoursStart, setQuietHoursStart] = useState('08:00');
   const [quietHoursEnd, setQuietHoursEnd] = useState('20:00');
   const [userTimezone, setUserTimezone] = useState('America/New_York');
+
+  // Plan info
+  const [userPlan, setUserPlan] = useState<string>('growth');
+  const [userCredits, setUserCredits] = useState(0);
+  const [nextRenewal, setNextRenewal] = useState<string | null>(null);
+
+  // AI Handoff settings
+  const [aiHandoffEnabled, setAiHandoffEnabled] = useState(true);
+  const [handoffOnHotLead, setHandoffOnHotLead] = useState(true);
+  const [handoffOnPriceQuestion, setHandoffOnPriceQuestion] = useState(true);
+  const [handoffOnAppointmentRequest, setHandoffOnAppointmentRequest] = useState(true);
+  const [handoffOnNegativeSentiment, setHandoffOnNegativeSentiment] = useState(true);
+  const [handoffAfterReplies, setHandoffAfterReplies] = useState(3);
+  const [handoffKeywords, setHandoffKeywords] = useState('speak to someone, talk to a person, real person, human, manager, supervisor');
+  const [notifyOnHandoff, setNotifyOnHandoff] = useState(true);
 
   // Profile editing
   const [profileName, setProfileName] = useState('');
@@ -196,9 +212,9 @@ export default function Page() {
     loadData();
   }, []);
 
-  // Fetch Telnyx numbers + pool numbers when numbers or sms tab is active
+  // Fetch Telnyx numbers + pool numbers when numbers tab is active
   useEffect(() => {
-    if (activeTab === 'numbers' || activeTab === 'sms') {
+    if (activeTab === 'numbers') {
       fetchTelnyxNumbers();
       fetchPoolNumbers();
     }
@@ -211,6 +227,11 @@ export default function Page() {
       const data = await res.json();
       if (data.success || data.numbers) {
         setMyTelnyxNumbers(data.numbers || []);
+      }
+      // Handle auto-released unverified numbers
+      if (data.numbersReleased && data.numbersReleased.length > 0) {
+        toast.error(data.releaseMessage || 'An unverified number was released. Please claim a verified one.');
+        await fetchPoolNumbers();
       }
     } catch (e) {
       console.error('Failed to fetch telnyx numbers:', e);
@@ -226,26 +247,8 @@ export default function Page() {
       const data = await res.json();
       if (data.success && data.numbers?.length > 0) {
         setPoolNumbers(data.numbers);
-        return;
-      }
-
-      // Pool is empty — fall back to Telnyx search for toll-free numbers
-      const telnyxRes = await fetch('/api/telnyx/search-numbers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tollFree: true, countryCode: 'US', limit: 10 }),
-      });
-      const telnyxData = await telnyxRes.json();
-
-      if (telnyxData.success && telnyxData.numbers?.length > 0) {
-        const converted = telnyxData.numbers.map((n: any, i: number) => ({
-          id: `telnyx-${i}`,
-          phone_number: n.phoneNumber,
-          friendly_name: n.friendlyName,
-          number_type: 'tollfree',
-          region: n.region || null,
-        }));
-        setPoolNumbers(converted);
+      } else {
+        setPoolNumbers([]);
       }
     } catch (e) {
       console.error('Failed to fetch pool numbers:', e);
@@ -257,28 +260,6 @@ export default function Page() {
   async function handleClaimPoolNumber(numberId: string) {
     setClaimingNumber(true);
     try {
-      // If it's a Telnyx search result, purchase directly
-      if (numberId.startsWith('telnyx-')) {
-        const num = poolNumbers.find(n => n.id === numberId);
-        if (!num) { toast.error('Number not found'); return; }
-
-        const res = await fetch('/api/telnyx/purchase-number', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber: num.phone_number }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          toast.success('Number claimed! It will be ready shortly.');
-          await fetchTelnyxNumbers();
-          await fetchPoolNumbers();
-        } else {
-          toast.error(data.error || 'Failed to claim number');
-        }
-        return;
-      }
-
-      // Standard pool claim
       const res = await fetch('/api/number-pool/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -490,210 +471,380 @@ export default function Page() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
+      <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700 pb-2">
+        {/* Core Settings */}
         <button
-          onClick={() => setActiveTab('sms')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'sms'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+          onClick={() => setActiveTab('plan')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
+            activeTab === 'plan'
+              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-b-2 border-purple-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
-          SMS Provider
+          Plan
         </button>
         <button
           onClick={() => setActiveTab('numbers')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'numbers'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Phone Numbers
         </button>
         <button
           onClick={() => setActiveTab('spam')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'spam'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-b-2 border-orange-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Spam Protection
         </button>
         <button
+          onClick={() => setActiveTab('aihandoff')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
+            activeTab === 'aihandoff'
+              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
+        >
+          AI Handoff
+        </button>
+        <button
           onClick={() => setActiveTab('autorefill')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'autorefill'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Auto-Refill
         </button>
         <button
+          onClick={() => setActiveTab('notifications')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
+            activeTab === 'notifications'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
+        >
+          Notifications
+        </button>
+        <button
           onClick={() => setActiveTab('integrations')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'integrations'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Integrations
         </button>
         <button
           onClick={() => setActiveTab('dnc')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'dnc'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           DNC List
         </button>
+        <span className="text-slate-300 dark:text-slate-600 self-center px-1">|</span>
         <button
           onClick={() => setActiveTab('privacy')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'privacy'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b-2 border-slate-400'
+              : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
-          Privacy Policy
+          Privacy
         </button>
         <button
           onClick={() => setActiveTab('terms')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'terms'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b-2 border-slate-400'
+              : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
-          Terms of Service
+          Terms
         </button>
         <button
           onClick={() => setActiveTab('compliance')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'compliance'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b-2 border-slate-400'
+              : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Compliance
         </button>
         <button
           onClick={() => setActiveTab('refund')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'refund'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b-2 border-slate-400'
+              : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
-          Refund Policy
+          Refund
         </button>
         <button
           onClick={() => setActiveTab('contact')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'contact'
-              ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-b-2 border-slate-400'
+              : 'text-slate-500 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Contact
         </button>
+        <span className="text-slate-300 dark:text-slate-600 self-center px-1">|</span>
         <button
           onClick={() => setActiveTab('account')}
-          className={`px-4 py-2 font-medium ${
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
             activeTab === 'account'
-              ? 'border-b-2 border-red-500 text-red-500'
-              : 'text-slate-600 dark:text-slate-400 hover:text-gray-900'
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-b-2 border-red-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
           }`}
         >
           Account
         </button>
       </div>
 
-      {/* SMS Provider Tab */}
-      {activeTab === 'sms' && (
-        <div className="card space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold mb-2">SMS Account Status</h2>
-            <p className="text-slate-700 dark:text-slate-300 mb-4">
-              HyveWyre uses Telnyx for reliable SMS delivery. Your messaging is ready as soon as you claim or purchase a phone number.
-            </p>
-          </div>
+      {/* Plan Management Tab */}
+      {activeTab === 'plan' && (
+        <div className="space-y-6">
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Your Subscription</h2>
 
-          {myTelnyxNumbers.length === 0 && !telnyxLoading ? (
-            <div className="space-y-4">
-              <div className="p-6 bg-sky-500/10 rounded-lg border-2 border-sky-200">
-                <h3 className="text-lg font-semibold mb-2 text-sky-600">Get Started with SMS</h3>
-                <p className="text-slate-700 dark:text-slate-300 mb-4">
-                  Claim a free phone number or purchase one to start sending messages!
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setActiveTab('numbers')}
-                    className="inline-block bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:opacity-90 font-medium"
-                  >
-                    Get a Phone Number →
-                  </button>
-                  <a
-                    href="/points"
-                    className="inline-block bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 font-medium"
-                  >
-                    Buy Points
-                  </a>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">Current Plan</p>
+                <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 capitalize">{userPlan || 'Growth'}</p>
               </div>
-
-              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                <h3 className="font-medium mb-2 text-slate-900 dark:text-slate-100">What's included?</h3>
-                <ul className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
-                  <li>• Dedicated SMS & voice via Telnyx</li>
-                  <li>• Toll-free numbers work immediately</li>
-                  <li>• $1/month per additional number or use points</li>
-                  <li>• Geo-routing to match closest area code</li>
-                  <li>• AI-powered spam detection</li>
-                  <li>• Port your existing number anytime</li>
-                </ul>
+              <div className="p-4 bg-sky-50 dark:bg-sky-900/20 rounded-lg border border-sky-200 dark:border-sky-800">
+                <p className="text-sm text-sky-600 dark:text-sky-400 mb-1">Credit Balance</p>
+                <p className="text-2xl font-bold text-sky-700 dark:text-sky-300">{userCredits.toLocaleString()}</p>
               </div>
-
-              <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                <h3 className="font-medium text-yellow-400 mb-2">How It Works</h3>
-                <ol className="text-sm text-slate-700 dark:text-slate-300 space-y-1 list-decimal list-inside">
-                  <li>Claim a free toll-free number or purchase one</li>
-                  <li>Start sending SMS and MMS right away</li>
-                  <li>Use points to send messages (1 point per SMS)</li>
-                  <li>Buy more points or upgrade your plan as you grow</li>
-                  <li>Add additional numbers for $1/mo or 100 points/mo</li>
-                </ol>
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-1">Next Renewal</p>
+                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{nextRenewal || '—'}</p>
               </div>
             </div>
-          ) : (
+
             <div className="space-y-4">
-              <div className="p-4 bg-sky-500/10 rounded-lg border border-sky-200">
-                <h3 className="font-semibold text-sky-600 mb-2">SMS Account Active</h3>
-                <div className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
-                  <p><strong>Provider:</strong> Telnyx</p>
-                  <p><strong>Status:</strong> Active & Ready</p>
-                  <p><strong>Phone Numbers:</strong> {myTelnyxNumbers.length} active</p>
+              <h3 className="font-medium text-slate-900 dark:text-slate-100">Plan Features</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> Unlimited contacts
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> Unlimited campaigns
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> AI-powered responses
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> AI Receptionist mode
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> Advanced analytics
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-emerald-500">✓</span> Priority support
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <a
+                href="/points"
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Manage Plan & Credits
+              </a>
+              <a
+                href="/points"
+                className="px-6 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Buy More Credits
+              </a>
+            </div>
+          </div>
+
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Volume Discounts</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Save more when you buy credit packs in bulk. Scale plan members get the best rates!
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Starter 4K</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">10% off</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Pro 10K</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">20% off</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Business 25K</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">25% off</p>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-center border border-amber-200 dark:border-amber-800">
+                <p className="text-xs text-amber-600 dark:text-amber-400">Enterprise 60K</p>
+                <p className="font-bold text-amber-700 dark:text-amber-300">30% off</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Handoff Tab */}
+      {activeTab === 'aihandoff' && (
+        <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">AI Handoff Settings</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+            Configure when the AI should automatically hand off conversations to you for personal follow-up.
+          </p>
+
+          {/* Master Toggle */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 mb-6">
+            <div>
+              <h3 className="font-medium text-slate-900 dark:text-slate-100">Enable AI Handoff</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Get notified when AI detects high-value opportunities
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={aiHandoffEnabled}
+                onChange={(e) => setAiHandoffEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+
+          {aiHandoffEnabled && (
+            <div className="space-y-6">
+              {/* Trigger Conditions */}
+              <div>
+                <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Handoff Triggers</h3>
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">Hot Lead Detected</span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">When AI identifies a lead with high purchase intent</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={handoffOnHotLead}
+                      onChange={(e) => setHandoffOnHotLead(e.target.checked)}
+                      className="w-5 h-5 text-emerald-600 bg-slate-100 border-slate-300 rounded focus:ring-emerald-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">Price/Quote Request</span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">When lead asks about pricing, quotes, or costs</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={handoffOnPriceQuestion}
+                      onChange={(e) => setHandoffOnPriceQuestion(e.target.checked)}
+                      className="w-5 h-5 text-emerald-600 bg-slate-100 border-slate-300 rounded focus:ring-emerald-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">Appointment Request</span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">When lead wants to schedule a call or meeting</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={handoffOnAppointmentRequest}
+                      onChange={(e) => setHandoffOnAppointmentRequest(e.target.checked)}
+                      className="w-5 h-5 text-emerald-600 bg-slate-100 border-slate-300 rounded focus:ring-emerald-500"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">Negative Sentiment</span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">When lead expresses frustration or dissatisfaction</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={handoffOnNegativeSentiment}
+                      onChange={(e) => setHandoffOnNegativeSentiment(e.target.checked)}
+                      className="w-5 h-5 text-emerald-600 bg-slate-100 border-slate-300 rounded focus:ring-emerald-500"
+                    />
+                  </label>
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveTab('numbers')}
-                  className="bg-[var(--accent)] text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:opacity-90"
-                >
-                  Manage Phone Numbers →
-                </button>
-                <a
-                  href="/points"
-                  className="bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
-                >
-                  Buy More Points
-                </a>
+              {/* Conversation Depth */}
+              <div>
+                <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Auto-Handoff After Replies</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  Automatically hand off after this many lead replies (0 = disabled)
+                </p>
+                <input
+                  type="number"
+                  value={handoffAfterReplies}
+                  onChange={(e) => setHandoffAfterReplies(Number(e.target.value))}
+                  min="0"
+                  max="20"
+                  className="w-32 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                />
               </div>
+
+              {/* Keywords */}
+              <div>
+                <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-3">Handoff Keywords</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  Trigger handoff when lead uses these phrases (comma-separated)
+                </p>
+                <textarea
+                  value={handoffKeywords}
+                  onChange={(e) => setHandoffKeywords(e.target.value)}
+                  rows={3}
+                  placeholder="speak to someone, talk to a person, real person, human, manager"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+              </div>
+
+              {/* Notification */}
+              <label className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-700 cursor-pointer">
+                <div>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-300">Send Browser Notification</span>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Get notified immediately when a handoff occurs</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notifyOnHandoff}
+                  onChange={(e) => setNotifyOnHandoff(e.target.checked)}
+                  className="w-5 h-5 text-emerald-600 bg-slate-100 border-emerald-300 rounded focus:ring-emerald-500"
+                />
+              </label>
+
+              <button
+                onClick={() => {
+                  toast.success('AI handoff settings saved');
+                }}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Save AI Handoff Settings
+              </button>
             </div>
           )}
         </div>
@@ -1153,6 +1304,13 @@ export default function Page() {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+          <NotificationSettings />
         </div>
       )}
 

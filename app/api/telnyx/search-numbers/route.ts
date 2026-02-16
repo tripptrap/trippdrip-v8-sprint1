@@ -3,6 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,34 +39,76 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Build query params based on number type
+    if (tollFree) {
+      // Only return verified toll-free numbers that aren't claimed by any user
+      const verifiedNumbers = await getVerifiedTollFreeNumbers();
+
+      if (verifiedNumbers.size === 0) {
+        return NextResponse.json({
+          success: true,
+          numbers: [],
+          total: 0,
+          numberType: 'toll-free',
+        });
+      }
+
+      // Check which verified numbers are already claimed
+      const supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { data: claimedNumbers } = await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .in('status', ['active', 'pending']);
+
+      const claimedSet = new Set((claimedNumbers || []).map((n: any) => n.phone_number));
+
+      const available = Array.from(verifiedNumbers)
+        .filter(num => !claimedSet.has(num))
+        .map(num => ({
+          phoneNumber: num,
+          friendlyName: num,
+          locality: '',
+          region: '',
+          numberType: 'toll-free',
+          capabilities: { voice: true, sms: true, mms: true },
+          monthlyPrice: null,
+          upfrontPrice: null,
+          reservable: false,
+        }));
+
+      console.log(`🔍 Found ${available.length} available verified toll-free numbers`);
+
+      return NextResponse.json({
+        success: true,
+        numbers: available,
+        total: available.length,
+        numberType: 'toll-free',
+      });
+    }
+
+    // Local number search — unchanged
     const params = new URLSearchParams();
     params.append('filter[country_code]', countryCode);
     params.append('filter[limit]', limit.toString());
-    params.append('filter[features]', 'sms'); // Must support SMS
+    params.append('filter[features]', 'sms');
+    params.append('filter[number_type]', 'local');
 
-    if (tollFree) {
-      // Search toll-free numbers
-      params.append('filter[number_type]', 'toll-free');
-    } else {
-      // Search local numbers
-      params.append('filter[number_type]', 'local');
-
-      if (areaCode) {
-        params.append('filter[national_destination_code]', areaCode);
-      }
-      if (city) {
-        params.append('filter[locality]', city);
-      }
-      if (state) {
-        params.append('filter[administrative_area]', state);
-      }
-      if (contains) {
-        params.append('filter[phone_number][contains]', contains);
-      }
+    if (areaCode) {
+      params.append('filter[national_destination_code]', areaCode);
+    }
+    if (city) {
+      params.append('filter[locality]', city);
+    }
+    if (state) {
+      params.append('filter[administrative_area]', state);
+    }
+    if (contains) {
+      params.append('filter[phone_number][contains]', contains);
     }
 
-    // Search via Telnyx API
     const searchResponse = await fetch(
       `https://api.telnyx.com/v2/available_phone_numbers?${params.toString()}`,
       {
@@ -86,13 +130,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Format the results
     const numbers = (searchData.data || []).map((num: any) => ({
       phoneNumber: num.phone_number,
       friendlyName: num.phone_number,
       locality: num.locality || '',
       region: num.administrative_area || num.region_information?.[0]?.region_name || '',
-      numberType: num.phone_number_type || (tollFree ? 'toll-free' : 'local'),
+      numberType: num.phone_number_type || 'local',
       capabilities: {
         voice: num.features?.includes('voice') || true,
         sms: num.features?.includes('sms') || true,
@@ -103,13 +146,13 @@ export async function POST(req: NextRequest) {
       reservable: num.reservable || false,
     }));
 
-    console.log(`🔍 Found ${numbers.length} available ${tollFree ? 'toll-free' : 'local'} numbers`);
+    console.log(`🔍 Found ${numbers.length} available local numbers`);
 
     return NextResponse.json({
       success: true,
       numbers,
       total: numbers.length,
-      numberType: tollFree ? 'toll-free' : 'local',
+      numberType: 'local',
     });
 
   } catch (error: any) {

@@ -430,7 +430,7 @@ export default function PreviewClient() {
             viewport={{ once: true }}
             className="order-1 lg:order-2"
           >
-            <div className="text-teal-600 font-semibold mb-2">BULK SMS & EMAIL CAMPAIGNS</div>
+            <div className="text-teal-600 font-semibold mb-2">BULK SMS CAMPAIGNS</div>
             <h3 className="text-3xl font-bold text-gray-900 mb-4">Send Thousands of Personalized Messages</h3>
             <p className="text-gray-600 mb-6">
               Build campaigns in minutes with our intuitive builder. Segment your audience, personalize every message, and schedule sends for optimal times.
@@ -646,7 +646,7 @@ export default function PreviewClient() {
             },
             {
               q: 'What happens if I run out of credits?',
-              a: 'You can purchase additional credit packs anytime at discounted rates (up to 30% off with Professional plan). Your campaigns will pause if you run out, and you\'ll be notified before that happens.'
+              a: 'You can purchase additional credit packs anytime at discounted rates (up to 30% off with Scale plan). Your campaigns will pause if you run out, and you\'ll be notified before that happens.'
             },
             {
               q: 'Can I import my existing leads?',
@@ -755,7 +755,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Advanced Analytics</h3>
             <p className="text-gray-600">
-              Track opens, clicks, replies, and conversions. Make data-driven decisions with comprehensive reporting and insights.
+              Track delivery rates, replies, and conversions. Make data-driven decisions with comprehensive reporting and insights.
             </p>
           </motion.div>
 
@@ -940,9 +940,15 @@ export default function PreviewClient() {
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
             Simple, Transparent Pricing
           </h2>
-          <p className="text-xl text-gray-600">
+          <p className="text-xl text-gray-600 mb-4">
             Choose the plan that fits your business. All plans include monthly credit renewal.
           </p>
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-full text-sm font-semibold">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+            </svg>
+            Scale Plan: Save up to 30% on credit packs — the more you buy, the more you save!
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -1013,7 +1019,7 @@ export default function PreviewClient() {
             </motion.div>
           </motion.div>
 
-          {/* Professional Plan */}
+          {/* Scale Plan - Best Value */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1028,23 +1034,28 @@ export default function PreviewClient() {
             className="relative p-8 bg-gradient-to-br from-teal-50 via-white to-cyan-50 border-2 border-teal-400 rounded-2xl shadow-xl shadow-teal-500/10"
           >
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold px-5 py-1.5 rounded-full shadow-lg shadow-teal-500/30">
-              MOST POPULAR
+              BEST VALUE
             </div>
 
-            {/* Savings callout */}
-            <div className="absolute top-4 right-4">
-              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
-                SAVE UP TO 30%
-              </span>
+            {/* Prominent Savings Banner */}
+            <div className="absolute -top-2 -right-2">
+              <div className="relative">
+                <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transform rotate-3 animate-pulse">
+                  SAVE UP TO 30%
+                </div>
+              </div>
             </div>
 
             <div className="text-center mb-6 pt-2">
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Scale</h3>
               <div className="text-5xl font-bold text-gray-900 mb-1">${SUBSCRIPTION_FEATURES.scale.price}</div>
               <div className="text-gray-600">per month</div>
-              <div className="mt-2 text-sm text-teal-600 font-medium">3.3x more credits than Growth</div>
+              <div className="mt-3 space-y-1">
+                <div className="text-sm text-teal-600 font-semibold">3.3x more credits than Growth</div>
+                <div className="text-xs text-gray-500">Only $0.0098/credit vs $0.01/credit on Growth</div>
+              </div>
             </div>
-            <div className="space-y-4 mb-8">
+            <div className="space-y-4 mb-6">
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-900 font-semibold">{SUBSCRIPTION_FEATURES.scale.monthlyCredits.toLocaleString()} credits/month</span>
@@ -1075,31 +1086,152 @@ export default function PreviewClient() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
-                <div>
-                  <span className="text-gray-900 font-semibold">Up to {SUBSCRIPTION_FEATURES.scale.pointPackDiscount}% off point packs</span>
-                  <div className="text-xs text-teal-600 mt-0.5">Best rates on additional credits</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Priority support</span>
               </div>
             </div>
+
+            {/* Volume Discount Highlight */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+                </svg>
+                <span className="font-bold text-amber-800">Volume Discounts on Credit Packs</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex justify-between text-gray-600">
+                  <span>Starter (4K):</span>
+                  <span className="text-amber-700 font-semibold">10% off</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Pro (10K):</span>
+                  <span className="text-amber-700 font-semibold">20% off</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Business (25K):</span>
+                  <span className="text-amber-700 font-semibold">25% off</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Enterprise (60K):</span>
+                  <span className="text-orange-600 font-bold">30% off</span>
+                </div>
+              </div>
+            </div>
+
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Link
                 href="/auth/register?plan=scale"
                 className="block w-full py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold rounded-lg text-center transition-all shadow-lg shadow-teal-500/25 text-lg"
               >
-                Get Started
+                Get Started with Scale
               </Link>
             </motion.div>
           </motion.div>
         </div>
 
+        {/* Credit Pack Pricing Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.6 }}
+          viewport={{ once: true }}
+          className="mt-16 max-w-4xl mx-auto"
+        >
+          <div className="text-center mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Need More Credits?</h3>
+            <p className="text-gray-600">Purchase additional credit packs anytime. Scale plan members get the best rates.</p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-lg">
+            <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-200">
+              <div className="p-4 font-semibold text-gray-700">Credit Pack</div>
+              <div className="p-4 font-semibold text-gray-700 text-center">Base Price</div>
+              <div className="p-4 font-semibold text-gray-700 text-center">Growth Price</div>
+              <div className="p-4 font-semibold text-center">
+                <span className="text-teal-600">Scale Price</span>
+              </div>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors">
+                <div className="p-4">
+                  <div className="font-medium text-gray-900">Starter</div>
+                  <div className="text-sm text-gray-500">4,000 credits</div>
+                </div>
+                <div className="p-4 text-center text-gray-600">$40</div>
+                <div className="p-4 text-center text-gray-600">$40</div>
+                <div className="p-4 text-center">
+                  <span className="font-semibold text-teal-600">$36</span>
+                  <span className="ml-1 text-xs text-amber-600">(10% off)</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-teal-50/30">
+                <div className="p-4">
+                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                    Pro
+                    <span className="bg-teal-100 text-teal-700 text-xs px-2 py-0.5 rounded-full">Popular</span>
+                  </div>
+                  <div className="text-sm text-gray-500">10,000 credits</div>
+                </div>
+                <div className="p-4 text-center text-gray-600">$100</div>
+                <div className="p-4 text-center">
+                  <span className="text-gray-700">$95</span>
+                  <span className="ml-1 text-xs text-gray-500">(5% off)</span>
+                </div>
+                <div className="p-4 text-center">
+                  <span className="font-semibold text-teal-600">$80</span>
+                  <span className="ml-1 text-xs text-amber-600">(20% off)</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors">
+                <div className="p-4">
+                  <div className="font-medium text-gray-900">Business</div>
+                  <div className="text-sm text-gray-500">25,000 credits</div>
+                </div>
+                <div className="p-4 text-center text-gray-600">$250</div>
+                <div className="p-4 text-center">
+                  <span className="text-gray-700">$225</span>
+                  <span className="ml-1 text-xs text-gray-500">(10% off)</span>
+                </div>
+                <div className="p-4 text-center">
+                  <span className="font-semibold text-teal-600">$187.50</span>
+                  <span className="ml-1 text-xs text-amber-600">(25% off)</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-gradient-to-r from-amber-50/50 to-orange-50/50">
+                <div className="p-4">
+                  <div className="font-medium text-gray-900 flex items-center gap-2">
+                    Enterprise
+                    <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs px-2 py-0.5 rounded-full">Best Deal</span>
+                  </div>
+                  <div className="text-sm text-gray-500">60,000 credits</div>
+                </div>
+                <div className="p-4 text-center text-gray-600">$600</div>
+                <div className="p-4 text-center">
+                  <span className="text-gray-700">$510</span>
+                  <span className="ml-1 text-xs text-gray-500">(15% off)</span>
+                </div>
+                <div className="p-4 text-center">
+                  <span className="font-bold text-teal-600">$420</span>
+                  <span className="ml-1 text-xs text-orange-600 font-semibold">(30% off)</span>
+                  <div className="text-xs text-orange-600 font-medium mt-1">Save $180!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 text-center text-sm text-gray-500">
+            Credits never expire. Buy in bulk and save big with Scale.
+          </div>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
+          transition={{ delay: 0.4, duration: 0.6 }}
           viewport={{ once: true }}
           className="text-center mt-12"
         >
@@ -1122,7 +1254,7 @@ export default function PreviewClient() {
             Ready to Transform Your Outreach?
           </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join thousands of businesses already using HyveWyre™ to engage, nurture, and convert more leads.
+            Start using HyveWyre™ today to engage, nurture, and convert more leads with AI-powered SMS marketing.
           </p>
           <motion.div whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(20, 184, 166, 0.4)" }} whileTap={{ scale: 0.95 }}>
             <Link
@@ -1227,7 +1359,7 @@ export default function PreviewClient() {
             </div>
           </div>
           <div className="text-center mt-6 text-sm text-gray-400">
-            © 2025 HyveWyre™. All rights reserved.
+            © 2026 HyveWyre™. All rights reserved.
           </div>
         </div>
       </footer>

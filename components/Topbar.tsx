@@ -292,7 +292,7 @@ export default function Topbar(){
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 overflow-hidden"
+                  className="absolute right-0 mt-2 w-56 sm:w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20 overflow-hidden"
                 >
                   <div className="p-3 border-b border-slate-100 dark:border-slate-700">
                     <div className="font-medium text-slate-900 dark:text-slate-100 truncate">{user?.name || 'User'}</div>

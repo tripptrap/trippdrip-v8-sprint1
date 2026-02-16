@@ -254,28 +254,13 @@ function OnboardingContent() {
   const fetchAvailableNumbers = useCallback(async () => {
     setNumbersLoading(true)
     try {
-      // Try number pool first
+      // Only show verified numbers from the pool
       const poolRes = await fetch('/api/number-pool/available')
       const poolData = await poolRes.json()
 
       if (poolData.success && poolData.numbers?.length > 0) {
         setPoolNumbers(poolData.numbers)
         setNumberSource('pool')
-        setNumbersLoading(false)
-        return
-      }
-
-      // Fall back to Telnyx toll-free search
-      const telRes = await fetch('/api/telnyx/search-numbers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tollFree: true, countryCode: 'US', limit: 10 })
-      })
-      const telData = await telRes.json()
-
-      if (telData.success && telData.numbers?.length > 0) {
-        setTelnyxNumbers(telData.numbers)
-        setNumberSource('telnyx')
       }
     } catch (err) {
       console.error('Error fetching numbers:', err)

@@ -112,11 +112,12 @@ export async function GET(req: NextRequest) {
       });
 
     // Get Telnyx numbers per user
-    const telnyxNumbersByUser: Record<string, { phone_number: string; friendly_name: string | null; status: string; created_at: string }[]> = {};
+    const telnyxNumbersByUser: Record<string, { phone_number: string; friendly_name: string | null; status: string; created_at: string; payment_method: string | null }[]> = {};
     try {
       const { data: telnyxNumbers } = await adminClient
         .from('user_telnyx_numbers')
-        .select('user_id, phone_number, friendly_name, status, created_at');
+        .select('user_id, phone_number, friendly_name, status, created_at, payment_method')
+        .order('created_at', { ascending: true });
       telnyxNumbers?.forEach((num: any) => {
         if (!telnyxNumbersByUser[num.user_id]) {
           telnyxNumbersByUser[num.user_id] = [];
@@ -126,6 +127,7 @@ export async function GET(req: NextRequest) {
           friendly_name: num.friendly_name,
           status: num.status,
           created_at: num.created_at,
+          payment_method: num.payment_method || null,
         });
       });
     } catch (e) {

@@ -77,10 +77,10 @@ export default function TermsOfServicePage() {
             <strong>Subscription Plans:</strong>
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Basic Plan: $30/month (includes 3,000 monthly credits)</li>
-            <li>Premium Plan: $98/month (includes 10,000 monthly credits)</li>
-            <li>Points never expire and roll over month-to-month</li>
-            <li>Additional points can be purchased as needed</li>
+            <li>Growth Plan: $30/month (includes 3,000 monthly credits)</li>
+            <li>Scale Plan: $98/month (includes 10,000 monthly credits)</li>
+            <li>Credits never expire and roll over month-to-month</li>
+            <li>Additional credits can be purchased as needed</li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-3">
             Payments are processed securely through Stripe. You authorize us to charge your payment method
@@ -89,17 +89,16 @@ export default function TermsOfServicePage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-3">7. Point System</h2>
-          <p className="text-slate-700 dark:text-slate-300 mb-3">Points are used for:</p>
+          <h2 className="text-xl font-semibold mb-3">7. Credit System</h2>
+          <p className="text-slate-700 dark:text-slate-300 mb-3">Credits are used for:</p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>SMS messages: 1 point per SMS segment (160 characters)</li>
-            <li>AI-generated responses: 2 points per response</li>
-            <li>Email messages: 0.5 points per email</li>
-            <li>AI chat messages: 1 point per message</li>
-            <li>Flow generation: 5 points per flow</li>
+            <li>SMS messages: 1 credit per SMS segment (160 characters)</li>
+            <li>AI-generated responses: 2 credits per response</li>
+            <li>AI chat messages: 1 credit per message</li>
+            <li>Flow generation: 5 credits per flow</li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-3">
-            Points are non-refundable but never expire. Unused points roll over indefinitely.
+            Credits are non-refundable but never expire. Unused credits roll over indefinitely.
           </p>
         </section>
 

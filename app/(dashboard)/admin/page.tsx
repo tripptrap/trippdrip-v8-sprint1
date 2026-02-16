@@ -24,7 +24,9 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Gift,
+  DollarSign
 } from 'lucide-react';
 
 interface User {
@@ -46,7 +48,7 @@ interface User {
   lead_count: number;
   avg_spam_score: number;
   high_spam_count: number;
-  telnyx_numbers: { phone_number: string; friendly_name: string | null; status: string; created_at: string }[];
+  telnyx_numbers: { phone_number: string; friendly_name: string | null; status: string; created_at: string; payment_method: string | null }[];
 }
 
 interface UserMessage {
@@ -109,6 +111,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterIndustry, setFilterIndustry] = useState<string>('all');
+  const [filterSpam, setFilterSpam] = useState<string>('all');
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ userId: string; email: string; action: string; label: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -117,6 +122,9 @@ export default function AdminPage() {
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [userMessages, setUserMessages] = useState<UserMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [grantCreditsModal, setGrantCreditsModal] = useState<{ userId: string; email: string; name: string; currentCredits: number } | null>(null);
+  const [grantAmount, setGrantAmount] = useState<string>('1000');
+  const [grantReason, setGrantReason] = useState<string>('');
 
   useEffect(() => {
     checkAdminAccess();
@@ -210,12 +218,65 @@ export default function AdminPage() {
     }
   }
 
+  async function handleGrantCredits() {
+    if (!grantCreditsModal) return;
+    const amount = Number(grantAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid credit amount');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/users/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'grant_credits',
+          userId: grantCreditsModal.userId,
+          userEmail: grantCreditsModal.email,
+          credits: amount,
+          grantReason: grantReason || `Admin granted ${amount.toLocaleString()} credits`,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Update local state
+        setUsers(prev => prev.map(u =>
+          u.id === grantCreditsModal.userId
+            ? { ...u, credits: data.newBalance }
+            : u
+        ));
+        setGrantCreditsModal(null);
+        setGrantAmount('1000');
+        setGrantReason('');
+      } else {
+        alert(data.error || 'Failed to grant credits');
+      }
+    } catch (error) {
+      alert('Failed to grant credits');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.full_name.toLowerCase().includes(searchTerm.toLowerCase());
+      user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.phone && user.phone.includes(searchTerm));
     const matchesPlan = filterPlan === 'all' || user.plan_type === filterPlan;
-    return matchesSearch && matchesPlan;
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'active' && user.account_status !== 'suspended' && user.email_confirmed) ||
+      (filterStatus === 'suspended' && user.account_status === 'suspended') ||
+      (filterStatus === 'pending' && !user.email_confirmed);
+    const matchesIndustry = filterIndustry === 'all' || user.industry === filterIndustry;
+    const matchesSpam = filterSpam === 'all' ||
+      (filterSpam === 'high' && user.avg_spam_score >= 30) ||
+      (filterSpam === 'medium' && user.avg_spam_score >= 10 && user.avg_spam_score < 30) ||
+      (filterSpam === 'low' && user.avg_spam_score < 10) ||
+      (filterSpam === 'flagged' && user.high_spam_count > 0);
+    return matchesSearch && matchesPlan && matchesStatus && matchesIndustry && matchesSpam;
   });
 
   if (!authorized || loading) {
@@ -376,16 +437,18 @@ export default function AdminPage() {
       {/* Users Table */}
       <div className="card">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">All Users</h3>
-            <div className="flex gap-2">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 justify-between">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">All Users</h3>
               <input
                 type="text"
-                placeholder="Search users..."
+                placeholder="Search name, email, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+                className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white w-full sm:w-64"
               />
+            </div>
+            <div className="flex flex-wrap gap-2">
               <select
                 value={filterPlan}
                 onChange={(e) => setFilterPlan(e.target.value)}
@@ -396,6 +459,51 @@ export default function AdminPage() {
                 <option value="growth">Growth</option>
                 <option value="none">No Plan</option>
               </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="pending">Pending Verification</option>
+              </select>
+              <select
+                value={filterIndustry}
+                onChange={(e) => setFilterIndustry(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              >
+                <option value="all">All Industries</option>
+                {Object.entries(industryLabels).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+              <select
+                value={filterSpam}
+                onChange={(e) => setFilterSpam(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              >
+                <option value="all">All Spam Levels</option>
+                <option value="high">High Spam (30+)</option>
+                <option value="medium">Medium Spam (10-29)</option>
+                <option value="low">Low Spam (&lt;10)</option>
+                <option value="flagged">Has Flagged Messages</option>
+              </select>
+              {(filterPlan !== 'all' || filterStatus !== 'all' || filterIndustry !== 'all' || filterSpam !== 'all' || searchTerm) && (
+                <button
+                  onClick={() => {
+                    setFilterPlan('all');
+                    setFilterStatus('all');
+                    setFilterIndustry('all');
+                    setFilterSpam('all');
+                    setSearchTerm('');
+                  }}
+                  className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -528,6 +636,16 @@ export default function AdminPage() {
                       </button>
                       {actionMenuOpen === user.id && (
                         <div className="absolute right-0 top-8 z-20 w-44 bg-white dark:bg-slate-700 rounded-lg shadow-xl border border-slate-200 dark:border-slate-600 py-1">
+                          <button
+                            onClick={() => {
+                              setGrantCreditsModal({ userId: user.id, email: user.email, name: user.full_name, currentCredits: user.credits });
+                              setActionMenuOpen(null);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                          >
+                            <Gift className="w-4 h-4" /> Grant Credits
+                          </button>
+                          <div className="border-t border-slate-200 dark:border-slate-600 my-1" />
                           {user.account_status === 'suspended' ? (
                             <button
                               onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'unsuspend', label: 'unsuspend' }); }}
@@ -567,25 +685,60 @@ export default function AdminPage() {
                         {user.telnyx_numbers.length === 0 ? (
                           <p className="text-sm text-slate-500 mb-4">No phone numbers owned</p>
                         ) : (
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {user.telnyx_numbers.map((num) => (
-                              <span
-                                key={num.phone_number}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                  num.status === 'active'
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                                    : num.status === 'pending'
-                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                                }`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  num.status === 'active' ? 'bg-green-500' : num.status === 'pending' ? 'bg-yellow-500' : 'bg-slate-400'
-                                }`} />
-                                {num.phone_number}
-                                {num.friendly_name && <span className="text-[10px] opacity-70">({num.friendly_name})</span>}
-                              </span>
-                            ))}
+                          <div className="mb-4 space-y-3">
+                            {/* Free numbers (no payment_method) */}
+                            {user.telnyx_numbers.filter(n => !n.payment_method).length > 0 && (
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Free (Included with Plan)</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {user.telnyx_numbers.filter(n => !n.payment_method).map((num) => (
+                                    <span
+                                      key={num.phone_number}
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                        num.status === 'active'
+                                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                          : num.status === 'pending'
+                                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        num.status === 'active' ? 'bg-green-500' : num.status === 'pending' ? 'bg-yellow-500' : 'bg-slate-400'
+                                      }`} />
+                                      {num.phone_number}
+                                      {num.friendly_name && num.friendly_name !== num.phone_number && <span className="text-[10px] opacity-70">({num.friendly_name})</span>}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Purchased numbers (has payment_method) */}
+                            {user.telnyx_numbers.filter(n => n.payment_method).length > 0 && (
+                              <div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-medium">Purchased</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {user.telnyx_numbers.filter(n => n.payment_method).map((num) => (
+                                    <span
+                                      key={num.phone_number}
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                        num.status === 'active'
+                                          ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300'
+                                          : num.status === 'pending'
+                                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                      }`}
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${
+                                        num.status === 'active' ? 'bg-sky-500' : num.status === 'pending' ? 'bg-yellow-500' : 'bg-slate-400'
+                                      }`} />
+                                      {num.phone_number}
+                                      <span className="text-[10px] opacity-70">({num.payment_method === 'credits' ? 'Credits' : num.payment_method === 'stripe' ? '$1/mo' : num.payment_method})</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -758,6 +911,106 @@ export default function AdminPage() {
                 }`}
               >
                 {actionLoading ? 'Processing...' : `Yes, ${confirmAction.label}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grant Credits Modal */}
+      {grantCreditsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                <Gift className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white">Grant Credits</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{grantCreditsModal.name}</p>
+              </div>
+            </div>
+
+            <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">Current Balance:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">{grantCreditsModal.currentCredits.toLocaleString()} credits</span>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Credits to Grant
+              </label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="number"
+                  value={grantAmount}
+                  onChange={(e) => setGrantAmount(e.target.value)}
+                  placeholder="1000"
+                  min="1"
+                  max="1000000"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400"
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
+                {[100, 500, 1000, 5000, 10000].map((amt) => (
+                  <button
+                    key={amt}
+                    onClick={() => setGrantAmount(String(amt))}
+                    className={`flex-1 px-2 py-1 text-xs rounded border transition-colors ${
+                      grantAmount === String(amt)
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                        : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {amt >= 1000 ? `${amt / 1000}k` : amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Reason (optional)
+              </label>
+              <textarea
+                value={grantReason}
+                onChange={(e) => setGrantReason(e.target.value)}
+                placeholder="e.g., Compensation for service issue, promotional credits..."
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 resize-none"
+              />
+            </div>
+
+            <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-emerald-700 dark:text-emerald-300">New Balance:</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                  {(grantCreditsModal.currentCredits + (Number(grantAmount) || 0)).toLocaleString()} credits
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setGrantCreditsModal(null);
+                  setGrantAmount('1000');
+                  setGrantReason('');
+                }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 text-sm font-medium border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGrantCredits}
+                disabled={actionLoading || !grantAmount || Number(grantAmount) <= 0}
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Granting...' : `Grant ${Number(grantAmount || 0).toLocaleString()} Credits`}
               </button>
             </div>
           </div>

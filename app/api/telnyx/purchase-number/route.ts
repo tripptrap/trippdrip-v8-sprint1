@@ -3,6 +3,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+
+// Admin client to bypass RLS for database operations
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +40,12 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.TELNYX_API_KEY;
     const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
 
+    console.log('📱 Purchase number request:', {
+      phoneNumber,
+      messagingProfileId: messagingProfileId ? `${messagingProfileId.substring(0, 8)}...` : 'MISSING',
+      hasApiKey: !!apiKey
+    });
+
     if (!apiKey) {
       return NextResponse.json(
         { error: 'Telnyx API key not configured' },
@@ -37,8 +53,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     // Check if number is already owned by someone
-    const { data: existingNumber } = await supabase
+    const { data: existingNumber } = await supabaseAdmin
       .from('user_telnyx_numbers')
       .select('id, user_id')
       .eq('phone_number', phoneNumber)
@@ -55,6 +78,17 @@ export async function POST(req: NextRequest) {
         { error: 'This number is already owned by another user' },
         { status: 400 }
       );
+    }
+
+    // Block purchase of unverified toll-free numbers
+    if (isTollFreeNumber(phoneNumber)) {
+      const verifiedNumbers = await getVerifiedTollFreeNumbers();
+      if (!verifiedNumbers.has(phoneNumber)) {
+        return NextResponse.json(
+          { error: 'This toll-free number is not verified for messaging. Please choose a verified number from the available pool.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Create number order via Telnyx API
@@ -75,7 +109,11 @@ export async function POST(req: NextRequest) {
     const orderData = await orderResponse.json();
 
     if (!orderResponse.ok) {
-      console.error('Telnyx order error:', orderData);
+      console.error('Telnyx order error:', JSON.stringify(orderData, null, 2));
+      console.error('Request body was:', JSON.stringify({
+        phone_numbers: [{ phone_number: phoneNumber }],
+        messaging_profile_id: messagingProfileId,
+      }, null, 2));
       return NextResponse.json(
         { error: orderData.errors?.[0]?.detail || 'Failed to order phone number' },
         { status: orderResponse.status }
@@ -88,9 +126,9 @@ export async function POST(req: NextRequest) {
       userId: user.id,
     });
 
-    // Create pending record in database
+    // Create pending record in database using admin client (bypasses RLS)
     // This will be updated to 'active' when webhook confirms provisioning
-    const { error: dbError } = await supabase
+    const { error: dbError } = await supabaseAdmin
       .from('user_telnyx_numbers')
       .insert({
         user_id: user.id,
@@ -102,7 +140,10 @@ export async function POST(req: NextRequest) {
 
     if (dbError) {
       console.error('Error saving pending number:', dbError);
-      // Continue anyway - webhook will handle it
+      return NextResponse.json(
+        { error: 'Failed to save number to database: ' + dbError.message },
+        { status: 500 }
+      );
     }
 
     // For toll-free numbers, they're usually available immediately
@@ -114,6 +155,15 @@ export async function POST(req: NextRequest) {
                        phoneNumber.startsWith('+1855') ||
                        phoneNumber.startsWith('+1844') ||
                        phoneNumber.startsWith('+1833');
+
+    // Toll-free numbers are instant - activate immediately
+    if (isTollFree) {
+      await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .update({ status: 'active' })
+        .eq('user_id', user.id)
+        .eq('phone_number', phoneNumber);
+    }
 
     return NextResponse.json({
       success: true,

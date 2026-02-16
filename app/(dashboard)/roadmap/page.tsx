@@ -1,148 +1,67 @@
 'use client';
 
-import { CheckCircle, Clock, Rocket, Zap, Users, Mail, Shield, TrendingUp, Gift, Lock } from 'lucide-react';
+import { Zap, Mail, Gift, Lock, Smartphone, Globe, Palette, UserCog } from 'lucide-react';
 
-type RoadmapStatus = 'completed' | 'in-progress' | 'planned';
+type RoadmapStatus = 'future';
 
 interface RoadmapItem {
   id: string;
   title: string;
   description: string;
   status: RoadmapStatus;
-  category: 'features' | 'integrations' | 'compliance' | 'analytics';
+  category: 'features' | 'integrations' | 'compliance' | 'analytics' | 'platform';
   quarter?: string;
   icon: any;
 }
 
 const roadmapItems: RoadmapItem[] = [
-  // Completed
+  // Post-Launch / Future
   {
-    id: 'demo-mode',
-    title: 'Demo Mode',
-    description: 'Explore the platform with realistic sample data including leads, conversations, and campaigns.',
-    status: 'completed',
+    id: 'native-mobile-apps',
+    title: 'Native Mobile Apps',
+    description: 'iOS and Android apps for managing leads, conversations, and campaigns on the go with push notifications.',
+    status: 'future',
+    category: 'platform',
+    quarter: 'Q3 2026',
+    icon: Smartphone
+  },
+  {
+    id: 'browser-extension',
+    title: 'Browser Extension',
+    description: 'Chrome and Firefox extensions for quick lead capture, message sending, and CRM integration from any webpage.',
+    status: 'future',
+    category: 'platform',
+    quarter: 'Q3 2026',
+    icon: Globe
+  },
+  {
+    id: 'branded-opt-in',
+    title: 'Branded Opt-In Pages',
+    description: 'Create custom-branded SMS opt-in landing pages with your logo, colors, and messaging for lead capture.',
+    status: 'future',
     category: 'features',
-    quarter: 'Q4 2024',
-    icon: Users
+    quarter: 'Q4 2026',
+    icon: Palette
   },
   {
-    id: 'quiet-hours',
-    title: 'Quiet Hours & Time Restrictions',
-    description: 'Set time windows for automated message sending (8am-8pm) with timezone support to maintain compliance.',
-    status: 'completed',
-    category: 'compliance',
-    quarter: 'Q4 2024',
-    icon: Clock
-  },
-  {
-    id: 'ai-rephrasing',
-    title: 'AI Text Rephrasing',
-    description: 'Instantly rephrase messages with AI - make them shorter, longer, more professional, or completely rewrite them.',
-    status: 'completed',
+    id: 'team-roles',
+    title: 'Team Roles & Permissions',
+    description: 'Invite team members with customizable roles - Admin, Manager, Agent - with granular permission controls.',
+    status: 'future',
     category: 'features',
-    quarter: 'Q4 2024',
-    icon: Zap
-  },
-  {
-    id: 're-drip',
-    title: 'Re-Drip Campaigns',
-    description: 'Re-enroll leads into drip campaigns, with option to reset progress or continue from where they left off.',
-    status: 'completed',
-    category: 'features',
-    quarter: 'Q4 2024',
-    icon: TrendingUp
-  },
-
-  // In Progress
-  {
-    id: 'automation-detection',
-    title: 'Automation Detection & Analytics',
-    description: 'Track which flow responses are automated vs manual with detailed statistics and engagement metrics.',
-    status: 'in-progress',
-    category: 'analytics',
-    quarter: 'Q1 2025',
-    icon: TrendingUp
-  },
-
-  // Planned
-  {
-    id: 'unified-numbers',
-    title: 'Unified SMS & Call Numbers',
-    description: 'Use the same phone number for both SMS messaging and voice calls - simplify your communication.',
-    status: 'planned',
-    category: 'features',
-    quarter: 'Q1 2025',
-    icon: Rocket
-  },
-  {
-    id: 'integrations-hub',
-    title: 'Integrations Hub',
-    description: 'Connect with Landline Remover, Google Calendar, CRM tools, and more third-party integrations.',
-    status: 'planned',
-    category: 'integrations',
-    quarter: 'Q1 2025',
-    icon: Zap
-  },
-  {
-    id: 'referral-program',
-    title: 'Referral Program',
-    description: 'Refer friends and get 1 month of premium free for each successful referral. Grow together!',
-    status: 'planned',
-    category: 'features',
-    quarter: 'Q1 2025',
-    icon: Users
-  },
-  {
-    id: 'ai-workflows',
-    title: 'AI Workflow Templates',
-    description: 'Pre-built AI workflows specifically designed for insurance agents and real estate professionals.',
-    status: 'planned',
-    category: 'features',
-    quarter: 'Q1 2025',
-    icon: Zap
-  },
-  {
-    id: 'email-service',
-    title: 'Service Email Integration',
-    description: 'Send and receive emails alongside SMS - manage all communication in one unified inbox.',
-    status: 'planned',
-    category: 'features',
-    quarter: 'Q2 2025',
-    icon: Mail
-  },
-  {
-    id: 'enterprise-dnc',
-    title: 'Enterprise DNC List',
-    description: 'Maintain a company-wide Do Not Call list to ensure compliance across all team members.',
-    status: 'planned',
-    category: 'compliance',
-    quarter: 'Q2 2025',
-    icon: Shield
+    quarter: 'Q4 2026',
+    icon: UserCog
   },
 ];
 
 export default function RoadmapPage() {
   const statusConfig = {
-    completed: {
-      label: 'Completed',
-      color: 'text-sky-700',
+    future: {
+      label: 'Coming Soon',
+      color: 'text-teal-700',
       bgColor: 'bg-white',
       borderColor: 'border-slate-200 dark:border-slate-700',
-      icon: CheckCircle
-    },
-    'in-progress': {
-      label: 'In Progress',
-      color: 'text-amber-700',
-      bgColor: 'bg-white',
-      borderColor: 'border-slate-200 dark:border-slate-700',
-      icon: Clock
-    },
-    planned: {
-      label: 'Planned',
-      color: 'text-violet-700',
-      bgColor: 'bg-white',
-      borderColor: 'border-slate-200 dark:border-slate-700',
-      icon: Rocket
+      icon: Gift
     }
   };
 
@@ -150,13 +69,12 @@ export default function RoadmapPage() {
     features: { label: 'Features', color: 'text-sky-600' },
     integrations: { label: 'Integrations', color: 'text-sky-600' },
     compliance: { label: 'Compliance', color: 'text-sky-600' },
-    analytics: { label: 'Analytics', color: 'text-sky-600' }
+    analytics: { label: 'Analytics', color: 'text-sky-600' },
+    platform: { label: 'Platform', color: 'text-teal-600' }
   };
 
   const groupedItems = {
-    completed: roadmapItems.filter(item => item.status === 'completed'),
-    'in-progress': roadmapItems.filter(item => item.status === 'in-progress'),
-    planned: roadmapItems.filter(item => item.status === 'planned')
+    future: roadmapItems.filter(item => item.status === 'future')
   };
 
   return (
@@ -213,44 +131,20 @@ export default function RoadmapPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-sky-100 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-sky-700" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-sky-700">{groupedItems.completed.length}</div>
-              <div className="text-sm text-slate-700 dark:text-slate-300">Completed</div>
-            </div>
+      <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
+            <Gift className="h-5 w-5 text-teal-700" />
           </div>
-        </div>
-        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-amber-700" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-amber-700">{groupedItems['in-progress'].length}</div>
-              <div className="text-sm text-slate-700 dark:text-slate-300">In Progress</div>
-            </div>
-          </div>
-        </div>
-        <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
-              <Rocket className="h-5 w-5 text-violet-700" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-violet-700">{groupedItems.planned.length}</div>
-              <div className="text-sm text-slate-700 dark:text-slate-300">Planned</div>
-            </div>
+          <div>
+            <div className="text-2xl font-bold text-teal-700">{groupedItems.future.length}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-300">Upcoming Features</div>
           </div>
         </div>
       </div>
 
       {/* Roadmap Sections */}
-      {(['completed', 'in-progress', 'planned'] as RoadmapStatus[]).map((status) => {
+      {(['future'] as RoadmapStatus[]).map((status) => {
         const config = statusConfig[status];
         const StatusIcon = config.icon;
         const items = groupedItems[status];

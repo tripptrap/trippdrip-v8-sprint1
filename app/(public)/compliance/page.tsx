@@ -50,20 +50,6 @@ export default function CompliancePage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-3">CAN-SPAM Compliance</h2>
-          <p className="text-slate-700 dark:text-slate-300 mb-3">
-            For email campaigns, we ensure compliance with the CAN-SPAM Act:
-          </p>
-          <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Accurate "From" and "Subject" lines</li>
-            <li>Clear identification of messages as advertisements</li>
-            <li>Valid physical postal address in every email</li>
-            <li>Functional unsubscribe mechanism</li>
-            <li>Processing unsubscribe requests within 10 business days</li>
-          </ul>
-        </section>
-
-        <section>
           <h2 className="text-xl font-semibold mb-3">Do Not Call Registry</h2>
           <p className="text-slate-700 dark:text-slate-300 mb-3">
             HyveWyre™ helps you respect the National Do Not Call Registry:

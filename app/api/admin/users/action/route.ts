@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action, userId, userEmail, duration, reason } = await req.json();
+    const { action, userId, userEmail, duration, reason, credits, grantReason } = await req.json();
 
     if (!action || !userId) {
       return NextResponse.json({ error: 'action and userId required' }, { status: 400 });
@@ -220,6 +220,84 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ ok: true, message: 'User deleted' });
+      }
+
+      case 'grant_credits': {
+        const creditAmount = Number(credits) || 0;
+
+        if (creditAmount <= 0 || creditAmount > 1000000) {
+          return NextResponse.json({ error: 'Invalid credit amount (must be 1-1,000,000)' }, { status: 400 });
+        }
+
+        // Get current user credits
+        let currentCredits = 0;
+        const { data: userData } = await adminClient
+          .from('users')
+          .select('credits')
+          .eq('email', (userEmail || '').toLowerCase())
+          .single();
+
+        if (userData) {
+          currentCredits = userData.credits || 0;
+        }
+
+        const newCredits = currentCredits + creditAmount;
+
+        // Update credits in users table
+        const { error: updateError } = await adminClient
+          .from('users')
+          .update({
+            credits: newCredits,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email', (userEmail || '').toLowerCase());
+
+        if (updateError) {
+          console.error('Error granting credits:', updateError);
+          return NextResponse.json({ error: updateError.message }, { status: 500 });
+        }
+
+        // Log the transaction
+        await adminClient.from('points_transactions').insert({
+          user_id: userId,
+          points_amount: creditAmount,
+          action_type: 'admin_grant',
+          description: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits`,
+          balance_after: newCredits,
+          created_at: new Date().toISOString(),
+        });
+
+        // Send notification email
+        if (userEmail) {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
+            await fetch(`${baseUrl}/api/email/service`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.SYSTEM_API_KEY || '',
+              },
+              body: JSON.stringify({
+                type: 'credits_granted',
+                to: userEmail,
+                data: {
+                  userName: 'there',
+                  credits: creditAmount.toLocaleString(),
+                  reason: grantReason || 'Admin credit grant',
+                  newBalance: newCredits.toLocaleString(),
+                },
+              }),
+            });
+          } catch (emailErr) {
+            console.error('Failed to send credits granted email:', emailErr);
+          }
+        }
+
+        return NextResponse.json({
+          ok: true,
+          message: `Granted ${creditAmount.toLocaleString()} credits to user`,
+          newBalance: newCredits,
+        });
       }
 
       default:

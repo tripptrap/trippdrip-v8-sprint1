@@ -1,6 +1,15 @@
 // API Route: Claim a number from the pool
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+
+// Admin client to bypass RLS for database operations
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,8 +51,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get the number and verify it's available
-    const { data: poolNumber, error: fetchError } = await supabase
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    // Get the number and verify it's available (use admin to bypass RLS)
+    const { data: poolNumber, error: fetchError } = await supabaseAdmin
       .from('number_pool')
       .select('*')
       .eq('id', numberId)
@@ -59,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Assign the number to the user
-    const { data: updatedNumber, error: updateError } = await supabase
+    const { data: updatedNumber, error: updateError } = await supabaseAdmin
       .from('number_pool')
       .update({
         is_assigned: true,
@@ -80,8 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Add to user_telnyx_numbers table (primary ownership table)
-    // This ensures the user owns the number and can use it for sending
-    const { error: telnyxNumberError } = await supabase
+    const { error: telnyxNumberError } = await supabaseAdmin
       .from('user_telnyx_numbers')
       .insert({
         user_id: user.id,
@@ -93,7 +108,7 @@ export async function POST(req: NextRequest) {
     if (telnyxNumberError) {
       console.error('Error adding to user_telnyx_numbers:', telnyxNumberError);
       // Rollback the pool assignment
-      await supabase
+      await supabaseAdmin
         .from('number_pool')
         .update({
           is_assigned: false,

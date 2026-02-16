@@ -32,15 +32,18 @@ export async function sendTelnyxSMS(options: SendTelnyxSMSOptions): Promise<Teln
   }
 
   try {
+    // When we have a specific 'from' number, send it directly without messaging_profile_id.
+    // Including messaging_profile_id with 'from' causes Telnyx to validate against the
+    // number pool, which fails if Number Pool isn't enabled on the profile.
     const requestBody: any = {
       to,
       text: message,
-      messaging_profile_id: messagingProfileId,
     };
 
-    // Add from number if provided
     if (from) {
       requestBody.from = from;
+    } else {
+      requestBody.messaging_profile_id = messagingProfileId;
     }
 
     // Add media for MMS
@@ -75,6 +78,92 @@ export async function sendTelnyxSMS(options: SendTelnyxSMSOptions): Promise<Teln
     console.error('Telnyx send error:', error);
     return { success: false, error: error.message || 'Network error' };
   }
+}
+
+// ── Toll-Free Verification ──────────────────────────────────────────────
+
+const TOLL_FREE_PREFIXES = ['+1800', '+1888', '+1877', '+1866', '+1855', '+1844', '+1833'];
+
+/** Check if a phone number is toll-free */
+export function isTollFreeNumber(phoneNumber: string): boolean {
+  return TOLL_FREE_PREFIXES.some(p => phoneNumber.startsWith(p));
+}
+
+// Cache verified numbers for 5 minutes
+let verifiedNumbersCache: { numbers: Set<string>; fetchedAt: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Fetches verified toll-free numbers from the Telnyx verification API.
+ * Results are cached for 5 minutes.
+ */
+export async function getVerifiedTollFreeNumbers(): Promise<Set<string>> {
+  if (verifiedNumbersCache && Date.now() - verifiedNumbersCache.fetchedAt < CACHE_TTL_MS) {
+    return verifiedNumbersCache.numbers;
+  }
+
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) {
+    console.error('TELNYX_API_KEY not configured');
+    return new Set();
+  }
+
+  const verified = new Set<string>();
+
+  try {
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await fetch(
+        `${TELNYX_API_URL}/messaging_tollfree/verification/requests?page=${page}&page_size=20`,
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Telnyx verification API error:', response.status);
+        break;
+      }
+
+      const data = await response.json();
+      const records = data.records || data.data || [];
+
+      if (records.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const record of records) {
+        if (record.verificationStatus === 'Verified') {
+          const phoneNumbers = record.phoneNumbers || [];
+          for (const pn of phoneNumbers) {
+            const num = pn.phoneNumber || pn.phone_number;
+            if (typeof num === 'string') {
+              verified.add(num);
+            }
+          }
+        }
+      }
+
+      // Simple pagination — if we got a full page, check the next
+      if (records.length >= 20) {
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching toll-free verification status:', error);
+  }
+
+  console.log(`[TF Verification] Found ${verified.size} verified toll-free numbers`);
+  verifiedNumbersCache = { numbers: verified, fetchedAt: Date.now() };
+  return verified;
 }
 
 // Get phone numbers from Telnyx

@@ -108,6 +108,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fallback: If still no from number, get user's first active number
+    if (!resolvedFrom && userId && supabaseAdmin) {
+      const { data: userNumbers } = await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (userNumbers && userNumbers.length > 0) {
+        resolvedFrom = userNumbers[0].phone_number;
+        console.log('📱 Fallback to first number:', resolvedFrom);
+      }
+    }
+
+    // Final check: no from number available
+    if (!resolvedFrom) {
+      return NextResponse.json(
+        { error: 'No phone number available. Please claim a phone number first.' },
+        { status: 400 }
+      );
+    }
+
     // Fetch user's settings (opt-out keyword + spam protection)
     let optOutKeyword: string | null = null;
     let spamProtection = {
@@ -301,12 +325,20 @@ export async function POST(req: NextRequest) {
       : message;
 
     // Build request body
+    // When we have a specific 'from' number, send it directly without messaging_profile_id.
+    // Including messaging_profile_id with 'from' causes Telnyx to validate against the
+    // number pool, which fails if Number Pool isn't enabled on the profile.
+    // Only include messaging_profile_id when no 'from' is specified (auto-select mode).
     const requestBody: any = {
-      from: resolvedFrom || undefined, // If not provided, Telnyx will use number pool
       to: to,
       text: messageToSend,
-      messaging_profile_id: messagingProfileId,
     };
+
+    if (resolvedFrom) {
+      requestBody.from = resolvedFrom;
+    } else {
+      requestBody.messaging_profile_id = messagingProfileId;
+    }
 
     // Add media for MMS
     if (mediaUrls && mediaUrls.length > 0) {

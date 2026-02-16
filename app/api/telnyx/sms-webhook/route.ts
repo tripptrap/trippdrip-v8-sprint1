@@ -210,6 +210,19 @@ async function handleInboundSMS(payload: any) {
     return;
   }
 
+  // Look up lead for this phone number (needed for message insert)
+  let leadId: string | null = null;
+  const { data: leadData } = await supabaseAdmin
+    .from('leads')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('phone', from)
+    .single();
+
+  if (leadData) {
+    leadId = leadData.id;
+  }
+
   // Find or create thread for this conversation
   let threadId: string;
 
@@ -235,19 +248,23 @@ async function handleInboundSMS(payload: any) {
       .eq('id', threadId);
   } else {
     // Create new thread
+    const threadInsert: Record<string, any> = {
+      user_id: userId,
+      phone_number: from,
+      channel: 'sms',
+      status: 'active',
+      last_message: messageBody,
+      messages_from_lead: 1,
+      messages_from_user: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (leadId) {
+      threadInsert.lead_id = leadId;
+    }
     const { data: newThread, error: threadError } = await supabaseAdmin
       .from('threads')
-      .insert({
-        user_id: userId,
-        phone_number: from,
-        channel: 'sms',
-        status: 'active',
-        last_message: messageBody,
-        messages_from_lead: 1,
-        messages_from_user: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(threadInsert)
       .select('id')
       .single();
 
@@ -296,22 +313,21 @@ async function handleInboundSMS(payload: any) {
     ...(optOut ? ['OPT_OUT_REQUEST'] : []),
   ];
 
-  const messageData = {
-    user_id: userId, // Required for RLS
+  const messageData: Record<string, any> = {
+    user_id: userId,
     thread_id: threadId,
+    lead_id: leadId,
     from_phone: from,
     to_phone: to,
     body: messageBody,
-    content: messageBody, // content column has NOT NULL constraint
+    content: messageBody,
     direction: 'inbound',
-    status: 'delivered', // 'received' not allowed by check constraint
+    status: 'delivered',
     message_sid: messageSid,
     num_media: mediaUrls.length,
     media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     channel: mediaUrls.length > 0 ? 'mms' : 'sms',
     provider: 'telnyx',
-    spam_score: spamScore,
-    spam_flags: spamFlags.length > 0 ? spamFlags : null,
     created_at: new Date().toISOString(),
   };
 

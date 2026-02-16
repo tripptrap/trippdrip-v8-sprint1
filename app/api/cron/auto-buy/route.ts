@@ -5,9 +5,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// Timing-safe comparison to prevent timing attacks
+function secureCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
 
 // Point pack definitions with prices
 const POINT_PACKS = {
@@ -37,11 +53,17 @@ function findClosestPack(amount: number): { points: number; price: number; name:
 
 export async function GET(req: NextRequest) {
   try {
-    // Verify cron secret for security
-    const authHeader = req.headers.get('authorization');
+    // Verify cron secret for security (MANDATORY)
     const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error('❌ CRON_SECRET not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const authHeader = req.headers.get('authorization') || '';
+    const providedSecret = authHeader.replace('Bearer ', '');
+    if (!secureCompare(providedSecret, cronSecret)) {
+      console.error('❌ Invalid or missing cron secret');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

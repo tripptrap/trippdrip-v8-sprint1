@@ -2,8 +2,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+
+// Admin client to bypass RLS for phone number lookup
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -138,13 +147,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone} via Telnyx...`);
+    // Resolve 'from' number: use provided, or fall back to user's first active number
+    let resolvedFrom = fromPhone;
+    if (!resolvedFrom && supabaseAdmin) {
+      const { data: userNumbers } = await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (userNumbers && userNumbers.length > 0) {
+        resolvedFrom = userNumbers[0].phone_number;
+      }
+    }
+
+    if (!resolvedFrom) {
+      return NextResponse.json(
+        { error: 'No phone number available. Please claim a phone number first.' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`📤 Sending ${channel.toUpperCase()} to ${toPhone} from ${resolvedFrom} via Telnyx...`);
 
     // Send SMS via Telnyx (with opt-out footer if first message)
     const result = await sendTelnyxSMS({
       to: toPhone,
       message: messageToSend,
-      from: fromPhone,
+      from: resolvedFrom,
       mediaUrls: mediaUrls,
     });
 
@@ -275,8 +307,9 @@ export async function POST(req: NextRequest) {
 
       await supabase.from('messages').insert({
         thread_id: threadId,
-        sender: actualFromPhone,
-        recipient: toPhone,
+        from_phone: actualFromPhone,
+        to_phone: toPhone,
+        content: messageBody,
         body: messageBody,
         direction: 'outbound',
         status: result.status || 'sent',

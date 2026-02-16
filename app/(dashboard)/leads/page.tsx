@@ -1553,7 +1553,7 @@ export default function LeadsPage() {
               value={q}
               onChange={(e)=>setQ(e.target.value)}
               placeholder="Search name, email, phone, state, tag…"
-              className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none w-[260px]"
+              className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none w-full sm:w-[260px]"
             />
 
             {/* Action Buttons Group - prominent styling */}
@@ -1597,7 +1597,7 @@ export default function LeadsPage() {
                     : "Campaigns"}
                 </button>
                 {campaignMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-[280px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
+                  <div className="absolute right-0 mt-1 w-[calc(100vw-32px)] sm:w-[280px] max-w-[280px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                       onClick={()=>{ setActiveCampaignId(null); setCampaignMenuOpen(false); }}
@@ -1634,7 +1634,7 @@ export default function LeadsPage() {
                   {activeTagFilter ? activeTagFilter : "Tags"}
                 </button>
                 {tagsMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-[240px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
+                  <div className="absolute right-0 mt-1 w-[calc(100vw-32px)] sm:w-[240px] max-w-[240px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
                     <button
                       className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
                       onClick={()=>{ setActiveTagFilter(null); setTagsMenuOpen(false); }}

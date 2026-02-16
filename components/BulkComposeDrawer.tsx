@@ -360,7 +360,7 @@ export default function BulkComposeDrawer({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-lg bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full sm:max-w-lg bg-white dark:bg-slate-900 shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-sky-500/10 to-amber-500/10">
           <div className="flex items-center gap-3">

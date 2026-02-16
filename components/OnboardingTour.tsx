@@ -121,11 +121,25 @@ export default function OnboardingTour() {
 
   const step = tourSteps[currentStep];
 
-  // Calculate tooltip position
+  // Calculate tooltip position with mobile support
   const getTooltipPosition = () => {
     const padding = 20;
-    const tooltipWidth = 420;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const tooltipWidth = isMobile ? Math.min(window.innerWidth - 32, 380) : 420;
     const tooltipHeight = 260;
+
+    // On mobile, always position at bottom center of screen
+    if (isMobile) {
+      return {
+        top: 'auto',
+        bottom: 20,
+        left: 16,
+        right: 16,
+        width: 'calc(100vw - 32px)',
+        maxWidth: '420px',
+        position: 'fixed' as const,
+      };
+    }
 
     switch (step.position) {
       case 'right':
@@ -154,6 +168,7 @@ export default function OnboardingTour() {
   };
 
   const tooltipPos = getTooltipPosition();
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
   return (
     <AnimatePresence>
@@ -207,8 +222,13 @@ export default function OnboardingTour() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="fixed z-[202] w-[420px]"
-            style={{
+            className="fixed z-[202] w-[calc(100vw-32px)] sm:w-[420px] max-w-[420px]"
+            style={isMobile ? {
+              bottom: 20,
+              left: 16,
+              right: 16,
+              top: 'auto',
+            } : {
               top: tooltipPos.top,
               left: tooltipPos.left,
             }}
@@ -283,19 +303,21 @@ export default function OnboardingTour() {
               </div>
             </div>
 
-            {/* Arrow pointer */}
-            <div
-              className="absolute w-4 h-4 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700"
-              style={{
-                transform: step.position === 'right' ? 'rotate(-45deg)' :
-                           step.position === 'left' ? 'rotate(135deg)' :
-                           step.position === 'bottom' ? 'rotate(45deg)' : 'rotate(-135deg)',
-                ...(step.position === 'right' && { left: -8, top: '50%', marginTop: -8 }),
-                ...(step.position === 'left' && { right: -8, top: '50%', marginTop: -8 }),
-                ...(step.position === 'bottom' && { top: -8, left: '50%', marginLeft: -8 }),
-                ...(step.position === 'top' && { bottom: -8, left: '50%', marginLeft: -8 }),
-              }}
-            />
+            {/* Arrow pointer - hidden on mobile */}
+            {!isMobile && (
+              <div
+                className="absolute w-4 h-4 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700"
+                style={{
+                  transform: step.position === 'right' ? 'rotate(-45deg)' :
+                             step.position === 'left' ? 'rotate(135deg)' :
+                             step.position === 'bottom' ? 'rotate(45deg)' : 'rotate(-135deg)',
+                  ...(step.position === 'right' && { left: -8, top: '50%', marginTop: -8 }),
+                  ...(step.position === 'left' && { right: -8, top: '50%', marginTop: -8 }),
+                  ...(step.position === 'bottom' && { top: -8, left: '50%', marginLeft: -8 }),
+                  ...(step.position === 'top' && { bottom: -8, left: '50%', marginLeft: -8 }),
+                }}
+              />
+            )}
           </motion.div>
 
           {/* Skip button in corner */}

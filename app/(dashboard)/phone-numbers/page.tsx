@@ -72,7 +72,7 @@ export default function PhoneNumbersPage() {
     setTimeout(() => setMessage(null), 5000);
   };
 
-  // Fetch user's phone numbers
+  // Fetch user's phone numbers (handles auto-release of unverified numbers)
   const fetchMyNumbers = async () => {
     try {
       const response = await fetch('/api/telnyx/numbers');
@@ -80,6 +80,11 @@ export default function PhoneNumbersPage() {
 
       if (data.success) {
         setMyNumbers(data.numbers || []);
+        // Alert user if unverified numbers were auto-released
+        if (data.numbersReleased && data.numbersReleased.length > 0) {
+          showMessage('error', data.releaseMessage || 'An unverified number was released. Please claim a verified number.');
+          await loadPoolNumbers();
+        }
       } else {
         showMessage('error', data.error || 'Failed to fetch your phone numbers');
       }
@@ -189,7 +194,7 @@ export default function PhoneNumbersPage() {
     }
   };
 
-  // Load available pool numbers, fall back to Telnyx search if pool is empty
+  // Load available pool numbers (verified only)
   const loadPoolNumbers = async () => {
     try {
       setLoadingPool(true);
@@ -198,30 +203,8 @@ export default function PhoneNumbersPage() {
 
       if (data.success && data.numbers && data.numbers.length > 0) {
         setPoolNumbers(data.numbers);
-        return;
-      }
-
-      // Pool is empty — search Telnyx for toll-free numbers as fallback
-      const telnyxResponse = await fetch('/api/telnyx/search-numbers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tollFree: true, countryCode: 'US', limit: 10 }),
-      });
-      const telnyxData = await telnyxResponse.json();
-
-      if (telnyxData.success && telnyxData.numbers && telnyxData.numbers.length > 0) {
-        // Convert Telnyx search results to pool-like format for the UI
-        const converted: PoolNumber[] = telnyxData.numbers.map((n: any, i: number) => ({
-          id: `telnyx-${i}`,
-          phone_number: n.phoneNumber,
-          phone_sid: '',
-          friendly_name: n.friendlyName,
-          number_type: 'tollfree',
-          capabilities: n.capabilities || { sms: true, mms: true, voice: true },
-          is_verified: true,
-          monthly_cost: 1,
-        }));
-        setPoolNumbers(converted);
+      } else {
+        setPoolNumbers([]);
       }
     } catch (error) {
       console.error('Error loading pool numbers:', error);
@@ -230,38 +213,11 @@ export default function PhoneNumbersPage() {
     }
   };
 
-  // Claim a number from the pool or purchase from Telnyx
+  // Claim a verified number from the pool
   const claimPoolNumber = async (numberId: string) => {
     setClaimingPool(true);
 
     try {
-      // If it's a Telnyx search result (not from pool), purchase directly
-      if (numberId.startsWith('telnyx-')) {
-        const poolNum = poolNumbers.find(n => n.id === numberId);
-        if (!poolNum) {
-          showMessage('error', 'Number not found');
-          return;
-        }
-
-        const response = await fetch('/api/telnyx/purchase-number', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber: poolNum.phone_number }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          showMessage('success', `Number ${poolNum.phone_number} claimed! It will be ready shortly.`);
-          await fetchMyNumbers();
-          await loadPoolNumbers();
-        } else {
-          showMessage('error', data.error || 'Failed to claim number');
-        }
-        return;
-      }
-
-      // Standard pool claim
       const response = await fetch('/api/number-pool/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

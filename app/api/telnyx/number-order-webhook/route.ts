@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 // Create Supabase admin client (bypasses RLS)
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -12,17 +13,80 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
     )
   : null;
 
+// Timing-safe comparison to prevent timing attacks
+function secureCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // Still run comparison to avoid timing leak on length
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+// Verify Telnyx webhook signature (HMAC-SHA256)
+function verifyTelnyxSignature(
+  payload: string,
+  signature: string,
+  timestamp: string,
+  publicKey: string
+): boolean {
+  try {
+    const signedPayload = `${timestamp}|${payload}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', publicKey)
+      .update(signedPayload)
+      .digest('base64');
+
+    return secureCompare(signature, expectedSignature);
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-    const body = JSON.parse(rawBody);
 
+    // Verify Telnyx webhook signature (REQUIRED)
+    const signature = req.headers.get('telnyx-signature-ed25519');
+    const timestamp = req.headers.get('telnyx-timestamp');
+    const publicKey = process.env.TELNYX_PUBLIC_KEY;
+
+    // Always require signature verification in production
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (!signature || !timestamp) {
+      console.error('❌ Missing Telnyx webhook signature headers');
+      if (isProduction) {
+        return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+      }
+      console.warn('⚠️ Allowing unsigned webhook in non-production mode');
+    } else if (publicKey) {
+      const isValid = verifyTelnyxSignature(rawBody, signature, timestamp, publicKey);
+      if (!isValid) {
+        console.error('❌ Invalid Telnyx webhook signature');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
+    } else if (isProduction) {
+      console.error('❌ TELNYX_PUBLIC_KEY not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const body = JSON.parse(rawBody);
     const eventType = body?.data?.event_type;
     const payload = body?.data?.payload;
 
     console.log('📞 Telnyx number order webhook received:', {
       event_type: eventType,
       record_type: body?.data?.record_type,
+      signature_verified: !!signature,
     });
 
     if (!supabaseAdmin) {
