@@ -39,6 +39,7 @@ export default function Composer({
   const [showAiMenu, setShowAiMenu] = useState(false);
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState<string | null>(null); // 'smart' | 'followup' | 'compose' | 'spam'
+  const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'friendly' | 'urgent'>('professional');
   const [userCredits, setUserCredits] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -211,7 +212,7 @@ export default function Composer({
           mode,
           leadId,
           threadId: thread.id,
-          tone: 'professional',
+          tone: aiTone,
         }),
       });
       const data = await res.json();
@@ -394,6 +395,16 @@ export default function Composer({
 
             {showAiMenu && (
               <>
+                <select
+                  value={aiTone}
+                  onChange={(e) => setAiTone(e.target.value as any)}
+                  className="px-1.5 py-1 rounded text-xs font-medium border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                >
+                  <option value="professional">Professional</option>
+                  <option value="casual">Casual</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="urgent">Urgent</option>
+                </select>
                 <button
                   onClick={fetchSmartReplies}
                   disabled={!!aiLoading}
