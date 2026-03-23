@@ -18,6 +18,7 @@ import {
   XCircle,
   Loader2,
   MoreVertical,
+  Ban,
   Pause,
   Play,
   Trash2,
@@ -173,7 +174,7 @@ export default function AdminPage() {
           userId,
           userEmail: email,
           ...(action === 'suspend' ? { duration: suspendDuration === 'indefinite' ? null : Number(suspendDuration) } : {}),
-          ...(action === 'suspend' && actionReason ? { reason: actionReason } : {}),
+          ...((action === 'suspend' || action === 'ban') && actionReason ? { reason: actionReason } : {}),
         }),
       });
       const data = await res.json();
@@ -267,8 +268,9 @@ export default function AdminPage() {
       (user.phone && user.phone.includes(searchTerm));
     const matchesPlan = filterPlan === 'all' || user.plan_type === filterPlan;
     const matchesStatus = filterStatus === 'all' ||
-      (filterStatus === 'active' && user.account_status !== 'suspended' && user.email_confirmed) ||
+      (filterStatus === 'active' && user.account_status !== 'suspended' && user.account_status !== 'banned' && user.email_confirmed) ||
       (filterStatus === 'suspended' && user.account_status === 'suspended') ||
+      (filterStatus === 'banned' && user.account_status === 'banned') ||
       (filterStatus === 'pending' && !user.email_confirmed);
     const matchesIndustry = filterIndustry === 'all' || user.industry === filterIndustry;
     const matchesSpam = filterSpam === 'all' ||
@@ -467,6 +469,7 @@ export default function AdminPage() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
+                <option value="banned">Banned</option>
                 <option value="pending">Pending Verification</option>
               </select>
               <select
@@ -602,7 +605,12 @@ export default function AdminPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {user.account_status === 'suspended' ? (
+                    {user.account_status === 'banned' ? (
+                      <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                        <Ban className="w-4 h-4" />
+                        <span className="text-xs">Banned</span>
+                      </div>
+                    ) : user.account_status === 'suspended' ? (
                       <div className="flex items-center gap-1 text-orange-500">
                         <Pause className="w-4 h-4" />
                         <span className="text-xs">Suspended</span>
@@ -659,6 +667,22 @@ export default function AdminPage() {
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-orange-600 dark:text-orange-400 hover:bg-slate-100 dark:hover:bg-slate-600"
                             >
                               <Pause className="w-4 h-4" /> Suspend
+                            </button>
+                          )}
+                          {user.account_status !== 'banned' && (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'ban', label: 'ban' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Ban className="w-4 h-4" /> Ban User
+                            </button>
+                          )}
+                          {user.account_status === 'banned' && (
+                            <button
+                              onClick={() => { setConfirmAction({ userId: user.id, email: user.email, action: 'unban', label: 'unban' }); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+                            >
+                              <Play className="w-4 h-4" /> Unban User
                             </button>
                           )}
                           <div className="border-t border-slate-200 dark:border-slate-600 my-1" />
@@ -838,7 +862,7 @@ export default function AdminPage() {
                 'bg-orange-100 dark:bg-orange-900/30'
               }`}>
                 <AlertTriangle className={`w-5 h-5 ${
-                  confirmAction.action === 'delete'
+                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
                     ? 'text-red-600 dark:text-red-400'
                     : 'text-orange-600 dark:text-orange-400'
                 }`} />
@@ -852,9 +876,10 @@ export default function AdminPage() {
               Are you sure you want to <strong>{confirmAction.label}</strong> this account?
               {confirmAction.action === 'delete' && ' This action cannot be undone.'}
               {confirmAction.action === 'suspend' && ' The user will be temporarily blocked from signing in.'}
+              {confirmAction.action === 'ban' && ' The user will be permanently blocked from signing in.'}
             </p>
 
-            {confirmAction.action === 'suspend' && (
+            {(confirmAction.action === 'suspend' || confirmAction.action === 'ban') && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Reason (sent to user via email)
@@ -903,9 +928,9 @@ export default function AdminPage() {
                 onClick={() => handleUserAction(confirmAction.userId, confirmAction.email, confirmAction.action)}
                 disabled={actionLoading}
                 className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 ${
-                  confirmAction.action === 'delete'
+                  confirmAction.action === 'delete' || confirmAction.action === 'ban'
                     ? 'bg-red-600 hover:bg-red-700'
-                    : confirmAction.action === 'unsuspend'
+                    : confirmAction.action === 'unsuspend' || confirmAction.action === 'unban'
                     ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-orange-600 hover:bg-orange-700'
                 }`}

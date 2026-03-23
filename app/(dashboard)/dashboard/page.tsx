@@ -83,6 +83,12 @@ export default function Dashboard(){
   const [funnelMetrics, setFunnelMetrics] = useState<{ avg_messages_before_sale: number; overall: number } | null>(null);
   const [funnelLoading, setFunnelLoading] = useState(true);
 
+  // Cache demo mode check (avoids localStorage reads in render path)
+  const [demoMode, setDemoMode] = useState(false);
+  useEffect(() => {
+    setDemoMode(typeof window !== 'undefined' && localStorage.getItem('demo_mode') === 'true');
+  }, []);
+
   useEffect(() => {
     fetchAnalytics();
     fetchRecentLeads();
@@ -93,14 +99,28 @@ export default function Dashboard(){
     fetchPipelineTags();
     fetchCampaignPerformance();
     fetchConversionFunnel();
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     fetchChartData();
-  }, [timeRange]);
+  }, [timeRange, demoMode]);
 
   async function fetchRecentLeads() {
     try {
+      if (demoMode) {
+        const { DEMO_LEADS } = await import('@/lib/demoData');
+        const activeLeads = DEMO_LEADS.filter(l => l.disposition !== 'sold');
+        setRecentLeads(activeLeads.slice(0, 5).map(l => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          created_at: l.created_at,
+          status: l.status,
+          disposition: l.disposition || undefined,
+        })));
+        setRecentLoading(false);
+        return;
+      }
       const res = await fetch('/api/leads?page=1&pageSize=10');
       const data = await res.json();
       const leads = data.items || data.leads || [];
@@ -116,6 +136,20 @@ export default function Dashboard(){
 
   async function fetchRecentClients() {
     try {
+      if (demoMode) {
+        const { DEMO_LEADS } = await import('@/lib/demoData');
+        const soldLeads = DEMO_LEADS.filter(l => l.disposition === 'sold' || l.disposition === 'closed_won');
+        setRecentClients(soldLeads.slice(0, 5).map(l => ({
+          id: l.id,
+          name: l.name,
+          phone: l.phone,
+          created_at: l.created_at,
+          converted_at: l.last_contacted || l.created_at,
+          disposition: 'sold',
+        })));
+        setClientsLoading(false);
+        return;
+      }
       const res = await fetch('/api/clients?page=1&pageSize=5');
       const data = await res.json();
       if (data.items) {
@@ -137,6 +171,20 @@ export default function Dashboard(){
 
   async function fetchAnalytics() {
     try {
+      if (demoMode) {
+        setAnalytics({
+          totalLeads: 247,
+          totalCampaigns: 5,
+          totalMessagesSent: 1832,
+          totalMessagesReceived: 623,
+          responseRate: 34,
+          conversionRate: 12,
+          soldLeads: 30,
+          totalCreditsUsed: 2455,
+        });
+        setLoading(false);
+        return;
+      }
       const res = await fetch('/api/analytics/overview');
       const data = await res.json();
       setAnalytics(data);
@@ -150,6 +198,21 @@ export default function Dashboard(){
   async function fetchChartData() {
     setChartLoading(true);
     try {
+      if (demoMode) {
+        const days = parseInt(timeRange);
+        const demoChart: ChartDataPoint[] = [];
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          demoChart.push({
+            date: format(d, 'MMM dd'),
+            sent: Math.floor(Math.random() * 40) + 20,
+            received: Math.floor(Math.random() * 20) + 5,
+          });
+        }
+        setChartData(demoChart);
+        setChartLoading(false);
+        return;
+      }
       const res = await fetch(`/api/analytics/messages-over-time?days=${timeRange}`);
       const json = await res.json();
       setChartData(json.data || []);
@@ -163,6 +226,10 @@ export default function Dashboard(){
 
   async function fetchCredits() {
     try {
+      if (demoMode) {
+        setUserCredits({ credits: 4250, monthly_credits: 5000 });
+        return;
+      }
       const res = await fetch('/api/user/profile');
       const data = await res.json();
       if (data) {
@@ -178,6 +245,36 @@ export default function Dashboard(){
 
   async function fetchAppointments() {
     try {
+      if (demoMode) {
+        setAppointments([
+          {
+            id: 'demo-apt-1',
+            summary: 'Policy Review - Sarah Johnson',
+            start_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            end_time: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+            attendee_name: 'Sarah Johnson',
+            lead_id: 'demo-lead-1',
+          },
+          {
+            id: 'demo-apt-2',
+            summary: 'Quote Presentation - Lisa Anderson',
+            start_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
+            end_time: new Date(Date.now() + 27 * 60 * 60 * 1000).toISOString(),
+            attendee_name: 'Lisa Anderson',
+            lead_id: 'demo-lead-7',
+          },
+          {
+            id: 'demo-apt-3',
+            summary: 'Follow-up Call - Emily Rodriguez',
+            start_time: new Date(Date.now() + 50 * 60 * 60 * 1000).toISOString(),
+            end_time: new Date(Date.now() + 51 * 60 * 60 * 1000).toISOString(),
+            attendee_name: 'Emily Rodriguez',
+            lead_id: 'demo-lead-3',
+          },
+        ]);
+        setAppointmentsLoading(false);
+        return;
+      }
       const res = await fetch('/api/appointments?filter=upcoming&limit=5');
       const data = await res.json();
       if (data.ok && data.appointments) {
@@ -192,6 +289,27 @@ export default function Dashboard(){
 
   async function fetchUnreadThreads() {
     try {
+      if (demoMode) {
+        const { DEMO_CONVERSATIONS, DEMO_LEADS } = await import('@/lib/demoData');
+        const soldIds = new Set(DEMO_LEADS.filter(l => l.disposition === 'sold' || l.disposition === 'closed_won').map(l => l.id));
+        const threads: UnreadThread[] = DEMO_CONVERSATIONS.map(conv => {
+          const lastMsg = conv.messages[conv.messages.length - 1];
+          const lead = DEMO_LEADS.find(l => l.id === conv.lead_id);
+          return {
+            id: conv.id,
+            lead_id: conv.lead_id,
+            lead_name: conv.lead_name,
+            lead_phone: lead?.phone || '',
+            last_message_body: lastMsg?.body || '',
+            last_message_at: lastMsg?.created_at || '',
+            isClient: soldIds.has(conv.lead_id),
+          };
+        });
+        setUnreadCount(threads.length);
+        setUnreadThreads(threads);
+        setUnreadLoading(false);
+        return;
+      }
       // Fetch threads and sold lead IDs in parallel
       const [threadsRes, clientsRes] = await Promise.all([
         fetch('/api/messages/threads'),
@@ -225,6 +343,27 @@ export default function Dashboard(){
 
   async function fetchPipelineTags() {
     try {
+      if (demoMode) {
+        const { DEMO_LEADS } = await import('@/lib/demoData');
+        // Extract tags from demo leads and count occurrences
+        const tagMap = new Map<string, number>();
+        DEMO_LEADS.forEach(lead => {
+          (lead.tags || []).forEach(tag => {
+            tagMap.set(tag, (tagMap.get(tag) || 0) + 1);
+          });
+        });
+        const colors = ['blue', 'green', 'purple', 'orange', 'red', 'teal', 'pink'];
+        let colorIdx = 0;
+        const tags: PipelineTag[] = Array.from(tagMap.entries()).map(([name, count]) => ({
+          id: `demo-tag-${name.toLowerCase().replace(/\s+/g, '-')}`,
+          name,
+          color: colors[colorIdx++ % colors.length],
+          count,
+        }));
+        setPipelineTags(tags);
+        setPipelineLoading(false);
+        return;
+      }
       const res = await fetch('/api/tags');
       const data = await res.json();
       if (data.ok && data.items) {
@@ -239,6 +378,19 @@ export default function Dashboard(){
 
   async function fetchCampaignPerformance() {
     try {
+      if (demoMode) {
+        const { DEMO_CAMPAIGNS } = await import('@/lib/demoData');
+        setCampaignPerf(DEMO_CAMPAIGNS.map(c => ({
+          id: c.id,
+          name: c.name,
+          totalLeads: c.total_sent,
+          messagesSent: c.total_sent,
+          responseRate: c.total_sent > 0 ? Math.round((c.total_responses / c.total_sent) * 100) : 0,
+          conversionRate: c.total_sent > 0 ? Math.round((c.total_responses / c.total_sent) * 50) : 0,
+        })));
+        setCampaignPerfLoading(false);
+        return;
+      }
       const res = await fetch('/api/analytics/campaign-performance');
       const data = await res.json();
       setCampaignPerf((data.data || []).slice(0, 5));
@@ -251,6 +403,18 @@ export default function Dashboard(){
 
   async function fetchConversionFunnel() {
     try {
+      if (demoMode) {
+        setFunnelStages([
+          { name: 'New Leads', count: 247, percentage: 100 },
+          { name: 'Contacted', count: 189, percentage: 76.5 },
+          { name: 'Qualified', count: 98, percentage: 39.7 },
+          { name: 'Proposal Sent', count: 54, percentage: 21.9 },
+          { name: 'Sold', count: 30, percentage: 12.1 },
+        ]);
+        setFunnelMetrics({ avg_messages_before_sale: 8.3, overall: 12.1 });
+        setFunnelLoading(false);
+        return;
+      }
       const res = await fetch('/api/analytics/conversion-funnel');
       const data = await res.json();
       if (data.ok && data.funnel) {
@@ -736,71 +900,43 @@ export default function Dashboard(){
               <p className="text-xs mt-1">No unread messages</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {/* Lead messages */}
-              {unreadThreads.filter(t => !t.isClient).length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 dark:text-slate-500 mb-1.5 px-2">Leads</div>
-                  <div className="space-y-1">
-                    {unreadThreads.filter(t => !t.isClient).slice(0, 5).map((thread) => (
-                      <Link
-                        key={thread.id}
-                        href={`/texts?thread=${thread.id}`}
-                        className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-                          {thread.lead_name?.charAt(0)?.toUpperCase() || '?'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                            {thread.lead_name || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                            {thread.last_message_body || 'New message'}
-                          </div>
-                        </div>
-                        {thread.last_message_at && (
-                          <div className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
-                            {formatDistanceToNow(new Date(thread.last_message_at), { addSuffix: true })}
-                          </div>
-                        )}
-                      </Link>
-                    ))}
+            <div className="space-y-1">
+              {[...unreadThreads]
+                .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                .slice(0, 8)
+                .map((thread) => (
+                <Link
+                  key={thread.id}
+                  href={`/texts?thread=${thread.id}`}
+                  className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                >
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${thread.isClient ? 'from-emerald-400 to-teal-500' : 'from-sky-400 to-blue-500'} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}>
+                    {thread.lead_name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
-                </div>
-              )}
-              {/* Client messages */}
-              {unreadThreads.filter(t => t.isClient).length > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider font-semibold text-emerald-500 dark:text-emerald-400 mb-1.5 px-2">Clients</div>
-                  <div className="space-y-1">
-                    {unreadThreads.filter(t => t.isClient).slice(0, 5).map((thread) => (
-                      <Link
-                        key={thread.id}
-                        href={`/texts?thread=${thread.id}`}
-                        className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-                          {thread.lead_name?.charAt(0)?.toUpperCase() || '?'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                            {thread.lead_name || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                            {thread.last_message_body || 'New message'}
-                          </div>
-                        </div>
-                        {thread.last_message_at && (
-                          <div className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
-                            {formatDistanceToNow(new Date(thread.last_message_at), { addSuffix: true })}
-                          </div>
-                        )}
-                      </Link>
-                    ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                        {thread.lead_name || 'Unknown'}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        thread.isClient
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+                      }`}>
+                        {thread.isClient ? 'Client' : 'Lead'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {thread.last_message_body || 'New message'}
+                    </div>
                   </div>
-                </div>
-              )}
+                  {thread.last_message_at && (
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">
+                      {formatDistanceToNow(new Date(thread.last_message_at), { addSuffix: true })}
+                    </div>
+                  )}
+                </Link>
+              ))}
             </div>
           )}
         </motion.div>

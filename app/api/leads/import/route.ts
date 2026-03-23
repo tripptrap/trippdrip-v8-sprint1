@@ -77,8 +77,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Fetch existing phone numbers for duplicate detection
+    const { data: existingLeads } = await supabase
+      .from('leads')
+      .select('phone')
+      .eq('user_id', user.id)
+      .not('phone', 'is', null);
+
+    const existingPhones = new Set(
+      (existingLeads || [])
+        .map((l: any) => (l.phone || "").replace(/\D/g, "").slice(-10))
+        .filter((p: string) => p.length === 10)
+    );
+
+    // Filter out duplicates based on phone number
+    const deduped = incoming.filter((l: any) => {
+      const digits = String(l.phone || "").replace(/\D/g, "").slice(-10);
+      return digits.length !== 10 || !existingPhones.has(digits);
+    });
+    const duplicatesCount = incoming.length - deduped.length;
+
+    if (!deduped.length) {
+      return NextResponse.json({
+        ok: true,
+        message: "All leads were duplicates",
+        campaignId,
+        added: 0,
+        duplicates: duplicatesCount,
+        total: existingLeads?.length || 0
+      });
+    }
+
     // Prepare leads for Supabase insert - include campaign_id if available
-    const leadsToInsert = incoming.map((l: any) => {
+    const leadsToInsert = deduped.map((l: any) => {
       const currentTags = Array.isArray(l?.tags) ? l.tags : (l?.tags ? String(l.tags).split(",").map((s:string)=>s.trim()).filter(Boolean) : []);
       const lead: any = {
         user_id: user.id,
@@ -113,7 +144,7 @@ export async function POST(req: NextRequest) {
     // If campaign_id column doesn't exist, retry without it
     if (insertError && insertError.message?.includes('campaign_id')) {
       console.log('[Import] campaign_id column not found, retrying without it');
-      const leadsWithoutCampaign = incoming.map((l: any) => {
+      const leadsWithoutCampaign = deduped.map((l: any) => {
         const currentTags = Array.isArray(l?.tags) ? l.tags : (l?.tags ? String(l.tags).split(",").map((s:string)=>s.trim()).filter(Boolean) : []);
         return {
           user_id: user.id,
@@ -163,6 +194,7 @@ export async function POST(req: NextRequest) {
       message: "leads successfully uploaded",
       campaignId,
       added: addedCount,
+      duplicates: duplicatesCount,
       total: totalCount || addedCount
     });
   } catch (e: any) {

@@ -13,6 +13,7 @@ import SessionsPanel from './SessionsPanel';
 import SendSMSModal from '@/components/SendSMSModal';
 import AIDripModal from '@/components/AIDripModal';
 import BulkComposeDrawer from '@/components/BulkComposeDrawer';
+import OutOfCreditsBlocker from '@/components/OutOfCreditsBlocker';
 import toast from 'react-hot-toast';
 
 interface TextsLayoutProps {
@@ -55,6 +56,26 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
   const [showAIDripModal, setShowAIDripModal] = useState(false);
   const [showBulkDrawer, setShowBulkDrawer] = useState(false);
   const [bulkContactType, setBulkContactType] = useState<'leads' | 'clients' | 'both'>('both');
+  const [userCredits, setUserCredits] = useState<number | null>(null);
+
+  // Fetch user credits on mount and periodically
+  useEffect(() => {
+    const fetchCredits = async () => {
+      try {
+        const res = await fetch('/api/user/credits');
+        const data = await res.json();
+        if (data.credits !== undefined) {
+          setUserCredits(data.credits);
+        }
+      } catch {
+        // Silently fail - credits will remain null (blocker won't activate)
+      }
+    };
+
+    fetchCredits();
+    const interval = setInterval(fetchCredits, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-open bulk drawer if URL has ?bulk=true
   useEffect(() => {
@@ -317,16 +338,18 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
                   onToggleInfoPanel={() => { setShowInfoPanel(!showInfoPanel); setShowSessionsPanel(false); }}
                   onArchiveThread={handleArchiveFromConversation}
                 >
-                  <Composer
-                    thread={activeThread}
-                    optOutKeyword={optOutKeyword}
-                    isFirstMessage={isFirstMessage}
-                    channel={'sms'}
-                    onSend={handleSendMessage}
-                    disabled={false}
-                    leadId={activeThread.lead_id || activeThread.leads?.id || undefined}
-                    onOpenAIDrip={() => setShowAIDripModal(true)}
-                  />
+                  <OutOfCreditsBlocker credits={userCredits ?? 1}>
+                    <Composer
+                      thread={activeThread}
+                      optOutKeyword={optOutKeyword}
+                      isFirstMessage={isFirstMessage}
+                      channel={'sms'}
+                      onSend={handleSendMessage}
+                      disabled={false}
+                      leadId={activeThread.lead_id || activeThread.leads?.id || undefined}
+                      onOpenAIDrip={() => setShowAIDripModal(true)}
+                    />
+                  </OutOfCreditsBlocker>
                 </ConversationView>
               </div>
               {showInfoPanel && (activeThread.lead_id || activeThread.leads?.id) && (

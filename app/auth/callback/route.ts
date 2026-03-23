@@ -52,12 +52,22 @@ export async function GET(request: NextRequest) {
 
     if (data.user && data.session) {
       // Session is now established
-      // Check if user has already selected a plan
+      // Check account status and plan
       const { data: userData } = await supabase
         .from('users')
-        .select('subscription_tier')
+        .select('subscription_tier, account_status')
         .eq('id', data.user.id)
         .single()
+
+      // If account is banned or suspended, sign out and redirect to login with error
+      if (userData?.account_status === 'banned' || userData?.account_status === 'suspended') {
+        await supabase.auth.signOut()
+        const blockedRedirect = NextResponse.redirect(requestUrl.origin + '/auth/login?error=account_blocked')
+        response.cookies.getAll().forEach(cookie => {
+          blockedRedirect.cookies.set(cookie)
+        })
+        return blockedRedirect
+      }
 
       // Create response with proper redirect
       const redirectUrl = (!userData || !userData.subscription_tier)

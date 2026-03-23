@@ -44,14 +44,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If user is authenticated, check if they have selected a plan
+  // If user is authenticated, check account status and plan
   // Skip this check if they're already on the onboarding page
   if (pathname !== '/auth/onboarding') {
     const { data: userData } = await supabase
       .from('users')
-      .select('subscription_tier')
+      .select('subscription_tier, account_status')
       .eq('id', user.id)
       .single()
+
+    // If account is banned or suspended, redirect to login with error
+    if (userData?.account_status === 'banned' || userData?.account_status === 'suspended') {
+      // Sign out the user so they can't keep hitting protected routes
+      await supabase.auth.signOut()
+      const url = new URL('/auth/login?error=account_blocked', request.url)
+      return NextResponse.redirect(url)
+    }
 
     // If no plan selected or unpaid, redirect to onboarding
     if (!userData || !userData.subscription_tier || userData.subscription_tier === 'unpaid') {

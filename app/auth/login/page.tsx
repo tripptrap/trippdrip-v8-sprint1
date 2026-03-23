@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
@@ -14,10 +14,18 @@ interface AccountStatusInfo {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [accountStatus, setAccountStatus] = useState<AccountStatusInfo | null>(null)
+
+  // Show error toast if redirected due to blocked account
+  useEffect(() => {
+    if (searchParams.get('error') === 'account_blocked') {
+      toast.error('Your account has been suspended or banned. Please contact support.')
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

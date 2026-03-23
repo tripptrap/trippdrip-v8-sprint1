@@ -986,6 +986,7 @@ export default function LeadsPage() {
         l.phone = digits ? (digits.length===10 ? `+1${digits}` : `+${digits}`) : "";
       }
       if (map.state) l.state = String(r[map.state] ?? "").trim().toUpperCase();
+      if (map.zip_code) l.zip_code = String(r[map.zip_code] ?? "").trim();
       if (map.tags)  l.tags  = normalizeTags(r[map.tags]);
       if (map.status) l.status = String(r[map.status] ?? "").trim() || "Active";
       if (!l.first_name && !l.last_name && l.email) {
@@ -1106,8 +1107,8 @@ export default function LeadsPage() {
         setLastSummary({
           ok: true,
           incoming: raw?.total || 0,
-          added: mappedAll.length,
-          duplicates: 0,
+          added: json?.added ?? mappedAll.length,
+          duplicates: json?.duplicates ?? 0,
           total: (json?.total || mappedAll.length),
           data_quality: { missing_name: 0, missing_contact: 0, invalid_state: 0 },
           top_states: [],
