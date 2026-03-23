@@ -8,6 +8,9 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient();
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500);
+    const before = searchParams.get('before'); // ISO date for pagination
 
     // Get current user
     const {
@@ -23,7 +26,7 @@ export async function GET(
     // Verify thread belongs to user
     const { data: thread, error: threadError } = await supabase
       .from('threads')
-      .select('user_id')
+      .select('user_id, phone_number, lead_id')
       .eq('id', threadId)
       .single();
 
@@ -41,16 +44,21 @@ export async function GET(
       );
     }
 
-    // Fetch messages for this thread
-    const { data: messages, error } = await supabase
+    // Fetch messages for this thread with pagination
+    let query = supabase
       .from('messages')
       .select('*')
       .eq('thread_id', threadId)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(limit);
 
-    console.log('📨 Fetching messages for thread:', threadId);
-    console.log('📨 Found messages:', messages?.length || 0);
+    // If paginating, fetch messages before a certain date
+    if (before) {
+      query = query.lt('created_at', before);
+    }
+
+    const { data: messages, error } = await query;
 
     if (error) {
       console.error('Error fetching messages:', error);
@@ -62,25 +70,15 @@ export async function GET(
 
     // If no messages found with thread_id, try to find by phone number from thread
     if (!messages || messages.length === 0) {
-      // Get thread details to find phone number
-      const { data: threadDetails } = await supabase
-        .from('threads')
-        .select('phone_number, lead_id')
-        .eq('id', threadId)
-        .single();
-
-      console.log('📨 Thread details:', threadDetails);
-
-      if (threadDetails?.phone_number) {
+      if (thread.phone_number) {
         // Try to find messages by from_phone/to_phone
         const { data: messagesByPhone } = await supabase
           .from('messages')
           .select('*')
           .eq('user_id', user.id)
-          .or(`from_phone.eq.${threadDetails.phone_number},to_phone.eq.${threadDetails.phone_number}`)
-          .order('created_at', { ascending: true });
-
-        console.log('📨 Found messages by phone:', messagesByPhone?.length || 0);
+          .or(`from_phone.eq.${thread.phone_number},to_phone.eq.${thread.phone_number}`)
+          .order('created_at', { ascending: true })
+          .limit(limit);
 
         if (messagesByPhone && messagesByPhone.length > 0) {
           // Update these messages to have the correct thread_id for future queries
@@ -88,7 +86,8 @@ export async function GET(
           await supabase
             .from('messages')
             .update({ thread_id: threadId })
-            .in('id', messageIds);
+            .in('id', messageIds)
+            .eq('user_id', user.id);
 
           const normalizedMessages = messagesByPhone.map((msg: any) => ({
             ...msg,
@@ -101,6 +100,7 @@ export async function GET(
           return NextResponse.json({
             success: true,
             messages: normalizedMessages,
+            hasMore: normalizedMessages.length >= limit,
           });
         }
       }
@@ -117,6 +117,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       messages: normalizedMessages,
+      hasMore: normalizedMessages.length >= limit,
     });
   } catch (error: any) {
     console.error('Error in messages API:', error);

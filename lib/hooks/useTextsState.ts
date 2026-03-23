@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import toast from 'react-hot-toast';
 
 export interface Thread {
   id: string;
@@ -109,7 +110,6 @@ function playNotificationSound() {
     const audio = new Audio('/sounds/notification.wav');
     audio.volume = 0.3;
     audio.play().catch(() => {
-      // Fallback to oscillator
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
@@ -130,6 +130,26 @@ function playNotificationSound() {
   }
 }
 
+/** Fetch with timeout + abort support */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeout?: number } = {}
+): Promise<Response> {
+  const { timeout = 10000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export function useTextsState(): UseTextsStateReturn {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -147,12 +167,20 @@ export function useTextsState(): UseTextsStateReturn {
   const prevMessageIdsRef = useRef<Set<string>>(new Set());
   const initialLoadDoneRef = useRef(false);
   const activeThreadRef = useRef<Thread | null>(null);
+  // Track in-flight requests to prevent pileup
+  const threadsFetchingRef = useRef(false);
+  const messagesFetchingRef = useRef(false);
+  const errorShownRef = useRef(false);
 
   // Keep ref in sync
   activeThreadRef.current = activeThread;
 
   const loadThreads = useCallback(async (silent = false) => {
+    // Skip if a request is already in flight (prevents polling pileup)
+    if (threadsFetchingRef.current && silent) return;
+
     try {
+      threadsFetchingRef.current = true;
       if (!silent) setLoading(true);
 
       const params = new URLSearchParams();
@@ -161,25 +189,43 @@ export function useTextsState(): UseTextsStateReturn {
       if (searchQuery) params.set('search', searchQuery);
       if (showArchived) params.set('archived', 'true');
 
-      const res = await fetch(`/api/texts/threads?${params}`);
+      const res = await fetchWithTimeout(`/api/texts/threads?${params}`, { timeout: 15000 });
       const data = await res.json();
 
       if (data.success) {
         setThreads(data.threads || []);
         if (data.counts) setCounts(data.counts);
+        errorShownRef.current = false;
+      } else if (!errorShownRef.current) {
+        toast.error('Failed to load conversations');
+        errorShownRef.current = true;
       }
-    } catch (err) {
-      console.error('Error loading threads:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.warn('Threads request timed out');
+      } else {
+        console.error('Error loading threads:', err);
+      }
+      // Only show error toast once to avoid spam from polling
+      if (!silent && !errorShownRef.current) {
+        toast.error('Failed to load conversations. Retrying...');
+        errorShownRef.current = true;
+      }
     } finally {
+      threadsFetchingRef.current = false;
       if (!silent) setLoading(false);
     }
   }, [channel, tab, searchQuery, showArchived]);
 
   const loadMessages = useCallback(async (threadId: string, silent = false) => {
+    // Skip if a request is already in flight (prevents polling pileup)
+    if (messagesFetchingRef.current && silent) return;
+
     try {
+      messagesFetchingRef.current = true;
       if (!silent) setMessagesLoading(true);
 
-      const res = await fetch(`/api/messages/threads/${threadId}`);
+      const res = await fetchWithTimeout(`/api/messages/threads/${threadId}`, { timeout: 10000 });
       const data = await res.json();
 
       if (data.success) {
@@ -200,9 +246,17 @@ export function useTextsState(): UseTextsStateReturn {
         setMessages(newMessages);
         initialLoadDoneRef.current = true;
       }
-    } catch (err) {
-      console.error('Error loading messages:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.warn('Messages request timed out');
+      } else {
+        console.error('Error loading messages:', err);
+      }
+      if (!silent) {
+        toast.error('Failed to load messages');
+      }
     } finally {
+      messagesFetchingRef.current = false;
       if (!silent) setMessagesLoading(false);
     }
   }, []);
@@ -220,13 +274,12 @@ export function useTextsState(): UseTextsStateReturn {
   // Refresh the active thread's data (e.g. after editing contact info)
   const refreshActiveThread = useCallback(async () => {
     await loadThreads(true);
-    // Update the active thread object from the refreshed threads list
     if (activeThreadRef.current) {
       const params = new URLSearchParams();
       params.set('channel', channel);
       params.set('tab', tab);
       if (searchQuery) params.set('search', searchQuery);
-      const res = await fetch(`/api/texts/threads?${params}`);
+      const res = await fetchWithTimeout(`/api/texts/threads?${params}`, { timeout: 10000 });
       const data = await res.json();
       if (data.success) {
         const updated = (data.threads || []).find(
@@ -257,6 +310,7 @@ export function useTextsState(): UseTextsStateReturn {
   }, [loadThreads]);
 
   // Polling: refresh threads and active conversation every 5 seconds
+  // Uses guard refs to prevent concurrent requests from piling up
   useEffect(() => {
     const interval = setInterval(() => {
       loadThreads(true);
@@ -271,50 +325,74 @@ export function useTextsState(): UseTextsStateReturn {
   // Archive helpers
   const archiveThread = useCallback(async (id: string) => {
     try {
-      await fetch('/api/threads/manage', {
+      const res = await fetchWithTimeout('/api/threads/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'archive', threadId: id }),
+        timeout: 10000,
       });
+      const data = await res.json();
+      if (!data.success && data.error) {
+        toast.error(data.error);
+        return;
+      }
       if (activeThreadRef.current?.id === id) {
         setActiveThread(null);
         setMessages([]);
       }
+      toast.success('Conversation archived');
       await loadThreads(true);
     } catch (err) {
       console.error('Error archiving thread:', err);
+      toast.error('Failed to archive conversation');
     }
   }, [loadThreads]);
 
   const unarchiveThread = useCallback(async (id: string) => {
     try {
-      await fetch('/api/threads/manage', {
+      const res = await fetchWithTimeout('/api/threads/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'unarchive', threadId: id }),
+        timeout: 10000,
       });
+      const data = await res.json();
+      if (!data.success && data.error) {
+        toast.error(data.error);
+        return;
+      }
+      toast.success('Conversation unarchived');
       await loadThreads(true);
     } catch (err) {
       console.error('Error unarchiving thread:', err);
+      toast.error('Failed to unarchive conversation');
     }
   }, [loadThreads]);
 
   const bulkArchiveThreads = useCallback(async (ids: string[]) => {
     try {
-      await fetch('/api/threads/manage', {
+      const res = await fetchWithTimeout('/api/threads/manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'bulk_archive', threadIds: ids }),
+        timeout: 15000,
       });
+      const data = await res.json();
+      if (!data.success && data.error) {
+        toast.error(data.error);
+        return;
+      }
       if (activeThreadRef.current && ids.includes(activeThreadRef.current.id)) {
         setActiveThread(null);
         setMessages([]);
       }
       setSelectedThreadIds(new Set());
       setSelectMode(false);
+      toast.success(`${ids.length} conversation${ids.length > 1 ? 's' : ''} archived`);
       await loadThreads(true);
     } catch (err) {
       console.error('Error bulk archiving threads:', err);
+      toast.error('Failed to archive conversations');
     }
   }, [loadThreads]);
 
@@ -327,10 +405,14 @@ export function useTextsState(): UseTextsStateReturn {
     });
   }, []);
 
-  // Reset select mode when switching tabs/filters
+  // Reset select mode and clear active thread when switching tabs/filters
   useEffect(() => {
     setSelectMode(false);
     setSelectedThreadIds(new Set());
+    setActiveThread(null);
+    setMessages([]);
+    prevMessageIdsRef.current = new Set();
+    initialLoadDoneRef.current = false;
   }, [tab, showArchived]);
 
   // Refresh on visibility change

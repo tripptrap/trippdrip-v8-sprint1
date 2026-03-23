@@ -9,10 +9,11 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = new URL(req.url);
 
-    const channel = searchParams.get('channel') || null; // 'sms' | 'whatsapp' | null (all)
-    const tab = searchParams.get('tab') || 'all'; // 'leads' | 'clients' | 'all'
+    const channel = searchParams.get('channel') || null;
+    const tab = searchParams.get('tab') || 'all';
     const search = searchParams.get('search') || '';
     const archived = searchParams.get('archived') === 'true';
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 200);
 
     const {
       data: { user },
@@ -45,30 +46,55 @@ export async function GET(req: NextRequest) {
         )
       `)
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .limit(limit);
 
     // Filter by channel if specified
     if (channel) {
       query = query.eq('channel', channel);
     }
 
-    // First attempt: fetch threads (no archive filter on base query)
+    // Try DB-level archive filter first, fall back to JS if column doesn't exist
+    if (archived) {
+      query = query.eq('is_archived', true);
+    } else {
+      query = query.or('is_archived.is.null,is_archived.eq.false');
+    }
+
     let { data: threads, error } = await query;
 
     if (error) {
-      console.error('Error fetching threads:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+      // If is_archived column doesn't exist, retry without it and filter in JS
+      if (error.message?.includes('is_archived') || error.code === '42703') {
+        const retryQuery = supabase
+          .from('threads')
+          .select(`
+            *,
+            campaigns:campaign_id ( id, name ),
+            leads:lead_id ( id, first_name, last_name, phone, email, state, zip_code, status, tags, converted )
+          `)
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(limit);
 
-    // Filter by archive status in JS to avoid column-not-found errors
-    // (is_archived column may not exist in DB yet)
-    if (archived) {
-      threads = (threads || []).filter((t: any) => t.is_archived === true);
-    } else {
-      threads = (threads || []).filter((t: any) => !t.is_archived);
+        if (channel) retryQuery.eq('channel', channel);
+
+        const retryResult = await retryQuery;
+        if (retryResult.error) {
+          console.error('Error fetching threads (retry):', retryResult.error);
+          return NextResponse.json({ success: false, error: retryResult.error.message }, { status: 500 });
+        }
+        threads = retryResult.data;
+        // Filter in JS as fallback
+        if (archived) {
+          threads = (threads || []).filter((t: any) => t.is_archived === true);
+        } else {
+          threads = (threads || []).filter((t: any) => !t.is_archived);
+        }
+      } else {
+        console.error('Error fetching threads:', error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      }
     }
 
     // Normalize phone for matching
@@ -78,28 +104,34 @@ export async function GET(req: NextRequest) {
     };
 
     // For threads without lead_id, try to find matching lead by phone
+    // Only fetch leads if we actually have orphaned threads (avoids unnecessary query)
     const threadsWithoutLeads = (threads || []).filter(t => !t.leads && t.phone_number);
     if (threadsWithoutLeads.length > 0) {
-      const { data: allLeads } = await supabase
+      // Build a set of normalized phones to search for
+      const phonesToFind = threadsWithoutLeads.map(t => normalizePhone(t.phone_number));
+
+      const { data: matchingLeads } = await supabase
         .from('leads')
         .select('id, first_name, last_name, phone, email, state, zip_code, status, tags, converted')
         .eq('user_id', user.id);
 
-      const phoneToLead = new Map();
-      (allLeads || []).forEach(lead => {
-        if (lead.phone) {
-          phoneToLead.set(normalizePhone(lead.phone), lead);
-        }
-      });
-
-      threads?.forEach(thread => {
-        if (!thread.leads && thread.phone_number) {
-          const match = phoneToLead.get(normalizePhone(thread.phone_number));
-          if (match) {
-            thread.leads = match;
+      if (matchingLeads) {
+        const phoneToLead = new Map();
+        matchingLeads.forEach(lead => {
+          if (lead.phone) {
+            phoneToLead.set(normalizePhone(lead.phone), lead);
           }
-        }
-      });
+        });
+
+        threads?.forEach(thread => {
+          if (!thread.leads && thread.phone_number) {
+            const match = phoneToLead.get(normalizePhone(thread.phone_number));
+            if (match) {
+              thread.leads = match;
+            }
+          }
+        });
+      }
     }
 
     // Fetch all clients for this user to determine contact_type
@@ -155,6 +187,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Count totals before tab filtering for tab badges
+    const allContactTypes = enrichedThreads.map(t => t.contact_type);
+
     // Filter by tab (leads vs clients)
     if (tab === 'leads') {
       enrichedThreads = enrichedThreads.filter(t => t.contact_type === 'lead');
@@ -162,22 +197,13 @@ export async function GET(req: NextRequest) {
       enrichedThreads = enrichedThreads.filter(t => t.contact_type === 'client');
     }
 
-    // Count totals before tab filtering for tab badges
-    const allThreads = (threads || []).map(thread => {
-      const leadId = thread.lead_id || thread.leads?.id;
-      const isConverted = thread.leads?.converted === true;
-      const hasClientRecord = leadId ? leadIdToClient.has(leadId) : false;
-      const phoneClient = thread.phone_number ? phoneToClient.get(normalizePhone(thread.phone_number)) : null;
-      return (isConverted || hasClientRecord || phoneClient) ? 'client' : 'lead';
-    });
-
     return NextResponse.json({
       success: true,
       threads: enrichedThreads,
       counts: {
-        total: threads?.length || 0,
-        leads: allThreads.filter(t => t === 'lead').length,
-        clients: allThreads.filter(t => t === 'client').length,
+        total: allContactTypes.length,
+        leads: allContactTypes.filter(t => t === 'lead').length,
+        clients: allContactTypes.filter(t => t === 'client').length,
       },
     });
   } catch (error: any) {
