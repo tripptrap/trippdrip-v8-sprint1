@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
       { href: "/analytics", label: "Analytics" },
       { href: "/sms-analytics", label: "SMS Delivery" },
       { href: "/analytics-automation", label: "Automation" },
+      { href: "/flow-analytics", label: "Flow Analytics" },
       { href: "/best-times", label: "Best Times" },
       { href: "/follow-ups", label: "Follow-ups" },
     ]
