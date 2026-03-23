@@ -10,6 +10,8 @@ export interface ReceptionistSettings {
   // AI Configuration
   system_prompt: string | null;
   greeting_message: string | null;
+  industry: string | null; // Industry for preset tone selection
+  use_industry_preset: boolean; // Use industry preset vs custom prompt
 
   // Business Hours
   business_hours_enabled: boolean;
@@ -36,6 +38,8 @@ export interface ReceptionistSettingsInput {
   enabled?: boolean;
   system_prompt?: string | null;
   greeting_message?: string | null;
+  industry?: string | null;
+  use_industry_preset?: boolean;
   business_hours_enabled?: boolean;
   business_hours_start?: string;
   business_hours_end?: string;
@@ -111,6 +115,8 @@ export const DEFAULT_RECEPTIONIST_SETTINGS: Omit<ReceptionistSettings, 'id' | 'u
   enabled: false,
   system_prompt: null,
   greeting_message: 'Hi! Thanks for reaching out. How can I help you today?',
+  industry: null,
+  use_industry_preset: true,
   business_hours_enabled: true,
   business_hours_start: '09:00:00',
   business_hours_end: '17:00:00',

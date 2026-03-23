@@ -89,6 +89,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Validate industry if provided
+    const validIndustries = ['insurance', 'real_estate', 'solar', 'roofing', 'home_services', 'financial_services', 'healthcare', 'automotive', 'retail', 'other'];
+    if (input.industry && !validIndustries.includes(input.industry)) {
+      return NextResponse.json({ error: `Invalid industry. Must be one of: ${validIndustries.join(', ')}` }, { status: 400 });
+    }
+
     // Check if settings exist
     const { data: existingSettings } = await supabase
       .from('receptionist_settings')

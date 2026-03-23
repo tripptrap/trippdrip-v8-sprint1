@@ -198,25 +198,37 @@ export default function Composer({
     setAiLoading(null);
   }
 
-  async function handleAiCompose() {
-    if (!text.trim() || aiLoading) return;
+  async function handleAiCompose(mode: 'improve' | 'rewrite' | 'generate' | 'shorten' = 'improve') {
+    if (mode !== 'generate' && !text.trim()) return;
+    if (aiLoading) return;
     setAiLoading('compose');
     try {
-      const res = await fetch('/api/ai', {
+      const res = await fetch('/api/ai/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            { role: 'system', content: 'You are an SMS writing assistant. Rewrite the user\'s draft message to be more professional, concise, and effective for SMS. Keep it under 160 characters if possible. Only return the rewritten message, nothing else.' },
-            { role: 'user', content: text },
-          ],
+          message: text,
+          mode,
+          leadId,
+          threadId: thread.id,
+          tone: 'professional',
         }),
       });
       const data = await res.json();
-      if (data.ok && data.reply) {
-        setText(data.reply);
+      if (data.ok && data.primary) {
+        setText(data.primary);
+        // Show alternatives as smart replies for easy selection
+        if (data.alternatives?.length > 0) {
+          setSmartReplies(data.alternatives);
+        }
         setShowAiMenu(false);
-        toast.success('Message improved');
+        const labels: Record<string, string> = {
+          improve: 'Message improved',
+          rewrite: 'Message rewritten',
+          generate: 'Message generated',
+          shorten: 'Message shortened',
+        };
+        toast.success(labels[mode] || 'Done');
       } else {
         toast.error(data.error || 'Failed to compose');
       }
@@ -398,15 +410,34 @@ export default function Composer({
                   {aiLoading === 'followup' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
                   Follow-up
                 </button>
+                {/* Generate from scratch (no draft needed) */}
+                {!text.trim() && (
+                  <button
+                    onClick={() => handleAiCompose('generate')}
+                    disabled={!!aiLoading}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/30 disabled:opacity-50"
+                  >
+                    {aiLoading === 'compose' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    Draft
+                  </button>
+                )}
                 {text.trim() && (
                   <>
                     <button
-                      onClick={handleAiCompose}
+                      onClick={() => handleAiCompose('improve')}
                       disabled={!!aiLoading}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 disabled:opacity-50"
                     >
                       {aiLoading === 'compose' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                       Improve
+                    </button>
+                    <button
+                      onClick={() => handleAiCompose('shorten')}
+                      disabled={!!aiLoading}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 disabled:opacity-50"
+                    >
+                      {aiLoading === 'compose' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Shorten
                     </button>
                     <button
                       onClick={handleSpamCheck}

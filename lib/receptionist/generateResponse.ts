@@ -9,6 +9,7 @@ import {
   DEFAULT_SYSTEM_PROMPT
 } from './types';
 import { isWithinBusinessHours, getBusinessHoursDisplay } from './businessHours';
+import { getReceptionistPreset } from '@/lib/receptionistPresets';
 
 // Lazy-load OpenAI client
 let openaiClient: OpenAI | null = null;
@@ -119,7 +120,18 @@ function buildSystemPrompt(
   params: ReceptionistResponseParams,
   isNewContactGreeting: boolean
 ): string {
-  const basePrompt = settings.system_prompt || DEFAULT_SYSTEM_PROMPT;
+  // Use industry preset if enabled and industry is set, otherwise fall back to custom/default
+  let basePrompt: string;
+  if (settings.use_industry_preset && settings.industry) {
+    const preset = getReceptionistPreset(settings.industry);
+    basePrompt = preset.systemPrompt;
+    // If user also has a custom prompt, append it as additional instructions
+    if (settings.system_prompt) {
+      basePrompt += `\n\nADDITIONAL INSTRUCTIONS FROM BUSINESS OWNER:\n${settings.system_prompt}`;
+    }
+  } else {
+    basePrompt = settings.system_prompt || DEFAULT_SYSTEM_PROMPT;
+  }
   const businessHours = getBusinessHoursDisplay(settings);
 
   let prompt = `${basePrompt}
