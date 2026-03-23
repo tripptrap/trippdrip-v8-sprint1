@@ -48,6 +48,10 @@ export default function ReceptionistSettings() {
   const [respondToNewContacts, setRespondToNewContacts] = useState(true);
   const [autoCreateLeads, setAutoCreateLeads] = useState(true);
 
+  // Industry tone
+  const [industry, setIndustry] = useState<string | null>(null);
+  const [useIndustryPreset, setUseIndustryPreset] = useState(true);
+
   // Calendar
   const [calendarEnabled, setCalendarEnabled] = useState(false);
 
@@ -80,6 +84,8 @@ export default function ReceptionistSettings() {
         setAutoCreateLeads(settings.auto_create_leads ?? true);
 
         setCalendarEnabled(settings.calendar_enabled ?? false);
+        setIndustry(settings.industry || null);
+        setUseIndustryPreset(settings.use_industry_preset ?? true);
       }
     } catch (error) {
       console.error('Error loading receptionist settings:', error);
@@ -109,6 +115,8 @@ export default function ReceptionistSettings() {
           respond_to_new_contacts: respondToNewContacts,
           auto_create_leads: autoCreateLeads,
           calendar_enabled: calendarEnabled,
+          industry: industry || null,
+          use_industry_preset: useIndustryPreset,
         }),
       });
 
@@ -127,6 +135,30 @@ export default function ReceptionistSettings() {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveToggle = async (newEnabled: boolean) => {
+    try {
+      const response = await fetch('/api/receptionist/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newEnabled }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Receptionist ${newEnabled ? 'enabled' : 'disabled'}`);
+        setHasSettings(true);
+      } else if (data.upgradeRequired) {
+        setEnabled(!newEnabled); // Revert toggle
+        toast.error('A paid subscription (Growth or Scale) is required to enable the Receptionist.');
+      } else {
+        setEnabled(!newEnabled); // Revert toggle
+        toast.error(data.error || 'Failed to update');
+      }
+    } catch (error) {
+      setEnabled(!newEnabled); // Revert toggle
+      toast.error('Failed to update receptionist');
     }
   };
 
@@ -177,7 +209,12 @@ export default function ReceptionistSettings() {
             <input
               type="checkbox"
               checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
+              onChange={(e) => {
+                const newVal = e.target.checked;
+                setEnabled(newVal);
+                // Auto-save the toggle immediately
+                saveToggle(newVal);
+              }}
               className="sr-only peer"
             />
             <div className="w-14 h-7 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-sky-500 peer-checked:to-teal-500"></div>
@@ -205,19 +242,63 @@ export default function ReceptionistSettings() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Personality & Prompt</h2>
         </div>
 
+        {/* Industry Tone Selector */}
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Custom Instructions (Optional)
+            Industry Tone
+          </label>
+          <select
+            value={industry || ''}
+            onChange={(e) => setIndustry(e.target.value || null)}
+            className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          >
+            <option value="">No industry preset (custom only)</option>
+            <option value="insurance">Insurance</option>
+            <option value="real_estate">Real Estate</option>
+            <option value="solar">Solar</option>
+            <option value="roofing">Roofing</option>
+            <option value="home_services">Home Services</option>
+            <option value="financial_services">Financial Services</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="automotive">Automotive</option>
+            <option value="retail">Retail</option>
+            <option value="other">Other</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Selects an industry-specific AI personality and rules for your receptionist.
+          </p>
+        </div>
+
+        {industry && (
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="useIndustryPreset"
+              checked={useIndustryPreset}
+              onChange={(e) => setUseIndustryPreset(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+            />
+            <label htmlFor="useIndustryPreset" className="text-sm text-slate-700 dark:text-slate-300">
+              Use industry preset as base prompt (your custom instructions below will be added on top)
+            </label>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Custom Instructions {industry && useIndustryPreset ? '(Added to industry preset)' : ''}
           </label>
           <textarea
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
-            placeholder={DEFAULT_SYSTEM_PROMPT}
+            placeholder={industry && useIndustryPreset ? 'Optional — add specific instructions on top of your industry preset...' : DEFAULT_SYSTEM_PROMPT}
             rows={6}
             className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
           />
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Describe your business, services, and how you want the AI to respond. Leave blank to use the default prompt.
+            {industry && useIndustryPreset
+              ? 'Your industry preset handles the basics. Add any extra rules or business-specific details here.'
+              : 'Describe your business, services, and how you want the AI to respond. Leave blank to use the default prompt.'}
           </p>
         </div>
 
