@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { ContactType } from '@/lib/receptionist/types';
 import { detectSpam } from '@/lib/spam/detector';
+import { sendTelnyxSMS } from '@/lib/telnyx';
 
 // Opt-out keywords that indicate a lead wants to stop receiving messages
 const OPT_OUT_KEYWORDS = [
@@ -22,6 +23,19 @@ function isOptOut(message: string, customKeyword?: string | null): boolean {
   if (OPT_OUT_KEYWORDS.includes(lower)) return true;
   // Partial match for phrases
   return OPT_OUT_KEYWORDS.some(kw => kw.length > 4 && lower.includes(kw));
+}
+
+const CANCEL_KEYWORDS = ['cancel', 'cancel appointment', 'cancel my appointment', 'cant make it', "can't make it", 'no longer need'];
+const RESCHEDULE_KEYWORDS = ['reschedule', 'move appointment', 'different time', 'change appointment', 'change time', 'new time'];
+
+function isAppointmentCancel(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  return CANCEL_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isAppointmentReschedule(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  return RESCHEDULE_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 // Create Supabase admin client (bypasses RLS)
@@ -393,6 +407,133 @@ async function handleInboundSMS(payload: any) {
 
       // Do NOT trigger receptionist for opt-out messages
       return;
+    }
+
+    // Handle appointment cancel/reschedule via SMS (only if NOT an opt-out)
+    if (messageBody && leadId && !optOut) {
+      const wantsCancel = isAppointmentCancel(messageBody);
+      const wantsReschedule = isAppointmentReschedule(messageBody);
+
+      if (wantsCancel || wantsReschedule) {
+        try {
+          // Look up lead's next upcoming appointment
+          const { data: upcomingAppt } = await supabaseAdmin
+            .from('calendar_events')
+            .select('id, google_event_id')
+            .eq('lead_id', leadId)
+            .gt('start_time', new Date().toISOString())
+            .order('start_time', { ascending: true })
+            .limit(1)
+            .single();
+
+          if (upcomingAppt) {
+            // Look up user's primary Telnyx number for the reply
+            const { data: telnyxNum } = await supabaseAdmin
+              .from('user_telnyx_numbers')
+              .select('phone_number')
+              .eq('user_id', userId)
+              .eq('status', 'active')
+              .order('is_primary', { ascending: false })
+              .limit(1)
+              .single();
+
+            const replyFrom = telnyxNum?.phone_number || to;
+
+            if (wantsCancel) {
+              // Update calendar_event as cancelled
+              await supabaseAdmin
+                .from('calendar_events')
+                .update({
+                  cancellation_status: 'cancelled',
+                  cancellation_reason: 'Cancelled via SMS',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', upcomingAppt.id);
+
+              // Try to delete from Google Calendar if user has tokens
+              if (upcomingAppt.google_event_id) {
+                try {
+                  const { data: userData } = await supabaseAdmin
+                    .from('users')
+                    .select('google_calendar_access_token, google_calendar_refresh_token')
+                    .eq('id', userId)
+                    .single();
+
+                  if (userData?.google_calendar_access_token && upcomingAppt.google_event_id) {
+                    const gcalResponse = await fetch(
+                      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${upcomingAppt.google_event_id}`,
+                      {
+                        method: 'DELETE',
+                        headers: {
+                          'Authorization': `Bearer ${userData.google_calendar_access_token}`
+                        }
+                      }
+                    );
+
+                    if (!gcalResponse.ok && gcalResponse.status !== 404) {
+                      console.error('Failed to delete appointment from Google Calendar:', gcalResponse.status);
+                    }
+                  }
+                } catch (gcalErr) {
+                  console.error('Error deleting from Google Calendar:', gcalErr);
+                }
+              }
+
+              // Update lead: appointment_scheduled = false
+              await supabaseAdmin
+                .from('leads')
+                .update({
+                  appointment_scheduled: false,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', leadId);
+
+              // Send confirmation SMS
+              await sendTelnyxSMS({
+                to: from,
+                from: replyFrom,
+                message: "Your appointment has been cancelled. If you'd like to reschedule, just reply RESCHEDULE.",
+              });
+
+              // Log activity
+              await supabaseAdmin
+                .from('activity_log')
+                .insert({
+                  user_id: userId,
+                  lead_id: leadId,
+                  type: 'appointment_cancelled',
+                  description: 'Appointment cancelled via SMS',
+                  created_at: new Date().toISOString(),
+                });
+
+              console.log(`Appointment cancelled via SMS for lead ${leadId}`);
+            } else if (wantsReschedule) {
+              // Update calendar_event as rescheduled
+              await supabaseAdmin
+                .from('calendar_events')
+                .update({
+                  cancellation_status: 'rescheduled',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', upcomingAppt.id);
+
+              // Send SMS to prompt for new time
+              await sendTelnyxSMS({
+                to: from,
+                from: replyFrom,
+                message: "No problem! I'll help you find a new time. What day and time works better for you?",
+              });
+
+              console.log(`Appointment reschedule initiated via SMS for lead ${leadId}`);
+              // Let the receptionist/flow AI take over from here
+            }
+          }
+          // If no upcoming appointment found, fall through to normal handling
+        } catch (apptErr) {
+          console.error('Error handling appointment cancel/reschedule:', apptErr);
+          // Don't block normal flow on error
+        }
+      }
     }
 
     // Stop-on-reply: pause any active drip campaign enrollments for this lead
