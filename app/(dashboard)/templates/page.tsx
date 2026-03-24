@@ -228,7 +228,12 @@ export default function FlowsPage() {
     whoYouAre: "",
     whatOffering: "",
     whoTexting: "",
-    clientGoals: ""
+    clientGoals: "",
+    agentName: "",
+    companyName: "",
+    contactReason: "",
+    callbackNumber: "",
+    website: "",
   });
   const [requiredQuestions, setRequiredQuestions] = useState<RequiredQuestion[]>([]);
   const [requiresCall, setRequiresCall] = useState(false);
@@ -469,7 +474,7 @@ export default function FlowsPage() {
         setFlows(updated);
         setSelectedFlow(newFlow);
         setNewFlowName("");
-        setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+        setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
         setRequiredQuestions([]);
         setRequiresCall(false);
         setShowNewFlowDialog(false);
@@ -1636,7 +1641,7 @@ Available variables:
                   onClick={() => {
                     setShowNewFlowDialog(false);
                     setNewFlowName("");
-                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
                     setRequiredQuestions([]);
                     setRequiresCall(false);
                   }}
@@ -1692,6 +1697,71 @@ Available variables:
                 className="input-dark w-full px-4 py-3 rounded-lg resize-none"
                 rows={3}
               />
+            </div>
+
+            {/* Agent Identity Section */}
+            <div className="p-4 bg-violet-50 dark:bg-violet-900/10 rounded-lg border border-violet-200 dark:border-violet-800 space-y-3">
+              <div>
+                <label className="text-sm font-semibold text-violet-900 dark:text-violet-300 mb-1 block">Agent Identity</label>
+                <p className="text-xs text-violet-600 dark:text-violet-400">Give your flow a name and company so it can introduce itself to leads.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Agent Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Sarah, your insurance specialist"
+                    value={flowContext.agentName}
+                    onChange={e => setFlowContext({...flowContext, agentName: e.target.value})}
+                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Company Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., ABC Insurance Group"
+                    value={flowContext.companyName}
+                    onChange={e => setFlowContext({...flowContext, companyName: e.target.value})}
+                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Why are you reaching out? *</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Following up on your request for a health insurance quote"
+                  value={flowContext.contactReason}
+                  onChange={e => setFlowContext({...flowContext, contactReason: e.target.value})}
+                  className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Callback Number (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., (555) 123-4567"
+                    value={flowContext.callbackNumber}
+                    onChange={e => setFlowContext({...flowContext, callbackNumber: e.target.value})}
+                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Website (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., www.abcinsurance.com"
+                    value={flowContext.website}
+                    onChange={e => setFlowContext({...flowContext, website: e.target.value})}
+                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -1777,7 +1847,7 @@ Available variables:
               <button
                 onClick={createNewFlow}
                 className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting}
+                disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting || !flowContext.agentName || !flowContext.companyName || !flowContext.contactReason}
               >
                 {isGenerating ? "Generating Flow..." : "Generate Flow with AI"}
               </button>
@@ -1785,7 +1855,7 @@ Available variables:
                 onClick={() => {
                   setShowNewFlowDialog(false);
                   setNewFlowName("");
-                  setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "" });
+                  setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
                   setRequiredQuestions([]);
                   setRequiresCall(false);
                 }}
