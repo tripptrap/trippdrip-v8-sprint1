@@ -47,6 +47,15 @@ const resetFiltersBtn = document.getElementById('resetFilters');
 const exportCSVBtn = document.getElementById('exportCSV');
 const exportJSONBtn = document.getElementById('exportJSON');
 
+// DOM elements - Quick SMS
+const quickSmsSection = document.getElementById('quickSmsSection');
+const smsBody = document.getElementById('smsBody');
+const sendSmsBtn = document.getElementById('sendSmsBtn');
+const sendSmsText = document.getElementById('sendSmsText');
+const smsCharCount = document.getElementById('smsCharCount');
+const smsCreditCost = document.getElementById('smsCreditCost');
+const smsMessageContainer = document.getElementById('smsMessageContainer');
+
 // DOM elements - Reply suggestions
 const suggestionsContainer = document.getElementById('suggestionsContainer');
 const suggestionsList = document.getElementById('suggestionsList');
@@ -107,6 +116,10 @@ function setupEventListeners() {
   resetFiltersBtn?.addEventListener('click', resetFilters);
   exportCSVBtn?.addEventListener('click', () => exportLeads('csv'));
   exportJSONBtn?.addEventListener('click', () => exportLeads('json'));
+
+  // Quick SMS
+  sendSmsBtn?.addEventListener('click', sendQuickSms);
+  smsBody?.addEventListener('input', updateSmsCharCount);
 
   // Reply suggestions
   refreshSuggestionsBtn?.addEventListener('click', generateSuggestions);
@@ -255,7 +268,10 @@ async function loadCurrentLead() {
       importLeadBtn?.classList.remove('hidden');
       refreshPageBtn?.classList.remove('hidden');
 
-      // Show suggestions container when lead is available
+      // Show Quick SMS and suggestions when lead is available
+      if (response.lead.phone) {
+        quickSmsSection?.classList.remove('hidden');
+      }
       suggestionsContainer?.classList.remove('hidden');
       generateSuggestions();
     } else {
@@ -369,6 +385,92 @@ function copyLeadToClipboard() {
     showMessage('Failed to copy lead', 'error');
   });
 }
+
+// Quick SMS functionality
+function updateSmsCharCount() {
+  const text = smsBody?.value || '';
+  const len = text.length;
+  const segments = Math.max(1, Math.ceil(len / 160));
+  const credits = segments;
+
+  if (smsCharCount) {
+    smsCharCount.textContent = `${len} / 160 characters${segments > 1 ? ` (${segments} segments)` : ''}`;
+    smsCharCount.style.color = len > 160 ? 'rgba(251, 146, 60, 0.9)' : 'rgba(255,255,255,0.5)';
+  }
+  if (smsCreditCost) {
+    smsCreditCost.textContent = `${credits} credit${credits > 1 ? 's' : ''}`;
+  }
+  if (sendSmsBtn) {
+    sendSmsBtn.disabled = len === 0;
+  }
+}
+
+async function sendQuickSms() {
+  const message = smsBody?.value?.trim();
+  if (!message || !currentLead?.phone) return;
+
+  const { apiKey } = await chrome.storage.sync.get(['apiKey']);
+  if (!apiKey) {
+    showSmsMessage('Please configure your API key first', 'error');
+    return;
+  }
+
+  if (sendSmsBtn) sendSmsBtn.disabled = true;
+  if (sendSmsText) sendSmsText.innerHTML = 'Sending... <span class="loading"></span>';
+
+  try {
+    const response = await fetchWithTimeout(`${HYVEWYRE_URL}/api/sms/send`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        to: sanitizePhone(currentLead.phone),
+        message: message,
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && (data.success || data.ok)) {
+      showSmsMessage(`SMS sent to ${formatPhoneDisplay(currentLead.phone)}!`, 'success');
+      if (smsBody) smsBody.value = '';
+      updateSmsCharCount();
+
+      if (sendSmsBtn) sendSmsBtn.classList.add('btn-success');
+      if (sendSmsText) sendSmsText.textContent = '✓ SMS Sent';
+
+      setTimeout(() => {
+        if (sendSmsBtn) {
+          sendSmsBtn.disabled = false;
+          sendSmsBtn.classList.remove('btn-success');
+        }
+        if (sendSmsText) sendSmsText.textContent = 'Send SMS';
+      }, 3000);
+    } else {
+      throw new Error(data.error || 'Failed to send SMS');
+    }
+  } catch (error) {
+    console.error('SMS send error:', error);
+    showSmsMessage(error.message || 'Failed to send SMS', 'error');
+    if (sendSmsBtn) sendSmsBtn.disabled = false;
+    if (sendSmsText) sendSmsText.textContent = 'Send SMS';
+  }
+}
+
+function showSmsMessage(text, type) {
+  if (!smsMessageContainer) return;
+  const msg = document.createElement('div');
+  msg.className = `message ${type}`;
+  msg.textContent = text;
+  smsMessageContainer.innerHTML = '';
+  smsMessageContainer.appendChild(msg);
+  setTimeout(() => msg.remove(), 5000);
+}
+
+// Allow clicking a suggestion to populate SMS body
+const originalDisplaySuggestions = displaySuggestions;
 
 // Chat functionality
 async function sendChatMessage() {
@@ -656,15 +758,23 @@ function displaySuggestions(suggestions) {
     </div>
   `).join('');
 
-  // Add click handlers
+  // Add click handlers — populate SMS body + copy to clipboard
   suggestionsList.querySelectorAll('.suggestion-item').forEach(item => {
     item.addEventListener('click', () => {
-      // Copy to clipboard
-      navigator.clipboard.writeText(item.textContent.trim()).then(() => {
-        item.classList.add('selected');
-        showMessage('Suggestion copied!', 'success');
-        setTimeout(() => item.classList.remove('selected'), 2000);
-      });
+      const text = item.textContent.trim();
+      // Populate SMS body if visible
+      if (smsBody && quickSmsSection && !quickSmsSection.classList.contains('hidden')) {
+        smsBody.value = text;
+        updateSmsCharCount();
+        showMessage('Suggestion loaded into SMS composer', 'success');
+      } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+          showMessage('Suggestion copied!', 'success');
+        });
+      }
+      item.classList.add('selected');
+      setTimeout(() => item.classList.remove('selected'), 2000);
     });
   });
 }

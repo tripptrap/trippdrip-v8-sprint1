@@ -739,6 +739,24 @@
         <button class="btn-secondary hidden" id="refreshPage">Refresh VanillaSoft Page</button>
       </div>
 
+      <!-- Quick Send SMS -->
+      <div class="lead-preview hidden" id="quickSmsSection">
+        <h3>
+          <span>Quick Send SMS</span>
+        </h3>
+        <div class="input-group">
+          <textarea id="smsBody" placeholder="Type your message..." rows="3" style="resize: vertical; min-height: 60px;"></textarea>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 11px; color: rgba(255,255,255,0.5);" id="smsCharCount">0 / 160 characters</span>
+          <span style="font-size: 11px; color: rgba(255,255,255,0.5);" id="smsCreditCost">1 credit</span>
+        </div>
+        <button class="btn-primary" id="sendSmsBtn" disabled>
+          <span id="sendSmsText">Send SMS</span>
+        </button>
+        <div id="smsMessageContainer" style="margin-top: 8px;"></div>
+      </div>
+
       <!-- Reply Suggestions -->
       <div class="suggestions-container hidden" id="suggestionsContainer">
         <div class="suggestions-header">
