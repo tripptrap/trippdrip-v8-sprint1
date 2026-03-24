@@ -32,8 +32,19 @@ export async function POST(req: NextRequest) {
 
     // Build flow guidance if available
     let flowGuidance = "";
-    if (flowContext && flowContext.steps && Array.isArray(flowContext.steps)) {
-      flowGuidance = `\n\nConversation Flow Guidance:
+    if (flowContext) {
+      // Add agent identity from flow context
+      if (flowContext.context?.agentName || flowContext.context?.companyName) {
+        flowGuidance += `\n\nAGENT IDENTITY:
+You are ${flowContext.context.agentName || 'a specialist'}${flowContext.context.companyName ? ` from ${flowContext.context.companyName}` : ''}.
+${flowContext.context.contactReason ? `Reason for contact: ${flowContext.context.contactReason}` : ''}
+${flowContext.context.callbackNumber ? `Callback number: ${flowContext.context.callbackNumber}` : ''}
+${flowContext.context.website ? `Website: ${flowContext.context.website}` : ''}
+If the lead asks "who is this?" or "who are you?", respond with your agent identity.`;
+      }
+
+      if (flowContext.steps && Array.isArray(flowContext.steps)) {
+        flowGuidance += `\n\nConversation Flow Guidance:
 Follow this flow as a general guide, adapting naturally to the conversation:
 
 ${flowContext.steps.map((step: any, index: number) => {
@@ -46,6 +57,7 @@ ${flowContext.steps.map((step: any, index: number) => {
   }
   return stepText;
 }).join('\n\n')}`;
+      }
     }
 
     // Determine conversation stage and tone

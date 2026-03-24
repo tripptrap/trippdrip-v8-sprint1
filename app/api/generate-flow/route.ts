@@ -84,7 +84,12 @@ Context:
 - What they're offering: ${context.whatOffering}
 - Who they're texting: ${context.whoTexting}
 - Flow name: ${flowName}
-- Qualifying questions: ${context.qualifyingQuestions}${requiredQuestionsText}${requiresCallText}
+- Qualifying questions: ${context.qualifyingQuestions}
+- Agent name: ${context.agentName || 'your specialist'}
+- Company name: ${context.companyName || '{businessName}'}
+- Contact reason: ${context.contactReason || 'Following up on their inquiry'}${context.callbackNumber ? `\n- Callback number: ${context.callbackNumber}` : ''}${context.website ? `\n- Website: ${context.website}` : ''}${requiredQuestionsText}${requiresCallText}
+
+AGENT IDENTITY: The AI should introduce itself as ${context.agentName || 'your specialist'} from ${context.companyName || '{businessName}'}. If the lead asks 'who is this?' or 'who are you?', respond with the agent identity. The reason for contact is: ${context.contactReason || 'Following up on their inquiry'}
 
 Create a LINEAR conversation flow showing the OPTIMAL PATH where the client moves forward with the sale:
 
@@ -102,7 +107,7 @@ FLOW STRUCTURE (8-12 steps total):
 - Response options are there to handle ALTERNATE scenarios (objections, questions, pushback)
 
 CRITICAL STRUCTURE:
-1. Step 1: Initial outreach / introduction
+1. Step 1: Initial outreach / introduction - MUST include agent identity (e.g. "Hi! This is {agentName} with {companyName}. {contactReason}")
 2. Step 2: Gauge interest and qualify the lead
 3. Steps 3-N: Ask each REQUIRED QUESTION as a separate step (ONE QUESTION PER STEP)
    - NEVER combine required questions into one message

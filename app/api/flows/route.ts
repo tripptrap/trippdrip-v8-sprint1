@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Flow name is required' }, { status: 400 });
@@ -74,13 +74,16 @@ export async function POST(req: NextRequest) {
 
     const now = new Date().toISOString();
 
+    // Build the context object — use provided context if available, otherwise fall back to description-only
+    const flowContext = context || { whatOffering: description || '' };
+
     // Create flow using conversation_flows table
     const { data, error } = await supabase
       .from('conversation_flows')
       .insert({
         user_id: user.id,
         name: name.trim(),
-        context: { whatOffering: description || '' },
+        context: flowContext,
         steps: steps,
         required_questions: requiredQuestions || [],
         requires_call: requiresCall || false,
@@ -113,7 +116,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Flow ID is required' }, { status: 400 });
@@ -125,7 +128,11 @@ export async function PUT(req: NextRequest) {
     };
 
     if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined) {
+    if (context !== undefined) {
+      // Use full context object if provided (includes agent identity fields)
+      updateData.context = context;
+    } else if (description !== undefined) {
+      // Fallback: legacy description-only updates
       updateData.context = { whatOffering: description };
     }
     if (steps !== undefined) updateData.steps = steps;

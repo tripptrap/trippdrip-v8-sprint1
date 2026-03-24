@@ -33,6 +33,11 @@ export interface FlowTemplate {
     whatOffering: string;
     whoTexting: string;
     clientGoals: string;
+    agentName: string;
+    companyName: string;
+    contactReason: string;
+    callbackNumber?: string;
+    website?: string;
   };
   steps: FlowStep[];
   requiredQuestions: RequiredQuestion[];
@@ -47,11 +52,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Health, Life, Auto, Home, and Commercial insurance',
       whoTexting: 'People interested in insurance coverage',
       clientGoals: 'Qualify leads and schedule consultation appointments',
+      agentName: 'your insurance specialist',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out because you expressed interest in getting an insurance quote.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for your interest in insurance coverage. What type of insurance are you looking for?',
+        yourMessage: 'Hi! This is your insurance specialist with {businessName}. I\'m reaching out because you expressed interest in getting an insurance quote. What type of insurance are you looking for?',
         responses: [
           { label: 'Health', followUpMessage: 'Great choice! Health coverage is so important.', nextStepId: '2' },
           { label: 'Auto', followUpMessage: 'We can definitely help with auto coverage.', nextStepId: '2' },
@@ -118,11 +126,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Residential and commercial real estate services',
       whoTexting: 'People looking to buy, sell, or rent property',
       clientGoals: 'Qualify buyers and schedule property showings',
+      agentName: 'your real estate agent',
+      companyName: '{businessName}',
+      contactReason: 'I\'m following up on your interest in real estate services.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out about real estate. Are you looking to buy, sell, or rent?',
+        yourMessage: 'Hi! This is your real estate agent with {businessName}. I\'m following up on your interest in real estate services. Are you looking to buy, sell, or rent?',
         responses: [
           { label: 'Buy', followUpMessage: 'Exciting! Let\'s find your perfect home.', nextStepId: '2' },
           { label: 'Sell', followUpMessage: 'Great — I can help you get top dollar for your property.', nextStepId: '2' },
@@ -198,11 +209,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Residential and commercial solar panel installation',
       whoTexting: 'Homeowners interested in solar energy',
       clientGoals: 'Qualify leads and schedule site surveys',
+      agentName: 'your solar energy consultant',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out about your interest in going solar and saving on energy costs.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for your interest in going solar. Do you own your home?',
+        yourMessage: 'Hi! This is your solar energy consultant with {businessName}. I\'m reaching out about your interest in going solar. Do you own your home?',
         responses: [
           { label: 'Yes, I own', followUpMessage: 'Great! Homeowners get the best solar benefits.', nextStepId: '2' },
           { label: 'Renting', followUpMessage: 'There are still options for renters — let me explain.', nextStepId: '2' },
@@ -273,11 +287,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Residential and commercial roofing services',
       whoTexting: 'Homeowners needing roof repair or replacement',
       clientGoals: 'Qualify leads and schedule roof inspections',
+      agentName: 'your roofing specialist',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out about your roofing needs.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out about roofing. What brings you in — repair, replacement, or a new build?',
+        yourMessage: 'Hi! This is your roofing specialist with {businessName}. I\'m reaching out about your roofing needs. What brings you in — repair, replacement, or a new build?',
         responses: [
           { label: 'Repair', followUpMessage: 'We handle all types of roof repairs.', nextStepId: '2' },
           { label: 'Replacement', followUpMessage: 'A new roof can transform your home. Let\'s get you a quote.', nextStepId: '2' },
@@ -338,11 +355,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'HVAC, plumbing, electrical, and general home services',
       whoTexting: 'Homeowners needing home repairs or maintenance',
       clientGoals: 'Qualify service requests and schedule appointments',
+      agentName: 'your home services coordinator',
+      companyName: '{businessName}',
+      contactReason: 'I\'m following up on your request for home services.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out. What type of service do you need?',
+        yourMessage: 'Hi! This is your home services coordinator with {businessName}. I\'m following up on your request for home services. What type of service do you need?',
         responses: [
           { label: 'HVAC', followUpMessage: 'We handle all heating and cooling needs.', nextStepId: '2' },
           { label: 'Plumbing', followUpMessage: 'Our plumbing team can take care of that.', nextStepId: '2' },
@@ -401,11 +421,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Financial planning, investment, tax, and mortgage services',
       whoTexting: 'People seeking financial guidance',
       clientGoals: 'Qualify prospects and schedule consultation calls',
+      agentName: 'your financial advisor',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out about your interest in financial planning services.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out. What financial service are you interested in?',
+        yourMessage: 'Hi! This is your financial advisor with {businessName}. I\'m reaching out about your interest in financial planning services. What area can I help you with?',
         responses: [
           { label: 'Investment', followUpMessage: 'Smart move! Let\'s talk about your investment goals.', nextStepId: '2' },
           { label: 'Tax planning', followUpMessage: 'Tax strategy is key to building wealth.', nextStepId: '2' },
@@ -453,11 +476,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Medical, dental, specialist, and wellness services',
       whoTexting: 'Patients seeking healthcare appointments',
       clientGoals: 'Qualify patient needs and schedule appointments',
+      agentName: 'your healthcare coordinator',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out to help you schedule your healthcare appointment.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for contacting us. Are you a new or existing patient?',
+        yourMessage: 'Hi! This is your healthcare coordinator with {businessName}. I\'m reaching out to help you schedule your appointment. Are you a new or existing patient?',
         responses: [
           { label: 'New patient', followUpMessage: 'Welcome! We\'re happy to have you.', nextStepId: '2' },
           { label: 'Existing patient', followUpMessage: 'Welcome back! How can we help?', nextStepId: '2' },
@@ -510,11 +536,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'New and used vehicles, service, and financing',
       whoTexting: 'People interested in purchasing or servicing a vehicle',
       clientGoals: 'Qualify buyers and schedule test drives',
+      agentName: 'your automotive specialist',
+      companyName: '{businessName}',
+      contactReason: 'I\'m following up on your interest in a vehicle.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for your interest. Are you looking for a new vehicle, used, or need service?',
+        yourMessage: 'Hi! This is your automotive specialist with {businessName}. I\'m following up on your interest in a vehicle. Are you looking for new, used, or need service?',
         responses: [
           { label: 'New vehicle', followUpMessage: 'We have a great selection of new models.', nextStepId: '2' },
           { label: 'Used vehicle', followUpMessage: 'Our pre-owned inventory is top quality.', nextStepId: '2' },
@@ -571,11 +600,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Products and services for our customers',
       whoTexting: 'Customers interested in products or with questions',
       clientGoals: 'Answer questions and drive purchases',
+      agentName: 'your customer service rep',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out to help you find what you\'re looking for.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out. Are you looking for a specific product or browsing?',
+        yourMessage: 'Hi! This is your customer service rep with {businessName}. I\'m reaching out to help you find what you\'re looking for. Are you looking for a specific product or browsing?',
         responses: [
           { label: 'Specific product', followUpMessage: 'I can check availability for you right away.', nextStepId: '2' },
           { label: 'Browsing', followUpMessage: 'Happy to help you find what you need.', nextStepId: '2' },
@@ -619,11 +651,14 @@ export const FLOW_TEMPLATES: Record<string, FlowTemplate> = {
       whatOffering: 'Our products and services',
       whoTexting: 'People interested in learning more',
       clientGoals: 'Qualify leads and schedule follow-up conversations',
+      agentName: 'your account representative',
+      companyName: '{businessName}',
+      contactReason: 'I\'m reaching out to see how we can help you.',
     },
     steps: [
       {
         id: '1',
-        yourMessage: 'Hi! Thanks for reaching out. What can we help you with today?',
+        yourMessage: 'Hi! This is your account representative with {businessName}. I\'m reaching out to see how we can help you. What can I assist you with today?',
         responses: [
           { label: 'Learn more', followUpMessage: 'Happy to tell you more about what we offer.', nextStepId: '2' },
           { label: 'Get a quote', followUpMessage: 'I can put together a quote for you.', nextStepId: '2' },

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false, sessionId, flowId } = await req.json();
+    const { userMessage, currentStep, allSteps, conversationHistory, collectedInfo = {}, requiredQuestions = [], requiresCall = false, sessionId, flowId, flowContext } = await req.json();
 
     if (!userMessage || !currentStep || !allSteps) {
       return NextResponse.json(
@@ -484,9 +484,19 @@ export async function POST(req: NextRequest) {
       ? `\n\n✅ APPOINTMENT BOOKED for ${bookedAppointmentInfo.time}! Confirm the booking and thank them.`
       : '';
 
+    // Build agent identity section from flow context
+    const agentIdentityText = flowContext?.agentName || flowContext?.companyName
+      ? `\nAGENT IDENTITY:
+- Your name/role: ${flowContext.agentName || 'a specialist'}
+- Company: ${flowContext.companyName || 'the company'}
+- Why you\'re contacting them: ${flowContext.contactReason || 'Following up on their inquiry'}${flowContext.callbackNumber ? `\n- Callback number: ${flowContext.callbackNumber}` : ''}${flowContext.website ? `\n- Website: ${flowContext.website}` : ''}
+If the client asks "who is this?" or "who are you?", respond with your agent identity.
+`
+      : '';
+
     // Build a much simpler, more focused prompt
     const prompt = `You are a sales agent texting a client. Read carefully and respond appropriately.
-
+${agentIdentityText}
 ${hasCollectedInfo ? `
 ═══════════════════════════════════════════════════════════════
 🚨 STOP! READ THIS FIRST - INFORMATION YOU ALREADY HAVE:
@@ -541,7 +551,7 @@ Return ONLY valid JSON (no markdown):
     const apiKey = process.env.OPENAI_API_KEY;
 
     // Build system message - emphasize not repeating questions
-    const systemMessage = `You are a sales agent via SMS. CRITICAL: ${hasCollectedInfo ? 'Check the INFORMATION YOU ALREADY HAVE section - NEVER ask for anything listed there!' : 'Collect info naturally.'} Keep responses short. Return only valid JSON.`;
+    const systemMessage = `You are a sales agent via SMS.${flowContext?.agentName ? ` You are ${flowContext.agentName}${flowContext.companyName ? ` from ${flowContext.companyName}` : ''}.` : ''} CRITICAL: ${hasCollectedInfo ? 'Check the INFORMATION YOU ALREADY HAVE section - NEVER ask for anything listed there!' : 'Collect info naturally.'} Keep responses short. Return only valid JSON.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
