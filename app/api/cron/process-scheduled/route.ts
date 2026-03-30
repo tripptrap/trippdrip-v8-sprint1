@@ -531,5 +531,9 @@ async function sendEmail(to: string, subject: string, body: string): Promise<{ s
   //   html: body,
   // });
 
-  return { success: true };
+  // MED-11: Email provider not yet integrated — return failure so credits are NOT deducted
+  // and the message is marked as failed instead of silently "sent".
+  // TODO: Replace with real email provider (SendGrid, Resend, Postmark, etc.)
+  console.warn(`⚠️ Email send skipped — no provider configured (to: ${to})`);
+  return { success: false, error: 'Email provider not configured' };
 }

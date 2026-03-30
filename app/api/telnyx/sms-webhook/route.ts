@@ -481,7 +481,7 @@ async function handleInboundSMS(payload: any) {
                 })
                 .eq('id', upcomingAppt.id);
 
-              // Try to delete from Google Calendar if user has tokens
+              // MED-3: Try to delete from Google Calendar — refresh token if access token expired
               if (upcomingAppt.google_event_id) {
                 try {
                   const { data: userData } = await supabaseAdmin
@@ -491,17 +491,44 @@ async function handleInboundSMS(payload: any) {
                     .single();
 
                   if (userData?.google_calendar_access_token && upcomingAppt.google_event_id) {
+                    let accessToken = userData.google_calendar_access_token;
+
                     const gcalResponse = await fetch(
                       `https://www.googleapis.com/calendar/v3/calendars/primary/events/${upcomingAppt.google_event_id}`,
-                      {
-                        method: 'DELETE',
-                        headers: {
-                          'Authorization': `Bearer ${userData.google_calendar_access_token}`
-                        }
-                      }
+                      { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
                     );
 
-                    if (!gcalResponse.ok && gcalResponse.status !== 404) {
+                    // Token expired — attempt refresh and retry once
+                    if (gcalResponse.status === 401 && userData.google_calendar_refresh_token) {
+                      try {
+                        const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                          body: new URLSearchParams({
+                            client_id: process.env.GOOGLE_CLIENT_ID || '',
+                            client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+                            refresh_token: userData.google_calendar_refresh_token,
+                            grant_type: 'refresh_token',
+                          }),
+                        });
+                        if (refreshRes.ok) {
+                          const refreshData = await refreshRes.json();
+                          accessToken = refreshData.access_token;
+                          // Persist refreshed token
+                          await supabaseAdmin.from('users').update({
+                            google_calendar_access_token: accessToken,
+                            updated_at: new Date().toISOString(),
+                          }).eq('id', userId);
+                          // Retry delete with new token
+                          await fetch(
+                            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${upcomingAppt.google_event_id}`,
+                            { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
+                          );
+                        }
+                      } catch (refreshErr) {
+                        console.error('Google Calendar token refresh failed:', refreshErr);
+                      }
+                    } else if (!gcalResponse.ok && gcalResponse.status !== 404) {
                       console.error('Failed to delete appointment from Google Calendar:', gcalResponse.status);
                     }
                   }
