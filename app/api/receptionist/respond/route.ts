@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       leadName,
       toPhoneNumber, // The user's Telnyx number that received the message
       draftOnly,     // If true, store AI draft on thread instead of auto-sending (suggest mode)
+      flowContext,   // Flow qualification context — passed when lead has an active flow
     } = await req.json();
 
     if (!userId || !phoneNumber || !inboundMessage) {
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
       leadId,
       leadName,
       conversationHistory,
+      flowContext: flowContext || null,
     };
 
     const result = await generateReceptionistResponse(params, settings as ReceptionistSettings);

@@ -6,6 +6,7 @@ import {
   ReceptionistResponseParams,
   ReceptionistResponseResult,
   ResponseType,
+  FlowContext,
   DEFAULT_SYSTEM_PROMPT
 } from './types';
 import { isWithinBusinessHours, getBusinessHoursDisplay } from './businessHours';
@@ -156,6 +157,55 @@ ${settings.greeting_message ? `Use this greeting style: "${settings.greeting_mes
     prompt += `
 
 SCHEDULING: You can help schedule appointments. When someone wants to book a meeting or call, ask for their preferred date/time and confirm you'll check availability.`;
+  }
+
+  // Add flow qualification guidance when an active flow is present
+  if (params.flowContext) {
+    const fc = params.flowContext;
+
+    if (fc.allAnswered) {
+      // All info collected — wrap up and offer next step
+      const collected = Object.entries(fc.collectedInfo)
+        .map(([k, v]) => `  - ${k}: ${v}`)
+        .join('\n');
+      prompt += `
+
+QUALIFICATION COMPLETE — ALL REQUIRED INFO COLLECTED:
+${collected}
+
+INSTRUCTIONS: All qualifying questions have been answered. Confirm the details with the lead, thank them, and move toward booking an appointment or next step. Do NOT ask any more qualifying questions.`;
+    } else {
+      // Still gathering info
+      const collected = Object.keys(fc.collectedInfo).length > 0
+        ? Object.entries(fc.collectedInfo)
+            .map(([k, v]) => `  ✓ ${k}: ${v}`)
+            .join('\n')
+        : '  (none yet)';
+
+      const nextQ = fc.remainingQuestions[0];
+      const remaining = fc.remainingQuestions
+        .map((q, i) => `  ${i + 1}. ${q.question} [${q.fieldName}]`)
+        .join('\n');
+
+      prompt += `
+
+QUALIFICATION FLOW — "${fc.flowName}":
+You are gathering specific information from this lead. Ask ONE question at a time, naturally.
+
+Already collected:
+${collected}
+
+Still need (in order):
+${remaining}
+
+NEXT QUESTION TO ASK: "${nextQ.question}"
+
+INSTRUCTIONS:
+- Acknowledge their last message naturally, then ask the NEXT QUESTION above
+- Do NOT ask multiple questions at once
+- Keep it conversational — do not sound like a form
+- Once all questions are answered, confirm and offer to book an appointment`;
+    }
   }
 
   prompt += `

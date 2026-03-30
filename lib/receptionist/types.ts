@@ -85,6 +85,19 @@ export interface ReceptionistTriggerResult {
   settings?: ReceptionistSettings;
 }
 
+export interface FlowQuestion {
+  question: string;
+  fieldName: string;
+}
+
+export interface FlowContext {
+  flowName: string;
+  requiredQuestions: FlowQuestion[];
+  collectedInfo: Record<string, string>;   // fieldName → value already gathered
+  remainingQuestions: FlowQuestion[];       // not yet answered
+  allAnswered: boolean;
+}
+
 export interface ReceptionistResponseParams {
   userId: string;
   threadId: string;
@@ -94,6 +107,7 @@ export interface ReceptionistResponseParams {
   leadId?: string | null;
   leadName?: string | null;
   conversationHistory?: Array<{ direction: string; body: string }>;
+  flowContext?: FlowContext | null;          // present when lead has an active flow
 }
 
 export interface ReceptionistResponseResult {

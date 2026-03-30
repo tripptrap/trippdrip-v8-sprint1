@@ -701,6 +701,7 @@ async function checkAndTriggerReceptionist(
     let contactType: ContactType;
     let leadId: string | undefined;
     let leadName: string | undefined;
+    let flowContext: import('@/lib/receptionist/types').FlowContext | null = null;
 
     if (lead) {
       leadId = lead.id;
@@ -736,9 +737,10 @@ async function checkAndTriggerReceptionist(
       }
 
       if (effectiveFlowId) {
+        // Fetch full flow data — required_questions, steps, and context (autonomy + identity)
         const { data: flowData } = await supabaseAdmin
           .from('conversation_flows')
-          .select('context')
+          .select('name, required_questions, context')
           .eq('id', effectiveFlowId)
           .single();
 
@@ -747,6 +749,90 @@ async function checkAndTriggerReceptionist(
           console.log('🤖 Receptionist: Skipping — assigned flow is in manual mode');
           return;
         }
+
+        // ── Extract answers & update conversation state ──────────────────────
+        const requiredQuestions: Array<{ question: string; fieldName: string }> =
+          flowData?.required_questions || [];
+
+        if (requiredQuestions.length > 0 && lead?.id) {
+          // Load current collected info from lead.conversation_state
+          const { data: leadState } = await supabaseAdmin
+            .from('leads')
+            .select('conversation_state, tags, primary_tag')
+            .eq('id', lead.id)
+            .single();
+
+          const currentCollected: Record<string, string> =
+            (leadState?.conversation_state as any)?.collectedInfo || {};
+
+          // Determine which questions still need answers
+          const remaining = requiredQuestions.filter(
+            q => !currentCollected[q.fieldName]
+          );
+
+          // Extract any answers from this message (non-blocking)
+          let newlyExtracted: Record<string, string> = {};
+          if (remaining.length > 0) {
+            try {
+              const { extractFlowAnswers } = await import('@/lib/ai/extractFlowAnswers');
+              newlyExtracted = await extractFlowAnswers(messageBody, remaining, currentCollected);
+            } catch (extractErr) {
+              console.error('🤖 Answer extraction failed (non-fatal):', extractErr);
+            }
+          }
+
+          // Merge and persist updated collectedInfo
+          const updatedCollected = { ...currentCollected, ...newlyExtracted };
+          const updatedRemaining = requiredQuestions.filter(
+            q => !updatedCollected[q.fieldName]
+          );
+          const allAnswered = updatedRemaining.length === 0 && requiredQuestions.length > 0;
+
+          if (Object.keys(newlyExtracted).length > 0) {
+            await supabaseAdmin
+              .from('leads')
+              .update({
+                conversation_state: {
+                  ...(leadState?.conversation_state as any || {}),
+                  collectedInfo: updatedCollected,
+                  lastUpdated: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', lead.id);
+
+            console.log('🤖 Flow answers extracted:', newlyExtracted);
+          }
+
+          // Auto-tag when all required questions are answered
+          if (allAnswered) {
+            const existingTags: string[] = leadState?.tags || [];
+            const qualifiedTag = 'qualified';
+            if (!existingTags.includes(qualifiedTag)) {
+              const newTags = [...new Set([...existingTags, qualifiedTag])];
+              await supabaseAdmin
+                .from('leads')
+                .update({
+                  tags: newTags,
+                  primary_tag: qualifiedTag,
+                  status: 'qualified',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', lead.id);
+              console.log('🤖 Flow complete — lead auto-tagged "qualified"');
+            }
+          }
+
+          // Build flowContext to pass to the AI so it knows what to ask next
+          flowContext = {
+            flowName: flowData?.name || 'Qualification Flow',
+            requiredQuestions,
+            collectedInfo: updatedCollected,
+            remainingQuestions: updatedRemaining,
+            allAnswered,
+          };
+        }
+
         // 'suggest' mode: generate draft and store on thread, notify user — don't auto-send
         if (flowAutonomyMode === 'suggest') {
           console.log('🤖 Receptionist: Suggest mode — generating draft for user review');
@@ -765,6 +851,7 @@ async function checkAndTriggerReceptionist(
                 leadId: lead?.id,
                 leadName: (lead as any)?.first_name || lead?.name || 'Lead',
                 draftOnly: true,
+                flowContext,
               }),
             });
           } catch (err) {
@@ -772,7 +859,7 @@ async function checkAndTriggerReceptionist(
           }
           return;
         }
-        // 'full_auto': proceed normally
+        // 'full_auto': proceed normally (flowContext will be passed to receptionist below)
       }
 
       // Check if this is a sold client
@@ -842,7 +929,7 @@ async function checkAndTriggerReceptionist(
       leadId,
     });
 
-    // Call the receptionist respond API
+    // Call the receptionist respond API — pass flowContext so AI knows what to ask next
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const response = await fetch(`${baseUrl}/api/receptionist/respond`, {
       method: 'POST',
@@ -856,6 +943,7 @@ async function checkAndTriggerReceptionist(
         contactType,
         leadId,
         leadName,
+        flowContext: flowContext || null,
       }),
     });
 
