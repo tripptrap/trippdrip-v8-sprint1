@@ -747,7 +747,31 @@ async function checkAndTriggerReceptionist(
           console.log('🤖 Receptionist: Skipping — assigned flow is in manual mode');
           return;
         }
-        // 'suggest' mode: for now auto-respond (draft UI coming in future sprint)
+        // 'suggest' mode: generate draft and store on thread, notify user — don't auto-send
+        if (flowAutonomyMode === 'suggest') {
+          console.log('🤖 Receptionist: Suggest mode — generating draft for user review');
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+            await fetch(`${baseUrl}/api/receptionist/respond`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId,
+                threadId,
+                phoneNumber,
+                toPhoneNumber,
+                inboundMessage: messageBody,
+                contactType: 'existing_lead',
+                leadId: lead?.id,
+                leadName: (lead as any)?.first_name || lead?.name || 'Lead',
+                draftOnly: true,
+              }),
+            });
+          } catch (err) {
+            console.error('🤖 Suggest mode draft generation failed:', err);
+          }
+          return;
+        }
         // 'full_auto': proceed normally
       }
 

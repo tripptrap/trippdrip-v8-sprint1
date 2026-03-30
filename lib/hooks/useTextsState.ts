@@ -23,6 +23,7 @@ export interface Thread {
   archived_at?: string | null;
   ai_disabled?: boolean;
   conversation_tags?: string[];
+  pending_ai_draft?: string | null;
   leads?: {
     id: string;
     first_name?: string;

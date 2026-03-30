@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle, Sparkles, MessageSquarePlus, Wand2, ShieldCheck, Loader2, Zap } from 'lucide-react';
+import { Send, Paperclip, Clock, X, Image as ImageIcon, AlertTriangle, Sparkles, MessageSquarePlus, Wand2, ShieldCheck, Loader2, Zap, Bot, CheckCircle2, XCircle } from 'lucide-react';
 import { calculateSMSCredits, getCharacterWarning } from '@/lib/creditCalculator';
 import ScheduleMessagePopover from './ScheduleMessagePopover';
 import type { Thread } from '@/lib/hooks/useTextsState';
@@ -16,6 +16,7 @@ interface ComposerProps {
   disabled?: boolean;
   leadId?: string;
   onOpenAIDrip?: () => void;
+  onDraftAction?: (action: 'approve' | 'dismiss') => void;
 }
 
 export default function Composer({
@@ -27,6 +28,7 @@ export default function Composer({
   disabled,
   leadId,
   onOpenAIDrip,
+  onDraftAction,
 }: ComposerProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -41,6 +43,7 @@ export default function Composer({
   const [aiLoading, setAiLoading] = useState<string | null>(null); // 'smart' | 'followup' | 'compose' | 'spam'
   const [aiTone, setAiTone] = useState<'professional' | 'casual' | 'friendly' | 'urgent'>('professional');
   const [userCredits, setUserCredits] = useState<number | null>(null);
+  const [draftLoading, setDraftLoading] = useState<'approve' | 'dismiss' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -315,6 +318,29 @@ export default function Composer({
     }
   }
 
+  async function handleDraftAction(action: 'approve' | 'dismiss') {
+    if (draftLoading) return;
+    setDraftLoading(action);
+    try {
+      const res = await fetch('/api/texts/threads/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: thread.id, action }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        toast.error(data.error || `Failed to ${action} draft`);
+      } else {
+        if (action === 'approve') toast.success('Draft sent!');
+        onDraftAction?.(action);
+      }
+    } catch {
+      toast.error(`Failed to ${action} draft`);
+    } finally {
+      setDraftLoading(null);
+    }
+  }
+
   if (isDncBlocked) {
     return (
       <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-red-50 dark:bg-red-900/10">
@@ -328,6 +354,46 @@ export default function Composer({
 
   return (
     <div className="border-t border-slate-200 dark:border-slate-700 shrink-0">
+      {/* AI Draft Banner — shown when flow autonomy mode is "suggest" and AI has drafted a reply */}
+      {thread.pending_ai_draft && (
+        <div className="mx-3 mt-3 rounded-lg border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 bg-violet-100 dark:bg-violet-900/40 border-b border-violet-200 dark:border-violet-700">
+            <Bot className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+            <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">AI drafted a reply — review before sending</span>
+          </div>
+          <div className="px-3 py-2.5">
+            <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">{thread.pending_ai_draft}</p>
+          </div>
+          <div className="flex items-center gap-2 px-3 pb-2.5">
+            <button
+              onClick={() => handleDraftAction('approve')}
+              disabled={!!draftLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white transition-colors"
+            >
+              {draftLoading === 'approve' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              Send Draft
+            </button>
+            <button
+              onClick={() => handleDraftAction('dismiss')}
+              disabled={!!draftLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-60 transition-colors"
+            >
+              {draftLoading === 'dismiss' ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5" />
+              )}
+              Dismiss
+            </button>
+            <span className="ml-auto text-xs text-slate-400">or write your own reply below</span>
+          </div>
+        </div>
+      )}
+
       {/* First message notice */}
       {isFirstMessage && text.trim() && (
         <div className="px-3 pt-2">

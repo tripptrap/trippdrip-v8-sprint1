@@ -348,6 +348,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
                       disabled={false}
                       leadId={activeThread.lead_id || activeThread.leads?.id || undefined}
                       onOpenAIDrip={() => setShowAIDripModal(true)}
+                      onDraftAction={async () => { await Promise.all([refreshMessages(), refreshActiveThread()]); }}
                     />
                   </OutOfCreditsBlocker>
                 </ConversationView>

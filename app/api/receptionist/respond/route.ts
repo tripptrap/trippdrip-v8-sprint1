@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       leadId,
       leadName,
       toPhoneNumber, // The user's Telnyx number that received the message
+      draftOnly,     // If true, store AI draft on thread instead of auto-sending (suggest mode)
     } = await req.json();
 
     if (!userId || !phoneNumber || !inboundMessage) {
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
         .eq('id', userId);
     }
 
-    // Apply AI guardrails before sending
+    // Apply AI guardrails
     const guardrailResult = applyGuardrails(result.response || '', DEFAULT_GUARDRAILS);
     if (!guardrailResult.passed) {
       console.warn('AI response blocked by guardrails:', guardrailResult.violations);
@@ -149,7 +150,25 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
-    // Send the SMS response using Telnyx
+    // SUGGEST MODE: store draft on thread instead of sending
+    if (draftOnly && threadId) {
+      await supabase
+        .from('threads')
+        .update({ pending_ai_draft: guardrailResult.message })
+        .eq('id', threadId);
+
+      console.log('🤖 Suggest mode: stored draft on thread', threadId);
+      return NextResponse.json({
+        success: true,
+        response: guardrailResult.message,
+        responseType: result.responseType,
+        pointsUsed: 0, // No credits spent for draft generation
+        messageSent: false,
+        isDraft: true,
+      });
+    }
+
+    // FULL AUTO MODE: send the SMS response using Telnyx
     const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telnyx/send-sms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
