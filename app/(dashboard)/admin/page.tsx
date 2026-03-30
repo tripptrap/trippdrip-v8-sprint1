@@ -1108,6 +1108,12 @@ function InternalDevNotes() {
     'Email alert notifications: added nodemailer + 4 email templates (new message, appointment, low credits, opt-out)',
     'Auto-refill sync fix: Settings UI now dual-writes to users.auto_topup* so the cron can read it',
     'Browser Extension (MVP): now works on any website — added platform detection (LinkedIn, Facebook, Google Maps, Yelp, etc.), platform-specific extractors, dynamic source tagging, removed VanillaSoft-only gate',
+    'Settings — Profile info section: name, email (read-only), phone, business name (Account tab)',
+    'Settings — Plan management: current plan, credits, next renewal, Stripe billing portal, upgrade CTA (Plan tab)',
+    'Settings — Spam protection: enable/disable, block threshold, hourly/daily rate limits, contact-level cooldowns (Spam Protection tab)',
+    'Settings — DNC list management UI (DNC tab)',
+    'Settings — Auto-buy configuration: enable toggle, refill threshold, refill amount, estimated cost (Auto-Refill tab)',
+    'Notifications: in-app bell/badge, SMS alerts, email alerts, per-type toggles (new message, appointment, low credits, opt-out) — all channels wired',
   ];
 
   // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
@@ -1117,13 +1123,6 @@ function InternalDevNotes() {
     { cat: 'Payments & Billing', item: 'Show Scale tier point pack discount clearly on pricing/preview pages' },
     { cat: 'Payments & Billing', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack' },
     { cat: 'Payments & Billing', item: 'Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits' },
-    { cat: 'Payments & Billing', item: 'Plan management (upgrade/downgrade) inside Settings page' },
-    // Settings
-    { cat: 'Settings Page', item: 'Profile info section (name, email, business info)' },
-    { cat: 'Settings Page', item: 'Plan management section (current plan, upgrade/downgrade, billing)' },
-    { cat: 'Settings Page', item: 'Spam protection settings' },
-    { cat: 'Settings Page', item: 'DNC list management UI' },
-    { cat: 'Settings Page', item: 'Auto-buy configuration (enable/disable, pick pack size)' },
     // Onboarding
     { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
     { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
