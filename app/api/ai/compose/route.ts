@@ -8,6 +8,26 @@ import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 
 export const dynamic = 'force-dynamic';
 
+// MED-8: Per-user burst rate limiter — 20 AI compose requests per minute
+// Prevents script loops from draining OpenAI budget before credits run out
+const AI_RATE_LIMIT = 20;
+const AI_RATE_WINDOW_MS = 60 * 1000;
+const aiRateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkAIRateLimit(userId: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = aiRateLimitMap.get(userId);
+  if (!entry || now - entry.windowStart > AI_RATE_WINDOW_MS) {
+    aiRateLimitMap.set(userId, { count: 1, windowStart: now });
+    return { allowed: true, remaining: AI_RATE_LIMIT - 1 };
+  }
+  if (entry.count >= AI_RATE_LIMIT) {
+    return { allowed: false, remaining: 0 };
+  }
+  entry.count++;
+  return { allowed: true, remaining: AI_RATE_LIMIT - entry.count };
+}
+
 interface ComposeRequest {
   message?: string; // User's draft (optional for 'generate' mode)
   mode: 'improve' | 'rewrite' | 'generate' | 'shorten';
@@ -23,6 +43,16 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // MED-8: Burst rate limit check
+    const rateCheck = checkAIRateLimit(user.id);
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        ok: false,
+        error: `Rate limit exceeded: maximum ${AI_RATE_LIMIT} AI compose requests per minute. Please wait a moment.`,
+        rateLimited: true
+      }, { status: 429 });
     }
 
     const body: ComposeRequest = await req.json();
