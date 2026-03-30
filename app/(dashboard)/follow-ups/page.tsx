@@ -56,6 +56,9 @@ export default function FollowUpsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadOptions, setLeadOptions] = useState<{ id: string; name: string; phone: string }[]>([]);
+  const [leadSearchLoading, setLeadSearchLoading] = useState(false);
   const [formData, setFormData] = useState({
     lead_id: '',
     title: '',
@@ -336,6 +339,22 @@ export default function FollowUpsPage() {
         message: 'Failed to create follow-up'
       });
     }
+  }
+
+  async function searchLeads(q: string) {
+    setLeadSearch(q);
+    if (!q.trim()) { setLeadOptions([]); return; }
+    setLeadSearchLoading(true);
+    try {
+      const res = await fetch(`/api/leads?q=${encodeURIComponent(q)}&pageSize=10`);
+      const data = await res.json();
+      setLeadOptions((data.items || []).map((l: any) => ({
+        id: l.id,
+        name: [l.first_name, l.last_name].filter(Boolean).join(' ') || 'Unknown',
+        phone: l.phone || '',
+      })));
+    } catch { setLeadOptions([]); }
+    finally { setLeadSearchLoading(false); }
   }
 
   async function updateFollowUp(id: string, updates: Partial<FollowUp>) {
@@ -723,21 +742,85 @@ export default function FollowUpsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal - Simplified for now */}
+      {/* Create Follow-up Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Create Follow-up</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Note: Currently you need to create follow-ups from the leads page or use Smart Suggestions.
-              Manual creation coming soon!
-            </p>
-            <button
-              onClick={() => setShowCreateModal(false)}
-              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"
-            >
-              Close
-            </button>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">New Follow-up</h2>
+              <button onClick={() => { setShowCreateModal(false); setLeadSearch(''); setLeadOptions([]); setFormData({ lead_id: '', title: '', notes: '', due_date: '', priority: 'medium' }); }} className="text-slate-400 hover:text-slate-600 text-xl">×</button>
+            </div>
+            <div className="space-y-4">
+              {/* Lead search */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Lead *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.lead_id
+                      ? (leadOptions.find(l => l.id === formData.lead_id)?.name || leadSearch)
+                      : leadSearch}
+                    onChange={e => { if (formData.lead_id) setFormData(f => ({ ...f, lead_id: '' })); searchLeads(e.target.value); }}
+                    placeholder="Search by name or phone..."
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  />
+                  {leadOptions.length > 0 && !formData.lead_id && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                      {leadSearchLoading && <div className="px-3 py-2 text-xs text-slate-400">Searching...</div>}
+                      {leadOptions.map(l => (
+                        <button key={l.id} type="button"
+                          onClick={() => { setFormData(f => ({ ...f, lead_id: l.id })); setLeadSearch(l.name); setLeadOptions([]); }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-between">
+                          <span className="text-slate-900 dark:text-slate-100 font-medium">{l.name}</span>
+                          <span className="text-xs text-slate-400">{l.phone}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Title *</label>
+                <input type="text" value={formData.title} onChange={e => setFormData(f => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. Follow up on quote"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40" />
+              </div>
+              {/* Due date + Priority row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Due Date *</label>
+                  <input type="datetime-local" value={formData.due_date} onChange={e => setFormData(f => ({ ...f, due_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Priority</label>
+                  <select value={formData.priority} onChange={e => setFormData(f => ({ ...f, priority: e.target.value as any }))}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Notes</label>
+                <textarea value={formData.notes} onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Optional notes..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/40" />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => { setShowCreateModal(false); setLeadSearch(''); setLeadOptions([]); setFormData({ lead_id: '', title: '', notes: '', due_date: '', priority: 'medium' }); }}
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400">Cancel</button>
+              <button onClick={createFollowUp} disabled={!formData.title || !formData.due_date || !formData.lead_id}
+                className="px-5 py-2 text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white rounded-lg disabled:opacity-40 transition-colors">
+                Create Follow-up
+              </button>
+            </div>
           </div>
         </div>
       )}

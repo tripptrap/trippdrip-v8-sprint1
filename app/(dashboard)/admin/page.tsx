@@ -942,6 +942,14 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* ============================================================
+          INTERNAL DEV NOTES — NOT VISIBLE TO REGULAR USERS
+          This section is only accessible via /admin (admin-only route).
+          Lists features that were removed from the dashboard as stubs
+          and are planned for future implementation.
+      ============================================================ */}
+      <InternalDevNotes />
+
       {/* Grant Credits Modal */}
       {grantCreditsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1039,6 +1047,131 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL DEV NOTES COMPONENT
+// Admin-only. Lists removed stub pages + planned features with priority/status.
+// ─────────────────────────────────────────────────────────────────────────────
+function InternalDevNotes() {
+  const [open, setOpen] = useState(false);
+
+  const removedStubs = [
+    {
+      route: '/referrals',
+      name: 'Referral Program',
+      status: 'Roadmap — Q4 2026',
+      priority: 'low',
+      notes:
+        'Redirects to /roadmap. Full feature: unique referral link per user, 1 month free Scale tier per conversion, stacking rewards. Needs referral_codes table + Stripe credit hooks.',
+    },
+    {
+      route: '/team/tripp-browning',
+      name: 'Team Profile — Tripp Browning',
+      status: 'Removed',
+      priority: 'low',
+      notes:
+        'Redirects to /admin. Was a static authorized-representative profile page for Telnyx/carrier registration. If required again, rebuild as a proper /legal/authorized-reps route with minimal static content.',
+    },
+    {
+      route: '/team/carson-rios',
+      name: 'Team Profile — Carson Rios',
+      status: 'Removed',
+      priority: 'low',
+      notes:
+        'Redirects to /admin. Same as above — static representative profile. Rebuild under /legal if carrier registration requires it.',
+    },
+    {
+      route: '/integrations → Landline Remover',
+      name: 'Landline Remover Integration',
+      status: 'Roadmap — Q2 2026',
+      priority: 'medium',
+      notes:
+        'Real-time landline/mobile detection before sending. Reduces bounce rates + saves credits on invalid numbers. Needs a phone validation API (e.g., Telnyx Number Lookup, Numverify, or Twilio Lookup). Could be auto-run on CSV import and manual lead entry.',
+    },
+    {
+      route: '/integrations → Email Integration',
+      name: 'Email Integration',
+      status: 'Roadmap — Q3 2026',
+      priority: 'medium',
+      notes:
+        'Unified inbox for SMS + email. Needs email provider (SendGrid, Postmark, or SMTP). Requires messages table extension with email-specific fields. Templates, campaign sends, open/click tracking. Large scope — post-launch.',
+    },
+    {
+      route: '/integrations → Zapier',
+      name: 'Zapier Integration',
+      status: 'Roadmap — Q3 2026',
+      priority: 'medium',
+      notes:
+        'Webhook-based Zapier app. Triggers: new lead, lead status change, message received, appointment booked. Actions: create lead, send message, add to campaign. Needs a Zapier developer account and REST hooks implementation.',
+    },
+    {
+      route: '/integrations → Enterprise DNC List',
+      name: 'Enterprise / Shared DNC List',
+      status: 'Roadmap — Q4 2026',
+      priority: 'low',
+      notes:
+        'Company-wide DNC that spans multiple team members (requires team/roles feature first). Also: national DNC registry scrub integration. Currently each user has their own DNC list which is sufficient for MVP.',
+    },
+  ];
+
+  const priorityColors: Record<string, string> = {
+    high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    low: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
+  };
+
+  return (
+    <div className="mt-12 border-t-2 border-dashed border-slate-300 dark:border-slate-700 pt-8">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 w-full text-left group"
+      >
+        <ShieldAlert className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
+        <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors uppercase tracking-widest">
+          Internal Dev Notes
+        </span>
+        <span className="ml-auto">
+          {open
+            ? <ChevronDown className="h-4 w-4 text-slate-400" />
+            : <ChevronRight className="h-4 w-4 text-slate-400" />
+          }
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-slate-500 dark:text-slate-500 italic mb-4">
+            Features removed from the UI as stubs / placeholders. Tracked here for dev reference only.
+            Not visible to end users. Last updated: March 2026.
+          </p>
+
+          {removedStubs.map((item) => (
+            <div
+              key={item.route}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
+            >
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                    {item.route}
+                  </span>
+                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                    {item.name}
+                  </span>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${priorityColors[item.priority]}`}>
+                  {item.priority}
+                </span>
+              </div>
+              <div className="text-xs text-sky-600 dark:text-sky-500 mb-2">{item.status}</div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{item.notes}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
