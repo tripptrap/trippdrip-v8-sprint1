@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function CarsonRiosPage() {
-  redirect('/admin');
+  redirect('/dashboard');
 }
