@@ -54,6 +54,7 @@ type Campaign = {
   created_at: string;
   updated_at: string;
   flow_id?: string;
+  auto_trigger_flow?: boolean;
   lead_type?: string;
   status?: string;
   // Computed/display fields
@@ -98,6 +99,8 @@ export default function CampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [editCampaignName, setEditCampaignName] = useState('');
   const [editFlowId, setEditFlowId] = useState('');
+  const [autoTriggerFlow, setAutoTriggerFlow] = useState(false);
+  const [editAutoTriggerFlow, setEditAutoTriggerFlow] = useState(false);
   const [editLeadType, setEditLeadType] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -233,6 +236,7 @@ export default function CampaignsPage() {
         body: JSON.stringify({
           name: newCampaignName.trim(),
           flowId: selectedFlowId || undefined,
+          autoTriggerFlow: selectedFlowId ? autoTriggerFlow : false,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
           lead_type: newLeadType || undefined,
         })
@@ -246,6 +250,7 @@ export default function CampaignsPage() {
         setSelectedFlowId('');
         setNewLeadType('');
         setSelectedTags([]);
+        setAutoTriggerFlow(false);
         await loadCampaigns();
         setModal({
           isOpen: true,
@@ -484,6 +489,7 @@ export default function CampaignsPage() {
     setEditingCampaign(campaign);
     setEditCampaignName(campaign.name);
     setEditFlowId(campaign.flow_id || '');
+    setEditAutoTriggerFlow(campaign.auto_trigger_flow || false);
     setEditLeadType(campaign.lead_type || '');
     setEditTags(campaign.tags || []);
     setEditTab('details');
@@ -506,6 +512,7 @@ export default function CampaignsPage() {
           id: editingCampaign.id,
           name: editCampaignName.trim(),
           flow_id: editFlowId || null,
+          auto_trigger_flow: editFlowId ? editAutoTriggerFlow : false,
           lead_type: editLeadType || null,
           tags: editTags
         })
@@ -517,6 +524,7 @@ export default function CampaignsPage() {
         setEditOpen(false);
         setEditingCampaign(null);
         setEditTags([]);
+        setEditAutoTriggerFlow(false);
         await loadCampaigns();
         setModal({
           isOpen: true,
@@ -765,13 +773,20 @@ export default function CampaignsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {campaign.flow_id ? (
-                        <span className="inline-block px-2 py-1 text-xs bg-sky-900/30 text-sky-300 border border-sky-700 rounded">
-                          {flows.find(f => f.id === campaign.flow_id)?.name || 'Unknown Flow'}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 dark:text-slate-400 text-sm">No flow</span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {campaign.flow_id ? (
+                          <span className="inline-block px-2 py-1 text-xs bg-sky-900/30 text-sky-300 border border-sky-700 rounded">
+                            {flows.find(f => f.id === campaign.flow_id)?.name || 'Unknown Flow'}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400 text-sm">No flow</span>
+                        )}
+                        {campaign.flow_id && campaign.auto_trigger_flow && (
+                          <span className="inline-block px-2 py-1 text-xs bg-emerald-900/30 text-emerald-400 border border-emerald-700/50 rounded">
+                            ⚡ Auto-triggers on reply
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
@@ -942,6 +957,25 @@ export default function CampaignsPage() {
                 )}
               </div>
 
+              {/* Auto-trigger flow toggle — only show when a flow is selected */}
+              {selectedFlowId && (
+                <div className="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="autoTriggerFlow"
+                    checked={autoTriggerFlow}
+                    onChange={(e) => setAutoTriggerFlow(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 checked:bg-sky-500 checked:border-sky-500 cursor-pointer flex-shrink-0"
+                  />
+                  <label htmlFor="autoTriggerFlow" className="cursor-pointer">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Auto-trigger flow on reply</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      When a lead in this campaign replies inbound, automatically activate this flow for them.
+                    </div>
+                  </label>
+                </div>
+              )}
+
               {/* Tags Selection */}
               <div>
                 <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags (Optional)</label>
@@ -1014,7 +1048,7 @@ export default function CampaignsPage() {
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => { setCreateOpen(false); setNewCampaignName(''); setSelectedFlowId(''); setSelectedTags([]); }}
+                  onClick={() => { setCreateOpen(false); setNewCampaignName(''); setSelectedFlowId(''); setSelectedTags([]); setAutoTriggerFlow(false); }}
                   className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 transition"
                 >
                   Cancel
@@ -1131,6 +1165,25 @@ export default function CampaignsPage() {
                     )}
                   </div>
 
+                  {/* Auto-trigger flow toggle — only show when a flow is selected */}
+                  {editFlowId && (
+                    <div className="flex items-start gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id="editAutoTriggerFlow"
+                        checked={editAutoTriggerFlow}
+                        onChange={(e) => setEditAutoTriggerFlow(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 checked:bg-sky-500 checked:border-sky-500 cursor-pointer flex-shrink-0"
+                      />
+                      <label htmlFor="editAutoTriggerFlow" className="cursor-pointer">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Auto-trigger flow on reply</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          When a lead in this campaign replies inbound, automatically activate this flow for them.
+                        </div>
+                      </label>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">Tags</label>
                     <div className="flex flex-wrap gap-2 mb-2">
@@ -1155,7 +1208,7 @@ export default function CampaignsPage() {
 
                   <div className="flex gap-3 pt-2">
                     <button
-                      onClick={() => { setEditOpen(false); setEditingCampaign(null); setEditTags([]); setCampaignLeads([]); }}
+                      onClick={() => { setEditOpen(false); setEditingCampaign(null); setEditTags([]); setEditAutoTriggerFlow(false); setCampaignLeads([]); }}
                       className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
                     >
                       Cancel

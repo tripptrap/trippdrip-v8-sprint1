@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, flowId, tags, lead_type } = body;
+    const { name, flowId, tags, lead_type, autoTriggerFlow } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Campaign name is required' }, { status: 400 });
@@ -81,6 +81,11 @@ export async function POST(req: NextRequest) {
     // Try to add flow_id if provided
     if (flowId) {
       insertData.flow_id = flowId;
+    }
+
+    // Add auto_trigger_flow if provided
+    if (typeof autoTriggerFlow === 'boolean') {
+      insertData.auto_trigger_flow = autoTriggerFlow;
     }
 
     // Add tags if provided
@@ -109,6 +114,7 @@ export async function POST(req: NextRequest) {
       };
       if (tags && Array.isArray(tags)) retryData2.tags = tags;
       if (lead_type) retryData2.lead_type = lead_type;
+      if (typeof autoTriggerFlow === 'boolean') retryData2.auto_trigger_flow = autoTriggerFlow;
 
       const { data: retryData, error: retryError } = await supabase
         .from('campaigns')
@@ -142,7 +148,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags, lead_type } = body;
+    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags, lead_type, auto_trigger_flow } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Campaign ID is required' }, { status: 400 });
@@ -165,6 +171,7 @@ export async function PUT(req: NextRequest) {
     if (flow_id !== undefined) updateData.flow_id = flow_id;
     if (tags !== undefined) updateData.tags = tags;
     if (lead_type !== undefined) updateData.lead_type = lead_type;
+    if (auto_trigger_flow !== undefined) updateData.auto_trigger_flow = auto_trigger_flow;
 
     let { data, error } = await supabase
       .from('campaigns')
@@ -178,6 +185,21 @@ export async function PUT(req: NextRequest) {
     if (error && error.message.includes('lead_type')) {
       console.log('lead_type column not found, retrying without it');
       delete updateData.lead_type;
+      const { data: retryData, error: retryError } = await supabase
+        .from('campaigns')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+      data = retryData;
+      error = retryError;
+    }
+
+    // If auto_trigger_flow column doesn't exist, retry without it
+    if (error && error.message.includes('auto_trigger_flow')) {
+      console.log('auto_trigger_flow column not found, retrying without it');
+      delete updateData.auto_trigger_flow;
       const { data: retryData, error: retryError } = await supabase
         .from('campaigns')
         .update(updateData)

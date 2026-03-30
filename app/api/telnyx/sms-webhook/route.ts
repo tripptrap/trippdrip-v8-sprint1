@@ -656,17 +656,39 @@ async function checkAndTriggerReceptionist(
       leadName = lead.name;
 
       // Check if lead has a flow assigned — respect its autonomy mode
+      // Also check campaign's auto_trigger_flow setting
       const { data: leadDetail } = await supabaseAdmin
         .from('leads')
-        .select('flow_id')
+        .select('flow_id, campaign_id')
         .eq('id', lead.id)
         .single();
 
-      if (leadDetail?.flow_id) {
+      let effectiveFlowId = leadDetail?.flow_id;
+
+      // If lead has no flow but their campaign has auto_trigger_flow enabled, assign it
+      if (!effectiveFlowId && leadDetail?.campaign_id) {
+        const { data: campaignData } = await supabaseAdmin
+          .from('campaigns')
+          .select('flow_id, auto_trigger_flow')
+          .eq('id', leadDetail.campaign_id)
+          .single();
+
+        if (campaignData?.auto_trigger_flow && campaignData?.flow_id) {
+          effectiveFlowId = campaignData.flow_id;
+          // Assign the flow to this lead so future messages use it directly
+          await supabaseAdmin
+            .from('leads')
+            .update({ flow_id: campaignData.flow_id })
+            .eq('id', lead.id);
+          console.log(`🤖 Auto-assigned campaign flow ${campaignData.flow_id} to lead ${lead.id}`);
+        }
+      }
+
+      if (effectiveFlowId) {
         const { data: flowData } = await supabaseAdmin
           .from('conversation_flows')
           .select('context')
-          .eq('id', leadDetail.flow_id)
+          .eq('id', effectiveFlowId)
           .single();
 
         const flowAutonomyMode = flowData?.context?.autonomyMode || 'full_auto';
