@@ -1055,69 +1055,245 @@ export default function AdminPage() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL DEV NOTES COMPONENT
-// Admin-only. Lists removed stub pages + planned features with priority/status.
+// Admin-only. Four sections: Completed, Todo, Removed Stubs, All Pages.
+// Not visible to regular users — /admin is admin-gated.
 // ─────────────────────────────────────────────────────────────────────────────
+function DevSection({ title, color, count, children }: { title: string; color: string; count: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 w-full text-left px-4 py-3 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+      >
+        <span className={`text-xs font-bold px-2 py-0.5 rounded ${color}`}>{count}</span>
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</span>
+        <span className="ml-auto">
+          {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        </span>
+      </button>
+      {open && <div className="p-4 space-y-2 bg-white dark:bg-slate-900/40">{children}</div>}
+    </div>
+  );
+}
+
 function InternalDevNotes() {
   const [open, setOpen] = useState(false);
 
+  // ── 1. COMPLETED ──────────────────────────────────────────────────────────
+  const completed = [
+    'Remove unused files from project (backup files, images, orphaned components, dead lib files)',
+    'Archive SQL migrations → migrations/archive/',
+    'Update .gitignore (tsconfig.tsbuildinfo, *.backup, *.bak)',
+    'Remove tsconfig.tsbuildinfo from git tracking',
+    'Document project context in CLAUDE.md',
+    'Standardize tier naming: basic/starter → "growth", premium/professional → "scale" across entire codebase',
+    'Fix inconsistent SubscriptionTier type (was preview/starter/professional, now growth/scale)',
+    'Remove "preview"/"free" tier references — replaced with unpaid state concept',
+    'Receptionist overhaul: AI now knows who it is (identity JSONB field, WHO YOU ARE block injected at top of every prompt)',
+    'Fixed {businessName} placeholder substitution in receptionist industry presets',
+    'Added isSoldEarly guard in SMS webhook — sold clients skip Flow AI entirely, go straight to Receptionist',
+    'Leads page: hideSold filter (default true) hides converted leads from active pipeline',
+    'Clients page: added 💬 Text quick-action per row, improved empty state with CTA',
+    'Follow-ups page: replaced "coming soon" modal with real lead-search form (live dropdown, title, due date, priority, notes)',
+    'Integrations page: removed 4 coming_soon stub cards (Landline Remover, Email, Zapier, Enterprise DNC) — kept Google Calendar only',
+    'Referrals page: removed coming soon stub → redirects to /roadmap',
+    'Team profile pages: moved from (dashboard) to (public) route group so they work without auth for preview page visitors',
+    'Admin page: added Internal Dev Notes panel (this section)',
+    'Flows page: full overhaul (AI conversation template builder)',
+  ];
+
+  // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
+  const todo = [
+    // Payments & Billing
+    { cat: 'Payments & Billing', item: 'Enforce payment at signup — no access without subscribing (card required during onboarding)' },
+    { cat: 'Payments & Billing', item: 'Show Scale tier point pack discount clearly on pricing/preview pages' },
+    { cat: 'Payments & Billing', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack' },
+    { cat: 'Payments & Billing', item: 'Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits' },
+    { cat: 'Payments & Billing', item: 'Plan management (upgrade/downgrade) inside Settings page' },
+    // Settings
+    { cat: 'Settings Page', item: 'Profile info section (name, email, business info)' },
+    { cat: 'Settings Page', item: 'Plan management section (current plan, upgrade/downgrade, billing)' },
+    { cat: 'Settings Page', item: 'Spam protection settings' },
+    { cat: 'Settings Page', item: 'DNC list management UI' },
+    { cat: 'Settings Page', item: 'Auto-buy configuration (enable/disable, pick pack size)' },
+    // Onboarding
+    { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
+    { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
+    { cat: 'Onboarding Rework', item: 'Guide user to set up AI Flows based on their industry' },
+    { cat: 'Onboarding Rework', item: 'Show industry-specific preset pipeline stages (user can customize)' },
+    { cat: 'Onboarding Rework', item: 'Optional Google Calendar connection step' },
+    // Leads vs Clients
+    { cat: 'Leads vs Clients', item: 'Add "mark as sold" action on leads to convert to client' },
+    { cat: 'Leads vs Clients', item: 'Split messages view into Lead conversations and Client conversations (tabs)' },
+    { cat: 'Leads vs Clients', item: 'Route Leads → Flows AI, Clients → Receptionist AI (full wiring)' },
+    // Flows
+    { cat: 'Flows', item: 'Industry-specific flow presets (insurance = DOB/household/income, real estate = budget/area, etc.)' },
+    { cat: 'Flows', item: 'Custom flow builder — user creates from scratch' },
+    { cat: 'Flows', item: 'Configurable required fields per flow' },
+    { cat: 'Flows', item: 'AI autonomy settings per flow (full auto, suggest replies, manual)' },
+    { cat: 'Flows', item: 'User can take over conversation at any time (AI stops or switches to suggest mode)' },
+    { cat: 'Flows', item: 'Flow completion → auto-book appointment → auto-tag "appointment set"' },
+    { cat: 'Flows', item: 'Flow trigger config: auto-on-reply vs manual assignment per campaign' },
+    // Dashboard
+    { cat: 'Dashboard Rework', item: 'Scrollable sections layout: appointments → unread messages → pipeline overview' },
+    { cat: 'Dashboard Rework', item: 'Upcoming appointments section (from Flows + Google Calendar)' },
+    { cat: 'Dashboard Rework', item: 'Unread messages section (leads + clients)' },
+    { cat: 'Dashboard Rework', item: 'Pipeline overview — lead counts by stage (visual pipeline view)' },
+    { cat: 'Dashboard Rework', item: 'Separate lead and client sections' },
+    // Tags & Pipeline
+    { cat: 'Tags & Pipeline', item: 'Support multiple tags per lead with one primary tag' },
+    { cat: 'Tags & Pipeline', item: 'Industry-specific preset tags loaded during onboarding' },
+    { cat: 'Tags & Pipeline', item: 'User can customize their own pipeline stages' },
+    { cat: 'Tags & Pipeline', item: 'Pipeline stages shown on dashboard' },
+    // Campaigns
+    { cat: 'Campaigns Rework', item: 'Redefine campaigns as lead type categories (health, life, auto, solar, etc.)' },
+    { cat: 'Campaigns Rework', item: 'Campaigns independent from tags' },
+    { cat: 'Campaigns Rework', item: 'Campaign determines which Flow presets are available' },
+    // Compliance
+    { cat: 'Compliance / DNC', item: 'Opt-out (STOP) = permanent DNC, completely blocked from all future messaging' },
+    { cat: 'Compliance / DNC', item: 'Lead record stays but is permanently locked — no ability to message again' },
+    { cat: 'Compliance / DNC', item: 'Verify current DNC implementation matches this behavior end-to-end' },
+    // Phone Numbers
+    { cat: 'Phone Numbers', item: 'One free number provisioned with plan during onboarding' },
+    { cat: 'Phone Numbers', item: 'Number porting (bring your own number) — required before launch' },
+    // Analytics
+    { cat: 'Analytics', item: 'Build /analytics page with full reporting' },
+    { cat: 'Analytics', item: 'Message delivery rates and response rates' },
+    { cat: 'Analytics', item: 'Campaign performance breakdowns' },
+    { cat: 'Analytics', item: 'Credits usage over time' },
+    { cat: 'Analytics', item: 'Charts and data visualization' },
+    { cat: 'Analytics', item: 'Export functionality (CSV/PDF)' },
+    // AI Behavior
+    { cat: 'AI Behavior', item: 'Industry-specific default tone presets' },
+    { cat: 'AI Behavior', item: 'User-customizable system prompt / AI personality' },
+    { cat: 'AI Behavior', item: 'AI guardrails (no promises, no legal/medical advice, no pricing unless configured)' },
+    // Preview / Landing
+    { cat: 'Preview / Landing Page', item: 'Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA' },
+    { cat: 'Preview / Landing Page', item: 'Clearly show Scale tier point pack discount as key differentiator' },
+    // Browser Extension
+    { cat: 'Browser Extension (MVP)', item: 'Scrape contact info from any platform the user is browsing' },
+    { cat: 'Browser Extension (MVP)', item: 'Import captured info into HyveWyre as a lead/client' },
+    { cat: 'Browser Extension (MVP)', item: 'Quick-send a message directly from the extension' },
+    // Notifications
+    { cat: 'Notifications', item: 'User-configurable notification preferences (per notification type)' },
+    { cat: 'Notifications', item: 'In-app notifications (bell/badge in dashboard)' },
+    { cat: 'Notifications', item: 'Email alerts' },
+    { cat: 'Notifications', item: 'SMS alerts to user personal phone' },
+    { cat: 'Notifications', item: 'Notification types: new messages, appointments, low credits, opt-outs, AI handoff requests' },
+    // Other
+    { cat: 'Other', item: 'Google Calendar integration for appointment booking from Flows' },
+    { cat: 'Other', item: 'AI suggest-reply mode (AI drafts, user reviews and sends)' },
+    { cat: 'Other', item: 'Inbound lead handling: Receptionist greets → user assigns as lead or client' },
+    { cat: 'Other', item: 'Admin panel updates to reflect new tier names and lead/client separation' },
+    { cat: 'Other', item: 'Opt-in page as generic compliance proof (not per-user branded)' },
+  ];
+
+  // ── 3. REMOVED STUBS ──────────────────────────────────────────────────────
   const removedStubs = [
     {
       route: '/referrals',
       name: 'Referral Program',
       status: 'Roadmap — Q4 2026',
       priority: 'low',
-      notes:
-        'Redirects to /roadmap. Full feature: unique referral link per user, 1 month free Scale tier per conversion, stacking rewards. Needs referral_codes table + Stripe credit hooks.',
+      notes: 'Redirects to /roadmap. Full feature: unique referral link per user, 1 month free Scale tier per conversion, stacking rewards. Needs referral_codes table + Stripe credit hooks.',
     },
     {
-      route: '/team/tripp-browning',
-      name: 'Team Profile — Tripp Browning',
-      status: 'Removed',
+      route: '/team/tripp-browning (dashboard)',
+      name: 'Team Profile — Tripp Browning (dashboard copy)',
+      status: 'Removed from dashboard — public copy lives at (public)/team/tripp-browning',
       priority: 'low',
-      notes:
-        'Redirects to /admin. Was a static authorized-representative profile page for Telnyx/carrier registration. If required again, rebuild as a proper /legal/authorized-reps route with minimal static content.',
+      notes: 'Dashboard version redirects to /dashboard. Public version is accessible from the preview page without auth.',
     },
     {
-      route: '/team/carson-rios',
-      name: 'Team Profile — Carson Rios',
-      status: 'Removed',
+      route: '/team/carson-rios (dashboard)',
+      name: 'Team Profile — Carson Rios (dashboard copy)',
+      status: 'Removed from dashboard — public copy lives at (public)/team/carson-rios',
       priority: 'low',
-      notes:
-        'Redirects to /admin. Same as above — static representative profile. Rebuild under /legal if carrier registration requires it.',
+      notes: 'Same as above.',
     },
     {
       route: '/integrations → Landline Remover',
       name: 'Landline Remover Integration',
       status: 'Roadmap — Q2 2026',
       priority: 'medium',
-      notes:
-        'Real-time landline/mobile detection before sending. Reduces bounce rates + saves credits on invalid numbers. Needs a phone validation API (e.g., Telnyx Number Lookup, Numverify, or Twilio Lookup). Could be auto-run on CSV import and manual lead entry.',
+      notes: 'Real-time landline/mobile detection before sending. Reduces bounce rates + saves credits. Needs Telnyx Number Lookup, Numverify, or similar API. Auto-run on CSV import + manual entry.',
     },
     {
       route: '/integrations → Email Integration',
       name: 'Email Integration',
       status: 'Roadmap — Q3 2026',
       priority: 'medium',
-      notes:
-        'Unified inbox for SMS + email. Needs email provider (SendGrid, Postmark, or SMTP). Requires messages table extension with email-specific fields. Templates, campaign sends, open/click tracking. Large scope — post-launch.',
+      notes: 'Unified inbox for SMS + email. Needs email provider (SendGrid, Postmark, or SMTP). Requires messages table extension, email templates, campaign sends, open/click tracking. Large scope — post-launch.',
     },
     {
       route: '/integrations → Zapier',
       name: 'Zapier Integration',
       status: 'Roadmap — Q3 2026',
       priority: 'medium',
-      notes:
-        'Webhook-based Zapier app. Triggers: new lead, lead status change, message received, appointment booked. Actions: create lead, send message, add to campaign. Needs a Zapier developer account and REST hooks implementation.',
+      notes: 'Webhook-based Zapier app. Triggers: new lead, status change, message received, appointment booked. Actions: create lead, send message, add to campaign.',
     },
     {
       route: '/integrations → Enterprise DNC List',
       name: 'Enterprise / Shared DNC List',
       status: 'Roadmap — Q4 2026',
       priority: 'low',
-      notes:
-        'Company-wide DNC that spans multiple team members (requires team/roles feature first). Also: national DNC registry scrub integration. Currently each user has their own DNC list which is sufficient for MVP.',
+      notes: 'Company-wide DNC spanning multiple team members (requires team/roles feature first). Also: national DNC registry scrub. Per-user DNC is sufficient for MVP.',
     },
   ];
+
+  // ── 4. ALL PAGES ──────────────────────────────────────────────────────────
+  const allPages = [
+    // Public
+    { route: '/preview', group: 'Public', desc: 'Landing page — hero, features, pricing, testimonials, CTA' },
+    { route: '/opt-in', group: 'Public', desc: 'Generic compliance proof / opt-in documentation' },
+    { route: '/compliance', group: 'Public', desc: 'Compliance information page' },
+    { route: '/privacy', group: 'Public', desc: 'Privacy policy' },
+    { route: '/terms', group: 'Public', desc: 'Terms of service' },
+    { route: '/refund', group: 'Public', desc: 'Refund policy' },
+    { route: '/team/tripp-browning', group: 'Public', desc: 'Founder profile — Tripp Browning (authorized representative)' },
+    { route: '/team/carson-rios', group: 'Public', desc: 'Founder profile — Carson Rios (CEO / authorized representative)' },
+    // Auth
+    { route: '/auth/login', group: 'Auth', desc: 'Login page' },
+    { route: '/auth/register', group: 'Auth', desc: 'Registration page' },
+    { route: '/auth/forgot-password', group: 'Auth', desc: 'Password reset request' },
+    { route: '/auth/reset-password', group: 'Auth', desc: 'Password reset (from email link)' },
+    { route: '/auth/callback', group: 'Auth', desc: 'Supabase OAuth callback handler' },
+    { route: '/auth/onboarding', group: 'Auth', desc: 'Post-signup onboarding flow' },
+    // Dashboard
+    { route: '/dashboard', group: 'Dashboard', desc: 'Main dashboard — appointments, unread messages, pipeline overview' },
+    { route: '/leads', group: 'Dashboard', desc: 'Lead contact list — campaign assignment, tagging, filtering, bulk actions' },
+    { route: '/clients', group: 'Dashboard', desc: 'Sold/active customers — managed by Receptionist AI' },
+    { route: '/texts', group: 'Dashboard', desc: 'Conversation inbox — lead and client threads (tabs)' },
+    { route: '/campaigns', group: 'Dashboard', desc: 'Lead type categories — bulk outreach, batch sending, campaign stats' },
+    { route: '/flows', group: 'Dashboard', desc: 'AI conversation templates — qualify leads, book appointments' },
+    { route: '/follow-ups', group: 'Dashboard', desc: 'Follow-up task manager — due dates, priorities, lead-linked' },
+    { route: '/phone-numbers', group: 'Dashboard', desc: 'Search/purchase local numbers via Telnyx' },
+    { route: '/points', group: 'Dashboard', desc: 'Credit balance, transaction history, buy point packs' },
+    { route: '/receptionist', group: 'Dashboard', desc: 'AI auto-reply config for clients and inbound leads' },
+    { route: '/integrations', group: 'Dashboard', desc: 'Third-party integrations — currently Google Calendar only' },
+    { route: '/analytics', group: 'Dashboard', desc: 'Full reporting: delivery rates, response rates, campaign performance, credits' },
+    { route: '/settings', group: 'Dashboard', desc: 'Profile, plan management, spam protection, DNC, auto-buy' },
+    { route: '/roadmap', group: 'Dashboard', desc: 'Public product roadmap — upcoming features and referral program preview' },
+    { route: '/admin', group: 'Dashboard', desc: 'Admin panel — user management, usage analytics, spam monitoring (admin-only)' },
+    // Redirects
+    { route: '/referrals', group: 'Redirects', desc: '→ /roadmap (referral program not built yet)' },
+    { route: '/team/tripp-browning (dashboard)', group: 'Redirects', desc: '→ /dashboard (public copy exists at (public)/team/tripp-browning)' },
+    { route: '/team/carson-rios (dashboard)', group: 'Redirects', desc: '→ /dashboard (public copy exists at (public)/team/carson-rios)' },
+    // Dev / Test
+    { route: '/test-ai', group: 'Dev/Test', desc: 'AI response testing sandbox — keep for dev, remove before launch' },
+    { route: '/test-points', group: 'Dev/Test', desc: 'Points/credits testing page — keep for dev, remove before launch' },
+  ];
+
+  const groups = [...new Set(allPages.map(p => p.group))];
+
+  const groupColors: Record<string, string> = {
+    Public: 'text-sky-700 bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400',
+    Auth: 'text-violet-700 bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400',
+    Dashboard: 'text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400',
+    Redirects: 'text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400',
+    'Dev/Test': 'text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400',
+  };
 
   const priorityColors: Record<string, string> = {
     high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -1125,53 +1301,101 @@ function InternalDevNotes() {
     low: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
   };
 
+  const todoByCategory = todo.reduce<Record<string, string[]>>((acc, t) => {
+    if (!acc[t.cat]) acc[t.cat] = [];
+    acc[t.cat].push(t.item);
+    return acc;
+  }, {});
+
   return (
     <div className="mt-12 border-t-2 border-dashed border-slate-300 dark:border-slate-700 pt-8">
+      {/* Master toggle */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-3 w-full text-left group"
+        className="flex items-center gap-3 w-full text-left group mb-4"
       >
         <ShieldAlert className="h-5 w-5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors" />
         <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors uppercase tracking-widest">
           Internal Dev Notes
         </span>
+        <span className="text-xs text-slate-400 ml-2">
+          {completed.length} done · {todo.length} todo · {removedStubs.length} stubs · {allPages.length} pages
+        </span>
         <span className="ml-auto">
-          {open
-            ? <ChevronDown className="h-4 w-4 text-slate-400" />
-            : <ChevronRight className="h-4 w-4 text-slate-400" />
-          }
+          {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
         </span>
       </button>
 
       {open && (
-        <div className="mt-4 space-y-3">
-          <p className="text-xs text-slate-500 dark:text-slate-500 italic mb-4">
-            Features removed from the UI as stubs / placeholders. Tracked here for dev reference only.
-            Not visible to end users. Last updated: March 2026.
+        <div className="space-y-3">
+          <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+            Admin-only. Not visible to regular users. Last updated: March 2026.
           </p>
 
-          {removedStubs.map((item) => (
-            <div
-              key={item.route}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4"
-            >
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
-                    {item.route}
-                  </span>
-                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                    {item.name}
-                  </span>
-                </div>
-                <span className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${priorityColors[item.priority]}`}>
-                  {item.priority}
-                </span>
+          {/* ── SECTION 1: COMPLETED ── */}
+          <DevSection title="Completed Items" color="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" count={completed.length}>
+            {completed.map((item, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400 py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                <span>{item}</span>
               </div>
-              <div className="text-xs text-sky-600 dark:text-sky-500 mb-2">{item.status}</div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{item.notes}</p>
-            </div>
-          ))}
+            ))}
+          </DevSection>
+
+          {/* ── SECTION 2: TODO ── */}
+          <DevSection title="Pre-Launch Todo" color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" count={todo.length}>
+            {Object.entries(todoByCategory).map(([cat, items]) => (
+              <div key={cat} className="mb-4 last:mb-0">
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                  {cat}
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                {items.map((item, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400 py-1">
+                    <XCircle className="h-3.5 w-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </DevSection>
+
+          {/* ── SECTION 3: REMOVED STUBS ── */}
+          <DevSection title="Removed Stubs / Placeholders" color="bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300" count={removedStubs.length}>
+            {removedStubs.map((item) => (
+              <div key={item.route} className="rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 mb-2 last:mb-0">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{item.route}</span>
+                    <span className="font-semibold text-xs text-slate-700 dark:text-slate-200">{item.name}</span>
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap flex-shrink-0 ${priorityColors[item.priority]}`}>{item.priority}</span>
+                </div>
+                <div className="text-xs text-sky-600 dark:text-sky-500 mb-1">{item.status}</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.notes}</p>
+              </div>
+            ))}
+          </DevSection>
+
+          {/* ── SECTION 4: ALL PAGES ── */}
+          <DevSection title="All Pages / Routes" color="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" count={allPages.length}>
+            {groups.map(group => (
+              <div key={group} className="mb-4 last:mb-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${groupColors[group] || 'text-slate-600 bg-slate-100'}`}>{group}</span>
+                  <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                </div>
+                {allPages.filter(p => p.group === group).map((page, i) => (
+                  <div key={i} className="flex items-start gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                    <span className="font-mono text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded min-w-0 flex-shrink-0">{page.route}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{page.desc}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </DevSection>
+
         </div>
       )}
     </div>
