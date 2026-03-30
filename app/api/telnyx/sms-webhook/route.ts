@@ -96,10 +96,10 @@ export async function POST(req: NextRequest) {
       has_timestamp: !!timestamp,
     });
 
-    // Verify webhook authenticity in production
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction && (!signature || !timestamp)) {
-      console.error('❌ Missing Telnyx webhook signature headers');
+    // CRIT-3: Verify signature whenever TELNYX_PUBLIC_KEY is set — not just in production.
+    // Skipping verification in dev/staging allows forged webhooks to be accepted.
+    if (publicKey && (!signature || !timestamp)) {
+      console.error('❌ Missing Telnyx webhook signature headers (TELNYX_PUBLIC_KEY is set, verification required)');
       return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
     }
     if (publicKey && signature && timestamp) {
@@ -119,11 +119,9 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
       } catch (verifyErr) {
-        // If verification fails due to key format issues, log but allow in non-production
-        console.warn('⚠️ Webhook signature verification error:', verifyErr);
-        if (isProduction) {
-          return NextResponse.json({ error: 'Signature verification failed' }, { status: 401 });
-        }
+        // CRIT-3: Reject on verification error whenever TELNYX_PUBLIC_KEY is configured
+        console.error('❌ Webhook signature verification error:', verifyErr);
+        return NextResponse.json({ error: 'Signature verification failed' }, { status: 401 });
       }
     }
 

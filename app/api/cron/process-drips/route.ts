@@ -174,30 +174,37 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Check stop-on-reply: skip if lead has replied since enrollment
-        const { data: replyCheck } = await supabaseAdmin
-          .from('messages')
-          .select('id')
-          .eq('direction', 'inbound')
-          .gte('created_at', enrollment.created_at || enrollment.enrolled_at || '2000-01-01')
-          .limit(1);
+        // MED-6: Check stop-on-reply — pause enrollment if lead has replied since enrolled.
+        // Handles both lead_id and phone-based lookups (null lead_id was dead code before).
+        {
+          const enrolledSince = enrollment.enrolled_at || enrollment.created_at || '2000-01-01';
+          let threadIds: string[] = [];
 
-        // Find if the lead has a thread with inbound messages
-        if (enrollment.lead_id) {
-          const { data: leadThreads } = await supabaseAdmin
-            .from('threads')
-            .select('id')
-            .eq('lead_id', enrollment.lead_id)
-            .eq('user_id', enrollment.user_id);
+          if (enrollment.lead_id) {
+            // Preferred: look up threads by lead_id
+            const { data: leadThreads } = await supabaseAdmin
+              .from('threads')
+              .select('id')
+              .eq('lead_id', enrollment.lead_id)
+              .eq('user_id', enrollment.user_id);
+            threadIds = (leadThreads || []).map((t: any) => t.id);
+          } else if (enrollment.phone_number) {
+            // Fallback: look up threads by phone number when lead_id is null
+            const { data: phoneThreads } = await supabaseAdmin
+              .from('threads')
+              .select('id')
+              .eq('phone_number', enrollment.phone_number)
+              .eq('user_id', enrollment.user_id);
+            threadIds = (phoneThreads || []).map((t: any) => t.id);
+          }
 
-          if (leadThreads && leadThreads.length > 0) {
-            const threadIds = leadThreads.map(t => t.id);
+          if (threadIds.length > 0) {
             const { count: replyCount } = await supabaseAdmin
               .from('messages')
               .select('id', { count: 'exact', head: true })
               .in('thread_id', threadIds)
               .eq('direction', 'inbound')
-              .gte('created_at', enrollment.enrolled_at || enrollment.created_at || '2000-01-01');
+              .gte('created_at', enrolledSince);
 
             if (replyCount && replyCount > 0) {
               console.log(`⏸️ Drip: Lead replied — pausing enrollment ${enrollment.id}`);

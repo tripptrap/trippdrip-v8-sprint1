@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import Stripe from 'stripe';
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -19,6 +20,31 @@ export async function DELETE(req: NextRequest) {
 
     // Create service role client for database operations
     const adminClient = createServiceRoleClient();
+
+    // LOW-8: Cancel Stripe subscription before deleting account so billing stops immediately
+    try {
+      const { data: userRow } = await adminClient
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .single();
+
+      if (userRow?.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY.trim());
+        const subscriptions = await stripe.subscriptions.list({
+          customer: userRow.stripe_customer_id,
+          status: 'active',
+          limit: 10,
+        });
+        for (const sub of subscriptions.data) {
+          await stripe.subscriptions.cancel(sub.id);
+          console.log(`✅ Cancelled Stripe subscription ${sub.id} for user ${userId}`);
+        }
+      }
+    } catch (stripeErr) {
+      console.error('Error cancelling Stripe subscription during account deletion:', stripeErr);
+      // Non-fatal — continue with account deletion
+    }
 
     // Delete all user data using service role client (bypasses RLS)
     // Delete in order respecting foreign key constraints
