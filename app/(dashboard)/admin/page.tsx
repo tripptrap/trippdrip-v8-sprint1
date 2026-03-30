@@ -1132,26 +1132,45 @@ function InternalDevNotes() {
     'Onboarding — industry-specific pipeline stages & campaigns: step 4 loads INDUSTRY_PRESETS[industry] tags + campaigns, user can toggle on/off before applying',
     'Onboarding — optional Google Calendar connection: step 6 with OAuth flow, skippable, returns to onboarding after auth',
     'Number porting: porting_orders table, POST/GET /api/telnyx/port-number, full form UI with status tracker, Telnyx porting API submission with review_needed fallback',
+    'Deep audit (42 findings): removed legacy sms_messages writes, fixed column name mismatches, switched number-order webhook to Ed25519, expanded porting webhook statuses, default opt-out to STOP, added rollback on disposition failure, insert-before-delete for drip steps, Google Calendar token refresh, spam score stored on inbound messages, removed premature toll-free activation, DB-side filtering on leads/list',
+    'Out-of-credits blocker: OutOfCreditsBlocker.tsx blocks all SMS/AI when credits=0, links to /points',
+    'AI suggest-reply mode: pending_ai_draft on threads, approve/dismiss in Composer',
+    'SMS alerts to personal phone: api/notifications/sms-alert with per-type toggles',
+    'Email alerts: api/notifications/email-alert with SendGrid/SMTP + 4 templates',
+    'Browser extension quick-send: popup.js sends SMS directly via API',
+    'Admin panel: updated to Growth/Scale tier names + lead/client separation',
   ];
 
-  // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
-  const todo = [
-    // Payments & Billing
-    { cat: 'Payments & Billing', item: 'Enforce payment at signup — no access without subscribing (card required during onboarding)' },
-    { cat: 'Payments & Billing', item: 'Show Scale tier point pack discount clearly on pricing/preview pages' },
-    { cat: 'Payments & Billing', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack' },
-    { cat: 'Payments & Billing', item: 'Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits' },
-    // Onboarding still needed
-    { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
-    { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
-    { cat: 'Onboarding Rework', item: 'Guide user to set up AI Flows based on their industry' },
-    { cat: 'Onboarding Rework', item: 'Show industry-specific preset pipeline stages (user can customize)' },
-    { cat: 'Onboarding Rework', item: 'Optional Google Calendar connection step' },
-    // Payments (deferred)
-    { cat: 'Payments & Billing (deferred)', item: 'Enforce payment at signup — no access without subscribing' },
-    { cat: 'Payments & Billing (deferred)', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt to buy point pack' },
-    { cat: 'Payments & Billing (deferred)', item: 'Auto-buy feature: auto-purchase point pack at zero credits' },
-    { cat: 'Payments & Billing (deferred)', item: 'Show Scale tier point pack discount on pricing page' },
+  // ── 2. PRODUCTION WIRING CHECKLIST ─────────────────────────────────────────
+  const prodChecklist = [
+    { cat: 'Telnyx Dashboard', item: 'SMS webhook URL → https://YOUR_DOMAIN/api/telnyx/sms-webhook', done: false },
+    { cat: 'Telnyx Dashboard', item: 'Number order webhook URL → https://YOUR_DOMAIN/api/telnyx/number-order-webhook', done: false },
+    { cat: 'Telnyx Dashboard', item: 'Messaging Profile ID matches TELNYX_MESSAGING_PROFILE_ID env var', done: false },
+    { cat: 'Telnyx Dashboard', item: 'Public key matches TELNYX_PUBLIC_KEY env var (for Ed25519 signature verification)', done: false },
+    { cat: 'Stripe Dashboard', item: 'Webhook endpoint → https://YOUR_DOMAIN/api/stripe/webhook', done: false },
+    { cat: 'Stripe Dashboard', item: 'Growth subscription price exists: price_1SQtYHFyk0lZUopFNa0lT81K', done: false },
+    { cat: 'Stripe Dashboard', item: 'Scale subscription price exists: price_1SQtaUFyk0lZUopFRJnuLftL', done: false },
+    { cat: 'Stripe Dashboard', item: '8 point pack prices exist (4 Growth + 4 Scale — see api/stripe/create-checkout)', done: false },
+    { cat: 'Stripe Dashboard', item: 'Create real phone number subscription price → set STRIPE_PHONE_NUMBER_PRICE_ID', done: false },
+    { cat: 'Google Cloud Console', item: 'OAuth redirect URI includes production domain: https://YOUR_DOMAIN/api/calendar/oauth/callback', done: false },
+    { cat: 'Vercel Env Vars', item: 'All .env.local vars copied to Vercel (Production)', done: false },
+    { cat: 'Vercel Env Vars', item: 'SENDGRID_API_KEY or SMTP_USER + SMTP_PASSWORD + SMTP_HOST (for email alerts)', done: false },
+    { cat: 'Vercel Env Vars', item: 'SYSTEM_API_KEY — generate with: openssl rand -hex 32', done: false },
+    { cat: 'Vercel Env Vars', item: 'CRON_SECRET — verify matches what Vercel uses for cron auth', done: false },
+    { cat: 'Vercel Cron', item: 'process-scheduled running every 5 min ✓ (in vercel.json)', done: true },
+    { cat: 'Vercel Cron', item: 'process-drips running every 10 min ✓ (in vercel.json)', done: true },
+    { cat: 'Vercel Cron', item: 'process-ai-drips running every 10 min ✓ (in vercel.json)', done: true },
+    { cat: 'Vercel Cron', item: 'auto-buy running hourly ✓ (in vercel.json)', done: true },
+    { cat: 'Vercel Cron', item: 'send-appointment-reminders running every 2 hrs ✓ (in vercel.json)', done: true },
+    { cat: 'Smoke Test', item: 'Register → pick Growth plan → pay with Stripe test card', done: false },
+    { cat: 'Smoke Test', item: 'Onboarding → pick industry → get free number provisioned', done: false },
+    { cat: 'Smoke Test', item: 'Import a lead → send an SMS → confirm delivery in Telnyx', done: false },
+    { cat: 'Smoke Test', item: 'Receive inbound reply → confirm webhook fires → message appears', done: false },
+    { cat: 'Smoke Test', item: 'AI Flow kicks in → qualifies lead → books appointment', done: false },
+    { cat: 'Smoke Test', item: 'Mark lead as sold → appears in /clients', done: false },
+    { cat: 'Smoke Test', item: 'Dashboard shows appointments, unread messages, pipeline', done: false },
+    { cat: 'Smoke Test', item: 'Analytics page loads with real data', done: false },
+    { cat: 'Smoke Test', item: 'Notifications fire (in-app, email, SMS to personal phone)', done: false },
   ];
 
   // ── 3. REMOVED STUBS ──────────────────────────────────────────────────────
@@ -1266,11 +1285,13 @@ function InternalDevNotes() {
     low: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400',
   };
 
-  const todoByCategory = todo.reduce<Record<string, string[]>>((acc, t) => {
+  const todoByCategory = prodChecklist.reduce<Record<string, { item: string; done: boolean }[]>>((acc, t) => {
     if (!acc[t.cat]) acc[t.cat] = [];
-    acc[t.cat].push(t.item);
+    acc[t.cat].push({ item: t.item, done: t.done });
     return acc;
   }, {});
+  const checklistDone = prodChecklist.filter(c => c.done).length;
+  const checklistTotal = prodChecklist.length;
 
   return (
     <div className="mt-12 border-t-2 border-dashed border-slate-300 dark:border-slate-700 pt-8">
@@ -1284,7 +1305,7 @@ function InternalDevNotes() {
           Internal Dev Notes
         </span>
         <span className="text-xs text-slate-400 ml-2">
-          {completed.length} done · {todo.length} todo · {removedStubs.length} stubs · {allPages.length} pages
+          {completed.length} done · {checklistDone}/{checklistTotal} wired · {removedStubs.length} stubs · {allPages.length} pages
         </span>
         <span className="ml-auto">
           {open ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
@@ -1307,8 +1328,14 @@ function InternalDevNotes() {
             ))}
           </DevSection>
 
-          {/* ── SECTION 2: TODO ── */}
-          <DevSection title="Pre-Launch Todo" color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" count={todo.length}>
+          {/* ── SECTION 2: PRODUCTION WIRING CHECKLIST ── */}
+          <DevSection title={`Production Wiring Checklist (${checklistDone}/${checklistTotal})`} color="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" count={checklistTotal - checklistDone}>
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${(checklistDone / checklistTotal) * 100}%` }} />
+              </div>
+              <span className="text-xs font-mono text-slate-500">{Math.round((checklistDone / checklistTotal) * 100)}%</span>
+            </div>
             {Object.entries(todoByCategory).map(([cat, items]) => (
               <div key={cat} className="mb-4 last:mb-0">
                 <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-2 flex items-center gap-2">
@@ -1316,10 +1343,13 @@ function InternalDevNotes() {
                   {cat}
                   <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
                 </div>
-                {items.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400 py-1">
-                    <XCircle className="h-3.5 w-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                    <span>{item}</span>
+                {items.map((entry, i) => (
+                  <div key={i} className={`flex items-start gap-2 text-xs py-1 ${entry.done ? 'text-slate-400 dark:text-slate-600 line-through' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {entry.done
+                      ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      : <XCircle className="h-3.5 w-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                    }
+                    <span>{entry.item}</span>
                   </div>
                 ))}
               </div>
