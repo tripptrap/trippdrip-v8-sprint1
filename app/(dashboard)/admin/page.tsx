@@ -1114,6 +1114,17 @@ function InternalDevNotes() {
     'Settings — DNC list management UI (DNC tab)',
     'Settings — Auto-buy configuration: enable toggle, refill threshold, refill amount, estimated cost (Auto-Refill tab)',
     'Notifications: in-app bell/badge, SMS alerts, email alerts, per-type toggles (new message, appointment, low credits, opt-out) — all channels wired',
+    'Leads vs Clients — Mark as sold: disposition dropdown on leads page with sold option, hideSold filter, converts lead to client',
+    'Leads vs Clients — Split messages tabs: Lead vs Client tabs in TextsLayout, separate Flow AI and Receptionist toggles per contact type',
+    'Leads vs Clients — Routing: SMS webhook checks disposition → leads go to Flow AI, sold clients go to Receptionist (isSoldEarly guard)',
+    'Flows — Industry presets: insurance, real estate, solar, roofing, home services templates via lib/flowTemplates',
+    'Flows — Custom flow builder: full editor UI with Start from Scratch option',
+    'Flows — AI autonomy: full_auto / suggest / manual per flow, SMS webhook respects the mode',
+    'Flows — Flow completion → auto-tag "appointment set": wired in conversations/complete route + sms-webhook',
+    'Tags & Pipeline — Multi-tag per lead with one primary tag: tags TEXT[] + primary_tag column, updated on flow completion',
+    'Compliance/DNC — STOP = permanent block: OPT_OUT_KEYWORDS list, DNC insert, sms_opt_in=false, receptionist skipped',
+    'Analytics page: full /analytics with overview + automation tabs, campaign performance, charts, CSV export',
+    'Preview/Landing page: hero, features, pricing table, demo conversations, industry sections built in PreviewClient.tsx',
   ];
 
   // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
@@ -1129,62 +1140,22 @@ function InternalDevNotes() {
     { cat: 'Onboarding Rework', item: 'Guide user to set up AI Flows based on their industry' },
     { cat: 'Onboarding Rework', item: 'Show industry-specific preset pipeline stages (user can customize)' },
     { cat: 'Onboarding Rework', item: 'Optional Google Calendar connection step' },
-    // Leads vs Clients
-    { cat: 'Leads vs Clients', item: 'Add "mark as sold" action on leads to convert to client' },
-    { cat: 'Leads vs Clients', item: 'Split messages view into Lead conversations and Client conversations (tabs)' },
-    { cat: 'Leads vs Clients', item: 'Route Leads → Flows AI, Clients → Receptionist AI (full wiring)' },
-    // Flows
-    { cat: 'Flows', item: 'Industry-specific flow presets (insurance = DOB/household/income, real estate = budget/area, etc.)' },
-    { cat: 'Flows', item: 'Custom flow builder — user creates from scratch' },
-    { cat: 'Flows', item: 'Configurable required fields per flow' },
-    { cat: 'Flows', item: 'AI autonomy settings per flow (full auto, suggest replies, manual)' },
-    { cat: 'Flows', item: 'User can take over conversation at any time (AI stops or switches to suggest mode)' },
-    { cat: 'Flows', item: 'Flow completion → auto-book appointment → auto-tag "appointment set"' },
-    { cat: 'Flows', item: 'Flow trigger config: auto-on-reply vs manual assignment per campaign' },
-    // Dashboard
-    { cat: 'Dashboard Rework', item: 'Scrollable sections layout: appointments → unread messages → pipeline overview' },
-    { cat: 'Dashboard Rework', item: 'Upcoming appointments section (from Flows + Google Calendar)' },
-    { cat: 'Dashboard Rework', item: 'Unread messages section (leads + clients)' },
-    { cat: 'Dashboard Rework', item: 'Pipeline overview — lead counts by stage (visual pipeline view)' },
-    { cat: 'Dashboard Rework', item: 'Separate lead and client sections' },
-    // Tags & Pipeline
-    { cat: 'Tags & Pipeline', item: 'Support multiple tags per lead with one primary tag' },
-    { cat: 'Tags & Pipeline', item: 'Industry-specific preset tags loaded during onboarding' },
-    { cat: 'Tags & Pipeline', item: 'User can customize their own pipeline stages' },
-    { cat: 'Tags & Pipeline', item: 'Pipeline stages shown on dashboard' },
-    // Campaigns
-    { cat: 'Campaigns Rework', item: 'Redefine campaigns as lead type categories (health, life, auto, solar, etc.)' },
-    { cat: 'Campaigns Rework', item: 'Campaigns independent from tags' },
-    { cat: 'Campaigns Rework', item: 'Campaign determines which Flow presets are available' },
-    // Compliance
-    { cat: 'Compliance / DNC', item: 'Opt-out (STOP) = permanent DNC, completely blocked from all future messaging' },
-    { cat: 'Compliance / DNC', item: 'Lead record stays but is permanently locked — no ability to message again' },
-    { cat: 'Compliance / DNC', item: 'Verify current DNC implementation matches this behavior end-to-end' },
+    // Campaigns (partial — backend schema exists, frontend UI incomplete)
+    { cat: 'Campaigns Rework', item: 'Lead type category UI — filter/organize campaigns by industry type (backend lead_type field exists, frontend not wired)' },
     // Phone Numbers
     { cat: 'Phone Numbers', item: 'One free number provisioned with plan during onboarding' },
     { cat: 'Phone Numbers', item: 'Number porting (bring your own number) — required before launch' },
-    // Analytics
-    { cat: 'Analytics', item: 'Build /analytics page with full reporting' },
-    { cat: 'Analytics', item: 'Message delivery rates and response rates' },
-    { cat: 'Analytics', item: 'Campaign performance breakdowns' },
-    { cat: 'Analytics', item: 'Credits usage over time' },
-    { cat: 'Analytics', item: 'Charts and data visualization' },
-    { cat: 'Analytics', item: 'Export functionality (CSV/PDF)' },
-    // AI Behavior
-    { cat: 'AI Behavior', item: 'Industry-specific default tone presets' },
-    { cat: 'AI Behavior', item: 'User-customizable system prompt / AI personality' },
-    { cat: 'AI Behavior', item: 'AI guardrails (no promises, no legal/medical advice, no pricing unless configured)' },
-    // Preview / Landing
-    { cat: 'Preview / Landing Page', item: 'Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA' },
-    { cat: 'Preview / Landing Page', item: 'Clearly show Scale tier point pack discount as key differentiator' },
-    // Notifications
-    { cat: 'Notifications', item: 'AI handoff request notifications (not yet wired)' },
-    // Other
-    { cat: 'Other', item: 'Google Calendar integration for appointment booking from Flows' },
-    { cat: 'Other', item: 'AI suggest-reply mode (AI drafts, user reviews and sends)' },
-    { cat: 'Other', item: 'Inbound lead handling: Receptionist greets → user assigns as lead or client' },
-    { cat: 'Other', item: 'Admin panel updates to reflect new tier names and lead/client separation' },
-    { cat: 'Other', item: 'Opt-in page as generic compliance proof (not per-user branded)' },
+    // Onboarding still needed
+    { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
+    { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
+    { cat: 'Onboarding Rework', item: 'Guide user to set up AI Flows based on their industry' },
+    { cat: 'Onboarding Rework', item: 'Show industry-specific preset pipeline stages (user can customize)' },
+    { cat: 'Onboarding Rework', item: 'Optional Google Calendar connection step' },
+    // Payments (deferred)
+    { cat: 'Payments & Billing (deferred)', item: 'Enforce payment at signup — no access without subscribing' },
+    { cat: 'Payments & Billing (deferred)', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt to buy point pack' },
+    { cat: 'Payments & Billing (deferred)', item: 'Auto-buy feature: auto-purchase point pack at zero credits' },
+    { cat: 'Payments & Billing (deferred)', item: 'Show Scale tier point pack discount on pricing page' },
   ];
 
   // ── 3. REMOVED STUBS ──────────────────────────────────────────────────────
