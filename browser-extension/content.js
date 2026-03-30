@@ -1,12 +1,146 @@
-// Content script for VanillaSoft pages
-// Enhanced with keyboard shortcuts, MutationObserver, and preview page scraping
+// Content script for all pages
+// Detects lead/contact data on any website and imports into HyveWyre
 
-console.log('HyveWyre VanillaSoft Extension: Content script loaded');
+console.log('HyveWyre Extension: Content script loaded');
 
 // State
 let lastExtractedLead = null;
 let isExtracting = false;
 let observer = null;
+
+// Detect which platform/site the user is currently on
+function detectPlatform() {
+  const host = window.location.hostname.toLowerCase();
+  if (host.includes('linkedin.com')) return 'LinkedIn';
+  if (host.includes('facebook.com') || host.includes('fb.com')) return 'Facebook';
+  if (host.includes('maps.google.com') || host.includes('google.com/maps')) return 'Google Maps';
+  if (host.includes('instagram.com')) return 'Instagram';
+  if (host.includes('twitter.com') || host.includes('x.com')) return 'X (Twitter)';
+  if (host.includes('yelp.com')) return 'Yelp';
+  if (host.includes('zillow.com')) return 'Zillow';
+  if (host.includes('realtor.com')) return 'Realtor.com';
+  if (host.includes('vanillasoft.com')) return 'VanillaSoft';
+  if (host.includes('salesforce.com')) return 'Salesforce';
+  if (host.includes('hubspot.com')) return 'HubSpot';
+  return host.replace(/^www\./, '');
+}
+
+// Platform-specific extractors
+function extractFromLinkedIn(lead) {
+  // Name from profile header
+  const nameEl = document.querySelector('h1.text-heading-xlarge, h1[class*="heading"]');
+  if (nameEl && !lead.firstName) {
+    const names = nameEl.textContent.trim().split(/\s+/);
+    lead.firstName = names[0] || '';
+    lead.lastName = names.slice(1).join(' ') || '';
+  }
+
+  // Company / current title from the sub-header
+  const titleEl = document.querySelector(
+    '.pv-text-details__left-panel .text-body-medium, ' +
+    '[class*="headline"], [data-generated-suggestion-target] .text-body-medium'
+  );
+  if (titleEl && !lead.company) {
+    const text = titleEl.textContent.trim();
+    // Title may read "Role at Company" — grab everything after " at "
+    const atIdx = text.toLowerCase().indexOf(' at ');
+    lead.company = atIdx !== -1 ? text.slice(atIdx + 4).trim() : text;
+  }
+
+  // Location
+  if (!lead.state) {
+    const locEl = document.querySelector(
+      '.pv-top-card--list .text-body-small.inline, ' +
+      '[class*="top-card"] .text-body-small'
+    );
+    if (locEl) lead.state = locEl.textContent.trim();
+  }
+
+  // Contact info section (only visible if already expanded)
+  const emailEl = document.querySelector('section.pv-contact-info a[href^="mailto:"]');
+  if (emailEl && !lead.email) lead.email = emailEl.href.replace('mailto:', '').split('?')[0];
+
+  const phoneEl = document.querySelector('section.pv-contact-info span.t-14.t-black.t-normal');
+  if (phoneEl && !lead.phone) lead.phone = phoneEl.textContent.trim();
+}
+
+function extractFromFacebook(lead) {
+  // Profile name
+  if (!lead.firstName) {
+    const nameEl = document.querySelector(
+      'h1[class*="x1heor9g"], ' +
+      '[data-pagelet="ProfileTilesFeed"] h1, ' +
+      'h1'
+    );
+    if (nameEl) {
+      const names = nameEl.textContent.trim().split(/\s+/);
+      lead.firstName = names[0] || '';
+      lead.lastName = names.slice(1).join(' ') || '';
+    }
+  }
+
+  // Phone / email from About / Intro panel
+  const aboutLinks = document.querySelectorAll('a[href^="tel:"], a[href^="mailto:"]');
+  aboutLinks.forEach(link => {
+    if (link.href.startsWith('tel:') && !lead.phone) {
+      lead.phone = link.href.replace('tel:', '');
+    }
+    if (link.href.startsWith('mailto:') && !lead.email) {
+      lead.email = link.href.replace('mailto:', '').split('?')[0];
+    }
+  });
+}
+
+function extractFromGoogleMaps(lead) {
+  // Business name
+  if (!lead.firstName) {
+    const nameEl = document.querySelector('h1.DUwDvf, h1[class*="fontHeadlineLarge"]');
+    if (nameEl) {
+      lead.firstName = nameEl.textContent.trim();
+    }
+  }
+
+  // Phone — shown in the info panel with aria-label "Phone: …"
+  if (!lead.phone) {
+    const phoneEl = document.querySelector(
+      '[data-tooltip*="phone" i], [aria-label*="Phone" i], ' +
+      'button[data-item-id*="phone"] .fontBodyMedium'
+    );
+    if (phoneEl) {
+      lead.phone = (phoneEl.getAttribute('aria-label') || phoneEl.textContent)
+        .replace(/phone[:\s]*/i, '').trim();
+    }
+  }
+
+  // Address → state approximation
+  if (!lead.state) {
+    const addrEl = document.querySelector(
+      '[data-tooltip*="address" i], [aria-label*="Address" i], ' +
+      'button[data-item-id*="address"] .fontBodyMedium'
+    );
+    if (addrEl) {
+      const addr = (addrEl.getAttribute('aria-label') || addrEl.textContent)
+        .replace(/address[:\s]*/i, '').trim();
+      // Try to pull state abbreviation from the end of the address
+      const stateMatch = addr.match(/,\s*([A-Z]{2})\s*\d{5}/) || addr.match(/([A-Z]{2})\s*\d{5}/);
+      lead.state = stateMatch ? stateMatch[1] : addr;
+    }
+  }
+}
+
+function extractFromYelp(lead) {
+  // Business name
+  if (!lead.firstName) {
+    const nameEl = document.querySelector('h1.css-1se7tcw, h1[class*="businessName"], h1');
+    if (nameEl) lead.firstName = nameEl.textContent.trim();
+  }
+
+  // Phone
+  if (!lead.phone) {
+    const phoneEl = document.querySelector('p.css-1p9ibgf a[href^="tel:"], a[href^="tel:"]');
+    if (phoneEl) lead.phone = phoneEl.href.replace('tel:', '');
+  }
+}
 
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -28,7 +162,7 @@ function initialize() {
 
   // Check if on preview page and extract data
   if (isPreviewPage()) {
-    console.log('HyveWyre: Preview page detected');
+    console.log('HyveWyre: Profile/preview page detected');
     const lead = scrapePublicProfile();
     if (lead) {
       lastExtractedLead = lead;
@@ -96,7 +230,7 @@ function setupMutationObserver() {
       });
 
       if (hasRelevantChanges && !isExtracting) {
-        console.log('HyveWyre: DOM changes detected, re-extracting lead data');
+        console.log('HyveWyre: DOM changed, re-extracting lead data');
         const lead = extractLeadData();
         if (lead && hasSignificantChanges(lead, lastExtractedLead)) {
           lastExtractedLead = lead;
@@ -278,8 +412,8 @@ function extractLeadData() {
   isExtracting = true;
 
   try {
-    // VanillaSoft typically displays lead information in various formats
-    // This is a generic extraction that looks for common patterns
+    // Generic extraction that works across any website.
+    // Platform-specific extractors run first, then generic fallbacks fill any gaps.
 
     const lead = {
       firstName: '',
@@ -290,6 +424,13 @@ function extractLeadData() {
       state: '',
       notes: ''
     };
+
+    // Method 0: Platform-specific extraction (highest accuracy)
+    const platform = detectPlatform();
+    if (platform === 'LinkedIn') extractFromLinkedIn(lead);
+    else if (platform === 'Facebook') extractFromFacebook(lead);
+    else if (platform === 'Google Maps') extractFromGoogleMaps(lead);
+    else if (platform === 'Yelp') extractFromYelp(lead);
 
     // Method 1: Try to extract from form fields
     const firstNameField = document.querySelector('input[name*="first" i], input[id*="first" i]');
@@ -361,6 +502,9 @@ function extractLeadData() {
       lead.phone = formatPhone(lead.phone);
     }
 
+    // Tag with source platform so the popup can include it on import
+    lead.source = `${detectPlatform()} (HyveWyre Extension)`;
+
     console.log('HyveWyre: Extracted lead data:', lead);
     lastExtractedLead = lead;
     return lead;
@@ -396,6 +540,7 @@ async function quickImportLead() {
   showToast('Importing lead...', 'info');
 
   try {
+    const platform = detectPlatform();
     const response = await chrome.runtime.sendMessage({
       action: 'importLead',
       lead: {
@@ -405,7 +550,7 @@ async function quickImportLead() {
         email: lead.email,
         company: lead.company,
         state: lead.state,
-        source: 'VanillaSoft Extension (Quick Import)',
+        source: `${platform} (HyveWyre Extension)`,
         notes: lead.notes || ''
       }
     });

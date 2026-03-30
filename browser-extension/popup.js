@@ -1,4 +1,4 @@
-// Popup script for HyveWyre VanillaSoft Extension
+// Popup script for HyveWyre Extension
 // Enhanced with AI Chat, Filters, and Export functionality
 
 const HYVEWYRE_URL = 'https://trippdrip-v8-sprint1-ouusl0ocj-tripptraps-projects.vercel.app';
@@ -255,11 +255,7 @@ async function loadCurrentLead() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    if (!tab.url?.includes('vanillasoft.com')) {
-      showMessage('Please navigate to VanillaSoft to import leads', 'info');
-      return;
-    }
-
+    // Extension works on any website — no domain gate needed
     const response = await chrome.tabs.sendMessage(tab.id, { action: 'getLead' });
 
     if (response && response.lead) {
@@ -279,7 +275,7 @@ async function loadCurrentLead() {
     }
   } catch (error) {
     console.error('Error loading lead:', error);
-    showMessage('Unable to extract lead data. Make sure you\'re on a VanillaSoft lead page.', 'info');
+    showMessage('Unable to extract lead data from this page.', 'info');
   }
 }
 
@@ -336,7 +332,7 @@ async function importLead() {
           email: sanitizeEmail(currentLead.email),
           company: sanitizeString(currentLead.company),
           state: sanitizeString(currentLead.state),
-          source: 'VanillaSoft Extension',
+          source: sanitizeString(currentLead.source || 'HyveWyre Extension'),
           notes: sanitizeString(currentLead.notes || '')
         }]
       })
@@ -586,7 +582,7 @@ function generateFallbackResponse(message) {
     return 'Here\'s a template: "Hi [Name], this is [Your Name] from [Company]. I noticed [specific detail]. Would you be interested in a quick chat about [value prop]? Reply YES to connect!"';
   }
   if (lowerMessage.includes('lead') || lowerMessage.includes('import')) {
-    return 'To import leads efficiently: 1) Navigate to a VanillaSoft lead page, 2) Click the Import button, 3) Verify the data preview, 4) Confirm the import. You can use Alt+Shift+L as a shortcut!';
+    return 'To import leads: 1) Navigate to any contact or profile page, 2) Click the Import button, 3) Verify the data preview, 4) Confirm the import. You can use Alt+Shift+L as a shortcut!';
   }
 
   return 'I\'m here to help with lead management, SMS templates, and campaign strategies. What specific topic would you like to explore?';
@@ -982,7 +978,7 @@ Alt+3        Filters tab
 Ctrl+Enter   Import lead
 Enter        Send chat message
 
-Page Shortcuts (on VanillaSoft):
+Page Shortcuts (on any page):
 ─────────────────────
 Alt+Shift+L  Quick add lead
 Alt+Shift+O  Open popup

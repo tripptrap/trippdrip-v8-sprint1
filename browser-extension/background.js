@@ -1,4 +1,4 @@
-// Background service worker for HyveWyre VanillaSoft Extension
+// Background service worker for HyveWyre Extension
 
 console.log('HyveWyre Extension: Background service worker loaded');
 

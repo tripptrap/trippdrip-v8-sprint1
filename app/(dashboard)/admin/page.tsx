@@ -1105,6 +1105,9 @@ function InternalDevNotes() {
     'Team profile pages: moved from (dashboard) to (public) route group so they work without auth for preview page visitors',
     'Admin page: added Internal Dev Notes panel (this section)',
     'Flows page: full overhaul (AI conversation template builder)',
+    'Email alert notifications: added nodemailer + 4 email templates (new message, appointment, low credits, opt-out)',
+    'Auto-refill sync fix: Settings UI now dual-writes to users.auto_topup* so the cron can read it',
+    'Browser Extension (MVP): now works on any website — added platform detection (LinkedIn, Facebook, Google Maps, Yelp, etc.), platform-specific extractors, dynamic source tagging, removed VanillaSoft-only gate',
   ];
 
   // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
@@ -1175,16 +1178,8 @@ function InternalDevNotes() {
     // Preview / Landing
     { cat: 'Preview / Landing Page', item: 'Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA' },
     { cat: 'Preview / Landing Page', item: 'Clearly show Scale tier point pack discount as key differentiator' },
-    // Browser Extension
-    { cat: 'Browser Extension (MVP)', item: 'Scrape contact info from any platform the user is browsing' },
-    { cat: 'Browser Extension (MVP)', item: 'Import captured info into HyveWyre as a lead/client' },
-    { cat: 'Browser Extension (MVP)', item: 'Quick-send a message directly from the extension' },
     // Notifications
-    { cat: 'Notifications', item: 'User-configurable notification preferences (per notification type)' },
-    { cat: 'Notifications', item: 'In-app notifications (bell/badge in dashboard)' },
-    { cat: 'Notifications', item: 'Email alerts' },
-    { cat: 'Notifications', item: 'SMS alerts to user personal phone' },
-    { cat: 'Notifications', item: 'Notification types: new messages, appointments, low credits, opt-outs, AI handoff requests' },
+    { cat: 'Notifications', item: 'AI handoff request notifications (not yet wired)' },
     // Other
     { cat: 'Other', item: 'Google Calendar integration for appointment booking from Flows' },
     { cat: 'Other', item: 'AI suggest-reply mode (AI drafts, user reviews and sends)' },
@@ -1380,6 +1375,96 @@ function InternalDevNotes() {
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.notes}</p>
               </div>
             ))}
+          </DevSection>
+
+          {/* ── SECTION 5: BROWSER EXTENSION ── */}
+          <DevSection title="Browser Extension — Setup & Testing" color="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" count={0}>
+            <div className="space-y-4 text-xs text-slate-600 dark:text-slate-400">
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">📁 Extension Location</p>
+                <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded font-mono text-slate-600 dark:text-slate-300 text-xs">
+                  /Applications/MAMP/htdocs/trippdrip-v8-sprint1/browser-extension/
+                </code>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2">🔧 How to Load in Chrome</p>
+                <ol className="space-y-1 list-none">
+                  {[
+                    'Open Chrome and go to chrome://extensions',
+                    'Enable Developer Mode (toggle, top-right corner)',
+                    'Click "Load unpacked"',
+                    'Select the browser-extension/ folder above',
+                    'Pin HyveWyre to the toolbar via the puzzle-piece icon',
+                  ].map((step, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-400 font-bold text-[10px] flex-shrink-0 mt-0.5">{i + 1}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2">🧪 How to Test (Backtesting)</p>
+                <ol className="space-y-1 list-none">
+                  {[
+                    'Navigate to any contact/profile page (LinkedIn, Google Maps, Facebook, Yelp, etc.)',
+                    'Click the HyveWyre icon in the toolbar — the popup will extract whatever contact data it finds',
+                    'Verify the Name, Phone, Email, Company, State fields are populated correctly',
+                    'Check the "Source" field shows the correct platform (e.g. "LinkedIn (HyveWyre Extension)")',
+                    'Click "Import Lead to HyveWyre" — confirm it appears in /leads with the right source tag',
+                    'Test Alt+Shift+L shortcut on the page for quick one-click import without opening popup',
+                    'After each import, check /leads to confirm data round-tripped correctly',
+                  ].map((step, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400 font-bold text-[10px] flex-shrink-0 mt-0.5">{i + 1}</span>
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2">✅ Platforms with Dedicated Extractors</p>
+                <div className="flex flex-wrap gap-2">
+                  {['LinkedIn', 'Facebook', 'Google Maps', 'Yelp'].map(p => (
+                    <span key={p} className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded text-xs font-medium">{p}</span>
+                  ))}
+                </div>
+                <p className="mt-2 text-slate-400 dark:text-slate-500">All other sites use generic form-field + label + regex fallbacks (JSON-LD, OpenGraph, vCard, tel:/mailto: links).</p>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-2">⌨️ Keyboard Shortcuts</p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded font-mono text-xs border border-slate-300 dark:border-slate-600">Alt+Shift+L</kbd>
+                    <span>Quick import lead from current page (no popup needed)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded font-mono text-xs border border-slate-300 dark:border-slate-600">Alt+Shift+O</kbd>
+                    <span>Open the extension popup</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <kbd className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded font-mono text-xs border border-slate-300 dark:border-slate-600">Esc</kbd>
+                    <span>Hide any extension UI on the page</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">🔄 Reloading After Code Changes</p>
+                <p>Go to <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">chrome://extensions</code> and click the 🔄 refresh icon on the HyveWyre card. No need to re-add it.</p>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">🔑 First-Time Setup</p>
+                <p>Open the popup → Settings tab → enter your HyveWyre API key. The key is used to authenticate imports to your account.</p>
+              </div>
+
+            </div>
           </DevSection>
 
           {/* ── SECTION 4: ALL PAGES ── */}
