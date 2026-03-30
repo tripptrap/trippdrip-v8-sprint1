@@ -181,23 +181,39 @@ async function handleInboundSMS(payload: any) {
     mediaCount: mediaUrls.length,
   });
 
-  // Find which user this message belongs to
-  // Strategy: Match the sender's phone number to an existing thread or lead
+  // HIGH-6: Identify tenant by the RECEIVING number (to) first — this definitively
+  // determines which user account the message belongs to. Starting with the sender's
+  // phone or lead lookup can route to the wrong tenant if two tenants have the same lead.
   let userId: string | null = null;
 
-  // First, check if there's an existing thread with this phone number
-  const { data: existingThread } = await supabaseAdmin
-    .from('threads')
+  // Step 1: Look up the receiving number in user_telnyx_numbers to identify the tenant
+  const { data: telnyxNumber } = await supabaseAdmin
+    .from('user_telnyx_numbers')
     .select('user_id')
-    .eq('phone_number', from)
+    .eq('phone_number', to)
+    .eq('status', 'active')
     .single();
 
-  if (existingThread) {
-    userId = existingThread.user_id;
-    console.log('Found user via existing thread:', userId);
+  if (telnyxNumber) {
+    userId = telnyxNumber.user_id;
+    console.log('Found user via Telnyx number (to):', userId);
   }
 
-  // If no thread, try to find a lead with this phone number
+  // Step 2: Fallback — check existing threads scoped to this user (or any user if not found)
+  if (!userId) {
+    const { data: existingThread } = await supabaseAdmin
+      .from('threads')
+      .select('user_id')
+      .eq('phone_number', from)
+      .single();
+
+    if (existingThread) {
+      userId = existingThread.user_id;
+      console.log('Found user via existing thread:', userId);
+    }
+  }
+
+  // Step 3: Last fallback — lead lookup by sender phone
   if (!userId) {
     const { data: lead } = await supabaseAdmin
       .from('leads')
@@ -208,21 +224,6 @@ async function handleInboundSMS(payload: any) {
     if (lead) {
       userId = lead.user_id;
       console.log('Found user via lead:', userId);
-    }
-  }
-
-  // Fallback: Try user_telnyx_numbers table (if user registered their number)
-  if (!userId) {
-    const { data: telnyxNumber } = await supabaseAdmin
-      .from('user_telnyx_numbers')
-      .select('user_id')
-      .eq('phone_number', to)
-      .eq('status', 'active')
-      .single();
-
-    if (telnyxNumber) {
-      userId = telnyxNumber.user_id;
-      console.log('Found user via Telnyx number:', userId);
     }
   }
 
