@@ -580,22 +580,27 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - [x] Inbound lead handling: Receptionist greets → user assigns as lead or client
 - [x] Opt-in page as generic compliance proof
 
+- [x] Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack
+- [x] AI autonomy settings per flow (full auto, suggest replies, manual)
+- [x] Flow completion → auto-book appointment → auto-tag "appointment set"
+- [x] Flow trigger config: user chooses auto-on-reply or manual assignment per campaign
+- [x] Support multiple tags per lead with one primary tag
+- [x] Number porting (bring your own number)
+- [x] Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA
+- [x] Browser extension: Quick-send a message from the extension
+- [x] Email alerts (notifications)
+- [x] SMS alerts to user's personal phone (notifications)
+- [x] AI suggest-reply mode (AI drafts, user reviews and sends)
+- [x] Admin panel updates to reflect new tier names and lead/client separation
+- [x] Deep audit: API routes, database schema, Telnyx integration — all findings fixed
+
 ### In Progress
 _(nothing currently in progress)_
 
 ### Remaining Pre-Launch
-- [ ] Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack
-- [ ] AI autonomy settings per flow (full auto, suggest replies, manual)
-- [ ] Flow completion → auto-book appointment → auto-tag "appointment set"
-- [ ] Flow trigger config: user chooses auto-on-reply or manual assignment per campaign
-- [ ] Support multiple tags per lead with one primary tag
-- [ ] Number porting (bring your own number) — before launch
-- [ ] Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA
-- [ ] Browser extension: Quick-send a message from the extension
-- [ ] Email alerts (notifications)
-- [ ] SMS alerts to user's personal phone (notifications)
-- [ ] AI suggest-reply mode (AI drafts, user reviews and sends)
-- [ ] Admin panel updates to reflect new tier names and lead/client separation
+- [ ] Encrypt email API key at rest (deferred — needs SETTINGS_ENCRYPTION_KEY env var)
+- [ ] End-to-end QA: full user flow testing (signup → onboarding → send SMS → receive reply → flow → appointment → sold)
+- [ ] Production verification: confirm Telnyx webhooks, Vercel cron jobs, and Stripe are wired up correctly
 
 ### Roadmap (Post-Launch)
 - [ ] Native iOS/Android mobile app
