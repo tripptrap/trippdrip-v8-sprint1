@@ -1,9 +1,12 @@
 // Admin configuration and helpers
 
-// Admin emails - these users have access to the admin dashboard
-const ADMIN_EMAILS = [
-  'tripped620@gmail.com',
-];
+// HIGH-3: Admin emails loaded from env var — not hardcoded in source.
+// Set ADMIN_EMAILS as a comma-separated list in your .env:
+//   ADMIN_EMAILS=tripped620@gmail.com,other@example.com
+const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
 
 /**
  * Check if an email address belongs to an admin

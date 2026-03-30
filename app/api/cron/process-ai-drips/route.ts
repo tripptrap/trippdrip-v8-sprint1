@@ -211,7 +211,10 @@ export async function POST(req: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
         const sendResponse = await fetch(`${baseUrl}/api/telnyx/send-sms`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': process.env.CRON_SECRET || '',
+          },
           body: JSON.stringify({
             to: drip.phone_number,
             from: drip.from_number,

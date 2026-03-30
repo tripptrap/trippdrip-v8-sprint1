@@ -12,6 +12,14 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(req: NextRequest) {
   try {
+    // MED-5: Internal-only endpoint — require x-internal-secret to prevent
+    // unauthenticated callers from burning any user's AI credits
+    const internalSecret = req.headers.get('x-internal-secret');
+    const cronSecret = process.env.CRON_SECRET;
+    if (!internalSecret || !cronSecret || internalSecret !== cronSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const {
       userId,
       threadId,
@@ -173,7 +181,10 @@ export async function POST(req: NextRequest) {
     // FULL AUTO MODE: send the SMS response using Telnyx
     const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telnyx/send-sms`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.CRON_SECRET || '',
+      },
       body: JSON.stringify({
         to: phoneNumber,
         from: toPhoneNumber,

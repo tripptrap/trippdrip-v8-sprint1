@@ -32,7 +32,13 @@ export async function GET(req: Request) {
   const source = url.searchParams.get("source");
   const dateFrom = url.searchParams.get("dateFrom");
   const dateTo = url.searchParams.get("dateTo");
-  const sortBy = url.searchParams.get("sortBy") || "created_at";
+  // MED-2: Allowlist sortBy to prevent schema probing via arbitrary column names
+  const SORTABLE_COLUMNS = new Set([
+    'created_at', 'updated_at', 'last_contacted', 'first_name', 'last_name',
+    'phone', 'email', 'status', 'source', 'disposition', 'temperature'
+  ]);
+  const rawSortBy = url.searchParams.get("sortBy") || "created_at";
+  const sortBy = SORTABLE_COLUMNS.has(rawSortBy) ? rawSortBy : "created_at";
   const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
   // Pagination

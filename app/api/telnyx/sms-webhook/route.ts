@@ -846,7 +846,10 @@ async function checkAndTriggerReceptionist(
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
             await fetch(`${baseUrl}/api/receptionist/respond`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'x-internal-secret': process.env.CRON_SECRET || '',
+              },
               body: JSON.stringify({
                 userId,
                 threadId,
@@ -940,7 +943,10 @@ async function checkAndTriggerReceptionist(
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const response = await fetch(`${baseUrl}/api/receptionist/respond`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.CRON_SECRET || '',
+      },
       body: JSON.stringify({
         userId,
         threadId,
