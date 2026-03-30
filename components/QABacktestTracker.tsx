@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, MinusCircle,
   ChevronDown, ChevronRight, Upload, X, Download, RotateCcw,
-  MessageSquare, Camera, BarChart3, Image as ImageIcon
+  MessageSquare, Camera, BarChart3, Copy, Sparkles, Loader2
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -615,6 +615,8 @@ export default function QABacktestTracker() {
                         testItem={testItem}
                         state={getItem(testItem.id)}
                         expanded={expandedItems.has(testItem.id)}
+                        page={page.page}
+                        route={page.route}
                         onToggleExpand={() => toggleItem(testItem.id)}
                         onStatusChange={(s) => updateStatus(testItem.id, s)}
                         onCommentChange={(c) => updateComment(testItem.id, c)}
@@ -659,6 +661,8 @@ interface TestItemRowProps {
   testItem: QATestItem;
   state: QAItemState;
   expanded: boolean;
+  page: string;
+  route: string;
   onToggleExpand: () => void;
   onStatusChange: (s: QAStatus) => void;
   onCommentChange: (c: string) => void;
@@ -667,8 +671,171 @@ interface TestItemRowProps {
   onOpenLightbox: (src: string) => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COPY IMAGE TO CLIPBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+async function copyImageToClipboard(base64: string): Promise<boolean> {
+  try {
+    // Convert base64 → blob
+    const res = await fetch(base64);
+    const blob = await res.blob();
+    await navigator.clipboard.write([
+      new ClipboardItem({ [blob.type]: blob }),
+    ]);
+    return true;
+  } catch {
+    // Fallback: copy the data URL as text
+    try {
+      await navigator.clipboard.writeText(base64);
+      return true;
+    } catch { return false; }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREENSHOT CARD — thumbnail + Copy + Ask AI
+// ─────────────────────────────────────────────────────────────────────────────
+function ScreenshotCard({
+  src, index, itemLabel, status, comment, page, route,
+  onRemove, onOpenLightbox,
+}: {
+  src: string;
+  index: number;
+  itemLabel: string;
+  status: QAStatus;
+  comment: string;
+  page: string;
+  route: string;
+  onRemove: () => void;
+  onOpenLightbox: (s: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showAi, setShowAi] = useState(false);
+
+  async function handleCopy() {
+    const ok = await copyImageToClipboard(src);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function handleAskAI() {
+    setAiLoading(true);
+    setAiError(null);
+    setShowAi(true);
+    try {
+      const res = await fetch('/api/admin/qa-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: src, itemLabel, status, comment, page, route }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      setAiResult(data.analysis);
+    } catch (err: any) {
+      setAiError(err.message ?? 'Something went wrong');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+      {/* Thumbnail row */}
+      <div className="relative group flex items-start gap-2 p-2">
+        <img
+          src={src}
+          alt={`Screenshot ${index + 1}`}
+          className="h-20 w-28 object-cover rounded border border-slate-100 dark:border-slate-700 cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+          onClick={() => onOpenLightbox(src)}
+        />
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+          <span className="text-xs text-slate-400">Screenshot {index + 1}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {/* Copy */}
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-md font-medium transition-colors ${
+                copied
+                  ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              }`}
+              title="Copy image to clipboard — then paste in Claude chat"
+            >
+              <Copy className="h-3 w-3" />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+
+            {/* Ask AI */}
+            <button
+              onClick={handleAskAI}
+              disabled={aiLoading}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors disabled:opacity-60"
+              title="Send to GPT-4o vision for instant QA analysis"
+            >
+              {aiLoading
+                ? <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing…</>
+                : <><Sparkles className="h-3 w-3" /> Ask AI</>
+              }
+            </button>
+
+            {/* Remove */}
+            <button
+              onClick={onRemove}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md font-medium bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-900/30 transition-colors"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 leading-tight">
+            Copy → paste in Claude chat · or Ask AI for instant analysis
+          </p>
+        </div>
+      </div>
+
+      {/* AI analysis panel */}
+      {showAi && (
+        <div className="border-t border-slate-100 dark:border-slate-800 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 flex items-center gap-1">
+              <Sparkles className="h-3 w-3" /> GPT-4o Analysis
+            </span>
+            <button
+              onClick={() => setShowAi(false)}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {aiLoading && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Sending screenshot to GPT-4o vision…
+            </div>
+          )}
+          {aiError && (
+            <p className="text-xs text-red-500">{aiError}</p>
+          )}
+          {aiResult && !aiLoading && (
+            <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
+              {aiResult}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST ITEM ROW
+// ─────────────────────────────────────────────────────────────────────────────
 function TestItemRow({
-  testItem, state, expanded, onToggleExpand,
+  testItem, state, expanded, page, route, onToggleExpand,
   onStatusChange, onCommentChange, onAddScreenshot,
   onRemoveScreenshot, onOpenLightbox,
 }: TestItemRowProps) {
@@ -681,12 +848,10 @@ function TestItemRow({
     <div className="bg-white dark:bg-slate-900">
       {/* Row header */}
       <div className="flex items-start gap-3 px-4 py-3">
-        {/* Status icon + toggle expand */}
         <button onClick={onToggleExpand} className="flex-shrink-0 mt-0.5">
           <Icon className={`h-4 w-4 ${cfg.color}`} />
         </button>
 
-        {/* Label */}
         <button onClick={onToggleExpand} className="flex-1 text-left min-w-0">
           <span className={`text-xs leading-relaxed ${state.status === 'pass' ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
             {testItem.label}
@@ -748,22 +913,20 @@ function TestItemRow({
             </label>
 
             {state.screenshots.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-2">
+              <div className="space-y-2 mb-3">
                 {state.screenshots.map((src, i) => (
-                  <div key={i} className="relative group">
-                    <img
-                      src={src}
-                      alt={`Screenshot ${i + 1}`}
-                      className="h-20 w-28 object-cover rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-90 transition-opacity"
-                      onClick={() => onOpenLightbox(src)}
-                    />
-                    <button
-                      onClick={() => onRemoveScreenshot(i)}
-                      className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
+                  <ScreenshotCard
+                    key={i}
+                    src={src}
+                    index={i}
+                    itemLabel={testItem.label}
+                    status={state.status}
+                    comment={state.comment}
+                    page={page}
+                    route={route}
+                    onRemove={() => onRemoveScreenshot(i)}
+                    onOpenLightbox={onOpenLightbox}
+                  />
                 ))}
               </div>
             )}
@@ -787,9 +950,6 @@ function TestItemRow({
                   <Upload className="h-3.5 w-3.5" />
                   Upload screenshot
                 </button>
-                <p className="text-xs text-slate-400 mt-1">
-                  To share with Claude: paste screenshots directly into the chat window.
-                </p>
               </>
             )}
           </div>
