@@ -210,11 +210,8 @@ async function processScheduledMessages(supabase: any) {
         const smsResult = await sendSMS(lead.phone, message.body, primaryNumber?.phone_number);
 
         if (smsResult.success) {
-          // Deduct credits
-          await supabase
-            .from('users')
-            .update({ credits: userSettings.credits - message.credits_cost })
-            .eq('id', message.user_id);
+          // CRIT-1: Atomic credit deduction via RPC — prevents race condition from read-then-write
+          await supabase.rpc('deduct_credits', { user_id: message.user_id, amount: message.credits_cost });
 
           // Create message record with automation tracking
           await supabase
@@ -432,11 +429,8 @@ async function processScheduledCampaigns(supabase: any) {
           const smsResult = await sendSMS(lead.phone, campaign.message, campaignPrimaryNumber?.phone_number);
 
           if (smsResult.success) {
-            // Deduct credits
-            await supabase
-              .from('users')
-              .update({ credits: user.credits - creditsNeeded })
-              .eq('id', campaign.user_id);
+            // CRIT-1: Atomic credit deduction via RPC
+            await supabase.rpc('deduct_credits', { user_id: campaign.user_id, amount: creditsNeeded });
 
             // Create message record with automation tracking
             await supabase

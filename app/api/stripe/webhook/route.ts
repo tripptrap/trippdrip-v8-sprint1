@@ -88,15 +88,33 @@ export async function POST(req: NextRequest) {
           // Handle subscription creation
           const monthlyCredits = planType === 'scale' ? 10000 : 3000;
 
+          // CRIT-4: Idempotency — insert transaction first with stripe_session_id dedup.
+          // If this session was already processed (Stripe retry), bail out immediately.
+          const subscriptionAmountCents = session.amount_total || 0;
+          const { error: txInsertError } = await supabaseAdmin.from('points_transactions').insert({
+            user_id: userId,
+            points_amount: monthlyCredits,
+            action_type: 'subscription',
+            description: `${planType === 'scale' ? 'Scale' : 'Growth'} subscription - monthly credits`,
+            stripe_session_id: sessionId,
+            amount_paid: subscriptionAmountCents,
+            created_at: new Date().toISOString()
+          });
+
+          if (txInsertError) {
+            console.log(`⚠️ Subscription session ${sessionId} already processed — skipping duplicate webhook`);
+            break;
+          }
+
           // Check if user row exists
           const { data: existingUser } = await supabaseAdmin
             .from('users')
-            .select('id')
+            .select('id, credits')
             .eq('id', userId)
             .single();
 
           if (!existingUser) {
-            // Create new user row
+            // Create new user row — first subscription, set credits to monthly allotment
             const { error: insertError } = await supabaseAdmin
               .from('users')
               .insert({
@@ -117,14 +135,16 @@ export async function POST(req: NextRequest) {
               console.log(`Created user ${userId} with ${planType} subscription and ${monthlyCredits} credits`);
             }
           } else {
-            // Update existing user
+            // CRIT-4: Additive credits — subscription renewal tops up balance, does not overwrite.
+            // Overwriting would destroy any un-used credits or purchased packs the user has.
+            const currentCredits = existingUser.credits || 0;
             const { error: updateError } = await supabaseAdmin
               .from('users')
               .update({
                 subscription_tier: planType,
                 plan_type: planType,
                 monthly_credits: monthlyCredits,
-                credits: monthlyCredits,
+                credits: currentCredits + monthlyCredits,
                 account_status: 'active',
                 updated_at: new Date().toISOString()
               })
@@ -133,20 +153,9 @@ export async function POST(req: NextRequest) {
             if (updateError) {
               console.error('Error updating user subscription:', updateError);
             } else {
-              console.log(`Updated user ${userId} to ${planType} subscription with ${monthlyCredits} credits`);
+              console.log(`Updated user ${userId} to ${planType}, added ${monthlyCredits} credits (new balance: ${currentCredits + monthlyCredits})`);
             }
           }
-
-          // Create points transaction record with actual amount paid
-          const subscriptionAmountCents = session.amount_total || 0;
-          await supabaseAdmin.from('points_transactions').insert({
-            user_id: userId,
-            points_amount: monthlyCredits,
-            action_type: 'subscription',
-            description: `${planType === 'scale' ? 'Scale' : 'Growth'} subscription - monthly credits`,
-            amount_paid: subscriptionAmountCents,
-            created_at: new Date().toISOString()
-          });
 
         } else if (points > 0) {
           // Handle one-time point pack purchase
