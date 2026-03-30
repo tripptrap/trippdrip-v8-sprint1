@@ -20,16 +20,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'No file provided' }, { status: 400 });
     }
 
+    // HIGH-9: Enforce 10MB file size cap to prevent serverless function timeout/OOM
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({
+        ok: false,
+        error: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum file size is 10MB.`
+      }, { status: 400 });
+    }
+
     // Read file content
     const text = await file.text();
-    const lines = text.split('\n').filter(line => line.trim());
+
+    // HIGH-9: Parse CSV properly handling quoted fields (naive split(',') breaks on "Smith, Jr." etc.)
+    function parseCSVLine(line: string): string[] {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++; // skip escaped quote
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    }
+
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
 
     if (lines.length < 2) {
       return NextResponse.json({ ok: false, error: 'CSV file is empty or invalid' }, { status: 400 });
     }
 
     // Parse CSV header
-    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const header = parseCSVLine(lines[0]).map(h => h.toLowerCase());
 
     // Required fields
     const requiredFields = ['first_name', 'last_name', 'phone'];
@@ -50,7 +85,7 @@ export async function POST(req: NextRequest) {
       const line = lines[i];
       if (!line.trim()) continue;
 
-      const values = line.split(',').map(v => v.trim());
+      const values = parseCSVLine(line);
 
       if (values.length !== header.length) {
         errors.push(`Line ${i + 1}: Column count mismatch`);
