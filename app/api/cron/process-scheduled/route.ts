@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { timingSafeEqual } from 'crypto';
 import { sendTelnyxSMS } from "@/lib/telnyx";
+
+// MED-7: Use service role client — user-scoped createClient() has no session in cron context
+// and RLS filters all rows to empty. Service role bypasses RLS as intended for cron jobs.
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createSupabaseAdmin(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,7 +59,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  if (!supabaseAdmin) {
+    console.error('❌ supabaseAdmin not configured — missing SUPABASE_SERVICE_ROLE_KEY');
+    return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
+  }
+
+  const supabase = supabaseAdmin;
 
   try {
     // Process individual scheduled messages
@@ -155,6 +169,30 @@ async function processScheduledMessages(supabase: any) {
 
         failed++;
         continue;
+      }
+
+      // HIGH-4: DNC check before sending — skip if lead has opted out
+      if (lead.phone) {
+        const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
+          p_user_id: message.user_id,
+          p_phone_number: lead.phone
+        });
+        if (!dncError && dncCheck) {
+          const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
+          if (dncResult.on_dnc_list) {
+            console.log(`🚫 Scheduled msg ${message.id} blocked — ${lead.phone} is on DNC list`);
+            await supabase
+              .from('scheduled_messages')
+              .update({
+                status: 'failed',
+                error_message: `Blocked: on DNC list (${dncResult.reason || 'opted out'})`,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', message.id);
+            failed++;
+            continue;
+          }
+        }
       }
 
       // Get user's primary Telnyx number

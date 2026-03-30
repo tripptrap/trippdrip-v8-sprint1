@@ -49,8 +49,6 @@ export async function POST(req: Request) {
     const sendSMS: boolean = body?.sendSMS === true;
     const fromNumber: string = body?.fromNumber || "";
 
-    // Points and settings from client
-    const userPoints: number = typeof body?.userPoints === 'number' ? body.userPoints : 0;
     const checkSpam: boolean = body?.checkSpam !== false;
 
     if (!campaignName) {
@@ -67,6 +65,14 @@ export async function POST(req: Request) {
     if (authError || !user) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
+
+    // CRIT-5: Fetch credits server-side — never trust client-supplied userPoints
+    const { data: userCreditsRow } = await supabase
+      .from('users')
+      .select('credits')
+      .eq('id', user.id)
+      .single();
+    const userPoints: number = userCreditsRow?.credits ?? 0;
 
     // Get leads from Supabase
     const { data: leads, error: leadsError } = await supabase
@@ -352,6 +358,9 @@ export async function POST(req: Request) {
             // Calculate credits for this specific personalized message
             const personalizedCreditCalc = calculateSMSCredits(personalizedMessage, 0);
             const messageCredits = personalizedCreditCalc.credits;
+
+            // CRIT-5: Deduct credits server-side after each successful send
+            await supabase.rpc('deduct_credits', { user_id: user.id, amount: messageCredits });
 
             sendResults.push({
               leadId: String(lead.id),

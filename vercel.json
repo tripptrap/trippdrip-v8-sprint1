@@ -6,7 +6,7 @@
   },
   "crons": [
     {
-      "path": "/api/cron/process-scheduled-messages",
+      "path": "/api/cron/process-scheduled",
       "schedule": "*/5 * * * *"
     },
     {

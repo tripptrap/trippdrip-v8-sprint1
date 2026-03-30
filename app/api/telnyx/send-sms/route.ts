@@ -30,6 +30,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // CRIT-2: Auth gate — require valid session OR x-internal-secret header for internal callers
+    // Internal callers (cron, webhook, receptionist) must pass x-internal-secret: CRON_SECRET
+    const internalSecret = req.headers.get('x-internal-secret');
+    const cronSecret = process.env.CRON_SECRET;
+    const isInternalCaller = !!(internalSecret && cronSecret && internalSecret === cronSecret);
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // If userId was supplied in the request body, the caller must be an authenticated internal service
+    if (passedUserId && !isInternalCaller) {
+      console.error('❌ Rejected: body-supplied userId without valid x-internal-secret');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Validate required fields
     if (!to || !message) {
       return NextResponse.json(
@@ -323,6 +339,25 @@ export async function POST(req: NextRequest) {
     const messageToSend = isFirstMessage
       ? `${message}\n\nReply ${optOutKeyword} to opt out`
       : message;
+
+    // HIGH-7: DNC check — block send if recipient is on do-not-contact list
+    if (userId && supabaseAdmin) {
+      const { data: dncCheck, error: dncError } = await supabaseAdmin.rpc('check_dnc', {
+        p_user_id: userId,
+        p_phone_number: to
+      });
+      if (!dncError && dncCheck) {
+        const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
+        if (dncResult.on_dnc_list) {
+          console.log(`🚫 send-sms blocked — ${to} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list)`);
+          return NextResponse.json({
+            error: `Message blocked: ${to} is on the Do Not Contact list.`,
+            onDncList: true,
+            reason: dncResult.reason
+          }, { status: 403 });
+        }
+      }
+    }
 
     // Build request body
     // When we have a specific 'from' number, send it directly without messaging_profile_id.
