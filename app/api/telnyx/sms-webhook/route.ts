@@ -9,21 +9,29 @@ import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 
-// Opt-out keywords that indicate a lead wants to stop receiving messages
+// Opt-out keywords that trigger permanent DNC (STOP, UNSUBSCRIBE, etc.)
+// LOW-5: "cancel" removed — it's too common in normal sentences ("cancel my appointment").
+//        Appointment cancellations are handled separately by CANCEL_KEYWORDS below.
 const OPT_OUT_KEYWORDS = [
-  'stop', 'unsubscribe', 'quit', 'cancel', 'opt out', 'optout',
+  'stop', 'unsubscribe', 'quit', 'opt out', 'optout',
   'remove me', 'stop texting', 'don\'t text', 'dont text',
-  'no more', 'leave me alone', 'take me off', 'end', 'halt'
+  'no more texts', 'leave me alone', 'take me off', 'end', 'halt'
 ];
 
 function isOptOut(message: string, customKeyword?: string | null): boolean {
   const lower = message.trim().toLowerCase();
-  // Check user's custom opt-out keyword first
+  // Check user's custom opt-out keyword first (exact match)
   if (customKeyword && lower === customKeyword.toLowerCase()) return true;
-  // Exact match for short keywords (stop, quit, end, etc.)
+  // Exact whole-message match
   if (OPT_OUT_KEYWORDS.includes(lower)) return true;
-  // Partial match for phrases
-  return OPT_OUT_KEYWORDS.some(kw => kw.length > 4 && lower.includes(kw));
+  // LOW-5: For multi-word phrases, require word-boundary match to avoid false positives
+  // (e.g. "remove me" must appear as a phrase, not just "remove")
+  return OPT_OUT_KEYWORDS.some(kw => {
+    if (kw.length <= 4) return false; // handled by exact match above
+    // Word-boundary check: phrase must not be part of a larger word
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'i').test(lower);
+  });
 }
 
 const CANCEL_KEYWORDS = ['cancel', 'cancel appointment', 'cancel my appointment', 'cant make it', "can't make it", 'no longer need'];

@@ -4,24 +4,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
-// Stripe Price IDs
+// LOW-1: Stripe Price IDs loaded from env vars — not hardcoded in source.
+// Set these in your .env.local / Vercel environment variables:
+//   STRIPE_PRICE_GROWTH=price_...
+//   STRIPE_PRICE_SCALE=price_...
+//   STRIPE_PRICE_PACK_GROWTH_STARTER=price_...  etc.
 const STRIPE_PRICES = {
   subscriptions: {
-    growth: 'price_1SQtYHFyk0lZUopFNa0lT81K',
-    scale: 'price_1SQtaUFyk0lZUopFRJnuLftL'
+    growth: process.env.STRIPE_PRICE_GROWTH || 'price_1SQtYHFyk0lZUopFNa0lT81K',
+    scale: process.env.STRIPE_PRICE_SCALE || 'price_1SQtaUFyk0lZUopFRJnuLftL'
   },
   pointPacks: {
     growth: {
-      starter: 'price_1SQtbMFyk0lZUopFleqbdgVZ',
-      pro: 'price_1SQtbuFyk0lZUopFbBFafou0',
-      business: 'price_1SQtciFyk0lZUopFP2ATsGyR',
-      enterprise: 'price_1SQtdJFyk0lZUopFuSaGfzU3'
+      starter: process.env.STRIPE_PRICE_PACK_GROWTH_STARTER || 'price_1SQtbMFyk0lZUopFleqbdgVZ',
+      pro: process.env.STRIPE_PRICE_PACK_GROWTH_PRO || 'price_1SQtbuFyk0lZUopFbBFafou0',
+      business: process.env.STRIPE_PRICE_PACK_GROWTH_BUSINESS || 'price_1SQtciFyk0lZUopFP2ATsGyR',
+      enterprise: process.env.STRIPE_PRICE_PACK_GROWTH_ENTERPRISE || 'price_1SQtdJFyk0lZUopFuSaGfzU3'
     },
     scale: {
-      starter: 'price_1SQtduFyk0lZUopFApnLorDd',
-      pro: 'price_1SQteQFyk0lZUopF63RURC72',
-      business: 'price_1SQteyFyk0lZUopFH9S2ebtD',
-      enterprise: 'price_1SQtfRFyk0lZUopFlv2sFszH'
+      starter: process.env.STRIPE_PRICE_PACK_SCALE_STARTER || 'price_1SQtduFyk0lZUopFApnLorDd',
+      pro: process.env.STRIPE_PRICE_PACK_SCALE_PRO || 'price_1SQteQFyk0lZUopF63RURC72',
+      business: process.env.STRIPE_PRICE_PACK_SCALE_BUSINESS || 'price_1SQteyFyk0lZUopFH9S2ebtD',
+      enterprise: process.env.STRIPE_PRICE_PACK_SCALE_ENTERPRISE || 'price_1SQtfRFyk0lZUopFlv2sFszH'
     }
   }
 };
