@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       name: tag.name,
       color: tag.color,
       position: tag.position ?? 0,
+      is_pipeline_stage: tag.is_pipeline_stage ?? false,
       count: tagCounts.get(tag.name) || 0,
       created_at: tag.created_at,
       updated_at: tag.updated_at,
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, color } = body;
+    const { name, color, is_pipeline_stage } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Tag name is required' }, { status: 400 });
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         color: color || '#3b82f6',
         position: newPosition,
+        is_pipeline_stage: is_pipeline_stage ?? false,
       })
       .select()
       .single();
@@ -132,7 +134,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, color } = body;
+    const { id, name, color, is_pipeline_stage } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Tag ID is required' }, { status: 400 });
@@ -142,6 +144,7 @@ export async function PUT(req: NextRequest) {
     const updateData: any = {};
     if (name !== undefined) updateData.name = name.trim();
     if (color !== undefined) updateData.color = color;
+    if (is_pipeline_stage !== undefined) updateData.is_pipeline_stage = is_pipeline_stage;
 
     const { data, error } = await supabase
       .from('tags')

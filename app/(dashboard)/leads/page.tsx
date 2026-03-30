@@ -1931,12 +1931,19 @@ export default function LeadsPage() {
                     <td className="px-3 py-2">{l.state || "—"}</td>
                     <td className="px-3 py-2">
                       {Array.isArray(l.tags) && l.tags.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {l.primary_tag && l.tags.includes(l.primary_tag) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-700">
-                              {l.primary_tag}
-                            </span>
-                          )}
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {l.primary_tag && l.tags.includes(l.primary_tag) && (() => {
+                            const tagColor = tagsList.find(t => t.name === l.primary_tag)?.color;
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-white"
+                                style={{ backgroundColor: tagColor || '#3b82f6' }}
+                                title="Primary stage"
+                              >
+                                ★ {l.primary_tag}
+                              </span>
+                            );
+                          })()}
                           {l.tags.filter((t: string) => t !== l.primary_tag).length > 0 && (
                             <span className="text-xs text-slate-500 dark:text-slate-400">
                               {l.primary_tag ? `+${l.tags.length - 1}` : l.tags.join(", ")}

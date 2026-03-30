@@ -585,6 +585,33 @@ async function handleInboundSMS(payload: any) {
       console.error('Error pausing drip enrollments on reply:', stopErr);
     }
 
+    // Fire auto-tagging rules for message_received and lead_replied triggers
+    if (leadId) {
+      try {
+        // message_received fires on every inbound message
+        const { error: atErr1 } = await supabaseAdmin
+          .rpc('execute_auto_tagging_rule', {
+            p_user_id: userId,
+            p_lead_id: leadId,
+            p_trigger_type: 'message_received',
+            p_trigger_data: { phone: from, message: messageBody },
+          });
+        if (atErr1) console.error('Auto-tag (message_received) error:', atErr1);
+
+        // lead_replied fires on every inbound message (treat every reply as a "reply" event)
+        const { error: atErr2 } = await supabaseAdmin
+          .rpc('execute_auto_tagging_rule', {
+            p_user_id: userId,
+            p_lead_id: leadId,
+            p_trigger_type: 'lead_replied',
+            p_trigger_data: { phone: from, message: messageBody },
+          });
+        if (atErr2) console.error('Auto-tag (lead_replied) error:', atErr2);
+      } catch (autoTagErr) {
+        console.error('Error firing auto-tagging rules:', autoTagErr);
+      }
+    }
+
     // Check and trigger AI Receptionist if enabled
     await checkAndTriggerReceptionist(userId, threadId, from, to, messageBody);
   }

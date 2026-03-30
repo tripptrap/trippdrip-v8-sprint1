@@ -10,6 +10,7 @@ type Tag = {
   name: string;
   color: string;
   position: number;
+  is_pipeline_stage: boolean;
   count: number;
   created_at?: string;
   updated_at?: string;
@@ -603,6 +604,84 @@ export default function TagsPage() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // PIPELINE STAGE TOGGLE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async function togglePipelineStage(tag: Tag) {
+    const newValue = !tag.is_pipeline_stage;
+    // Optimistic update
+    setTags(prev => prev.map(t => t.id === tag.id ? { ...t, is_pipeline_stage: newValue } : t));
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tag.id, is_pipeline_stage: newValue }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        // Roll back on failure
+        setTags(prev => prev.map(t => t.id === tag.id ? { ...t, is_pipeline_stage: tag.is_pipeline_stage } : t));
+      }
+    } catch (error) {
+      console.error('Error toggling pipeline stage:', error);
+      setTags(prev => prev.map(t => t.id === tag.id ? { ...t, is_pipeline_stage: tag.is_pipeline_stage } : t));
+    }
+  }
+
+  async function movePipelineStageUp(tag: Tag) {
+    const stageList = tags.filter(t => t.is_pipeline_stage).sort((a, b) => a.position - b.position);
+    const idx = stageList.findIndex(t => t.id === tag.id);
+    if (idx <= 0) return;
+    const prev = stageList[idx - 1];
+    // Swap positions among all tags
+    const allReordered = tags.map(t => {
+      if (t.id === tag.id) return { ...t, position: prev.position };
+      if (t.id === prev.id) return { ...t, position: tag.position };
+      return t;
+    }).sort((a, b) => a.position - b.position);
+    setTags(allReordered);
+    setSavingOrder(true);
+    try {
+      await fetch('/api/tags', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: allReordered.map(t => t.id) }),
+      });
+    } catch (error) {
+      console.error('Error saving stage order:', error);
+      loadTags();
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  async function movePipelineStageDown(tag: Tag) {
+    const stageList = tags.filter(t => t.is_pipeline_stage).sort((a, b) => a.position - b.position);
+    const idx = stageList.findIndex(t => t.id === tag.id);
+    if (idx < 0 || idx >= stageList.length - 1) return;
+    const next = stageList[idx + 1];
+    const allReordered = tags.map(t => {
+      if (t.id === tag.id) return { ...t, position: next.position };
+      if (t.id === next.id) return { ...t, position: tag.position };
+      return t;
+    }).sort((a, b) => a.position - b.position);
+    setTags(allReordered);
+    setSavingOrder(true);
+    try {
+      await fetch('/api/tags', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: allReordered.map(t => t.id) }),
+      });
+    } catch (error) {
+      console.error('Error saving stage order:', error);
+      loadTags();
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -735,6 +814,75 @@ export default function TagsPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'tags' && (
         <>
+          {/* ─── Pipeline Stages Funnel ─────────────────────────────────────── */}
+          {(() => {
+            const pipelineStages = tags.filter(t => t.is_pipeline_stage).sort((a, b) => a.position - b.position);
+            return (
+              <div className="card">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Pipeline Stages</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      These tags define your lead progression funnel, shown on your dashboard.
+                    </p>
+                  </div>
+                  {savingOrder && (
+                    <span className="text-xs text-slate-400">Saving order...</span>
+                  )}
+                </div>
+
+                {pipelineStages.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                    <p className="text-sm mb-1">No pipeline stages defined yet.</p>
+                    <p className="text-xs">Toggle the <span className="font-medium text-sky-600">Pipeline Stage</span> switch on any tag below to add it to your funnel.</p>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-1 flex-wrap">
+                    {pipelineStages.map((stage, idx) => (
+                      <div key={stage.id} className="flex items-center gap-1">
+                        <div className="flex flex-col items-center gap-1">
+                          <div
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium"
+                            style={{ borderColor: stage.color, backgroundColor: `${stage.color}18` }}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                            <span className="text-slate-900 dark:text-slate-100">{stage.name}</span>
+                            {stage.count > 0 && (
+                              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: stage.color }}>
+                                {stage.count}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-0.5">
+                            <button
+                              onClick={() => movePipelineStageUp(stage)}
+                              disabled={idx === 0}
+                              className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                              title="Move left"
+                            >
+                              <ChevronUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => movePipelineStageDown(stage)}
+                              disabled={idx === pipelineStages.length - 1}
+                              className="p-0.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                              title="Move right"
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        {idx < pipelineStages.length - 1 && (
+                          <span className="text-slate-300 dark:text-slate-600 text-lg font-bold self-start mt-2">→</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="card">
@@ -813,7 +961,17 @@ export default function TagsPage() {
                           />
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {/* Pipeline Stage toggle */}
+                        <div className="flex items-center gap-1.5" title={tag.is_pipeline_stage ? 'Remove from pipeline funnel' : 'Add to pipeline funnel'}>
+                          <span className="text-xs text-slate-400 hidden sm:inline">Pipeline</span>
+                          <button
+                            onClick={() => togglePipelineStage(tag)}
+                            className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${tag.is_pipeline_stage ? 'bg-sky-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                          >
+                            <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 transition-all ${tag.is_pipeline_stage ? 'left-4' : 'left-0.5'}`} />
+                          </button>
+                        </div>
                         <button
                           onClick={() => openEditModal(tag)}
                           className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg transition"

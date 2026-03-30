@@ -32,6 +32,8 @@ interface PipelineTag {
   name: string;
   color: string;
   count: number;
+  is_pipeline_stage?: boolean;
+  position?: number;
 }
 
 interface Appointment {
@@ -367,7 +369,13 @@ export default function Dashboard(){
       const res = await fetch('/api/tags');
       const data = await res.json();
       if (data.ok && data.items) {
-        setPipelineTags(data.items);
+        const allTags: PipelineTag[] = data.items;
+        // Prefer tags marked as pipeline stages, sorted by position
+        const stageOnly = allTags
+          .filter(t => t.is_pipeline_stage)
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+        // If no stages defined yet, fall back to all tags (original behaviour)
+        setPipelineTags(stageOnly.length > 0 ? stageOnly : allTags);
       }
     } catch (error) {
       console.error('Failed to fetch pipeline tags:', error);
