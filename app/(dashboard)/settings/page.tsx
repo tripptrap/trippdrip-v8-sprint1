@@ -76,6 +76,7 @@ export default function Page() {
   const [userPlan, setUserPlan] = useState<string>('growth');
   const [userCredits, setUserCredits] = useState(0);
   const [nextRenewal, setNextRenewal] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   // AI Handoff settings
   const [aiHandoffEnabled, setAiHandoffEnabled] = useState(true);
@@ -179,7 +180,7 @@ export default function Page() {
       setReplyTo(data.email.replyTo || '');
       }
 
-      // Load user profile
+      // Load user profile + plan info
       try {
         const profileRes = await fetch('/api/user/profile');
         if (profileRes.ok) {
@@ -188,6 +189,8 @@ export default function Page() {
           setProfileEmail(profileData.email || '');
           setProfilePhone(profileData.phone || '');
           setProfileBusinessName(profileData.business_name || '');
+          if (profileData.subscription_tier) setUserPlan(profileData.subscription_tier);
+          if (typeof profileData.credits === 'number') setUserCredits(profileData.credits);
         }
       } catch (e) { /* silent */ }
 
@@ -337,6 +340,41 @@ export default function Page() {
     const updated = await loadSettings();
     setSettings(updated);
     showSaveMessage('Email settings saved!');
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error(data.error || 'Failed to open billing portal');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to open billing portal');
+    } finally {
+      setOpeningPortal(false);
+    }
+  };
+
+  const handleUpgradePlan = async () => {
+    try {
+      const res = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionType: 'scale' }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error(data.error || 'Failed to start upgrade');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to start upgrade');
+    }
   };
 
   const showSaveMessage = (msg: string) => {
@@ -623,6 +661,7 @@ export default function Page() {
       {/* Plan Management Tab */}
       {activeTab === 'plan' && (
         <div className="space-y-6">
+          {/* Current Plan Card */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Your Subscription</h2>
 
@@ -641,37 +680,35 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 mb-6">
               <h3 className="font-medium text-slate-900 dark:text-slate-100">Plan Features</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> Unlimited contacts
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> Unlimited campaigns
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> AI-powered responses
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> AI Receptionist mode
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> Advanced analytics
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <span className="text-emerald-500">✓</span> Priority support
-                </div>
+                {[
+                  `${userPlan === 'scale' ? '10,000' : '3,000'} credits/month`,
+                  'Unlimited contacts',
+                  'Unlimited campaigns',
+                  'AI-powered responses',
+                  'AI Receptionist mode',
+                  'Advanced analytics',
+                  'Priority support',
+                  userPlan === 'scale' ? '30% off all credit packs' : 'Standard credit pack pricing',
+                ].map((feature) => (
+                  <div key={feature} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <span className={userPlan === 'scale' && feature.includes('30%') ? 'text-emerald-500 font-bold' : 'text-emerald-500'}>✓</span>
+                    <span className={userPlan === 'scale' && feature.includes('30%') ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>{feature}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              <a
-                href="/points"
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleOpenBillingPortal}
+                disabled={openingPortal}
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                Manage Plan & Credits
-              </a>
+                {openingPortal ? 'Opening...' : 'Manage Billing'}
+              </button>
               <a
                 href="/points"
                 className="px-6 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -681,28 +718,88 @@ export default function Page() {
             </div>
           </div>
 
+          {/* Upgrade CTA — only shown to Growth users */}
+          {userPlan !== 'scale' && (
+            <div className="card border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-emerald-900 dark:text-emerald-100 mb-1">Upgrade to Scale</h2>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-3">
+                    Get 10,000 credits/month and <strong>30% off every credit pack</strong> — the only plan with discounted top-ups.
+                  </p>
+                  <ul className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
+                    <li>✓ 10,000 credits/month (vs 3,000 on Growth)</li>
+                    <li>✓ 30% off all credit pack purchases</li>
+                    <li>✓ Everything in Growth</li>
+                  </ul>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-3xl font-bold text-emerald-800 dark:text-emerald-200">$98</div>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400">/month</div>
+                </div>
+              </div>
+              <button
+                onClick={handleUpgradePlan}
+                className="mt-4 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Upgrade to Scale →
+              </button>
+            </div>
+          )}
+
+          {/* Credit Pack Pricing — tier-aware */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Volume Discounts</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Credit Packs</h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Save more when you buy credit packs in bulk. Scale plan members get the best rates!
+              {userPlan === 'scale'
+                ? 'As a Scale member, you get 30% off every credit pack.'
+                : 'Upgrade to Scale to unlock 30% off every credit pack.'}
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Starter 4K</p>
-                <p className="font-semibold text-slate-900 dark:text-slate-100">10% off</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Pro 10K</p>
-                <p className="font-semibold text-slate-900 dark:text-slate-100">20% off</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Business 25K</p>
-                <p className="font-semibold text-slate-900 dark:text-slate-100">25% off</p>
-              </div>
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-center border border-amber-200 dark:border-amber-800">
-                <p className="text-xs text-amber-600 dark:text-amber-400">Enterprise 60K</p>
-                <p className="font-bold text-amber-700 dark:text-amber-300">30% off</p>
-              </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-700/50">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Pack</th>
+                    <th className="text-center px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Base Price</th>
+                    <th className={`text-center px-4 py-3 font-semibold ${userPlan === 'scale' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {userPlan === 'scale' ? 'Your Price (30% off)' : 'Your Price'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {[
+                    { name: 'Starter', credits: '4,000', base: 40, scale: 28 },
+                    { name: 'Pro', credits: '10,000', base: 100, scale: 70 },
+                    { name: 'Business', credits: '25,000', base: 250, scale: 175 },
+                    { name: 'Enterprise', credits: '60,000', base: 600, scale: 420 },
+                  ].map((pack) => (
+                    <tr key={pack.name} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-900 dark:text-slate-100">{pack.name}</div>
+                        <div className="text-xs text-slate-500">{pack.credits} credits</div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400">${pack.base}</td>
+                      <td className="px-4 py-3 text-center">
+                        {userPlan === 'scale' ? (
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            ${pack.scale} <span className="text-xs font-normal">(-${pack.base - pack.scale})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-700 dark:text-slate-300">${pack.base}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4">
+              <a
+                href="/points"
+                className="inline-block px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors text-sm"
+              >
+                Buy Credits →
+              </a>
             </div>
           </div>
         </div>
