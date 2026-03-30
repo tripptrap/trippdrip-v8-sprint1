@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard, ArrowRightLeft, Mail } from 'lucide-react';
+import { Phone, Search, Plus, Star, Trash2, Loader2, CreditCard, ArrowRightLeft, Mail, CheckCircle, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import PurchaseNumberModal from '@/components/PurchaseNumberModal';
 
 interface PhoneNumber {
@@ -47,6 +47,17 @@ interface PoolNumber {
 
 type NumberType = 'local' | 'tollfree';
 
+interface PortingOrder {
+  id: string;
+  phone_number: string;
+  carrier_name: string;
+  status: 'submitted' | 'pending' | 'in_progress' | 'complete' | 'failed' | 'cancelled' | 'review_needed';
+  status_details: string | null;
+  submitted_at: string;
+  completed_at: string | null;
+  telnyx_porting_order_id: string | null;
+}
+
 export default function PhoneNumbersPage() {
   const [myNumbers, setMyNumbers] = useState<PhoneNumber[]>([]);
   const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([]);
@@ -65,6 +76,22 @@ export default function PhoneNumbersPage() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState('');
   const [userCredits, setUserCredits] = useState(0);
+
+  // Porting state
+  const [portingOrders, setPortingOrders] = useState<PortingOrder[]>([]);
+  const [showPortForm, setShowPortForm] = useState(false);
+  const [submittingPort, setSubmittingPort] = useState(false);
+  const [portForm, setPortForm] = useState({
+    phoneNumber: '',
+    carrierName: '',
+    accountNumber: '',
+    accountPin: '',
+    authorizedName: '',
+    billingStreet: '',
+    billingCity: '',
+    billingState: '',
+    billingZip: '',
+  });
 
   // Show message temporarily
   const showMessage = (type: 'success' | 'error', text: string) => {
@@ -266,10 +293,52 @@ export default function PhoneNumbersPage() {
     fetchUserCredits();
   };
 
+  // Fetch porting orders
+  const fetchPortingOrders = async () => {
+    try {
+      const res = await fetch('/api/telnyx/port-number');
+      const data = await res.json();
+      if (data.orders) setPortingOrders(data.orders);
+    } catch (e) {
+      console.error('Error fetching porting orders:', e);
+    }
+  };
+
+  // Submit port request
+  const submitPortRequest = async () => {
+    const { phoneNumber, carrierName, accountNumber, accountPin, authorizedName, billingStreet, billingCity, billingState, billingZip } = portForm;
+    if (!phoneNumber || !carrierName || !accountNumber || !accountPin || !authorizedName || !billingStreet || !billingCity || !billingState || !billingZip) {
+      showMessage('error', 'Please fill in all required fields.');
+      return;
+    }
+    setSubmittingPort(true);
+    try {
+      const res = await fetch('/api/telnyx/port-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(portForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMessage('success', data.message);
+        setShowPortForm(false);
+        setPortForm({ phoneNumber: '', carrierName: '', accountNumber: '', accountPin: '', authorizedName: '', billingStreet: '', billingCity: '', billingState: '', billingZip: '' });
+        await fetchPortingOrders();
+      } else {
+        showMessage('error', data.error || 'Failed to submit porting request.');
+      }
+    } catch (e) {
+      showMessage('error', 'Failed to submit porting request.');
+    } finally {
+      setSubmittingPort(false);
+    }
+  };
+
   useEffect(() => {
     fetchMyNumbers();
     loadPoolNumbers();
     fetchUserCredits();
+    fetchPortingOrders();
   }, []);
 
   return (
@@ -667,39 +736,213 @@ export default function PhoneNumbersPage() {
 
       {/* Number Porting Section */}
       <div className="mt-6 bg-gray-800/50 border border-slate-200 dark:border-slate-700 rounded-lg">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <ArrowRightLeft className="h-5 w-5" />
-            Port Your Number
-          </h2>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-            Bring your existing phone number to HyveWyre
-          </p>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-8">
-            <ArrowRightLeft className="h-12 w-12 mx-auto text-slate-500 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Want to keep your current number?
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md mx-auto">
-              We can port your existing phone number from any carrier to HyveWyre. The process typically
-              takes 1-2 weeks and your number will continue working during the transfer.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <a
-                href="mailto:support@hyvewyre.com?subject=Number%20Porting%20Request&body=Hi%2C%20I%27d%20like%20to%20port%20my%20existing%20phone%20number%20to%20HyveWyre.%0A%0AMy%20current%20number%3A%20%0AMy%20current%20carrier%3A%20%0A"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors"
-              >
-                <Mail className="h-4 w-4" />
-                Contact Us to Port
-              </a>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
-              You'll need: your current phone number, carrier name, and account PIN/password.
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5" />
+              Port Your Number
+            </h2>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+              Bring your existing phone number from any carrier to HyveWyre. Typically takes 1–2 weeks.
             </p>
           </div>
+          <button
+            onClick={() => setShowPortForm(!showPortForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+          >
+            {showPortForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showPortForm ? 'Cancel' : 'Start Port Request'}
+          </button>
         </div>
+
+        {/* Existing porting orders */}
+        {portingOrders.length > 0 && (
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Active Port Requests</h3>
+            {portingOrders.map((order) => {
+              const statusMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                submitted:    { label: 'Submitted',    icon: <Clock className="h-4 w-4" />,        color: 'text-sky-600 bg-sky-50 dark:bg-sky-900/30' },
+                pending:      { label: 'Pending',      icon: <Clock className="h-4 w-4" />,        color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/30' },
+                in_progress:  { label: 'In Progress',  icon: <Loader2 className="h-4 w-4 animate-spin" />, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' },
+                complete:     { label: 'Complete',     icon: <CheckCircle className="h-4 w-4" />,  color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30' },
+                review_needed:{ label: 'Under Review', icon: <AlertCircle className="h-4 w-4" />, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30' },
+                failed:       { label: 'Failed',       icon: <XCircle className="h-4 w-4" />,     color: 'text-red-600 bg-red-50 dark:bg-red-900/30' },
+                cancelled:    { label: 'Cancelled',    icon: <XCircle className="h-4 w-4" />,     color: 'text-slate-500 bg-slate-100 dark:bg-slate-700' },
+              };
+              const s = statusMap[order.status] || statusMap.submitted;
+              return (
+                <div key={order.id} className="flex items-start justify-between gap-4 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">{order.phone_number}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Carrier: {order.carrier_name}</p>
+                    {order.status_details && (
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{order.status_details}</p>
+                    )}
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${s.color}`}>
+                    {s.icon}{s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Port request form */}
+        {showPortForm && (
+          <div className="p-6 space-y-5">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-300">
+              <strong>Before you start:</strong> Make sure the info below exactly matches what's on file with your current carrier. Mismatches will delay or reject the port.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Phone number */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Phone Number to Port <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="(555) 000-0000"
+                  value={portForm.phoneNumber}
+                  onChange={(e) => setPortForm((p) => ({ ...p, phoneNumber: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Carrier */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Current Carrier <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="AT&T, Verizon, T-Mobile…"
+                  value={portForm.carrierName}
+                  onChange={(e) => setPortForm((p) => ({ ...p, carrierName: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Account number */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Carrier Account Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Found on your carrier bill"
+                  value={portForm.accountNumber}
+                  onChange={(e) => setPortForm((p) => ({ ...p, accountNumber: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Account PIN */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Account PIN / Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Your carrier account PIN"
+                  value={portForm.accountPin}
+                  onChange={(e) => setPortForm((p) => ({ ...p, accountPin: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Authorized name */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Authorized Contact Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Name on carrier account"
+                  value={portForm.authorizedName}
+                  onChange={(e) => setPortForm((p) => ({ ...p, authorizedName: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Billing address */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Billing Street Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="123 Main St"
+                  value={portForm.billingStreet}
+                  onChange={(e) => setPortForm((p) => ({ ...p, billingStreet: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  City <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="City"
+                  value={portForm.billingCity}
+                  onChange={(e) => setPortForm((p) => ({ ...p, billingCity: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    State <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="TX"
+                    maxLength={2}
+                    value={portForm.billingState}
+                    onChange={(e) => setPortForm((p) => ({ ...p, billingState: e.target.value.toUpperCase() }))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    ZIP <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="00000"
+                    value={portForm.billingZip}
+                    onChange={(e) => setPortForm((p) => ({ ...p, billingZip: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={submitPortRequest}
+                disabled={submittingPort}
+                className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors text-sm"
+              >
+                {submittingPort ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
+                {submittingPort ? 'Submitting…' : 'Submit Port Request'}
+              </button>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Your number stays active with your current carrier until porting is complete.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!showPortForm && portingOrders.length === 0 && (
+          <div className="p-6 text-center text-sm text-slate-400 dark:text-slate-500">
+            No port requests yet. Click <strong>Start Port Request</strong> to begin.
+          </div>
+        )}
       </div>
 
       {/* Purchase Number Modal */}

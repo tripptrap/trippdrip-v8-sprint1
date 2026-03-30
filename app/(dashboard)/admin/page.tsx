@@ -1131,6 +1131,7 @@ function InternalDevNotes() {
     'Onboarding — industry-based AI Flow setup: step 5 uses getFlowTemplate(industry) to pre-populate flow context, steps, required questions',
     'Onboarding — industry-specific pipeline stages & campaigns: step 4 loads INDUSTRY_PRESETS[industry] tags + campaigns, user can toggle on/off before applying',
     'Onboarding — optional Google Calendar connection: step 6 with OAuth flow, skippable, returns to onboarding after auth',
+    'Number porting: porting_orders table, POST/GET /api/telnyx/port-number, full form UI with status tracker, Telnyx porting API submission with review_needed fallback',
   ];
 
   // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
@@ -1140,8 +1141,6 @@ function InternalDevNotes() {
     { cat: 'Payments & Billing', item: 'Show Scale tier point pack discount clearly on pricing/preview pages' },
     { cat: 'Payments & Billing', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack' },
     { cat: 'Payments & Billing', item: 'Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits' },
-    // Phone Numbers
-    { cat: 'Phone Numbers', item: 'Number porting (bring your own number) — required before launch' },
     // Onboarding still needed
     { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
     { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
