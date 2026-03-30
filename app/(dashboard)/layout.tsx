@@ -10,6 +10,7 @@ import OnboardingCongratsModal from "@/components/OnboardingCongratsModal"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { OnboardingProvider } from "@/lib/OnboardingContext"
 import LowCreditsWarning from "@/components/LowCreditsWarning"
+import ZeroCreditsModal from "@/components/ZeroCreditsModal"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -77,6 +78,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* 4. Congratulations Modal - final step */}
         <OnboardingCongratsModal />
+
+        {/* Zero-credits hard blocker — overlays entire dashboard when credits = 0 */}
+        <ZeroCreditsModal />
       </div>
     </OnboardingProvider>
     </ThemeProvider>

@@ -261,6 +261,8 @@ function OnboardingContent() {
       if (poolData.success && poolData.numbers?.length > 0) {
         setPoolNumbers(poolData.numbers)
         setNumberSource('pool')
+        // Auto-select the first available number so users don't have to hunt
+        setSelectedPoolNumber(poolData.numbers[0])
       }
     } catch (err) {
       console.error('Error fetching numbers:', err)
@@ -715,8 +717,8 @@ function OnboardingContent() {
               <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20 onb-pop-in">
                 <Phone className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-3xl font-bold mb-2 text-gray-900 onb-fade-up-d1">Choose Your Phone Number</h1>
-              <p className="text-gray-500 onb-fade-up-d2">Pick a toll-free number to send and receive messages</p>
+              <h1 className="text-3xl font-bold mb-2 text-gray-900 onb-fade-up-d1">Your Free Phone Number</h1>
+              <p className="text-gray-500 onb-fade-up-d2">A number has been reserved for you — included free with your plan</p>
             </div>
 
             <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm onb-fade-up-d2">
@@ -735,7 +737,7 @@ function OnboardingContent() {
                 </div>
               ) : (
                 <>
-                  <p className="text-gray-500 mb-4 text-center text-sm">Select a toll-free number — it&apos;s included free with your plan.</p>
+                  <p className="text-gray-500 mb-4 text-center text-sm">We&apos;ve pre-selected a number for you. You can swap it below if you prefer a different one.</p>
                   <div className="space-y-2 max-h-72 overflow-y-auto">
                     {numberSource === 'pool' ? poolNumbers.map(num => (
                       <button
@@ -795,7 +797,7 @@ function OnboardingContent() {
                       disabled={claiming}
                       className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      {claiming ? <><Loader2 className="w-5 h-5 animate-spin" />Claiming...</> : <>Claim This Number <ArrowRight className="w-5 h-5" /></>}
+                      {claiming ? <><Loader2 className="w-5 h-5 animate-spin" />Reserving your number...</> : <>Confirm This Number <ArrowRight className="w-5 h-5" /></>}
                     </button>
                   )}
                 </>

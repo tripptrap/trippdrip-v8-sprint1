@@ -1966,6 +1966,22 @@ export default function LeadsPage() {
                       </button>
                       {isMenuOpen && (
                         <div className="absolute right-0 mt-1 w-[200px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg z-10">
+                          {/* Text this lead */}
+                          {l.phone && (
+                            <button
+                              className="w-full text-left px-3 py-2 text-sm text-sky-600 dark:text-sky-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDispositionMenuOpen({});
+                                const params = new URLSearchParams({ phone: l.phone! });
+                                if (l.first_name || l.last_name) params.set('leadName', [l.first_name, l.last_name].filter(Boolean).join(' '));
+                                if (id) params.set('leadId', id);
+                                router.push(`/texts?${params.toString()}`);
+                              }}
+                            >
+                              💬 Text This Lead
+                            </button>
+                          )}
                           {/* Mark as Sold */}
                           <button
                             className="w-full text-left px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"

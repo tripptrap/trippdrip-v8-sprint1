@@ -36,7 +36,8 @@ export default function LowCreditsWarning() {
     return () => clearInterval(interval);
   }, []);
 
-  if (credits === null || credits > 50 || dismissed) return null;
+  // Never suppress the zero-credits banner regardless of dismissed state
+  if (credits === null || credits > 50 || (dismissed && credits > 0)) return null;
 
   const isOut = credits === 0;
 
