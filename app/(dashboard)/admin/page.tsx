@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { isAdminEmail } from '@/lib/admin';
 import QABacktestTracker from '@/components/QABacktestTracker';
 import { format } from 'date-fns';
 import {
@@ -133,10 +131,14 @@ export default function AdminPage() {
   }, []);
 
   async function checkAdminAccess() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user || !isAdminEmail(user.email)) {
+    try {
+      const res = await fetch('/api/user/plan');
+      const data = await res.json();
+      if (!data.isAdmin) {
+        router.push('/dashboard');
+        return;
+      }
+    } catch {
       router.push('/dashboard');
       return;
     }
@@ -629,7 +631,7 @@ export default function AdminPage() {
                     )}
                   </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    {isAdminEmail(user.email) ? (
+                    {user.email === 'tripped620@gmail.com' ? (
                       <div className="flex justify-end">
                         <span className="px-2 py-1 text-[10px] font-medium bg-gradient-to-r from-red-500 to-orange-500 text-white rounded">
                           ADMIN
