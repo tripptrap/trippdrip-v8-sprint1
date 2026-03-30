@@ -5,8 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { findLead as seedFindLead } from "@/lib/db";
 import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
-import { isAdminEmail } from "@/lib/admin";
 import { Shield } from "lucide-react";
 
 type NavItem = {
@@ -58,7 +56,6 @@ const navItems: NavItem[] = [
       { href: "/credit-history", label: "Usage History" },
     ]
   },
-  { href: "/roadmap",   label: "Roadmap" },
   { href: "/settings",  label: "Settings" },
 ];
 
@@ -85,23 +82,7 @@ export default function Sidebar(){
     };
   }, []);
 
-  // Check if user is admin
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && isAdminEmail(user.email)) {
-          setIsAdmin(true);
-        }
-      } catch (e) {
-        console.error('Error checking admin status:', e);
-      }
-    };
-    checkAdmin();
-  }, []);
-
-  // Detect user plan type and listen for changes
+  // Detect user plan type + admin status and listen for changes
   useEffect(() => {
     const updatePlan = async () => {
       try {
@@ -110,6 +91,9 @@ export default function Sidebar(){
 
         if (data.ok && data.planType) {
           setUserPlan(data.planType);
+        }
+        if (data.isAdmin) {
+          setIsAdmin(true);
         }
       } catch (e) {
         console.error('Error loading user plan:', e);

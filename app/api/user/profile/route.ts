@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { full_name, phone } = body;
+    const { full_name, phone, business_name } = body;
 
     // Update user metadata in Supabase Auth
     const { error: authUpdateError } = await supabase.auth.updateUser({
@@ -75,6 +75,7 @@ export async function PATCH(req: NextRequest) {
     const userUpdates: any = {};
     if (full_name !== undefined) userUpdates.full_name = full_name;
     if (phone !== undefined) userUpdates.phone_number = phone;
+    if (business_name !== undefined) userUpdates.business_name = business_name;
 
     if (Object.keys(userUpdates).length > 0) {
       const { error: dbUpdateError } = await supabase

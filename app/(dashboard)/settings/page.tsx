@@ -91,6 +91,7 @@ export default function Page() {
   const [profileName, setProfileName] = useState('');
   const [profileEmail, setProfileEmail] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
+  const [profileBusinessName, setProfileBusinessName] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -186,6 +187,7 @@ export default function Page() {
           setProfileName(profileData.full_name || '');
           setProfileEmail(profileData.email || '');
           setProfilePhone(profileData.phone || '');
+          setProfileBusinessName(profileData.business_name || '');
         }
       } catch (e) { /* silent */ }
 
@@ -377,6 +379,7 @@ export default function Page() {
         body: JSON.stringify({
           full_name: profileName.trim(),
           phone: profilePhone.trim(),
+          business_name: profileBusinessName.trim(),
         }),
       });
       const data = await res.json();
@@ -1425,6 +1428,16 @@ export default function Page() {
                   onChange={(e) => setProfilePhone(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
                   placeholder="Your phone number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Business Name</label>
+                <input
+                  type="text"
+                  value={profileBusinessName}
+                  onChange={(e) => setProfileBusinessName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Your business name"
                 />
               </div>
               <button

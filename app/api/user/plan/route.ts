@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isAdminEmail } from '@/lib/admin';
 
 export async function GET() {
   try {
@@ -30,7 +31,8 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      planType: userData?.plan_type || 'unpaid'
+      planType: userData?.plan_type || 'unpaid',
+      isAdmin: isAdminEmail(user.email),
     });
   } catch (error: any) {
     console.error('Error in GET /api/user/plan:', error);

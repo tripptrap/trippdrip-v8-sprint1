@@ -85,17 +85,6 @@ export default function PreviewClient() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
-      {/* Development Banner */}
-      <div className="bg-amber-500 text-white text-center py-2.5 px-4 text-sm font-medium tracking-wide">
-        <span className="inline-flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
-          </span>
-          This site is currently in development and is not yet functional. Stay tuned!
-        </span>
-      </div>
-
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
@@ -975,7 +964,7 @@ export default function PreviewClient() {
                 <svg className="w-3.5 h-3.5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
-                10% off credit pack purchases
+                Standard credit pack pricing
               </div>
             </div>
             <div className="space-y-4 mb-8">
@@ -1009,7 +998,7 @@ export default function PreviewClient() {
               </div>
               <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 -mx-1">
                 <span className="text-gray-500 text-base font-bold">%</span>
-                <span className="text-gray-600 text-sm">10% off all credit pack purchases</span>
+                <span className="text-gray-600 text-sm">Standard pricing on credit pack purchases</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1118,7 +1107,7 @@ export default function PreviewClient() {
                 <span className="font-bold text-emerald-800">Scale members save 30% on every credit pack</span>
               </div>
               <p className="text-xs text-emerald-700">
-                Every credit pack you buy is automatically discounted 30% — no matter the size. Growth members only get 10% off. Upgrade to Scale and keep more money in your pocket every time you top up.
+                Every credit pack you buy is automatically discounted 30% — no matter the size. Growth members pay standard pricing. Upgrade to Scale and keep more money in your pocket every time you top up.
               </p>
             </div>
 
@@ -1146,7 +1135,7 @@ export default function PreviewClient() {
               <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
             </svg>
             <span>
-              <span className="font-bold text-emerald-700">Scale members save 30%</span> on every credit pack purchase vs <span className="font-semibold">10% for Growth</span>
+              <span className="font-bold text-emerald-700">Scale members save 30%</span> on every credit pack purchase vs <span className="font-semibold">standard pricing for Growth</span>
             </span>
           </div>
         </motion.div>
@@ -1169,7 +1158,7 @@ export default function PreviewClient() {
               <div className="p-4 font-semibold text-gray-700">Credit Pack</div>
               <div className="p-4 font-semibold text-gray-700 text-center">Base Price</div>
               <div className="p-4 font-semibold text-gray-700 text-center">
-                Growth <span className="text-gray-400 font-normal text-xs">(10% off)</span>
+                Growth
               </div>
               <div className="p-4 font-semibold text-center">
                 <span className="text-emerald-600">Scale</span> <span className="text-emerald-400 font-normal text-xs">(30% off)</span>
@@ -1184,8 +1173,7 @@ export default function PreviewClient() {
                 </div>
                 <div className="p-4 text-center text-gray-600">$40</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$36</span>
-                  <span className="ml-1 text-xs text-gray-500">(-$4)</span>
+                  <span className="text-gray-700">$40</span>
                 </div>
                 <div className="p-4 text-center">
                   <span className="font-semibold text-emerald-600">$28</span>
@@ -1203,8 +1191,7 @@ export default function PreviewClient() {
                 </div>
                 <div className="p-4 text-center text-gray-600">$100</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$90</span>
-                  <span className="ml-1 text-xs text-gray-500">(-$10)</span>
+                  <span className="text-gray-700">$100</span>
                 </div>
                 <div className="p-4 text-center">
                   <span className="font-semibold text-emerald-600">$70</span>
@@ -1219,8 +1206,7 @@ export default function PreviewClient() {
                 </div>
                 <div className="p-4 text-center text-gray-600">$250</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$225</span>
-                  <span className="ml-1 text-xs text-gray-500">(-$25)</span>
+                  <span className="text-gray-700">$250</span>
                 </div>
                 <div className="p-4 text-center">
                   <span className="font-semibold text-emerald-600">$175</span>
@@ -1238,8 +1224,7 @@ export default function PreviewClient() {
                 </div>
                 <div className="p-4 text-center text-gray-600">$600</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$540</span>
-                  <span className="ml-1 text-xs text-gray-500">(-$60)</span>
+                  <span className="text-gray-700">$600</span>
                 </div>
                 <div className="p-4 text-center">
                   <span className="font-bold text-emerald-600">$420</span>
@@ -1251,7 +1236,7 @@ export default function PreviewClient() {
           </div>
 
           <div className="mt-4 text-center text-sm text-gray-500">
-            Credits never expire. Scale members save 30% on every pack — 3x more savings than Growth.
+            Credits never expire. Scale members save 30% on every pack — exclusive to the Scale plan.
           </div>
         </motion.div>
 
