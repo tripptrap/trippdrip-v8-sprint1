@@ -121,21 +121,41 @@ function buildSystemPrompt(
   params: ReceptionistResponseParams,
   isNewContactGreeting: boolean
 ): string {
-  // Use industry preset if enabled and industry is set, otherwise fall back to custom/default
+  const id = settings.identity || {};
+  const businessName = id.businessName || 'this business';
+
+  // ── Identity block — always first so AI never forgets who it is ──────────────
+  const identityLines: string[] = [];
+  if (id.agentName)       identityLines.push(`- Your name: ${id.agentName}`);
+  if (id.businessName)    identityLines.push(`- Business: ${id.businessName}`);
+  if (id.whatYouOffer)    identityLines.push(`- What you offer: ${id.whatYouOffer}`);
+  if (id.targetAudience)  identityLines.push(`- Who you help: ${id.targetAudience}`);
+  if (id.serviceArea)     identityLines.push(`- Service area: ${id.serviceArea}`);
+  if (id.callbackPhone)   identityLines.push(`- Phone to give out: ${id.callbackPhone}`);
+  if (id.website)         identityLines.push(`- Website: ${id.website}`);
+  if (id.tagline)         identityLines.push(`- Value prop: ${id.tagline}`);
+
+  const identityBlock = identityLines.length > 0
+    ? `WHO YOU ARE — answer ANY identity question from this section IMMEDIATELY and confidently:\n${identityLines.join('\n')}\n\nWhen someone asks "who are you?", "who do you work for?", "what do you want?", "what is this about?" — answer naturally using the above. NEVER say you don't know who you work for or what you're selling.\n\n`
+    : '';
+
+  // ── Base persona prompt (industry preset or custom) ──────────────────────────
   let basePrompt: string;
   if (settings.use_industry_preset && settings.industry) {
     const preset = getReceptionistPreset(settings.industry);
-    basePrompt = preset.systemPrompt;
-    // If user also has a custom prompt, append it as additional instructions
+    // Replace {businessName} placeholder with the real name
+    basePrompt = preset.systemPrompt.replace(/\{businessName\}/g, businessName);
     if (settings.system_prompt) {
       basePrompt += `\n\nADDITIONAL INSTRUCTIONS FROM BUSINESS OWNER:\n${settings.system_prompt}`;
     }
   } else {
-    basePrompt = settings.system_prompt || DEFAULT_SYSTEM_PROMPT;
+    basePrompt = (settings.system_prompt || DEFAULT_SYSTEM_PROMPT)
+      .replace(/\{businessName\}/g, businessName);
   }
+
   const businessHours = getBusinessHoursDisplay(settings);
 
-  let prompt = `${basePrompt}
+  let prompt = `${identityBlock}${basePrompt}
 
 CURRENT CONTACT:
 - Name: ${params.leadName || 'Unknown'}

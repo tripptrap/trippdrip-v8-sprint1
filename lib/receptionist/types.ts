@@ -1,11 +1,29 @@
 // TypeScript interfaces for Receptionist Mode
 
+/**
+ * Structured identity fields — the AI uses these to answer
+ * "who are you?", "who do you work for?", "what do you want?" etc.
+ */
+export interface ReceptionistIdentity {
+  agentName?: string;       // Name the AI introduces itself as
+  businessName?: string;    // Company / agency name
+  whatYouOffer?: string;    // One-liner: what product/service you sell
+  targetAudience?: string;  // Who you help (e.g. "homeowners in Texas")
+  serviceArea?: string;     // Geography you serve
+  callbackPhone?: string;   // Phone number to give out if they want to call
+  website?: string;         // Website URL
+  tagline?: string;         // Short pitch / value prop
+}
+
 export interface ReceptionistSettings {
   id: string;
   user_id: string;
 
   // Enable/Disable
   enabled: boolean;
+
+  // Identity — who the AI says it is
+  identity: ReceptionistIdentity;
 
   // AI Configuration
   system_prompt: string | null;
@@ -36,6 +54,7 @@ export interface ReceptionistSettings {
 
 export interface ReceptionistSettingsInput {
   enabled?: boolean;
+  identity?: ReceptionistIdentity;
   system_prompt?: string | null;
   greeting_message?: string | null;
   industry?: string | null;
@@ -127,6 +146,7 @@ export interface BusinessHoursCheckResult {
 // Default settings for new users
 export const DEFAULT_RECEPTIONIST_SETTINGS: Omit<ReceptionistSettings, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
   enabled: false,
+  identity: {},
   system_prompt: null,
   greeting_message: 'Hi! Thanks for reaching out. How can I help you today?',
   industry: null,

@@ -1,18 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { ReceptionistSettings as ReceptionistSettingsType, DEFAULT_RECEPTIONIST_SETTINGS, DEFAULT_SYSTEM_PROMPT } from '@/lib/receptionist/types';
-import { Headphones, MessageSquare, Clock, Users, Calendar, Zap, Shield, ChevronDown } from 'lucide-react';
+import {
+  ReceptionistSettings as ReceptionistSettingsType,
+  ReceptionistIdentity,
+  DEFAULT_RECEPTIONIST_SETTINGS,
+  DEFAULT_SYSTEM_PROMPT,
+} from '@/lib/receptionist/types';
+import {
+  Headphones, MessageSquare, Clock, Users, Calendar, Zap,
+  Shield, Bot, Building2, Phone, Globe, MapPin, Sparkles,
+  CheckCircle2, AlertCircle, Info,
+} from 'lucide-react';
+
+// ─── constants ───────────────────────────────────────────────────────────────
 
 const TIMEZONES = [
-  { value: 'America/New_York', label: 'Eastern (ET)' },
-  { value: 'America/Chicago', label: 'Central (CT)' },
-  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/New_York',    label: 'Eastern (ET)' },
+  { value: 'America/Chicago',     label: 'Central (CT)' },
+  { value: 'America/Denver',      label: 'Mountain (MT)' },
   { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
-  { value: 'America/Phoenix', label: 'Arizona (MST)' },
-  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
+  { value: 'America/Phoenix',     label: 'Arizona (MST)' },
+  { value: 'America/Anchorage',   label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu',    label: 'Hawaii (HST)' },
 ];
 
 const DAYS_OF_WEEK = [
@@ -25,553 +36,669 @@ const DAYS_OF_WEEK = [
   { value: 7, label: 'Sun' },
 ];
 
+const INDUSTRIES = [
+  { value: '',                    label: 'No industry preset (custom only)' },
+  { value: 'insurance',           label: 'Insurance' },
+  { value: 'real_estate',         label: 'Real Estate' },
+  { value: 'solar',               label: 'Solar' },
+  { value: 'roofing',             label: 'Roofing' },
+  { value: 'home_services',       label: 'Home Services' },
+  { value: 'financial_services',  label: 'Financial Services' },
+  { value: 'healthcare',          label: 'Healthcare' },
+  { value: 'automotive',          label: 'Automotive' },
+  { value: 'retail',              label: 'Retail' },
+  { value: 'other',               label: 'Other' },
+];
+
+// ─── small helpers ────────────────────────────────────────────────────────────
+
+function Toggle({
+  checked, onChange, size = 'md',
+}: { checked: boolean; onChange: (v: boolean) => void; size?: 'sm' | 'md' }) {
+  const w = size === 'sm' ? 'w-11 h-6' : 'w-14 h-7';
+  const dot = size === 'sm'
+    ? 'after:h-5 after:w-5 after:top-[2px] after:left-[2px]'
+    : 'after:h-6 after:w-6 after:top-0.5 after:left-[4px]';
+  return (
+    <label className="relative inline-flex items-center cursor-pointer">
+      <input type="checkbox" checked={checked}
+        onChange={e => onChange(e.target.checked)} className="sr-only peer" />
+      <div className={`${w} bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:bg-white after:border-slate-300 after:border after:rounded-full after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-sky-500 peer-checked:to-teal-500 ${dot}`} />
+    </label>
+  );
+}
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({
+  icon, iconBg, title, subtitle, right,
+}: {
+  icon: React.ReactNode; iconBg: string; title: string; subtitle?: string; right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between mb-5">
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+        <div>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+        </div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Field({
+  label, hint, icon, children,
+}: { label: string; hint?: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+        {icon && <span className="inline-flex mr-1.5 opacity-60">{icon}</span>}
+        {label}
+      </label>
+      {children}
+      {hint && <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{hint}</p>}
+    </div>
+  );
+}
+
+function Input({
+  value, onChange, placeholder, className = '',
+}: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+  return (
+    <input
+      type="text" value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-400 transition-colors ${className}`}
+    />
+  );
+}
+
+// ─── identity health check ────────────────────────────────────────────────────
+
+function identityCompleteness(id: ReceptionistIdentity): 'complete' | 'partial' | 'empty' {
+  const filled = [id.agentName, id.businessName, id.whatYouOffer].filter(Boolean).length;
+  if (filled === 3) return 'complete';
+  if (filled > 0)  return 'partial';
+  return 'empty';
+}
+
+// ─── main component ───────────────────────────────────────────────────────────
+
 export default function ReceptionistSettings() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [dirty, setDirty]       = useState(false);
   const [hasSettings, setHasSettings] = useState(false);
 
-  // Form state
-  const [enabled, setEnabled] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState('');
+  // top-level toggle (auto-saves)
+  const [enabled, setEnabled]   = useState(false);
+
+  // identity
+  const [identity, setIdentityRaw] = useState<ReceptionistIdentity>({});
+
+  // personality
+  const [industry, setIndustry]               = useState<string>('');
+  const [useIndustryPreset, setUsePreset]     = useState(true);
+  const [systemPrompt, setSystemPrompt]       = useState('');
   const [greetingMessage, setGreetingMessage] = useState('');
 
-  // Business hours
-  const [businessHoursEnabled, setBusinessHoursEnabled] = useState(true);
-  const [businessHoursStart, setBusinessHoursStart] = useState('09:00');
-  const [businessHoursEnd, setBusinessHoursEnd] = useState('17:00');
-  const [businessHoursTimezone, setBusinessHoursTimezone] = useState('America/New_York');
-  const [businessDays, setBusinessDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [afterHoursMessage, setAfterHoursMessage] = useState('');
+  // business hours
+  const [hoursEnabled, setHoursEnabled]       = useState(true);
+  const [hoursStart, setHoursStart]           = useState('09:00');
+  const [hoursEnd, setHoursEnd]               = useState('17:00');
+  const [hoursTz, setHoursTz]                 = useState('America/New_York');
+  const [businessDays, setBusinessDays]       = useState<number[]>([1, 2, 3, 4, 5]);
+  const [afterHours, setAfterHours]           = useState('');
 
-  // Response settings
-  const [respondToSoldClients, setRespondToSoldClients] = useState(true);
-  const [respondToNewContacts, setRespondToNewContacts] = useState(true);
-  const [autoCreateLeads, setAutoCreateLeads] = useState(true);
+  // response settings
+  const [respondClients, setRespondClients]   = useState(true);
+  const [respondNew, setRespondNew]           = useState(true);
+  const [autoCreate, setAutoCreate]           = useState(true);
 
-  // Industry tone
-  const [industry, setIndustry] = useState<string | null>(null);
-  const [useIndustryPreset, setUseIndustryPreset] = useState(true);
-
-  // Calendar
+  // calendar
   const [calendarEnabled, setCalendarEnabled] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
+  // ── helpers ──────────────────────────────────────────────────────────────────
+
+  const setIdentity = useCallback((patch: Partial<ReceptionistIdentity>) => {
+    setIdentityRaw(prev => ({ ...prev, ...patch }));
+    setDirty(true);
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const response = await fetch('/api/receptionist/settings');
-      const data = await response.json();
+  const markDirty = useCallback((fn: () => void) => {
+    fn();
+    setDirty(true);
+  }, []);
 
-      if (data.success) {
+  // ── load ──────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res  = await fetch('/api/receptionist/settings');
+        const data = await res.json();
+        if (!data.success) return;
+        const s = data.settings;
         setHasSettings(data.hasSettings);
-
-        const settings = data.settings;
-        setEnabled(settings.enabled || false);
-        setSystemPrompt(settings.system_prompt || '');
-        setGreetingMessage(settings.greeting_message || DEFAULT_RECEPTIONIST_SETTINGS.greeting_message || '');
-
-        setBusinessHoursEnabled(settings.business_hours_enabled ?? true);
-        setBusinessHoursStart(settings.business_hours_start?.substring(0, 5) || '09:00');
-        setBusinessHoursEnd(settings.business_hours_end?.substring(0, 5) || '17:00');
-        setBusinessHoursTimezone(settings.business_hours_timezone || 'America/New_York');
-        setBusinessDays(settings.business_days || [1, 2, 3, 4, 5]);
-        setAfterHoursMessage(settings.after_hours_message || '');
-
-        setRespondToSoldClients(settings.respond_to_sold_clients ?? true);
-        setRespondToNewContacts(settings.respond_to_new_contacts ?? true);
-        setAutoCreateLeads(settings.auto_create_leads ?? true);
-
-        setCalendarEnabled(settings.calendar_enabled ?? false);
-        setIndustry(settings.industry || null);
-        setUseIndustryPreset(settings.use_industry_preset ?? true);
+        setEnabled(s.enabled ?? false);
+        setIdentityRaw(s.identity ?? {});
+        setSystemPrompt(s.system_prompt ?? '');
+        setGreetingMessage(s.greeting_message ?? DEFAULT_RECEPTIONIST_SETTINGS.greeting_message ?? '');
+        setHoursEnabled(s.business_hours_enabled ?? true);
+        setHoursStart(s.business_hours_start?.substring(0, 5) ?? '09:00');
+        setHoursEnd(s.business_hours_end?.substring(0, 5) ?? '17:00');
+        setHoursTz(s.business_hours_timezone ?? 'America/New_York');
+        setBusinessDays(s.business_days ?? [1, 2, 3, 4, 5]);
+        setAfterHours(s.after_hours_message ?? '');
+        setRespondClients(s.respond_to_sold_clients ?? true);
+        setRespondNew(s.respond_to_new_contacts ?? true);
+        setAutoCreate(s.auto_create_leads ?? true);
+        setCalendarEnabled(s.calendar_enabled ?? false);
+        setIndustry(s.industry ?? '');
+        setUsePreset(s.use_industry_preset ?? true);
+      } catch {
+        toast.error('Failed to load settings');
+      } finally {
+        setLoading(false);
+        setDirty(false);
       }
-    } catch (error) {
-      console.error('Error loading receptionist settings:', error);
-      toast.error('Failed to load settings');
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, []);
 
-  const saveSettings = async () => {
+  // ── save ──────────────────────────────────────────────────────────────────────
+
+  const save = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/receptionist/settings', {
+      const res = await fetch('/api/receptionist/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enabled,
+          identity,
           system_prompt: systemPrompt || null,
           greeting_message: greetingMessage,
-          business_hours_enabled: businessHoursEnabled,
-          business_hours_start: businessHoursStart + ':00',
-          business_hours_end: businessHoursEnd + ':00',
-          business_hours_timezone: businessHoursTimezone,
+          business_hours_enabled: hoursEnabled,
+          business_hours_start: hoursStart + ':00',
+          business_hours_end:   hoursEnd   + ':00',
+          business_hours_timezone: hoursTz,
           business_days: businessDays,
-          after_hours_message: afterHoursMessage || null,
-          respond_to_sold_clients: respondToSoldClients,
-          respond_to_new_contacts: respondToNewContacts,
-          auto_create_leads: autoCreateLeads,
+          after_hours_message: afterHours || null,
+          respond_to_sold_clients: respondClients,
+          respond_to_new_contacts: respondNew,
+          auto_create_leads: autoCreate,
           calendar_enabled: calendarEnabled,
           industry: industry || null,
           use_industry_preset: useIndustryPreset,
         }),
       });
-
-      const data = await response.json();
-
+      const data = await res.json();
       if (data.success) {
-        toast.success(data.message || 'Settings saved successfully');
+        toast.success('Settings saved');
         setHasSettings(true);
+        setDirty(false);
       } else if (data.upgradeRequired) {
-        toast.error('Premium subscription required');
+        toast.error('Paid subscription required');
       } else {
-        toast.error(data.error || 'Failed to save settings');
+        toast.error(data.error || 'Failed to save');
       }
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+    } catch {
+      toast.error('Failed to save');
     } finally {
       setSaving(false);
     }
   };
 
-  const saveToggle = async (newEnabled: boolean) => {
+  const saveToggle = async (val: boolean) => {
     try {
-      const response = await fetch('/api/receptionist/settings', {
+      const res = await fetch('/api/receptionist/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: newEnabled }),
+        body: JSON.stringify({ enabled: val }),
       });
-      const data = await response.json();
+      const data = await res.json();
       if (data.success) {
-        toast.success(`Receptionist ${newEnabled ? 'enabled' : 'disabled'}`);
+        toast.success(`Receptionist ${val ? 'enabled' : 'disabled'}`);
         setHasSettings(true);
       } else if (data.upgradeRequired) {
-        setEnabled(!newEnabled); // Revert toggle
-        toast.error('A paid subscription (Growth or Scale) is required to enable the Receptionist.');
+        setEnabled(!val);
+        toast.error('A paid plan is required to enable the Receptionist.');
       } else {
-        setEnabled(!newEnabled); // Revert toggle
+        setEnabled(!val);
         toast.error(data.error || 'Failed to update');
       }
-    } catch (error) {
-      setEnabled(!newEnabled); // Revert toggle
-      toast.error('Failed to update receptionist');
+    } catch {
+      setEnabled(!val);
+      toast.error('Failed to update');
     }
   };
 
   const toggleDay = (day: number) => {
-    if (businessDays.includes(day)) {
-      setBusinessDays(businessDays.filter(d => d !== day));
-    } else {
-      setBusinessDays([...businessDays, day].sort((a, b) => a - b));
-    }
+    markDirty(() => setBusinessDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b)
+    ));
   };
+
+  // ── render ────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500" />
       </div>
     );
   }
 
+  const idStatus = identityCompleteness(identity);
+
   return (
-    <div className="space-y-6">
-      {/* Save Button (Top) */}
-      <div className="flex justify-end">
+    <div className="space-y-5">
+
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Receptionist Settings</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Configure how your AI responds to inbound messages</p>
+        </div>
         <button
-          onClick={saveSettings}
-          disabled={saving}
-          className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+          onClick={save}
+          disabled={saving || !dirty}
+          className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-40 shadow-sm"
         >
-          {saving ? 'Saving...' : 'Save Settings'}
+          {saving ? 'Saving…' : dirty ? 'Save Changes' : 'Saved'}
         </button>
       </div>
 
-      {/* Enable Toggle */}
-      <div className="card bg-gradient-to-br from-sky-50 to-teal-50 dark:from-sky-900/20 dark:to-teal-900/20 border border-sky-200 dark:border-sky-700/50">
+      {/* ── Enable toggle ── */}
+      <Card className="bg-gradient-to-br from-sky-50 to-teal-50 dark:from-sky-900/20 dark:to-teal-900/20 border-sky-200 dark:border-sky-700/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-teal-500 flex items-center justify-center shadow-sm">
               <Headphones className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Enable AI Receptionist</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Automatically respond to incoming messages from configured contact types
+              <h3 className="font-semibold text-slate-900 dark:text-slate-100">AI Receptionist</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Auto-respond to inbound texts from leads and clients
               </p>
             </div>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => {
-                const newVal = e.target.checked;
-                setEnabled(newVal);
-                // Auto-save the toggle immediately
-                saveToggle(newVal);
-              }}
-              className="sr-only peer"
-            />
-            <div className="w-14 h-7 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-sky-500 peer-checked:to-teal-500"></div>
-          </label>
+          <Toggle checked={enabled} onChange={v => { setEnabled(v); saveToggle(v); }} />
         </div>
-
         {enabled && (
-          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="font-medium">Receptionist is active and will respond to incoming messages</span>
-            </div>
+          <div className="mt-4 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Receptionist is active and responding to incoming messages
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Personality & Prompt */}
-      <div className="card space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+      {/* ── Identity ── */}
+      <Card className={
+        idStatus === 'empty'
+          ? 'border-amber-300 dark:border-amber-700/60 bg-amber-50/30 dark:bg-amber-900/5'
+          : idStatus === 'partial'
+            ? 'border-violet-200 dark:border-violet-700/50'
+            : 'border-violet-200 dark:border-violet-700/50'
+      }>
+        <CardHeader
+          icon={<Bot className="w-4 h-4 text-violet-600 dark:text-violet-400" />}
+          iconBg="bg-violet-100 dark:bg-violet-900/40"
+          title="AI Identity"
+          subtitle="Who the AI says it is — agent name, business, what you offer"
+          right={
+            idStatus === 'empty' ? (
+              <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" /> Required
+              </span>
+            ) : idStatus === 'complete' ? (
+              <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs text-violet-500 font-medium">
+                <Info className="w-3.5 h-3.5" /> Partial
+              </span>
+            )
+          }
+        />
+
+        {idStatus === 'empty' && (
+          <div className="mb-5 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+            <strong>Fill this in first.</strong> Without identity info, the AI can't answer "who are you?", "who do you work for?", or "what do you want?" — common questions from every lead.
           </div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Personality & Prompt</h2>
-        </div>
+        )}
 
-        {/* Industry Tone Selector */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Industry Tone
-          </label>
-          <select
-            value={industry || ''}
-            onChange={(e) => setIndustry(e.target.value || null)}
-            className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field
+            label="Agent / AI Name"
+            hint='What the AI calls itself. e.g. "Alex" or "Sarah from ABC Insurance"'
+            icon={<Bot className="w-3.5 h-3.5" />}
           >
-            <option value="">No industry preset (custom only)</option>
-            <option value="insurance">Insurance</option>
-            <option value="real_estate">Real Estate</option>
-            <option value="solar">Solar</option>
-            <option value="roofing">Roofing</option>
-            <option value="home_services">Home Services</option>
-            <option value="financial_services">Financial Services</option>
-            <option value="healthcare">Healthcare</option>
-            <option value="automotive">Automotive</option>
-            <option value="retail">Retail</option>
-            <option value="other">Other</option>
-          </select>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Selects an industry-specific AI personality and rules for your receptionist.
-          </p>
+            <Input
+              value={identity.agentName ?? ''}
+              onChange={v => setIdentity({ agentName: v })}
+              placeholder='e.g. "Alex"'
+            />
+          </Field>
+
+          <Field
+            label="Business Name"
+            hint="The company / agency the AI works for"
+            icon={<Building2 className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.businessName ?? ''}
+              onChange={v => setIdentity({ businessName: v })}
+              placeholder='e.g. "Smith Insurance Group"'
+            />
+          </Field>
+
+          <Field
+            label="What You Offer"
+            hint='One-liner about your product/service. e.g. "Affordable health, life, and auto insurance for families"'
+            icon={<Sparkles className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.whatYouOffer ?? ''}
+              onChange={v => setIdentity({ whatYouOffer: v })}
+              placeholder='e.g. "Affordable health and life insurance for Texas families"'
+              className="md:col-span-2"
+            />
+          </Field>
+
+          <Field
+            label="Who You Help"
+            hint='Target audience. e.g. "Homeowners ages 30–65 in the Southeast"'
+            icon={<Users className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.targetAudience ?? ''}
+              onChange={v => setIdentity({ targetAudience: v })}
+              placeholder='e.g. "Families and individuals looking for coverage"'
+            />
+          </Field>
+
+          <Field
+            label="Service Area"
+            hint="Where you operate / states you serve"
+            icon={<MapPin className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.serviceArea ?? ''}
+              onChange={v => setIdentity({ serviceArea: v })}
+              placeholder='e.g. "Texas, Oklahoma, and Louisiana"'
+            />
+          </Field>
+
+          <Field
+            label="Phone to Give Out"
+            hint="Number to share if someone asks to call"
+            icon={<Phone className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.callbackPhone ?? ''}
+              onChange={v => setIdentity({ callbackPhone: v })}
+              placeholder='e.g. "555-0100"'
+            />
+          </Field>
+
+          <Field
+            label="Website"
+            hint="Optional — share when relevant"
+            icon={<Globe className="w-3.5 h-3.5" />}
+          >
+            <Input
+              value={identity.website ?? ''}
+              onChange={v => setIdentity({ website: v })}
+              placeholder='e.g. "smithinsurance.com"'
+            />
+          </Field>
         </div>
 
-        {industry && (
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="useIndustryPreset"
-              checked={useIndustryPreset}
-              onChange={(e) => setUseIndustryPreset(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-            />
-            <label htmlFor="useIndustryPreset" className="text-sm text-slate-700 dark:text-slate-300">
-              Use industry preset as base prompt (your custom instructions below will be added on top)
-            </label>
+        {/* Preview */}
+        {(identity.agentName || identity.businessName || identity.whatYouOffer) && (
+          <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/50 rounded-xl">
+            <p className="text-xs font-medium text-violet-600 dark:text-violet-400 mb-2 uppercase tracking-wide">AI Introduction Preview</p>
+            <p className="text-sm text-slate-700 dark:text-slate-300 italic">
+              "
+              {identity.agentName ? `Hi, I'm ${identity.agentName}` : 'Hi'}
+              {identity.businessName ? ` with ${identity.businessName}` : ''}
+              {identity.whatYouOffer ? ` — ${identity.whatYouOffer}.` : '.'}
+              {identity.targetAudience ? ` We work with ${identity.targetAudience}.` : ''}
+              "
+            </p>
           </div>
         )}
+      </Card>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Custom Instructions {industry && useIndustryPreset ? '(Added to industry preset)' : ''}
-          </label>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            placeholder={industry && useIndustryPreset ? 'Optional — add specific instructions on top of your industry preset...' : DEFAULT_SYSTEM_PROMPT}
-            rows={6}
-            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
-          />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {industry && useIndustryPreset
-              ? 'Your industry preset handles the basics. Add any extra rules or business-specific details here.'
-              : 'Describe your business, services, and how you want the AI to respond. Leave blank to use the default prompt.'}
-          </p>
-        </div>
+      {/* ── Personality ── */}
+      <Card>
+        <CardHeader
+          icon={<MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+          iconBg="bg-indigo-100 dark:bg-indigo-900/40"
+          title="Personality & Tone"
+          subtitle="How the AI communicates — industry preset + custom rules"
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Greeting Message for New Contacts
-          </label>
-          <input
-            type="text"
-            value={greetingMessage}
-            onChange={(e) => setGreetingMessage(e.target.value)}
-            placeholder="Hi! Thanks for reaching out. How can I help you today?"
-            className="w-full px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-          />
-        </div>
-      </div>
+        <div className="space-y-4">
+          <Field label="Industry Preset" hint="Loads a built-in personality and rules tuned for your industry">
+            <select
+              value={industry}
+              onChange={e => markDirty(() => setIndustry(e.target.value))}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            >
+              {INDUSTRIES.map(i => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
+          </Field>
 
-      {/* Business Hours */}
-      <div className="card space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Business Hours</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Set when the receptionist should respond normally vs. send after-hours messages
-              </p>
-            </div>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={businessHoursEnabled}
-              onChange={(e) => setBusinessHoursEnabled(e.target.checked)}
-              className="sr-only peer"
+          {industry && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox" checked={useIndustryPreset}
+                onChange={e => markDirty(() => setUsePreset(e.target.checked))}
+                className="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                Use industry preset as base (extra instructions below are added on top)
+              </span>
+            </label>
+          )}
+
+          <Field
+            label={industry && useIndustryPreset ? 'Extra Instructions' : 'Custom Instructions'}
+            hint={industry && useIndustryPreset
+              ? 'Anything specific beyond the industry preset — objection handling, special offers, rules for your business.'
+              : 'Full description of how the AI should behave. Leave blank to use the default prompt.'}
+          >
+            <textarea
+              value={systemPrompt}
+              onChange={e => markDirty(() => setSystemPrompt(e.target.value))}
+              placeholder={industry && useIndustryPreset
+                ? 'Optional — e.g. "Always mention we have a same-day inspection guarantee."'
+                : DEFAULT_SYSTEM_PROMPT}
+              rows={5}
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40 resize-none"
             />
-            <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-          </label>
-        </div>
+          </Field>
 
-        {businessHoursEnabled && (
-          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field
+            label="Greeting — First Message to New Contacts"
+            hint="Sent the very first time someone texts your number"
+          >
+            <input
+              type="text"
+              value={greetingMessage}
+              onChange={e => markDirty(() => setGreetingMessage(e.target.value))}
+              placeholder="Hi! Thanks for reaching out. How can I help you today?"
+              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            />
+          </Field>
+        </div>
+      </Card>
+
+      {/* ── Business Hours ── */}
+      <Card>
+        <CardHeader
+          icon={<Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+          iconBg="bg-amber-100 dark:bg-amber-900/40"
+          title="Business Hours"
+          subtitle="When to reply normally vs. send an after-hours message"
+          right={<Toggle size="sm" checked={hoursEnabled} onChange={v => markDirty(() => setHoursEnabled(v))} />}
+        />
+
+        {hoursEnabled && (
+          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Start Time
-                </label>
-                <input
-                  type="time"
-                  value={businessHoursStart}
-                  onChange={(e) => setBusinessHoursStart(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Start Time</label>
+                <input type="time" value={hoursStart}
+                  onChange={e => markDirty(() => setHoursStart(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  End Time
-                </label>
-                <input
-                  type="time"
-                  value={businessHoursEnd}
-                  onChange={(e) => setBusinessHoursEnd(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">End Time</label>
+                <input type="time" value={hoursEnd}
+                  onChange={e => markDirty(() => setHoursEnd(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Timezone
-                </label>
-                <select
-                  value={businessHoursTimezone}
-                  onChange={(e) => setBusinessHoursTimezone(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                >
-                  {TIMEZONES.map(tz => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                  ))}
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Timezone</label>
+                <select value={hoursTz} onChange={e => markDirty(() => setHoursTz(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100">
+                  {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Business Days
-              </label>
-              <div className="flex gap-2">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Business Days</label>
+              <div className="flex gap-2 flex-wrap">
                 {DAYS_OF_WEEK.map(day => (
-                  <button
-                    key={day.value}
-                    type="button"
-                    onClick={() => toggleDay(day.value)}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  <button key={day.value} type="button" onClick={() => toggleDay(day.value)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       businessDays.includes(day.value)
                         ? 'bg-sky-500 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    }`}>
                     {day.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                After Hours Message
-              </label>
-              <textarea
-                value={afterHoursMessage}
-                onChange={(e) => setAfterHoursMessage(e.target.value)}
+            <Field label="After-Hours Message" hint="Sent automatically when someone texts outside your hours">
+              <textarea value={afterHours}
+                onChange={e => markDirty(() => setAfterHours(e.target.value))}
                 placeholder="Thanks for reaching out! We're currently closed. We'll get back to you during business hours."
                 rows={2}
-                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-              />
-            </div>
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/40" />
+            </Field>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Response Settings */}
-      <div className="card space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center">
-            <Users className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-          </div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Response Settings</h2>
-        </div>
-
+      {/* ── Response Rules ── */}
+      <Card>
+        <CardHeader
+          icon={<Users className="w-4 h-4 text-sky-600 dark:text-sky-400" />}
+          iconBg="bg-sky-100 dark:bg-sky-900/40"
+          title="Response Rules"
+          subtitle="Who the receptionist responds to"
+        />
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div>
-              <h3 className="font-medium text-slate-900 dark:text-slate-100">Respond to Sold Clients</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                AI will respond to messages from leads marked as "sold" or "closed won"
-              </p>
+          {[
+            {
+              label: 'Respond to Existing Clients',
+              desc: 'Auto-reply to leads you\'ve marked as sold / active clients',
+              val: respondClients, set: (v: boolean) => markDirty(() => setRespondClients(v)),
+            },
+            {
+              label: 'Respond to New Contacts',
+              desc: 'Auto-reply when an unknown number texts your line',
+              val: respondNew, set: (v: boolean) => markDirty(() => setRespondNew(v)),
+            },
+            {
+              label: 'Auto-Create Lead Record',
+              desc: 'Automatically create a lead entry for new contacts who text you',
+              val: autoCreate, set: (v: boolean) => markDirty(() => setAutoCreate(v)),
+            },
+          ].map(row => (
+            <div key={row.label} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{row.label}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{row.desc}</p>
+              </div>
+              <Toggle size="sm" checked={row.val} onChange={row.set} />
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={respondToSoldClients}
-                onChange={(e) => setRespondToSoldClients(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div>
-              <h3 className="font-medium text-slate-900 dark:text-slate-100">Respond to New Contacts</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                AI will respond to messages from unknown phone numbers
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={respondToNewContacts}
-                onChange={(e) => setRespondToNewContacts(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div>
-              <h3 className="font-medium text-slate-900 dark:text-slate-100">Auto-Create Leads</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Automatically create a lead record for new contacts who text you
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoCreateLeads}
-                onChange={(e) => setAutoCreateLeads(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-            </label>
-          </div>
+          ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Calendar Integration */}
-      <div className="card space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Calendar Integration</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Enable appointment scheduling through the receptionist
-              </p>
-            </div>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={calendarEnabled}
-              onChange={(e) => setCalendarEnabled(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-slate-300 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-          </label>
-        </div>
-
+      {/* ── Calendar ── */}
+      <Card>
+        <CardHeader
+          icon={<Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+          iconBg="bg-emerald-100 dark:bg-emerald-900/40"
+          title="Calendar Integration"
+          subtitle="Let the receptionist help contacts schedule appointments"
+          right={<Toggle size="sm" checked={calendarEnabled} onChange={v => markDirty(() => setCalendarEnabled(v))} />}
+        />
         {calendarEnabled && (
-          <div className="p-4 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg">
-            <p className="text-sm text-sky-700 dark:text-sky-400">
-              When enabled, the receptionist can help contacts schedule appointments.
-              Make sure you have connected your Google Calendar in the{' '}
-              <a href="/integrations" className="underline font-medium hover:no-underline">
-                Integrations
-              </a>{' '}
-              settings.
-            </p>
+          <div className="p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg text-sm text-sky-700 dark:text-sky-400">
+            Make sure you've connected your Google Calendar in{' '}
+            <a href="/integrations" className="underline font-medium">Integrations</a>.
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Usage Info */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-          </div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Usage & Pricing</h2>
+      {/* ── Usage ── */}
+      <Card>
+        <CardHeader
+          icon={<Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+          iconBg="bg-purple-100 dark:bg-purple-900/40"
+          title="Credit Usage"
+          subtitle="How many points each receptionist action costs"
+        />
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'AI response',            value: '2 pts', color: 'sky' },
+            { label: 'After-hours message',     value: 'Free',  color: 'emerald' },
+            { label: 'SMS send',               value: '1 pt',  color: 'amber' },
+          ].map(item => (
+            <div key={item.label}
+              className={`p-4 rounded-xl text-center bg-${item.color}-50 dark:bg-${item.color}-900/20 border border-${item.color}-200 dark:border-${item.color}-700/50`}>
+              <div className={`text-2xl font-bold text-${item.color}-600 dark:text-${item.color}-400`}>{item.value}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.label}</div>
+            </div>
+          ))}
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 rounded-xl text-center">
-            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center mx-auto mb-2">
-              <Zap className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-            </div>
-            <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">2</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Points per AI response</div>
-          </div>
-          <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-700/50 rounded-xl text-center">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto mb-2">
-              <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">0</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Points for after-hours messages</div>
-          </div>
-          <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl text-center">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mx-auto mb-2">
-              <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">1</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Point per SMS sent</div>
-          </div>
-        </div>
-
-        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-          Each receptionist response uses 2 points for AI generation plus 1 point for sending the SMS.
-          After-hours automated messages only cost 1 point (no AI generation).
+        <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+          Each AI reply = 2 pts (generation) + 1 pt (SMS). After-hours static messages are only 1 pt.
         </p>
-      </div>
+      </Card>
 
-      {/* Save Button (Bottom) */}
-      <div className="flex justify-end">
+      {/* ── Bottom save ── */}
+      <div className="flex justify-end pb-6">
         <button
-          onClick={saveSettings}
-          disabled={saving}
-          className="px-8 py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 shadow-sm"
+          onClick={save}
+          disabled={saving || !dirty}
+          className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-40 shadow-sm"
         >
-          {saving ? 'Saving...' : 'Save Settings'}
+          {saving ? 'Saving…' : dirty ? 'Save Changes' : 'All Saved'}
         </button>
       </div>
     </div>
