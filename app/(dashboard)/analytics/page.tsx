@@ -109,7 +109,6 @@ export default function AnalyticsPage() {
 
   // Export state
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   // Close export menu on outside click
@@ -123,31 +122,127 @@ export default function AnalyticsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleExport = async (type: 'overview' | 'campaigns' | 'messages', format: 'csv' | 'json') => {
-    setExporting(true);
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const toCSV = (rows: Record<string, unknown>[]): string => {
+    if (rows.length === 0) return '';
+    const headers = Object.keys(rows[0]);
+    const escape = (val: unknown): string => {
+      const str = val === null || val === undefined ? '' : String(val);
+      return str.includes(',') || str.includes('"') || str.includes('\n')
+        ? `"${str.replace(/"/g, '""')}"`
+        : str;
+    };
+    return [
+      headers.join(','),
+      ...rows.map(row => headers.map(h => escape(row[h])).join(',')),
+    ].join('\n');
+  };
+
+  const exportAnalyticsToCSV = (type: 'overview' | 'campaigns' | 'messages-over-time' | 'disposition' | 'automation' | 'flows') => {
     setShowExportMenu(false);
-    try {
-      const response = await fetch(`/api/analytics/export?type=${type}&format=${format}`);
-      if (format === 'csv') {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${type}-export-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-      } else {
-        const data = await response.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${type}-export-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
+    const date = new Date().toISOString().split('T')[0];
+
+    switch (type) {
+      case 'overview': {
+        if (!overview) return;
+        const rows: Record<string, unknown>[] = [
+          { metric: 'Total Leads', value: overview.totalLeads },
+          { metric: 'Sold Leads', value: overview.soldLeads },
+          { metric: 'Conversion Rate (%)', value: overview.conversionRate },
+          { metric: 'Total Messages', value: overview.totalMessages },
+          { metric: 'Messages Sent', value: overview.totalMessagesSent },
+          { metric: 'Messages Received', value: overview.totalMessagesReceived },
+          { metric: 'Response Rate (%)', value: overview.responseRate },
+          { metric: 'Avg Response Time (h)', value: overview.avgResponseTime },
+          { metric: 'Total Campaigns', value: overview.totalCampaigns },
+          { metric: 'Credits Used', value: overview.totalCreditsUsed },
+          { metric: 'Export Date', value: new Date().toISOString() },
+        ];
+        downloadFile(toCSV(rows), `hyvewyre-analytics-overview-${date}.csv`, 'text/csv');
+        break;
       }
-    } catch (error) {
-      console.error('Export failed:', error);
-    } finally {
-      setExporting(false);
+
+      case 'campaigns': {
+        if (campaignPerformance.length === 0) return;
+        const rows: Record<string, unknown>[] = campaignPerformance.map(c => ({
+          campaign_name: c.name,
+          total_leads: c.totalLeads,
+          messages_sent: c.messagesSent,
+          messages_received: c.messagesReceived,
+          response_rate_pct: c.responseRate,
+          conversions: c.conversions,
+          conversion_rate_pct: c.conversionRate,
+          avg_response_time_h: c.avgResponseTime,
+          created_at: c.created_at,
+        }));
+        downloadFile(toCSV(rows), `hyvewyre-analytics-campaigns-${date}.csv`, 'text/csv');
+        break;
+      }
+
+      case 'messages-over-time': {
+        if (messagesOverTime.length === 0) return;
+        const rows: Record<string, unknown>[] = messagesOverTime.map(d => ({
+          date: d.date,
+          sent: d.sent,
+          received: d.received,
+          total: d.sent + d.received,
+        }));
+        downloadFile(toCSV(rows), `hyvewyre-analytics-messages-${date}.csv`, 'text/csv');
+        break;
+      }
+
+      case 'disposition': {
+        if (dispositionBreakdown.length === 0) return;
+        const rows: Record<string, unknown>[] = dispositionBreakdown.map(d => ({
+          status: d.name,
+          count: d.value,
+          percentage: d.percentage,
+        }));
+        downloadFile(toCSV(rows), `hyvewyre-analytics-disposition-${date}.csv`, 'text/csv');
+        break;
+      }
+
+      case 'automation': {
+        if (!automationStats) return;
+        const summaryRows: Record<string, unknown>[] = [
+          { metric: 'Total Messages', value: automationStats.total_messages },
+          { metric: 'Automated Messages', value: automationStats.automated_messages },
+          { metric: 'Manual Messages', value: automationStats.manual_messages },
+          { metric: 'Automation Rate (%)', value: automationStats.automation_rate },
+          ...Object.entries(automationStats.by_source || {}).map(([source, count]) => ({
+            metric: `Source: ${source.replace('_', ' ')}`,
+            value: count,
+          })),
+        ];
+        downloadFile(toCSV(summaryRows), `hyvewyre-analytics-automation-${date}.csv`, 'text/csv');
+        break;
+      }
+
+      case 'flows': {
+        if (flowPerformance.length === 0) return;
+        const rows: Record<string, unknown>[] = flowPerformance.map(f => ({
+          flow_name: f.flow_name,
+          messages_sent: f.messages_sent,
+          unique_leads: f.unique_leads,
+          responses_received: f.responses_received,
+          response_rate_pct: f.response_rate,
+          avg_response_time_min: f.avg_response_time_minutes,
+          conversion_events: f.conversion_events,
+        }));
+        downloadFile(toCSV(rows), `hyvewyre-analytics-flows-${date}.csv`, 'text/csv');
+        break;
+      }
     }
   };
 
@@ -234,50 +329,67 @@ export default function AnalyticsPage() {
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                disabled={exporting}
-                className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors"
               >
-                <Download className={`w-4 h-4 ${exporting ? 'animate-pulse' : ''}`} />
+                <Download className="w-4 h-4" />
                 Export
                 <ChevronDown className="w-4 h-4" />
               </button>
 
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
+                <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
                   <div className="p-2">
-                    <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Export as CSV</p>
-                    <button
-                      onClick={() => handleExport('overview', 'csv')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-                    >
-                      Overview Summary
-                    </button>
-                    <button
-                      onClick={() => handleExport('campaigns', 'csv')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-                    >
-                      Campaign Performance
-                    </button>
-                    <button
-                      onClick={() => handleExport('messages', 'csv')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-                    >
-                      Message History
-                    </button>
-                    <div className="border-t border-slate-200 dark:border-slate-700 my-2" />
-                    <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Export as JSON</p>
-                    <button
-                      onClick={() => handleExport('overview', 'json')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-                    >
-                      Overview Summary
-                    </button>
-                    <button
-                      onClick={() => handleExport('campaigns', 'json')}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
-                    >
-                      Campaign Performance
-                    </button>
+                    {activeTab === 'overview' ? (
+                      <>
+                        <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Overview</p>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('overview')}
+                          disabled={!overview}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Overview Summary
+                        </button>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('campaigns')}
+                          disabled={campaignPerformance.length === 0}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Campaign Performance
+                        </button>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('messages-over-time')}
+                          disabled={messagesOverTime.length === 0}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Messages Over Time
+                        </button>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('disposition')}
+                          disabled={dispositionBreakdown.length === 0}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Lead Disposition
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="px-3 py-1.5 text-xs font-medium text-slate-500 uppercase">Automation</p>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('automation')}
+                          disabled={!automationStats}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Automation Summary
+                        </button>
+                        <button
+                          onClick={() => exportAnalyticsToCSV('flows')}
+                          disabled={flowPerformance.length === 0}
+                          className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md disabled:opacity-40"
+                        >
+                          Flow Performance
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

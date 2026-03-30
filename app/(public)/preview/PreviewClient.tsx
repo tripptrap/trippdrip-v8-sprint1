@@ -970,6 +970,13 @@ export default function PreviewClient() {
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Growth</h3>
               <div className="text-5xl font-bold text-gray-900 mb-2">${SUBSCRIPTION_FEATURES.growth.price}</div>
               <div className="text-gray-600">per month</div>
+              {/* Credit pack discount note */}
+              <div className="mt-3 inline-flex items-center gap-1.5 bg-gray-100 border border-gray-300 text-gray-600 text-xs font-medium px-3 py-1.5 rounded-full">
+                <svg className="w-3.5 h-3.5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+                </svg>
+                10% off credit pack purchases
+              </div>
             </div>
             <div className="space-y-4 mb-8">
               <div className="flex items-center gap-3">
@@ -1000,9 +1007,9 @@ export default function PreviewClient() {
                 <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Advanced analytics</span>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-teal-600 text-xl">✓</span>
-                <span className="text-gray-700">Up to {SUBSCRIPTION_FEATURES.growth.pointPackDiscount}% off point packs</span>
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 -mx-1">
+                <span className="text-gray-500 text-base font-bold">%</span>
+                <span className="text-gray-600 text-sm">10% off all credit pack purchases</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1050,7 +1057,14 @@ export default function PreviewClient() {
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Scale</h3>
               <div className="text-5xl font-bold text-gray-900 mb-1">${SUBSCRIPTION_FEATURES.scale.price}</div>
               <div className="text-gray-600">per month</div>
-              <div className="mt-3 space-y-1">
+              {/* Prominent 30% credit pack savings badge */}
+              <div className="mt-3 inline-flex items-center gap-2 bg-emerald-50 border-2 border-emerald-400 text-emerald-700 text-sm font-bold px-4 py-2 rounded-xl shadow-sm shadow-emerald-200">
+                <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+                </svg>
+                SAVE 30% on every credit pack
+              </div>
+              <div className="mt-2 space-y-1">
                 <div className="text-sm text-teal-600 font-semibold">3.3x more credits than Growth</div>
                 <div className="text-xs text-gray-500">Only $0.0098/credit vs $0.01/credit on Growth</div>
               </div>
@@ -1084,38 +1098,28 @@ export default function PreviewClient() {
                 <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Advanced analytics</span>
               </div>
+              {/* Key differentiator: flat 30% off all credit packs */}
+              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2.5 -mx-1">
+                <span className="text-emerald-600 text-xl font-bold">✓</span>
+                <span className="text-emerald-800 font-semibold text-sm">30% off all credit pack purchases</span>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Priority support</span>
               </div>
             </div>
 
-            {/* Volume Discount Highlight */}
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 mb-6">
+            {/* Credit Pack Savings Highlight */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
-                <span className="font-bold text-amber-800">Volume Discounts on Credit Packs</span>
+                <span className="font-bold text-emerald-800">Scale members save 30% on every credit pack</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex justify-between text-gray-600">
-                  <span>Starter (4K):</span>
-                  <span className="text-amber-700 font-semibold">10% off</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Pro (10K):</span>
-                  <span className="text-amber-700 font-semibold">20% off</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Business (25K):</span>
-                  <span className="text-amber-700 font-semibold">25% off</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Enterprise (60K):</span>
-                  <span className="text-orange-600 font-bold">30% off</span>
-                </div>
-              </div>
+              <p className="text-xs text-emerald-700">
+                Every credit pack you buy is automatically discounted 30% — no matter the size. Growth members only get 10% off. Upgrade to Scale and keep more money in your pocket every time you top up.
+              </p>
             </div>
 
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -1128,6 +1132,24 @@ export default function PreviewClient() {
             </motion.div>
           </motion.div>
         </div>
+
+        {/* Plan comparison callout — credit pack discount */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.5 }}
+          viewport={{ once: true }}
+          className="mt-6 text-center"
+        >
+          <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-5 py-2.5 text-sm text-emerald-800">
+            <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+            </svg>
+            <span>
+              <span className="font-bold text-emerald-700">Scale members save 30%</span> on every credit pack purchase vs <span className="font-semibold">10% for Growth</span>
+            </span>
+          </div>
+        </motion.div>
 
         {/* Credit Pack Pricing Table */}
         <motion.div
@@ -1146,9 +1168,11 @@ export default function PreviewClient() {
             <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-200">
               <div className="p-4 font-semibold text-gray-700">Credit Pack</div>
               <div className="p-4 font-semibold text-gray-700 text-center">Base Price</div>
-              <div className="p-4 font-semibold text-gray-700 text-center">Growth Price</div>
+              <div className="p-4 font-semibold text-gray-700 text-center">
+                Growth <span className="text-gray-400 font-normal text-xs">(10% off)</span>
+              </div>
               <div className="p-4 font-semibold text-center">
-                <span className="text-teal-600">Scale Price</span>
+                <span className="text-emerald-600">Scale</span> <span className="text-emerald-400 font-normal text-xs">(30% off)</span>
               </div>
             </div>
 
@@ -1159,10 +1183,13 @@ export default function PreviewClient() {
                   <div className="text-sm text-gray-500">4,000 credits</div>
                 </div>
                 <div className="p-4 text-center text-gray-600">$40</div>
-                <div className="p-4 text-center text-gray-600">$40</div>
                 <div className="p-4 text-center">
-                  <span className="font-semibold text-teal-600">$36</span>
-                  <span className="ml-1 text-xs text-amber-600">(10% off)</span>
+                  <span className="text-gray-700">$36</span>
+                  <span className="ml-1 text-xs text-gray-500">(-$4)</span>
+                </div>
+                <div className="p-4 text-center">
+                  <span className="font-semibold text-emerald-600">$28</span>
+                  <span className="ml-1 text-xs text-emerald-600">(-$12)</span>
                 </div>
               </div>
 
@@ -1176,12 +1203,12 @@ export default function PreviewClient() {
                 </div>
                 <div className="p-4 text-center text-gray-600">$100</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$95</span>
-                  <span className="ml-1 text-xs text-gray-500">(5% off)</span>
+                  <span className="text-gray-700">$90</span>
+                  <span className="ml-1 text-xs text-gray-500">(-$10)</span>
                 </div>
                 <div className="p-4 text-center">
-                  <span className="font-semibold text-teal-600">$80</span>
-                  <span className="ml-1 text-xs text-amber-600">(20% off)</span>
+                  <span className="font-semibold text-emerald-600">$70</span>
+                  <span className="ml-1 text-xs text-emerald-600">(-$30)</span>
                 </div>
               </div>
 
@@ -1193,38 +1220,38 @@ export default function PreviewClient() {
                 <div className="p-4 text-center text-gray-600">$250</div>
                 <div className="p-4 text-center">
                   <span className="text-gray-700">$225</span>
-                  <span className="ml-1 text-xs text-gray-500">(10% off)</span>
+                  <span className="ml-1 text-xs text-gray-500">(-$25)</span>
                 </div>
                 <div className="p-4 text-center">
-                  <span className="font-semibold text-teal-600">$187.50</span>
-                  <span className="ml-1 text-xs text-amber-600">(25% off)</span>
+                  <span className="font-semibold text-emerald-600">$175</span>
+                  <span className="ml-1 text-xs text-emerald-600">(-$75)</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-gradient-to-r from-amber-50/50 to-orange-50/50">
+              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-gradient-to-r from-emerald-50/50 to-teal-50/50">
                 <div className="p-4">
                   <div className="font-medium text-gray-900 flex items-center gap-2">
                     Enterprise
-                    <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs px-2 py-0.5 rounded-full">Best Deal</span>
+                    <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs px-2 py-0.5 rounded-full">Best Deal</span>
                   </div>
                   <div className="text-sm text-gray-500">60,000 credits</div>
                 </div>
                 <div className="p-4 text-center text-gray-600">$600</div>
                 <div className="p-4 text-center">
-                  <span className="text-gray-700">$510</span>
-                  <span className="ml-1 text-xs text-gray-500">(15% off)</span>
+                  <span className="text-gray-700">$540</span>
+                  <span className="ml-1 text-xs text-gray-500">(-$60)</span>
                 </div>
                 <div className="p-4 text-center">
-                  <span className="font-bold text-teal-600">$420</span>
-                  <span className="ml-1 text-xs text-orange-600 font-semibold">(30% off)</span>
-                  <div className="text-xs text-orange-600 font-medium mt-1">Save $180!</div>
+                  <span className="font-bold text-emerald-600">$420</span>
+                  <span className="ml-1 text-xs text-emerald-600 font-semibold">(-$180)</span>
+                  <div className="text-xs text-emerald-700 font-semibold mt-1">Save $180!</div>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="mt-4 text-center text-sm text-gray-500">
-            Credits never expire. Buy in bulk and save big with Scale.
+            Credits never expire. Scale members save 30% on every pack — 3x more savings than Growth.
           </div>
         </motion.div>
 
