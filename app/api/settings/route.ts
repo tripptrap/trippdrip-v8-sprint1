@@ -116,6 +116,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
+    // Sync autoRefill settings to users table so the auto-buy cron can read them
+    if (autoRefill !== undefined) {
+      await supabase
+        .from('users')
+        .update({
+          auto_topup: autoRefill?.enabled ?? false,
+          auto_topup_threshold: autoRefill?.threshold ?? 50,
+          auto_topup_amount: autoRefill?.amount ?? 1000,
+        })
+        .eq('id', user.id);
+    }
+
     return NextResponse.json({ ok: true, settings: data });
   } catch (error: any) {
     console.error('Error in POST /api/settings:', error);
