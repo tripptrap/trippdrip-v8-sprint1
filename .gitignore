@@ -8,6 +8,11 @@ out
 # env files
 .env
 .env.local
+.env.*.local
+.env.vercel.*
+
+# claude worktrees
+.claude/
 
 # mac
 .DS_Store

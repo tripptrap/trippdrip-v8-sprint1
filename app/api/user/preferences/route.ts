@@ -68,6 +68,18 @@ export async function PUT(req: NextRequest) {
     if (body.enableAiSuggestions !== undefined) {
       updates.enable_ai_suggestions = body.enableAiSuggestions;
     }
+    if (body.smsAlertsEnabled !== undefined) {
+      updates.sms_alerts_enabled = body.smsAlertsEnabled;
+    }
+    if (body.smsAlertNewMessage !== undefined) {
+      updates.sms_alert_new_message = body.smsAlertNewMessage;
+    }
+    if (body.smsAlertLowCredits !== undefined) {
+      updates.sms_alert_low_credits = body.smsAlertLowCredits;
+    }
+    if (body.smsAlertOptOut !== undefined) {
+      updates.sms_alert_opt_out = body.smsAlertOptOut;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No valid fields to update' }, { status: 400 });

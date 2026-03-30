@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import BulkComposeDrawer from "@/components/BulkComposeDrawer";
 
 type Client = {
   id: string;
@@ -66,6 +67,10 @@ export default function ClientsPage() {
 
   // Tags filter dropdown
   const [tagsFilterOpen, setTagsFilterOpen] = useState(false);
+
+  // Bulk SMS drawer
+  const [showBulkDrawer, setShowBulkDrawer] = useState(false);
+  const [bulkPreSelectedIds, setBulkPreSelectedIds] = useState<string[]>([]);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -282,14 +287,9 @@ export default function ClientsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/clients?page=1&pageSize=1000');
-                  const data = await res.json();
-                  const allPhones = (data.items || []).map((c: any) => c.phone).filter(Boolean);
-                  if (allPhones.length === 0) { showToast("No clients with phone numbers"); return; }
-                  router.push(`/bulk-sms?phones=${encodeURIComponent(allPhones.join(","))}&source=clients`);
-                } catch { showToast("Failed to load clients"); }
+              onClick={() => {
+                setBulkPreSelectedIds([]);
+                setShowBulkDrawer(true);
               }}
               className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm"
             >
@@ -299,10 +299,8 @@ export default function ClientsPage() {
               <>
                 <button
                   onClick={() => {
-                    const selected = clients.filter(c => selectedIds.has(c.id));
-                    const phones = selected.map(c => c.phone).filter(Boolean);
-                    if (phones.length === 0) { showToast("No phone numbers found"); return; }
-                    router.push(`/bulk-sms?phones=${encodeURIComponent(phones.join(","))}&source=clients`);
+                    setBulkPreSelectedIds(Array.from(selectedIds));
+                    setShowBulkDrawer(true);
                   }}
                   className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition shadow-sm"
                 >
@@ -840,6 +838,13 @@ export default function ClientsPage() {
           </div>
         </div>
       )}
+      {/* Bulk SMS Drawer */}
+      <BulkComposeDrawer
+        isOpen={showBulkDrawer}
+        onClose={() => setShowBulkDrawer(false)}
+        preSelectedLeadIds={bulkPreSelectedIds}
+        contactType="clients"
+      />
     </div>
   );
 }

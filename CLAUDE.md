@@ -519,115 +519,83 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - [x] Update `.gitignore` (tsconfig.tsbuildinfo, *.backup, *.bak)
 - [x] Remove `tsconfig.tsbuildinfo` from git tracking
 - [x] Document project context in CLAUDE.md
+- [x] Standardize tier naming: rename all basic/starter → "growth", all premium/professional → "scale"
+- [x] Fix inconsistent subscription tier type
+- [x] Remove "preview"/"free" tier references — replace with "unpaid" state
+- [x] Enforce payment at signup (card required during onboarding)
+- [x] Show Scale tier point pack discount clearly on pricing/preview pages
+- [x] Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits
+- [x] Plan management (upgrade/downgrade) inside Settings page
+- [x] Settings: Profile info section (name, email, business info)
+- [x] Settings: Plan management section (current plan, upgrade/downgrade, billing)
+- [x] Settings: Spam protection settings
+- [x] Settings: DNC list management
+- [x] Settings: Auto-buy configuration (enable/disable, pick pack size)
+- [x] Onboarding: Add demographic questions (industry, business type)
+- [x] Onboarding: Auto-provision one free local number
+- [x] Onboarding: Guide user to set up AI Flows based on industry
+- [x] Onboarding: Show industry-specific preset pipeline stages (customizable)
+- [x] Onboarding: Add optional Google Calendar connection step
+- [x] Create Clients concept — separate from Leads
+- [x] Add "mark as sold" action on leads to convert to client
+- [x] Create `/clients` page for managing sold/active customers
+- [x] Split messages view into Lead conversations and Client conversations (tabs)
+- [x] Route Leads → Flows AI, Clients → Receptionist AI
+- [x] Build Flow system — AI templates that gather info before booking appointments
+- [x] Industry-specific flow presets (insurance, real estate, solar, etc.)
+- [x] Custom flow builder (user can create from scratch)
+- [x] Configurable required fields per flow
+- [x] User can take over conversation at any time (AI stops or switches to suggest mode)
+- [x] Dashboard: Scrollable sections layout (appointments → unread → pipeline)
+- [x] Dashboard: Upcoming appointments section (Flows + Google Calendar)
+- [x] Dashboard: Unread messages section (leads + clients)
+- [x] Dashboard: Pipeline overview — lead counts by stage (visual)
+- [x] Dashboard: Separate lead and client sections
+- [x] Industry-specific preset tags loaded during onboarding
+- [x] User can customize their own pipeline stages
+- [x] Pipeline stages shown on dashboard
+- [x] Redefine campaigns as lead type categories (health, life, auto, solar, etc.)
+- [x] Campaigns independent from tags
+- [x] Campaign determines which Flow presets are available
+- [x] Opt-out (STOP) = permanent DNC, completely blocked from all future messaging
+- [x] Lead record stays but is permanently locked — no ability to message again
+- [x] Verify current DNC implementation matches this behavior
+- [x] One free number provisioned with plan during onboarding
+- [x] Build `/analytics` page with full reporting
+- [x] Message delivery rates and response rates
+- [x] Campaign performance breakdowns
+- [x] Credits usage over time
+- [x] Charts and data visualization
+- [x] Export functionality
+- [x] Industry-specific default tone presets
+- [x] User-customizable system prompt / AI personality
+- [x] AI guardrails (no promises, no legal/medical advice, no pricing unless configured)
+- [x] Clearly show Scale tier point pack discount as key differentiator
+- [x] Browser extension: Scrape contact info from any platform
+- [x] Browser extension: Import captured info into HyveWyre as a lead/client
+- [x] User-configurable notification preferences (per notification type)
+- [x] In-app notifications (bell/badge in dashboard)
+- [x] Notification types: new messages, appointments, low credits, opt-outs, AI handoff requests
+- [x] Google Calendar integration for appointment booking from Flows
+- [x] Inbound lead handling: Receptionist greets → user assigns as lead or client
+- [x] Opt-in page as generic compliance proof
 
 ### In Progress
 _(nothing currently in progress)_
 
-### Pre-Launch — Code Cleanup
-- [x] Standardize tier naming: rename all basic/starter → "growth", all premium/professional → "scale" across entire codebase
-- [x] Fix inconsistent subscription tier type (`SubscriptionTier` uses preview/starter/professional, other code uses basic/premium/free)
-- [x] Remove "preview"/"free" tier references — replace with a single "unpaid" state concept
-
-### Pre-Launch — Payments & Billing
-- [ ] Enforce payment at signup — no access without subscribing (card required during onboarding)
-- [ ] Show Scale tier point pack discount clearly on pricing/preview pages
+### Remaining Pre-Launch
 - [ ] Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack
-- [ ] Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits
-- [ ] Plan management (upgrade/downgrade) inside Settings page
-
-### Pre-Launch — Settings Page
-- [ ] Profile info section (name, email, business info)
-- [ ] Plan management section (current plan, upgrade/downgrade, billing)
-- [ ] Spam protection settings
-- [ ] DNC list management
-- [ ] Auto-buy configuration (enable/disable, pick pack size)
-
-### Pre-Launch — Onboarding Rework
-- [ ] Add demographic questions to onboarding (industry, business type)
-- [ ] Auto-provision one free local number during onboarding
-- [ ] Guide user to set up AI Flows based on their industry
-- [ ] Show industry-specific preset pipeline stages (user can customize)
-- [ ] Add optional Google Calendar connection step
-
-### Pre-Launch — Leads vs Clients Separation
-- [ ] Create Clients concept — separate from Leads
-- [ ] Add "mark as sold" action on leads to convert to client
-- [ ] Create `/clients` page for managing sold/active customers
-- [ ] Split messages view into Lead conversations and Client conversations (tabs)
-- [ ] Route Leads → Flows AI, Clients → Receptionist AI
-
-### Pre-Launch — Flows (AI Conversation Templates)
-- [ ] Build Flow system — AI templates that gather info before booking appointments
-- [ ] Industry-specific flow presets (insurance = DOB/household/income, real estate = budget/area, etc.)
-- [ ] Custom flow builder (user can create from scratch)
-- [ ] Configurable required fields per flow
 - [ ] AI autonomy settings per flow (full auto, suggest replies, manual)
-- [ ] User can take over conversation at any time (AI stops or switches to suggest mode)
 - [ ] Flow completion → auto-book appointment → auto-tag "appointment set"
 - [ ] Flow trigger config: user chooses auto-on-reply or manual assignment per campaign
-
-### Pre-Launch — Dashboard Rework
-- [ ] Scrollable sections layout: appointments → unread messages → pipeline overview
-- [ ] Upcoming appointments section (from Flows + Google Calendar)
-- [ ] Unread messages section (leads + clients)
-- [ ] Pipeline overview — lead counts by stage (visual pipeline view)
-- [ ] Separate lead and client sections
-
-### Pre-Launch — Tags & Pipeline
 - [ ] Support multiple tags per lead with one primary tag
-- [ ] Industry-specific preset tags loaded during onboarding
-- [ ] User can customize their own pipeline stages
-- [ ] Pipeline stages shown on dashboard
-
-### Pre-Launch — Campaigns Rework
-- [ ] Redefine campaigns as lead type categories (health, life, auto, solar, etc.)
-- [ ] Campaigns independent from tags
-- [ ] Campaign determines which Flow presets are available
-
-### Pre-Launch — Compliance / DNC
-- [ ] Opt-out (STOP) = permanent DNC, completely blocked from all future messaging
-- [ ] Lead record stays but is permanently locked — no ability to message again
-- [ ] Verify current DNC implementation matches this behavior
-
-### Pre-Launch — Phone Numbers
-- [ ] One free number provisioned with plan during onboarding
 - [ ] Number porting (bring your own number) — before launch
-
-### Pre-Launch — Analytics / Reporting
-- [ ] Build `/analytics` page with full reporting
-- [ ] Message delivery rates and response rates
-- [ ] Campaign performance breakdowns
-- [ ] Credits usage over time
-- [ ] Charts and data visualization
-- [ ] Export functionality
-
-### Pre-Launch — AI Behavior
-- [ ] Industry-specific default tone presets
-- [ ] User-customizable system prompt / AI personality
-- [ ] AI guardrails (no promises, no legal/medical advice, no pricing unless configured)
-
-### Pre-Launch — Preview / Landing Page
 - [ ] Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA
-- [ ] Clearly show Scale tier point pack discount as key differentiator
-
-### Pre-Launch — Browser Extension (MVP)
-- [ ] Scrape contact info from any platform the user is browsing
-- [ ] Import captured info into HyveWyre as a lead/client
-- [ ] Quick-send a message from the extension
-
-### Pre-Launch — Notifications
-- [ ] User-configurable notification preferences (per notification type)
-- [ ] In-app notifications (bell/badge in dashboard)
-- [ ] Email alerts
-- [ ] SMS alerts to user's personal phone
-- [ ] Notification types: new messages, appointments, low credits, opt-outs, AI handoff requests
-
-### Pre-Launch — Other
-- [ ] Google Calendar integration for appointment booking from Flows
+- [ ] Browser extension: Quick-send a message from the extension
+- [ ] Email alerts (notifications)
+- [ ] SMS alerts to user's personal phone (notifications)
 - [ ] AI suggest-reply mode (AI drafts, user reviews and sends)
-- [ ] Inbound lead handling: Receptionist greets → user assigns as lead or client
 - [ ] Admin panel updates to reflect new tier names and lead/client separation
-- [ ] Opt-in page as generic compliance proof
 
 ### Roadmap (Post-Launch)
 - [ ] Native iOS/Android mobile app

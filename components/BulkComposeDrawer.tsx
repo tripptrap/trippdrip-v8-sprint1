@@ -69,9 +69,20 @@ export default function BulkComposeDrawer({
   // UI state
   const [showLeadSelector, setShowLeadSelector] = useState(true);
 
-  // Load data when drawer opens
+  // Load data and reset state when drawer opens
   useEffect(() => {
     if (isOpen) {
+      // Reset all compose state on open (unless pre-selections are provided)
+      if (preSelectedLeadIds.length === 0 && !preSelectedCampaignId && preSelectedTags.length === 0) {
+        setSelectionMode('manual');
+        setSelectedLeadIds(new Set());
+        setSelectedTags([]);
+        setSelectedCampaignId('');
+      }
+      setMessage('');
+      setScheduleDate('');
+      setSendMode('now');
+      setSearchQuery('');
       loadData();
     }
   }, [isOpen]);

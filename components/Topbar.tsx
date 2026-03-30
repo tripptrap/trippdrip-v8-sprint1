@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { checkAndRenewCredits } from "@/lib/renewalSystem";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Headphones } from "lucide-react";
+import NotificationBell from './NotificationBell';
 
 export default function Topbar(){
   const router = useRouter();
@@ -250,6 +251,9 @@ export default function Topbar(){
             </div>
           </Link>
         </motion.div>
+
+        {/* Notification Bell */}
+        <NotificationBell />
 
         {/* User Menu */}
         <div className="relative">

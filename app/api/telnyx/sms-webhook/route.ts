@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { ContactType } from '@/lib/receptionist/types';
 import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 
 // Opt-out keywords that indicate a lead wants to stop receiving messages
 const OPT_OUT_KEYWORDS = [
@@ -356,6 +357,24 @@ async function handleInboundSMS(payload: any) {
   } else {
     console.log('✅ Telnyx inbound message saved:', insertedMsg);
 
+    // Send SMS alert to user's personal phone (new inbound message)
+    if (!optOut) {
+      const { data: leadForAlert } = await supabaseAdmin
+        .from('leads')
+        .select('first_name, last_name')
+        .eq('user_id', userId)
+        .eq('phone', from)
+        .single();
+      const leadName = leadForAlert
+        ? [leadForAlert.first_name, leadForAlert.last_name].filter(Boolean).join(' ')
+        : undefined;
+      sendSmsAlertToUser(userId, 'new_message', {
+        leadName: leadName || undefined,
+        leadPhone: from,
+        message: messageBody,
+      }).catch(err => console.error('SMS alert (new_message) failed:', err));
+    }
+
     // Handle opt-out: add to DNC list, update lead, skip receptionist
     if (optOut) {
       console.log(`🚫 Opt-out detected from ${from}: "${messageBody}"`);
@@ -373,6 +392,11 @@ async function handleInboundSMS(payload: any) {
           }, { onConflict: 'user_id,phone_number' });
 
         console.log(`✅ Added ${from} to DNC list for user ${userId}`);
+
+        // Send SMS alert to user's personal phone (opt-out)
+        sendSmsAlertToUser(userId, 'opt_out', {
+          leadPhone: from,
+        }).catch(err => console.error('SMS alert (opt_out) failed:', err));
 
         // Log DNC history
         await supabaseAdmin

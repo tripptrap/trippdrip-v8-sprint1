@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play, Smartphone } from 'lucide-react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   NotificationType,
@@ -21,6 +21,67 @@ export default function NotificationSettings() {
   } = useNotifications();
 
   const [testPlaying, setTestPlaying] = useState(false);
+
+  // SMS alert state
+  const [smsAlertsEnabled, setSmsAlertsEnabled] = useState(false);
+  const [smsAlertNewMessage, setSmsAlertNewMessage] = useState(true);
+  const [smsAlertLowCredits, setSmsAlertLowCredits] = useState(true);
+  const [smsAlertOptOut, setSmsAlertOptOut] = useState(false);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [smsPrefsSaving, setSmsPrefsSaving] = useState(false);
+
+  // Load SMS preferences and user phone on mount
+  useEffect(() => {
+    async function loadSmsPrefs() {
+      try {
+        const [prefsRes, profileRes] = await Promise.all([
+          fetch('/api/user/preferences'),
+          fetch('/api/user/profile'),
+        ]);
+        if (prefsRes.ok) {
+          const { preferences: p } = await prefsRes.json();
+          if (p) {
+            setSmsAlertsEnabled(p.sms_alerts_enabled ?? false);
+            setSmsAlertNewMessage(p.sms_alert_new_message ?? true);
+            setSmsAlertLowCredits(p.sms_alert_low_credits ?? true);
+            setSmsAlertOptOut(p.sms_alert_opt_out ?? false);
+          }
+        }
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          setUserPhone(profile.phone || null);
+        }
+      } catch (err) {
+        console.error('Error loading SMS preferences:', err);
+      }
+    }
+    loadSmsPrefs();
+  }, []);
+
+  async function saveSmsPrefs(patch: Record<string, boolean>) {
+    setSmsPrefsSaving(true);
+    try {
+      await fetch('/api/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+    } catch (err) {
+      console.error('Error saving SMS preferences:', err);
+    } finally {
+      setSmsPrefsSaving(false);
+    }
+  }
+
+  function toggleSmsAlerts(val: boolean) {
+    setSmsAlertsEnabled(val);
+    saveSmsPrefs({ smsAlertsEnabled: val });
+  }
+
+  function toggleSmsAlertType(key: string, setter: (v: boolean) => void, val: boolean) {
+    setter(val);
+    saveSmsPrefs({ [key]: val });
+  }
 
   const handleTestSound = () => {
     setTestPlaying(true);
@@ -242,6 +303,89 @@ export default function NotificationSettings() {
             );
           })}
         </div>
+      </div>
+
+      {/* SMS Alerts Section */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+          SMS Alerts to Your Phone
+        </h3>
+
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <Smartphone className={`w-5 h-5 ${smsAlertsEnabled ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400'}`} />
+            <div>
+              <h3 className="font-medium">Enable SMS Alerts</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {userPhone
+                  ? `Get texted at ${userPhone} when important things happen`
+                  : 'Add a personal phone number in your profile to receive SMS alerts'}
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={smsAlertsEnabled}
+              onChange={(e) => toggleSmsAlerts(e.target.checked)}
+              disabled={!userPhone || smsPrefsSaving}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>
+          </label>
+        </div>
+
+        {smsAlertsEnabled && (
+          <div className="space-y-2 ml-2">
+            {[
+              {
+                label: 'New inbound messages',
+                description: 'Alert when a lead replies to you',
+                value: smsAlertNewMessage,
+                setter: setSmsAlertNewMessage,
+                prefKey: 'smsAlertNewMessage',
+              },
+              {
+                label: 'Low credits',
+                description: 'Alert when your credit balance is running low',
+                value: smsAlertLowCredits,
+                setter: setSmsAlertLowCredits,
+                prefKey: 'smsAlertLowCredits',
+              },
+              {
+                label: 'Opt-out / STOP received',
+                description: 'Alert when a lead sends a STOP and is added to DNC',
+                value: smsAlertOptOut,
+                setter: setSmsAlertOptOut,
+                prefKey: 'smsAlertOptOut',
+              },
+            ].map(({ label, description, value, setter, prefKey }) => (
+              <div
+                key={prefKey}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                  value
+                    ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'
+                }`}
+              >
+                <div>
+                  <h4 className="font-medium text-sm">{label}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    onChange={(e) => toggleSmsAlertType(prefKey, setter, e.target.checked)}
+                    disabled={smsPrefsSaving}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Info Box */}
