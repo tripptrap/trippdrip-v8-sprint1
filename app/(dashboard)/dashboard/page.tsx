@@ -545,260 +545,6 @@ export default function Dashboard(){
         </motion.div>
       </div>
 
-      {/* Additional Stats - 3 cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Sent</div>
-              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
-                {loading ? '...' : (analytics?.totalMessagesSent || 0).toLocaleString()}
-              </div>
-            </div>
-            <Send className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Received</div>
-              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
-                {loading ? '...' : (analytics?.totalMessagesReceived || 0).toLocaleString()}
-              </div>
-            </div>
-            <Mail className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Leads vs Clients</div>
-              <div className="flex items-center gap-3">
-                <div>
-                  <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {loading ? '...' : ((analytics?.totalLeads || 0) - (analytics?.soldLeads || 0)).toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Active</div>
-                </div>
-                <div className="text-slate-300 dark:text-slate-600 text-lg">/</div>
-                <div>
-                  <div className="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {loading ? '...' : (analytics?.soldLeads || 0).toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400">Converted</div>
-                </div>
-              </div>
-            </div>
-            <UserCheck className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 dark:text-emerald-400 flex-shrink-0 ml-2" />
-          </div>
-        </div>
-      </div>
-
-      {/* Pipeline Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.45 }}
-        className="card p-4 md:p-6"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-sky-500" />
-            Pipeline Overview
-          </h2>
-          <Link href="/tags" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
-            Manage tags <ArrowRight className="w-3 h-3" />
-          </Link>
-        </div>
-
-        {pipelineLoading ? (
-          <div className="h-16 flex items-center justify-center">
-            <div className="animate-pulse flex gap-2 w-full">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex-1" />
-              ))}
-            </div>
-          </div>
-        ) : pipelineTags.length === 0 ? (
-          <div className="text-center py-6 text-slate-500 dark:text-slate-400">
-            <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No pipeline stages with leads yet</p>
-            <Link href="/tags" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
-              Set up your pipeline in Tags
-            </Link>
-          </div>
-        ) : (
-          <>
-            {/* Horizontal segmented bar */}
-            <div className="flex rounded-lg overflow-hidden h-10 mb-3">
-              {pipelineTags.map((tag) => {
-                const percent = totalPipelineLeads > 0 ? (tag.count / totalPipelineLeads) * 100 : 0;
-                return (
-                  <Link
-                    key={tag.id}
-                    href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                    className="relative group flex items-center justify-center transition-opacity hover:opacity-80"
-                    style={{ width: `${Math.max(percent, 5)}%`, backgroundColor: tag.color || '#3b82f6' }}
-                    title={`${tag.name}: ${tag.count} leads`}
-                  >
-                    {percent > 12 && (
-                      <span className="text-white text-xs font-medium truncate px-1">{tag.count}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3">
-              {pipelineTags.map((tag) => (
-                <Link
-                  key={tag.id}
-                  href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
-                  <span>{tag.name}</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">{tag.count}</span>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </motion.div>
-
-      {/* Conversion Funnel & Campaign Performance Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Conversion Funnel */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.47 }}
-          className="card p-4 md:p-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-sky-500" />
-              Conversion Funnel
-            </h2>
-            {funnelMetrics && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {funnelMetrics.overall.toFixed(1)}% overall
-              </span>
-            )}
-          </div>
-
-          {funnelLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded" style={{ width: `${100 - i * 15}%` }} />
-                </div>
-              ))}
-            </div>
-          ) : funnelStages.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-              <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No funnel data yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {funnelStages.map((stage, i) => {
-                const colors = ['bg-sky-500', 'bg-sky-400', 'bg-cyan-500', 'bg-emerald-400', 'bg-emerald-500'];
-                return (
-                  <div key={stage.name}>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-slate-700 dark:text-slate-300 font-medium">{stage.name}</span>
-                      <span className="text-slate-500 dark:text-slate-400">{stage.count} ({stage.percentage.toFixed(0)}%)</span>
-                    </div>
-                    <div className="h-7 bg-slate-100 dark:bg-slate-700 rounded-md overflow-hidden">
-                      <div
-                        className={`h-full ${colors[i] || 'bg-sky-500'} rounded-md transition-all duration-500 flex items-center pl-2`}
-                        style={{ width: `${Math.max(stage.percentage, 2)}%` }}
-                      >
-                        {stage.percentage > 15 && (
-                          <span className="text-white text-[10px] font-medium">{stage.count}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {funnelMetrics && funnelMetrics.avg_messages_before_sale > 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  Avg {funnelMetrics.avg_messages_before_sale.toFixed(0)} messages before conversion
-                </p>
-              )}
-            </div>
-          )}
-        </motion.div>
-
-        {/* Campaign Performance */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.48 }}
-          className="card p-4 md:p-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Send className="w-5 h-5 text-sky-500" />
-              Top Campaigns
-            </h2>
-            <Link href="/campaigns" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-
-          {campaignPerfLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
-                  <div className="flex-1">
-                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 mb-1" />
-                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : campaignPerf.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-              <Send className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No campaign data yet</p>
-              <Link href="/campaigns" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
-                Create a campaign
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="text-left py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Campaign</th>
-                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Leads</th>
-                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Sent</th>
-                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Response</th>
-                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Conv.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {campaignPerf.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                      <td className="py-2 text-slate-900 dark:text-slate-100 font-medium truncate max-w-[140px]">{c.name}</td>
-                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.totalLeads}</td>
-                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.messagesSent}</td>
-                      <td className="py-2 text-center text-sky-600 dark:text-sky-400 font-medium">{c.responseRate}%</td>
-                      <td className="py-2 text-center text-emerald-600 dark:text-emerald-400 font-medium">{c.conversionRate}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </motion.div>
-      </div>
-
       {/* Appointments & Unread Messages Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Upcoming Appointments */}
@@ -945,6 +691,260 @@ export default function Dashboard(){
                   )}
                 </Link>
               ))}
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* Pipeline Overview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.45 }}
+        className="card p-4 md:p-6"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-sky-500" />
+            Pipeline Overview
+          </h2>
+          <Link href="/tags" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+            Manage tags <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {pipelineLoading ? (
+          <div className="h-16 flex items-center justify-center">
+            <div className="animate-pulse flex gap-2 w-full">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex-1" />
+              ))}
+            </div>
+          </div>
+        ) : pipelineTags.length === 0 ? (
+          <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+            <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No pipeline stages with leads yet</p>
+            <Link href="/tags" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
+              Set up your pipeline in Tags
+            </Link>
+          </div>
+        ) : (
+          <>
+            {/* Horizontal segmented bar */}
+            <div className="flex rounded-lg overflow-hidden h-10 mb-3">
+              {pipelineTags.map((tag) => {
+                const percent = totalPipelineLeads > 0 ? (tag.count / totalPipelineLeads) * 100 : 0;
+                return (
+                  <Link
+                    key={tag.id}
+                    href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                    className="relative group flex items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ width: `${Math.max(percent, 5)}%`, backgroundColor: tag.color || '#3b82f6' }}
+                    title={`${tag.name}: ${tag.count} leads`}
+                  >
+                    {percent > 12 && (
+                      <span className="text-white text-xs font-medium truncate px-1">{tag.count}</span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3">
+              {pipelineTags.map((tag) => (
+                <Link
+                  key={tag.id}
+                  href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
+                  <span>{tag.name}</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{tag.count}</span>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+      </motion.div>
+
+      {/* Additional Stats - 3 cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Sent</div>
+              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
+                {loading ? '...' : (analytics?.totalMessagesSent || 0).toLocaleString()}
+              </div>
+            </div>
+            <Send className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Messages Received</div>
+              <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
+                {loading ? '...' : (analytics?.totalMessagesReceived || 0).toLocaleString()}
+              </div>
+            </div>
+            <Mail className="w-8 h-8 md:w-10 md:h-10 text-sky-600 dark:text-sky-400 flex-shrink-0 ml-2" />
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs md:text-sm text-slate-600 dark:text-slate-400 mb-1">Leads vs Clients</div>
+              <div className="flex items-center gap-3">
+                <div>
+                  <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    {loading ? '...' : ((analytics?.totalLeads || 0) - (analytics?.soldLeads || 0)).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">Active</div>
+                </div>
+                <div className="text-slate-300 dark:text-slate-600 text-lg">/</div>
+                <div>
+                  <div className="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {loading ? '...' : (analytics?.soldLeads || 0).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400">Converted</div>
+                </div>
+              </div>
+            </div>
+            <UserCheck className="w-8 h-8 md:w-10 md:h-10 text-emerald-500 dark:text-emerald-400 flex-shrink-0 ml-2" />
+          </div>
+        </div>
+      </div>
+
+      {/* Conversion Funnel & Campaign Performance Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Conversion Funnel */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.47 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-sky-500" />
+              Conversion Funnel
+            </h2>
+            {funnelMetrics && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {funnelMetrics.overall.toFixed(1)}% overall
+              </span>
+            )}
+          </div>
+
+          {funnelLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded" style={{ width: `${100 - i * 15}%` }} />
+                </div>
+              ))}
+            </div>
+          ) : funnelStages.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No funnel data yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {funnelStages.map((stage, i) => {
+                const colors = ['bg-sky-500', 'bg-sky-400', 'bg-cyan-500', 'bg-emerald-400', 'bg-emerald-500'];
+                return (
+                  <div key={stage.name}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">{stage.name}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{stage.count} ({stage.percentage.toFixed(0)}%)</span>
+                    </div>
+                    <div className="h-7 bg-slate-100 dark:bg-slate-700 rounded-md overflow-hidden">
+                      <div
+                        className={`h-full ${colors[i] || 'bg-sky-500'} rounded-md transition-all duration-500 flex items-center pl-2`}
+                        style={{ width: `${Math.max(stage.percentage, 2)}%` }}
+                      >
+                        {stage.percentage > 15 && (
+                          <span className="text-white text-[10px] font-medium">{stage.count}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {funnelMetrics && funnelMetrics.avg_messages_before_sale > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  Avg {funnelMetrics.avg_messages_before_sale.toFixed(0)} messages before conversion
+                </p>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Campaign Performance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.48 }}
+          className="card p-4 md:p-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Send className="w-5 h-5 text-sky-500" />
+              Top Campaigns
+            </h2>
+            <Link href="/campaigns" className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {campaignPerfLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                  <div className="flex-1">
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32 mb-1" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : campaignPerf.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <Send className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No campaign data yet</p>
+              <Link href="/campaigns" className="text-sky-600 dark:text-sky-400 text-xs hover:underline mt-1 inline-block">
+                Create a campaign
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Campaign</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Leads</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Sent</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Response</th>
+                    <th className="text-center py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Conv.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {campaignPerf.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                      <td className="py-2 text-slate-900 dark:text-slate-100 font-medium truncate max-w-[140px]">{c.name}</td>
+                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.totalLeads}</td>
+                      <td className="py-2 text-center text-slate-600 dark:text-slate-400">{c.messagesSent}</td>
+                      <td className="py-2 text-center text-sky-600 dark:text-sky-400 font-medium">{c.responseRate}%</td>
+                      <td className="py-2 text-center text-emerald-600 dark:text-emerald-400 font-medium">{c.conversionRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </motion.div>

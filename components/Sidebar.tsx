@@ -42,10 +42,11 @@ const navItems: NavItem[] = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
   {
-    href: "/templates",
-    label: "Your AI",
+    href: "/flows",
+    label: "AI Flows",
     children: [
-      { href: "/demo", label: "Flow Demo" },
+      { href: "/receptionist", label: "Receptionist" },
+      { href: "/flow-analytics", label: "Flow Analytics" },
     ]
   },
   { href: "/quoting",   label: "Quoting" },
