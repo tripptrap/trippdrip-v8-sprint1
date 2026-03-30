@@ -331,3 +331,100 @@ export const paymentFailedEmail = (userName: string, amount: number, retryUrl: s
   `),
   text: `Payment Failed\n\nHi ${userName},\n\nWe were unable to process your payment of $${amount.toFixed(2)}.\n\nThis could be due to:\n- Insufficient funds\n- Expired card\n- Card declined by your bank\n\nPlease update your payment method to continue using ${BRAND_NAME} without interruption.\n\nUpdate payment method: ${retryUrl}`
 });
+
+// ─── Notification Alert Emails ────────────────────────────────────────────────
+
+// New inbound message alert
+export const newMessageAlertEmail = (
+  userName: string,
+  leadName: string,
+  messageExcerpt: string,
+  appUrl: string
+): EmailTemplate => ({
+  subject: `New reply from ${leadName} — ${BRAND_NAME}`,
+  html: htmlWrapper(`
+    <h2 style="margin: 0 0 20px 0; color: #111827; font-size: 24px;">New Message</h2>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Hi ${userName},
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      <strong>${leadName}</strong> just replied to you:
+    </p>
+    <div style="margin: 0 0 25px 0; padding: 16px 20px; background: #f3f4f6; border-left: 4px solid ${BRAND_COLOR}; border-radius: 4px;">
+      <p style="margin: 0; color: #374151; font-size: 15px; font-style: italic;">"${messageExcerpt}"</p>
+    </div>
+    ${button('View Conversation', appUrl)}
+  `),
+  text: `New Message from ${leadName}\n\nHi ${userName},\n\n${leadName} just replied:\n\n"${messageExcerpt}"\n\nView conversation: ${appUrl}`,
+});
+
+// Appointment booked alert
+export const appointmentAlertEmail = (
+  userName: string,
+  leadName: string,
+  appointmentTime: string,
+  appUrl: string
+): EmailTemplate => ({
+  subject: `Appointment booked with ${leadName} — ${BRAND_NAME}`,
+  html: htmlWrapper(`
+    <h2 style="margin: 0 0 20px 0; color: #059669; font-size: 24px;">Appointment Booked ✓</h2>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Hi ${userName},
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      An appointment has been booked with <strong>${leadName}</strong>.
+    </p>
+    <div style="margin: 0 0 25px 0; padding: 16px 20px; background: #f0fdf4; border-left: 4px solid #059669; border-radius: 4px;">
+      <p style="margin: 0; color: #065f46; font-size: 15px; font-weight: bold;">${appointmentTime}</p>
+    </div>
+    ${button('View Appointments', appUrl)}
+  `),
+  text: `Appointment Booked\n\nHi ${userName},\n\nAn appointment was booked with ${leadName}.\n\nTime: ${appointmentTime}\n\nView appointments: ${appUrl}`,
+});
+
+// Low credits alert
+export const lowCreditsAlertEmail = (
+  userName: string,
+  currentCredits: number,
+  topUpUrl: string
+): EmailTemplate => ({
+  subject: `Low credit balance — ${BRAND_NAME}`,
+  html: htmlWrapper(`
+    <h2 style="margin: 0 0 20px 0; color: #d97706; font-size: 24px;">Low Credit Balance ⚠️</h2>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Hi ${userName},
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Your ${BRAND_NAME} credit balance is running low. You currently have <strong>${currentCredits} credits</strong> remaining.
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Top up now to keep your SMS and AI features running without interruption.
+    </p>
+    ${button('Buy Credits', topUpUrl)}
+  `),
+  text: `Low Credit Balance\n\nHi ${userName},\n\nYour credit balance is running low. You have ${currentCredits} credits remaining.\n\nTop up now: ${topUpUrl}`,
+});
+
+// Opt-out / STOP received alert
+export const optOutAlertEmail = (
+  userName: string,
+  leadName: string,
+  leadPhone: string,
+  appUrl: string
+): EmailTemplate => ({
+  subject: `Opt-out received from ${leadName || leadPhone} — ${BRAND_NAME}`,
+  html: htmlWrapper(`
+    <h2 style="margin: 0 0 20px 0; color: #dc2626; font-size: 24px;">Opt-Out Received</h2>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      Hi ${userName},
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      <strong>${leadName || leadPhone}</strong> sent a STOP message and has been added to your Do Not Contact list.
+    </p>
+    <p style="margin: 0 0 15px 0; color: #374151; font-size: 16px; line-height: 1.6;">
+      No further messages will be sent to this contact. This is required by law and cannot be overridden.
+    </p>
+    ${button('View DNC List', appUrl)}
+  `),
+  text: `Opt-Out Received\n\nHi ${userName},\n\n${leadName || leadPhone} sent STOP and has been added to your DNC list.\n\nNo further messages will be sent to this contact.\n\nView DNC list: ${appUrl}`,
+});

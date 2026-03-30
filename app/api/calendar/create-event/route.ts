@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { createClient } from '@/lib/supabase/server';
+import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,6 +116,16 @@ export async function POST(request: NextRequest) {
       attendee_name: attendeeName,
       created_at: new Date().toISOString()
     });
+
+    // Fire appointment notification (SMS + email based on user prefs)
+    const appointmentTime = new Date(start).toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+    sendSmsAlertToUser(user.id, 'appointment', {
+      leadName: attendeeName || undefined,
+      appointmentTime,
+    }).catch(err => console.error('Appointment alert failed:', err));
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,10 @@
 // This file is for use in API routes and server components only
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
+
+// Fire a low-credits alert once per threshold crossing (avoids spam)
+const LOW_CREDITS_THRESHOLD = 50;
 
 export type ActionType = 'sms_sent' | 'ai_response' | 'document_upload' | 'bulk_message' | 'flow_creation';
 
@@ -88,6 +92,12 @@ export async function spendPoints(
 
   if (transactionError) {
     console.error('Error recording transaction:', transactionError);
+  }
+
+  // Fire low-credits alert when balance crosses below threshold
+  if (currentBalance >= LOW_CREDITS_THRESHOLD && newBalance < LOW_CREDITS_THRESHOLD) {
+    sendSmsAlertToUser(user.id, 'low_credits', { currentCredits: newBalance })
+      .catch(err => console.error('Low credits alert failed:', err));
   }
 
   return { success: true, balance: newBalance };

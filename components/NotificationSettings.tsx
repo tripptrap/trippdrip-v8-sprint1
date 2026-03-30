@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play, Smartphone } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play, Smartphone, Mail } from 'lucide-react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   NotificationType,
@@ -30,9 +30,18 @@ export default function NotificationSettings() {
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [smsPrefsSaving, setSmsPrefsSaving] = useState(false);
 
-  // Load SMS preferences and user phone on mount
+  // Email alert state
+  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
+  const [emailAlertNewMessage, setEmailAlertNewMessage] = useState(true);
+  const [emailAlertLowCredits, setEmailAlertLowCredits] = useState(true);
+  const [emailAlertOptOut, setEmailAlertOptOut] = useState(false);
+  const [emailAlertAppointment, setEmailAlertAppointment] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
+
+  // Load SMS + email preferences and user profile on mount
   useEffect(() => {
-    async function loadSmsPrefs() {
+    async function loadPrefs() {
       try {
         const [prefsRes, profileRes] = await Promise.all([
           fetch('/api/user/preferences'),
@@ -45,17 +54,23 @@ export default function NotificationSettings() {
             setSmsAlertNewMessage(p.sms_alert_new_message ?? true);
             setSmsAlertLowCredits(p.sms_alert_low_credits ?? true);
             setSmsAlertOptOut(p.sms_alert_opt_out ?? false);
+            setEmailAlertsEnabled(p.email_alerts_enabled ?? false);
+            setEmailAlertNewMessage(p.email_alert_new_message ?? true);
+            setEmailAlertLowCredits(p.email_alert_low_credits ?? true);
+            setEmailAlertOptOut(p.email_alert_opt_out ?? false);
+            setEmailAlertAppointment(p.email_alert_appointment ?? true);
           }
         }
         if (profileRes.ok) {
           const profile = await profileRes.json();
           setUserPhone(profile.phone || null);
+          setUserEmail(profile.email || null);
         }
       } catch (err) {
-        console.error('Error loading SMS preferences:', err);
+        console.error('Error loading preferences:', err);
       }
     }
-    loadSmsPrefs();
+    loadPrefs();
   }, []);
 
   async function saveSmsPrefs(patch: Record<string, boolean>) {
@@ -81,6 +96,31 @@ export default function NotificationSettings() {
   function toggleSmsAlertType(key: string, setter: (v: boolean) => void, val: boolean) {
     setter(val);
     saveSmsPrefs({ [key]: val });
+  }
+
+  async function saveEmailPrefs(patch: Record<string, boolean>) {
+    setEmailPrefsSaving(true);
+    try {
+      await fetch('/api/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+    } catch (err) {
+      console.error('Error saving email preferences:', err);
+    } finally {
+      setEmailPrefsSaving(false);
+    }
+  }
+
+  function toggleEmailAlerts(val: boolean) {
+    setEmailAlertsEnabled(val);
+    saveEmailPrefs({ emailAlertsEnabled: val });
+  }
+
+  function toggleEmailAlertType(key: string, setter: (v: boolean) => void, val: boolean) {
+    setter(val);
+    saveEmailPrefs({ [key]: val });
   }
 
   const handleTestSound = () => {
@@ -378,6 +418,96 @@ export default function NotificationSettings() {
                     checked={value}
                     onChange={(e) => toggleSmsAlertType(prefKey, setter, e.target.checked)}
                     disabled={smsPrefsSaving}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Email Alerts Section */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+          Email Alerts
+        </h3>
+
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <Mail className={`w-5 h-5 ${emailAlertsEnabled ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400'}`} />
+            <div>
+              <h3 className="font-medium">Enable Email Alerts</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {userEmail
+                  ? `Get emailed at ${userEmail} when important things happen`
+                  : 'No email address found on your account'}
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={emailAlertsEnabled}
+              onChange={(e) => toggleEmailAlerts(e.target.checked)}
+              disabled={!userEmail || emailPrefsSaving}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>
+          </label>
+        </div>
+
+        {emailAlertsEnabled && (
+          <div className="space-y-2 ml-2">
+            {[
+              {
+                label: 'New inbound messages',
+                description: 'Email when a lead replies to you',
+                value: emailAlertNewMessage,
+                setter: setEmailAlertNewMessage,
+                prefKey: 'emailAlertNewMessage',
+              },
+              {
+                label: 'Appointments booked',
+                description: 'Email when an appointment is scheduled via AI Flow',
+                value: emailAlertAppointment,
+                setter: setEmailAlertAppointment,
+                prefKey: 'emailAlertAppointment',
+              },
+              {
+                label: 'Low credits',
+                description: 'Email when your credit balance is running low',
+                value: emailAlertLowCredits,
+                setter: setEmailAlertLowCredits,
+                prefKey: 'emailAlertLowCredits',
+              },
+              {
+                label: 'Opt-out / STOP received',
+                description: 'Email when a lead sends STOP and is added to DNC',
+                value: emailAlertOptOut,
+                setter: setEmailAlertOptOut,
+                prefKey: 'emailAlertOptOut',
+              },
+            ].map(({ label, description, value, setter, prefKey }) => (
+              <div
+                key={prefKey}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                  value
+                    ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'
+                }`}
+              >
+                <div>
+                  <h4 className="font-medium text-sm">{label}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    onChange={(e) => toggleEmailAlertType(prefKey, setter, e.target.checked)}
+                    disabled={emailPrefsSaving}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>

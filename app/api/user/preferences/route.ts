@@ -80,6 +80,21 @@ export async function PUT(req: NextRequest) {
     if (body.smsAlertOptOut !== undefined) {
       updates.sms_alert_opt_out = body.smsAlertOptOut;
     }
+    if (body.emailAlertsEnabled !== undefined) {
+      updates.email_alerts_enabled = body.emailAlertsEnabled;
+    }
+    if (body.emailAlertNewMessage !== undefined) {
+      updates.email_alert_new_message = body.emailAlertNewMessage;
+    }
+    if (body.emailAlertLowCredits !== undefined) {
+      updates.email_alert_low_credits = body.emailAlertLowCredits;
+    }
+    if (body.emailAlertOptOut !== undefined) {
+      updates.email_alert_opt_out = body.emailAlertOptOut;
+    }
+    if (body.emailAlertAppointment !== undefined) {
+      updates.email_alert_appointment = body.emailAlertAppointment;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No valid fields to update' }, { status: 400 });
