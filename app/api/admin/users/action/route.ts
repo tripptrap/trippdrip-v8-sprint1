@@ -66,8 +66,9 @@ export async function POST(req: NextRequest) {
             updated_at: new Date().toISOString(),
           };
           // Try by email first, then by id
-          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
-          if (!count || count === 0) {
+          // LOW-6: Use .select('id') to check if row was found — count is always null on update()
+          const { data: updatedRows } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase()).select('id');
+          if (!updatedRows || updatedRows.length === 0) {
             await adminClient.from('users').update(updateData).eq('id', userId);
           }
         }
@@ -118,8 +119,9 @@ export async function POST(req: NextRequest) {
             suspended_until: null,
             updated_at: new Date().toISOString(),
           };
-          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
-          if (!count || count === 0) {
+          // LOW-6: Use .select('id') to check if row was found — count is always null on update()
+          const { data: updatedRows } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase()).select('id');
+          if (!updatedRows || updatedRows.length === 0) {
             await adminClient.from('users').update(updateData).eq('id', userId);
           }
         }
@@ -144,8 +146,9 @@ export async function POST(req: NextRequest) {
             suspended_until: null,
             updated_at: new Date().toISOString(),
           };
-          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
-          if (!count || count === 0) {
+          // LOW-6: Use .select('id') to check if row was found — count is always null on update()
+          const { data: updatedRows } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase()).select('id');
+          if (!updatedRows || updatedRows.length === 0) {
             await adminClient.from('users').update(updateData).eq('id', userId);
           }
         }
@@ -194,8 +197,9 @@ export async function POST(req: NextRequest) {
             suspended_until: null,
             updated_at: new Date().toISOString(),
           };
-          const { count } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase());
-          if (!count || count === 0) {
+          // LOW-6: Use .select('id') to check if row was found — count is always null on update()
+          const { data: updatedRows } = await adminClient.from('users').update(updateData).eq('email', (userEmail || '').toLowerCase()).select('id');
+          if (!updatedRows || updatedRows.length === 0) {
             await adminClient.from('users').update(updateData).eq('id', userId);
           }
         }
@@ -213,8 +217,8 @@ export async function POST(req: NextRequest) {
 
         // Clean up users table row — try email first, then id
         {
-          const { count } = await adminClient.from('users').delete().eq('email', (userEmail || '').toLowerCase());
-          if (!count || count === 0) {
+          const { data: deletedRows } = await adminClient.from('users').delete().eq('email', (userEmail || '').toLowerCase()).select('id');
+          if (!deletedRows || deletedRows.length === 0) {
             await adminClient.from('users').delete().eq('id', userId);
           }
         }

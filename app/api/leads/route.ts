@@ -61,9 +61,10 @@ export async function GET(req: Request) {
       .eq('user_id', user.id);
 
     // Apply search filter (searches across multiple fields)
+    // MED-9: Strip PostgREST operators and SQL wildcard characters to prevent injection
     if (q) {
-      // Escape special PostgREST filter characters to prevent malformed queries
-      const safeQ = q.replace(/[,.()"\\]/g, '');
+      // Remove: PostgREST operators (dots, parens), SQL wildcards (%, _), quotes, backslashes
+      const safeQ = q.replace(/[%_.,()'"\\]/g, '').trim();
       if (safeQ) {
         query = query.or(`first_name.ilike.%${safeQ}%,last_name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,state.ilike.%${safeQ}%`);
       }
