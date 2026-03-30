@@ -1,2935 +1,849 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import CustomModal from "@/components/CustomModal";
+import { useState, useEffect, useRef } from "react";
+import {
+  Sparkles, Bot, Plus, Trash2, ChevronDown, ChevronRight,
+  CheckCircle2, Circle, AlertCircle, Loader2, Save, X,
+  MessageSquare, Zap, Eye, FlaskConical, Pencil, GripVertical,
+  Phone, Globe, User, Building2, Target, HelpCircle, RotateCcw,
+  Headphones
+} from "lucide-react";
+import Link from "next/link";
 import ReceptionistSettings from "@/components/ReceptionistSettings";
-import { TrendingUp, MessageSquare, Users, Clock, Settings, Cpu, Sparkles, Bot, Headphones, ChevronDown, MoreVertical, Plus, Trash2, Play, Zap, FileText, Phone } from 'lucide-react';
-import { AIModelVersion, UserAISettings, DEFAULT_USER_AI_SETTINGS } from '@/lib/ai/models';
+import toast from "react-hot-toast";
 
-type DripMessage = {
-  message: string;
-  delayHours: number; // Hours to wait before sending this drip message
-};
+// ── Types ────────────────────────────────────────────────────────────────────
 
-type ResponseOption = {
-  label: string; // e.g., "Interested", "Not Interested", "More Info", "Pricing"
-  followUpMessage: string;
-  nextStepId?: string; // ID of the next step to go to
-  action?: 'continue' | 'end';
-};
+type RequiredQuestion = { question: string; fieldName: string };
 
 type FlowStep = {
   id: string;
   yourMessage: string;
-  responses: ResponseOption[];
-  dripSequence?: DripMessage[]; // Follow-up messages if no response
-  tag?: {
-    label: string;
-    color: string;
-  };
+  responses?: { label: string; followUpMessage: string; action?: string }[];
+  dripSequence?: { message: string; delayHours: number }[];
+  tag?: { label: string; color: string };
 };
 
-type RequiredQuestion = {
-  question: string; // e.g., "What's your household income?"
-  fieldName: string; // e.g., "householdIncome"
+type FlowContext = {
+  whoYouAre?: string;
+  whatOffering?: string;
+  whoTexting?: string;
+  clientGoals?: string;
+  agentName?: string;
+  companyName?: string;
+  contactReason?: string;
+  callbackNumber?: string;
+  website?: string;
+  autonomyMode?: string;
 };
 
-type ConversationFlow = {
+type Flow = {
   id: string;
   name: string;
   steps: FlowStep[];
-  requiredQuestions?: RequiredQuestion[]; // Questions that must be answered
-  requiresCall?: boolean; // Whether this flow requires a phone/zoom call
-  autonomyMode?: 'full_auto' | 'suggest' | 'manual'; // How AI handles replies
-  context?: Record<string, any>; // Preserve full context for updates
+  requiredQuestions: RequiredQuestion[];
+  requiresCall: boolean;
+  autonomyMode: "full_auto" | "suggest" | "manual";
+  context: FlowContext;
   createdAt: string;
   updatedAt: string;
-  isAIGenerated?: boolean; // Track if flow was created with AI
-  is_ai_generated?: boolean; // Database field name (snake_case)
 };
 
-async function loadFlows(): Promise<ConversationFlow[]> {
-  if (typeof window === "undefined") return [];
+type Tab = "flows" | "receptionist";
 
-  try {
-    const response = await fetch('/api/flows');
-    if (!response.ok) {
-      console.error("Error loading flows: HTTP", response.status);
-      return [];
-    }
-    const data = await response.json();
+// ── Health helpers ────────────────────────────────────────────────────────────
 
-    if (data.ok && data.items) {
-      // Map database format to app format
-      return data.items.map((flow: any) => ({
-        id: flow.id,
-        name: flow.name,
-        steps: flow.steps || [],
-        requiredQuestions: flow.required_questions || [],
-        requiresCall: flow.requires_call || false,
-        autonomyMode: (flow.context?.autonomyMode || 'full_auto') as 'full_auto' | 'suggest' | 'manual',
-        context: flow.context || {},
-        createdAt: flow.created_at,
-        updatedAt: flow.updated_at,
-        isAIGenerated: flow.is_ai_generated
-      }));
-    }
-
-    return [];
-  } catch (e) {
-    console.error("Error loading flows:", e);
-    return [];
-  }
+function flowHealth(flow: Flow): "good" | "warn" | "weak" {
+  const hasContext = !!(flow.context?.whoYouAre && flow.context?.whatOffering && flow.context?.whoTexting);
+  const hasQuestions = flow.requiredQuestions?.length > 0;
+  const hasSteps = flow.steps?.length > 0;
+  if (hasContext && hasQuestions && hasSteps) return "good";
+  if (hasSteps) return "warn";
+  return "weak";
 }
 
-async function saveFlowToServer(flow: ConversationFlow): Promise<boolean> {
-  try {
-    // Check if flow exists by looking for matching flow_config.id
-    const checkResponse = await fetch('/api/flows');
-    const checkData = await checkResponse.json();
-    const existingFlow = checkData.ok && checkData.items && checkData.items.find((f: any) =>
-      f.id === flow.id || f.flow_config?.id === flow.id
-    );
+const HEALTH_COLORS = {
+  good: "bg-emerald-500",
+  warn: "bg-amber-400",
+  weak: "bg-red-400",
+};
 
-    const method = existingFlow ? 'PUT' : 'POST';
-    const response = await fetch('/api/flows', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: existingFlow?.id || flow.id,  // Use database ID for updates
-        name: flow.name,
-        steps: flow.steps,
-        requiredQuestions: flow.requiredQuestions || [],
-        requiresCall: flow.requiresCall || false,
-        isAIGenerated: flow.isAIGenerated,
-        description: ''
-      })
-    });
+const AUTONOMY_OPTIONS = [
+  {
+    value: "full_auto" as const,
+    label: "Full Auto",
+    icon: Zap,
+    desc: "AI replies instantly to every message. Hands-free.",
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800",
+    activeBg: "bg-emerald-500",
+  },
+  {
+    value: "suggest" as const,
+    label: "Suggest",
+    icon: Eye,
+    desc: "AI drafts a reply — you review and send it.",
+    color: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800",
+    activeBg: "bg-violet-500",
+  },
+  {
+    value: "manual" as const,
+    label: "Manual",
+    icon: User,
+    desc: "AI is off for this flow. You reply to every message.",
+    color: "text-slate-600 dark:text-slate-400",
+    bg: "bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-700",
+    activeBg: "bg-slate-500",
+  },
+];
 
-    if (!response.ok) {
-      console.error("Error saving flow: HTTP", response.status);
-      return false;
-    }
-    const data = await response.json();
-    return data.ok;
-  } catch (e) {
-    console.error("Error saving flow:", e);
-    return false;
-  }
-}
+const BLANK_CONTEXT: FlowContext = {
+  whoYouAre: "",
+  whatOffering: "",
+  whoTexting: "",
+  clientGoals: "",
+  agentName: "",
+  companyName: "",
+  contactReason: "",
+  callbackNumber: "",
+  website: "",
+};
 
-async function deleteFlowFromServer(flowId: string): Promise<boolean> {
-  try {
-    const response = await fetch(`/api/flows?id=${flowId}`, {
-      method: 'DELETE'
-    });
-    const data = await response.json();
-    return data.ok;
-  } catch (e) {
-    console.error("Error deleting flow:", e);
-    return false;
-  }
-}
-
-function saveFlows(flows: ConversationFlow[], changedFlowId?: string) {
-  // If a specific flow changed, only save that one
-  if (changedFlowId) {
-    const changedFlow = flows.find(f => f.id === changedFlowId);
-    if (changedFlow) {
-      saveFlowToServer(changedFlow).catch(e => console.error("Error saving flow:", e));
-    }
-    return;
-  }
-  // Fallback: save all flows (for bulk operations)
-  flows.forEach(flow => {
-    saveFlowToServer(flow).catch(e => console.error("Error saving flow:", e));
-  });
-}
-
-// Helper function to convert date/time strings to ISO format for Google Calendar API
-// Helper function to generate camelCase field names from questions
-function generateFieldName(question: string): string {
-  // Remove question marks and other punctuation
-  let cleaned = question.replace(/[?.,!;:'"]/g, '');
-
-  // Split into words
-  const words = cleaned.trim().split(/\s+/);
-
-  // Convert to camelCase
-  if (words.length === 0) return '';
-
-  return words.map((word, idx) => {
-    const lower = word.toLowerCase();
-    if (idx === 0) return lower;
-    return lower.charAt(0).toUpperCase() + lower.slice(1);
-  }).join('');
-}
-
-function parseAppointmentDateTime(dateStr: string, timeStr: string): { start: string; end: string } {
-  const now = new Date();
-  let appointmentDate = new Date();
-
-  // Parse date string
-  const dateLower = dateStr.toLowerCase();
-  if (dateLower === 'today') {
-    appointmentDate = new Date(now);
-  } else if (dateLower === 'tomorrow') {
-    appointmentDate = new Date(now);
-    appointmentDate.setDate(appointmentDate.getDate() + 1);
-  } else {
-    // Handle day names (Monday, Tuesday, etc.)
-    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const targetDay = daysOfWeek.indexOf(dateLower);
-    if (targetDay !== -1) {
-      const currentDay = now.getDay();
-      let daysUntilTarget = targetDay - currentDay;
-      if (daysUntilTarget <= 0) daysUntilTarget += 7; // Next occurrence
-      appointmentDate = new Date(now);
-      appointmentDate.setDate(appointmentDate.getDate() + daysUntilTarget);
-    }
-  }
-
-  // Parse time string (format: "5:00 PM", "2:30 AM", etc.)
-  const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (timeMatch) {
-    let hours = parseInt(timeMatch[1]);
-    const minutes = parseInt(timeMatch[2]);
-    const period = timeMatch[3].toUpperCase();
-
-    // Convert to 24-hour format
-    if (period === 'PM' && hours !== 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
-
-    appointmentDate.setHours(hours, minutes, 0, 0);
-  } else {
-    // Default to 2:00 PM if parsing fails
-    appointmentDate.setHours(14, 0, 0, 0);
-  }
-
-  // Create end time (1 hour after start)
-  const endDate = new Date(appointmentDate);
-  endDate.setHours(endDate.getHours() + 1);
-
-  return {
-    start: appointmentDate.toISOString(),
-    end: endDate.toISOString()
-  };
-}
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function FlowsPage() {
-  const [activeTab, setActiveTab] = useState<'flows' | 'receptionist'>(() => {
-    if (typeof window !== 'undefined') {
-      const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab === 'receptionist') return 'receptionist';
-    }
-    return 'flows';
-  });
-  const [flows, setFlows] = useState<ConversationFlow[]>([]);
-  const [selectedFlow, setSelectedFlow] = useState<ConversationFlow | null>(null);
-  const [showNewFlowDialog, setShowNewFlowDialog] = useState(false);
-  const [newFlowName, setNewFlowName] = useState("");
-  const [flowContext, setFlowContext] = useState({
-    whoYouAre: "",
-    whatOffering: "",
-    whoTexting: "",
-    clientGoals: "",
-    agentName: "",
-    companyName: "",
-    contactReason: "",
-    callbackNumber: "",
-    website: "",
-  });
-  const [requiredQuestions, setRequiredQuestions] = useState<RequiredQuestion[]>([]);
-  const [requiresCall, setRequiresCall] = useState(false);
-  const [autonomyMode, setAutonomyMode] = useState<'full_auto' | 'suggest' | 'manual'>('full_auto');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-  const [showStepDialog, setShowStepDialog] = useState(false);
-  const [stepPurpose, setStepPurpose] = useState("");
-  const [insertAfterIndex, setInsertAfterIndex] = useState<number>(-1);
-  const [showTestFlow, setShowTestFlow] = useState(false);
-  const [testMessages, setTestMessages] = useState<Array<{role: 'agent' | 'user' | 'system', text: string, timestamp?: string}>>([]);
-  const [testInput, setTestInput] = useState("");
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isTestingAI, setIsTestingAI] = useState(false);
-  const [simulatedTime, setSimulatedTime] = useState(new Date());
-  const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
-  const [pendingDrips, setPendingDrips] = useState<Array<{message: string, scheduledFor: Date}>>([]);
-  const [collectedInfo, setCollectedInfo] = useState<Record<string, string>>({});
-  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
-  const [showManualStepDialog, setShowManualStepDialog] = useState(false);
-  const [manualStep, setManualStep] = useState<FlowStep>({
-    id: '',
-    yourMessage: '',
-    responses: [],
-    dripSequence: []
-  });
-  const [showManualFlowDialog, setShowManualFlowDialog] = useState(false);
-  const [manualFlowName, setManualFlowName] = useState("");
-  const [manualFlowMessage, setManualFlowMessage] = useState("");
-  const [manualFlowSteps, setManualFlowSteps] = useState<string[]>([]);
-  const [editingStepIndex, setEditingStepIndex] = useState<number>(-1);
-  const [flowStats, setFlowStats] = useState<any>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showTemplatesDialog, setShowTemplatesDialog] = useState(false);
-  const [flowToDelete, setFlowToDelete] = useState<ConversationFlow | null>(null);
-  const [editingFlowName, setEditingFlowName] = useState(false);
-  const [tempFlowName, setTempFlowName] = useState("");
-  const [enableCalendarAppointments, setEnableCalendarAppointments] = useState(true);
-  const [createdAppointments, setCreatedAppointments] = useState<Array<{title: string, date: string, time: string, eventId?: string, htmlLink?: string}>>([]);
-  const [modal, setModal] = useState<{
-    isOpen: boolean;
-    type: 'success' | 'error' | 'warning' | 'info' | 'confirm';
-    title: string;
-    message: string;
-  }>({
-    isOpen: false,
-    type: 'info',
-    title: '',
-    message: ''
-  });
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [tab, setTab] = useState<Tab>("flows");
+  const [flows, setFlows] = useState<Flow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Flow | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  // AI Model Settings
-  const [showAISettings, setShowAISettings] = useState(false);
-  const [aiSettings, setAiSettings] = useState<UserAISettings>(DEFAULT_USER_AI_SETTINGS);
-  const [savingAISettings, setSavingAISettings] = useState(false);
-  const [loadingAISettings, setLoadingAISettings] = useState(true);
+  // Create-flow form
+  const [createName, setCreateName] = useState("");
+  const [createContext, setCreateContext] = useState<FlowContext>({ ...BLANK_CONTEXT });
+  const [createQuestions, setCreateQuestions] = useState<RequiredQuestion[]>([]);
+  const [createAutonomy, setCreateAutonomy] = useState<"full_auto" | "suggest" | "manual">("full_auto");
+  const [createRequiresCall, setCreateRequiresCall] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [newQ, setNewQ] = useState({ question: "", fieldName: "" });
 
-  // Load flows
+  // Edit-flow state (mirrors selected flow, dirty-tracked)
+  const [editName, setEditName] = useState("");
+  const [editContext, setEditContext] = useState<FlowContext>({ ...BLANK_CONTEXT });
+  const [editQuestions, setEditQuestions] = useState<RequiredQuestion[]>([]);
+  const [editAutonomy, setEditAutonomy] = useState<"full_auto" | "suggest" | "manual">("full_auto");
+  const [editRequiresCall, setEditRequiresCall] = useState(false);
+  const [editQ, setEditQ] = useState({ question: "", fieldName: "" });
+  const [saving, setSaving] = useState(false);
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  // ── Load flows ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    loadFlows().then(setFlows).catch(e => {
-      console.error("Error loading flows:", e);
-      setFlows([]);
-    });
+    fetchFlows();
   }, []);
 
-  // Load AI settings
-  useEffect(() => {
-    async function loadAISettings() {
-      try {
-        const response = await fetch('/api/ai-settings');
-        const data = await response.json();
-        if (data.ok && data.settings) {
-          setAiSettings(data.settings);
-        }
-      } catch (error) {
-        console.error('Error loading AI settings:', error);
-      } finally {
-        setLoadingAISettings(false);
-      }
-    }
-    loadAISettings();
-  }, []);
-
-  // Automatically enable calendar appointments when flow requires a call
-  useEffect(() => {
-    if (requiresCall) {
-      setEnableCalendarAppointments(true);
-    }
-  }, [requiresCall]);
-
-  // Load flow stats when a flow is selected
-  useEffect(() => {
-    const loadFlowStats = async () => {
-      if (!selectedFlow?.id) {
-        setFlowStats(null);
-        return;
-      }
-
-      // Debug log for calendar issues
-      console.log('📋 Selected flow details:', {
-        id: selectedFlow.id,
-        name: selectedFlow.name,
-        requiresCall: selectedFlow.requiresCall,
-        requiredQuestions: selectedFlow.requiredQuestions?.length || 0
-      });
-
-      setLoadingStats(true);
-      try {
-        const response = await fetch(`/api/analytics/automation?days=30`);
-        const data = await response.json();
-
-        if (data.ok && data.flowPerformance) {
-          const currentFlowStats = data.flowPerformance.find(
-            (f: any) => f.flow_id === selectedFlow.id
-          );
-          setFlowStats(currentFlowStats || null);
-        }
-      } catch (error) {
-        console.error('Error loading flow stats:', error);
-        setFlowStats(null);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
-    loadFlowStats();
-  }, [selectedFlow?.id]);
-
-  // Save AI settings
-  async function saveAISettings() {
-    setSavingAISettings(true);
+  async function fetchFlows() {
+    setLoading(true);
     try {
-      const response = await fetch('/api/ai-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: aiSettings })
-      });
-      const data = await response.json();
+      const res = await fetch("/api/flows");
+      const data = await res.json();
       if (data.ok) {
-        setModal({
-          isOpen: true,
-          type: 'success',
-          title: 'Settings Saved',
-          message: 'AI model settings have been saved successfully.'
-        });
-      } else {
-        throw new Error(data.error);
+        const mapped = (data.items || []).map(mapFlow);
+        setFlows(mapped);
       }
-    } catch (error) {
-      console.error('Error saving AI settings:', error);
-      setModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Save Failed',
-        message: 'Failed to save AI settings. Please try again.'
-      });
+    } catch {
+      toast.error("Failed to load flows");
     } finally {
-      setSavingAISettings(false);
+      setLoading(false);
     }
   }
 
-  async function updateFlowAutonomyMode(flowId: string, mode: 'full_auto' | 'suggest' | 'manual') {
-    // Merge new autonomy mode into existing context
-    const flow = flows.find(f => f.id === flowId);
-    const updatedContext = { ...(flow?.context || {}), autonomyMode: mode };
-
-    await fetch('/api/flows', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: flowId, context: updatedContext })
-    });
-
-    // Update local state
-    setFlows(prev => prev.map(f => f.id === flowId ? { ...f, autonomyMode: mode, context: updatedContext } : f));
-    setSelectedFlow(prev => prev?.id === flowId ? { ...prev, autonomyMode: mode, context: updatedContext } : prev);
+  function mapFlow(raw: any): Flow {
+    return {
+      id: raw.id,
+      name: raw.name,
+      steps: raw.steps || [],
+      requiredQuestions: raw.requiredQuestions || raw.required_questions || [],
+      requiresCall: raw.requiresCall || raw.requires_call || false,
+      autonomyMode: raw.autonomyMode || raw.context?.autonomyMode || "full_auto",
+      context: raw.context || {},
+      createdAt: raw.createdAt || raw.created_at,
+      updatedAt: raw.updatedAt || raw.updated_at,
+    };
   }
 
-  function assignStepColors(steps: FlowStep[]): FlowStep[] {
-    // Color progression: Blue -> Purple -> Orange -> Green (last step)
-    const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange
-    const greenColor = '#10B981'; // Green for last step
-
-    return steps.map((step, index) => {
-      const isLastStep = index === steps.length - 1;
-      const color = isLastStep ? greenColor : colors[index % colors.length];
-
-      return {
-        ...step,
-        tag: {
-          label: step.id || `Step ${index + 1}`,
-          color: color
-        }
-      };
-    });
+  // ── Select flow ─────────────────────────────────────────────────────────────
+  function selectFlow(flow: Flow) {
+    setSelected(flow);
+    setCreating(false);
+    setStepsOpen(false);
+    setDirty(false);
+    setEditName(flow.name);
+    setEditContext({ ...BLANK_CONTEXT, ...flow.context });
+    setEditQuestions(flow.requiredQuestions || []);
+    setEditAutonomy(flow.autonomyMode || "full_auto");
+    setEditRequiresCall(flow.requiresCall || false);
+    setEditQ({ question: "", fieldName: "" });
   }
 
-  async function createNewFlow() {
-    if (!newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting) {
-      setModal({
-        isOpen: true,
-        type: 'warning',
-        title: 'Missing Information',
-        message: 'Please fill in all required fields'
-      });
-      return;
-    }
-
-    setIsGenerating(true);
-
+  // ── Save edits ──────────────────────────────────────────────────────────────
+  async function handleSave() {
+    if (!selected || !editName.trim()) return;
+    setSaving(true);
     try {
-      // Filter out empty required questions and ensure field names are generated
-      const validRequiredQuestions = requiredQuestions
-        .filter(q => q.question.trim())
-        .map(q => ({
-          question: q.question,
-          fieldName: q.fieldName || generateFieldName(q.question)
-        }));
+      const res = await fetch("/api/flows", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selected.id,
+          name: editName.trim(),
+          context: { ...editContext, autonomyMode: editAutonomy },
+          requiredQuestions: editQuestions,
+          requiresCall: editRequiresCall,
+          autonomyMode: editAutonomy,
+          steps: selected.steps,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      toast.success("Flow saved");
+      await fetchFlows();
+      const updated = { ...selected, name: editName.trim(), context: { ...editContext, autonomyMode: editAutonomy }, requiredQuestions: editQuestions, requiresCall: editRequiresCall, autonomyMode: editAutonomy };
+      setSelected(updated);
+      setDirty(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
 
-      const response = await fetch("/api/generate-flow", {
+  // ── Delete flow ─────────────────────────────────────────────────────────────
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this flow? This cannot be undone.")) return;
+    try {
+      await fetch(`/api/flows?id=${id}`, { method: "DELETE" });
+      toast.success("Flow deleted");
+      setSelected(null);
+      setCreating(false);
+      await fetchFlows();
+    } catch {
+      toast.error("Failed to delete flow");
+    }
+  }
+
+  // ── Generate flow ───────────────────────────────────────────────────────────
+  async function handleGenerate() {
+    if (!createName.trim()) { toast.error("Flow name is required"); return; }
+    if (!createContext.whoYouAre?.trim()) { toast.error("Tell us who you are"); return; }
+    if (!createContext.whatOffering?.trim()) { toast.error("Tell us what you're offering"); return; }
+    if (!createContext.whoTexting?.trim()) { toast.error("Tell us who you're texting"); return; }
+
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/generate-flow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          flowName: newFlowName.trim(),
-          context: { ...flowContext, autonomyMode },
-          requiredQuestions: validRequiredQuestions,
-          requiresCall: requiresCall
-        })
+          flowName: createName.trim(),
+          context: createContext,
+          requiredQuestions: createQuestions,
+          requiresCall: createRequiresCall,
+          autonomyMode: createAutonomy,
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to generate flow: HTTP ${response.status}`);
-      }
-      const data = await response.json();
-
-      if (data.steps && data.flowId) {
-        // Assign automatic colors to steps (last step = green)
-        const stepsWithColors = assignStepColors(data.steps);
-
-        const newFlow: ConversationFlow = {
-          id: data.flowId, // Use the database-generated ID from the API
-          name: newFlowName.trim(),
-          steps: stepsWithColors,
-          requiredQuestions: validRequiredQuestions,
-          requiresCall: requiresCall,
-          autonomyMode: autonomyMode,
-          context: { ...flowContext, autonomyMode },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          isAIGenerated: true
-        };
-
-        // Don't call saveFlows - the flow is already saved by the API
-        // Just update local state
-        const updated = [...flows, newFlow];
-        setFlows(updated);
-        setSelectedFlow(newFlow);
-        setNewFlowName("");
-        setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
-        setRequiredQuestions([]);
-        setRequiresCall(false);
-        setAutonomyMode('full_auto');
-        setShowNewFlowDialog(false);
-      } else {
-        setModal({
-          isOpen: true,
-          type: 'error',
-          title: 'Generation Failed',
-          message: 'Failed to generate flow. Please try again.'
-        });
-      }
-    } catch (error) {
-      console.error("Error generating flow:", error);
-      setModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Error',
-        message: 'Error generating flow. Please try again.'
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  function deleteFlow(flowId: string) {
-    // Find the flow to check if it's AI-generated
-    const flow = flows.find(f => f.id === flowId);
-    if (flow) {
-      setFlowToDelete(flow);
-      setShowDeleteConfirm(true);
-    }
-  }
-
-  async function confirmDeleteFlow() {
-    if (!flowToDelete) return;
-
-    // Delete from server first
-    const success = await deleteFlowFromServer(flowToDelete.id);
-
-    if (success) {
-      // Only update local state if server deletion succeeded
-      const updated = flows.filter(f => f.id !== flowToDelete.id);
-      setFlows(updated);
-      if (selectedFlow?.id === flowToDelete.id) {
-        setSelectedFlow(null);
-      }
-      setShowDeleteConfirm(false);
-      setFlowToDelete(null);
-    } else {
-      setModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Delete Failed',
-        message: 'Failed to delete flow. Please try again.'
-      });
-    }
-  }
-
-  function cancelDeleteFlow() {
-    setShowDeleteConfirm(false);
-    setFlowToDelete(null);
-  }
-
-  function updateStep(stepId: string, updates: Partial<FlowStep>) {
-    if (!selectedFlow) return;
-
-    const updatedSteps = selectedFlow.steps.map(step =>
-      step.id === stepId ? { ...step, ...updates } : step
-    );
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: updatedSteps,
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows, selectedFlow.id);
-  }
-
-  function updateResponse(stepId: string, responseIndex: number, updates: Partial<ResponseOption>) {
-    if (!selectedFlow) return;
-
-    const updatedSteps = selectedFlow.steps.map(step => {
-      if (step.id === stepId) {
-        const updatedResponses = [...step.responses];
-        updatedResponses[responseIndex] = { ...updatedResponses[responseIndex], ...updates };
-        return { ...step, responses: updatedResponses };
-      }
-      return step;
-    });
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: updatedSteps,
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows, selectedFlow.id);
-  }
-
-  function addStep() {
-    if (!selectedFlow) return;
-
-    const stepNumber = selectedFlow.steps.length + 1;
-    const newStep: FlowStep = {
-      id: "step-" + Date.now(),
-      yourMessage: "Your next message here...",
-      responses: [
-        { label: "Response 1", followUpMessage: "Your reply to Response 1..." },
-        { label: "Response 2", followUpMessage: "Your reply to Response 2..." },
-        { label: "Response 3", followUpMessage: "Your reply to Response 3..." },
-        { label: "Response 4", followUpMessage: "Your reply to Response 4..." }
-      ],
-      tag: {
-        label: `Step ${stepNumber}`,
-        color: "#3B82F6" // Blue default
-      }
-    };
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: [...selectedFlow.steps, newStep],
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows, selectedFlow.id);
-  }
-
-  function insertStepAfter(afterIndex: number) {
-    setInsertAfterIndex(afterIndex);
-
-    // Check if this is a manual flow (not AI generated)
-    if (selectedFlow && selectedFlow.isAIGenerated === false) {
-      // Show manual step dialog for manual flows
-      setManualStep({
-        id: `step-${Date.now()}`,
-        yourMessage: '',
-        responses: [],
-        dripSequence: []
-      });
-      setEditingStepIndex(-1);
-      setShowManualStepDialog(true);
-    } else {
-      // Show AI step dialog for AI-generated flows
-      setShowStepDialog(true);
-    }
-  }
-
-  function renumberSteps(steps: FlowStep[]): FlowStep[] {
-    return steps.map((step, index) => {
-      // Determine color based on position
-      const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange
-      const greenColor = '#10B981'; // Green for last step
-      const isLastStep = index === steps.length - 1;
-      const color = isLastStep ? greenColor : colors[index % colors.length];
-      const newStepId = `step-${index + 1}`;
-
-      return {
-        ...step,
-        id: newStepId,
-        tag: {
-          label: newStepId,
-          color: color
-        }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+      toast.success(`Flow created! ${data.pointsUsed} pts used`);
+      await fetchFlows();
+      // Select the new flow
+      const newFlow: Flow = {
+        id: data.flowId,
+        name: createName.trim(),
+        steps: data.steps || [],
+        requiredQuestions: createQuestions,
+        requiresCall: createRequiresCall,
+        autonomyMode: createAutonomy,
+        context: { ...createContext, autonomyMode: createAutonomy },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
-    });
+      resetCreate();
+      selectFlow(newFlow);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate flow");
+    } finally {
+      setGenerating(false);
+    }
   }
 
-  async function generateAndInsertStep() {
-    if (!selectedFlow || !stepPurpose.trim()) {
-      setModal({
-        isOpen: true,
-        type: 'warning',
-        title: 'Missing Information',
-        message: 'Please describe what this step is for'
-      });
-      return;
-    }
-
-    setIsGenerating(true);
-
+  // ── Create blank flow ───────────────────────────────────────────────────────
+  async function handleCreateBlank() {
+    if (!createName.trim()) { toast.error("Flow name is required"); return; }
+    setGenerating(true);
     try {
-      const previousStep = insertAfterIndex >= 0 ? selectedFlow.steps[insertAfterIndex] : null;
-      const nextStep = insertAfterIndex < selectedFlow.steps.length - 1 ? selectedFlow.steps[insertAfterIndex + 1] : null;
-
-      // Use flow context from the selected flow's existing steps if flowContext is empty
-      const contextToSend = (flowContext.whoYouAre || flowContext.whatOffering || flowContext.whoTexting || flowContext.clientGoals)
-        ? flowContext
-        : {
-            whoYouAre: '',
-            whatOffering: '',
-            whoTexting: '',
-            clientGoals: '',
-            flowName: selectedFlow.name,
-            existingSteps: selectedFlow.steps.map((s: any) => s.yourMessage || '').filter(Boolean),
-          };
-
-      const response = await fetch("/api/generate-step", {
+      const res = await fetch("/api/flows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          stepPurpose: stepPurpose.trim(),
-          flowContext: contextToSend,
-          previousStep,
-          nextStep
-        })
+          name: createName.trim(),
+          context: { ...createContext, autonomyMode: createAutonomy },
+          requiredQuestions: createQuestions,
+          requiresCall: createRequiresCall,
+          steps: [],
+          autonomyMode: createAutonomy,
+        }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to generate step: HTTP ${response.status}`);
-      }
-      const data = await response.json();
-
-      if (data.yourMessage) {
-        const newStep: FlowStep = {
-          id: "step-" + Date.now(),
-          yourMessage: data.yourMessage,
-          responses: data.responses || [],
-          tag: {
-            label: `step-${insertAfterIndex + 2}`,
-            color: "#3B82F6"
-          }
-        };
-
-        const newSteps = [...selectedFlow.steps];
-        newSteps.splice(insertAfterIndex + 1, 0, newStep);
-
-        // Renumber all steps with correct colors
-        const renumberedSteps = renumberSteps(newSteps);
-
-        const updatedFlow = {
-          ...selectedFlow,
-          steps: renumberedSteps,
-          updatedAt: new Date().toISOString()
-        };
-
-        setSelectedFlow(updatedFlow);
-
-        const updatedFlows = flows.map(f =>
-          f.id === selectedFlow.id ? updatedFlow : f
-        );
-        setFlows(updatedFlows);
-        saveFlows(updatedFlows, selectedFlow.id);
-
-        setStepPurpose("");
-        setShowStepDialog(false);
-        setInsertAfterIndex(-1);
-      } else {
-        setModal({
-          isOpen: true,
-          type: 'error',
-          title: 'Generation Failed',
-          message: data.error || 'Failed to generate step. Please try again.'
-        });
-      }
-    } catch (error) {
-      console.error("Error generating step:", error);
-      setModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Error',
-        message: 'Error generating step. Please try again.'
-      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      toast.success("Flow created");
+      await fetchFlows();
+      resetCreate();
+      // re-fetch and select
+      const res2 = await fetch("/api/flows");
+      const d2 = await res2.json();
+      const all = (d2.items || []).map(mapFlow);
+      const found = all.find((f: Flow) => f.id === data.data?.id);
+      if (found) selectFlow(found);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create flow");
     } finally {
-      setIsGenerating(false);
+      setGenerating(false);
     }
   }
 
-  function saveManualStep() {
-    if (!selectedFlow || !manualStep.yourMessage.trim()) {
-      setModal({
-        isOpen: true,
-        type: 'warning',
-        title: 'Missing Information',
-        message: 'Please enter a message for this step'
-      });
-      return;
-    }
-
-    let updatedSteps: FlowStep[];
-
-    if (editingStepIndex >= 0) {
-      // Editing existing step
-      updatedSteps = [...selectedFlow.steps];
-      updatedSteps[editingStepIndex] = manualStep;
-    } else if (insertAfterIndex >= 0) {
-      // Inserting step after a specific position
-      updatedSteps = [...selectedFlow.steps];
-      updatedSteps.splice(insertAfterIndex + 1, 0, manualStep);
-    } else {
-      // Adding new step at end
-      updatedSteps = [...selectedFlow.steps, manualStep];
-    }
-
-    const coloredSteps = assignStepColors(updatedSteps);
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: coloredSteps,
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows, selectedFlow.id);
-
-    setShowManualStepDialog(false);
-    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
-    setEditingStepIndex(-1);
-    setInsertAfterIndex(-1);
+  function resetCreate() {
+    setCreating(false);
+    setCreateName("");
+    setCreateContext({ ...BLANK_CONTEXT });
+    setCreateQuestions([]);
+    setCreateAutonomy("full_auto");
+    setCreateRequiresCall(false);
+    setNewQ({ question: "", fieldName: "" });
   }
 
-  function deleteStep(stepId: string) {
-    if (!selectedFlow) return;
-    if (selectedFlow.steps.length <= 1) {
-      setModal({
-        isOpen: true,
-        type: 'warning',
-        title: 'Cannot Delete',
-        message: 'Flow must have at least one step'
-      });
-      return;
-    }
+  function markDirty() { setDirty(true); }
 
-    const filteredSteps = selectedFlow.steps.filter(s => s.id !== stepId);
-    const renumberedSteps = renumberSteps(filteredSteps);
-
-    const updatedFlow = {
-      ...selectedFlow,
-      steps: renumberedSteps,
-      updatedAt: new Date().toISOString()
-    };
-
-    setSelectedFlow(updatedFlow);
-
-    const updatedFlows = flows.map(f =>
-      f.id === selectedFlow.id ? updatedFlow : f
-    );
-    setFlows(updatedFlows);
-    saveFlows(updatedFlows, selectedFlow.id);
+  // ── Add/remove questions helpers ────────────────────────────────────────────
+  function addEditQ() {
+    if (!editQ.question.trim() || !editQ.fieldName.trim()) { toast.error("Fill in both fields"); return; }
+    setEditQuestions(prev => [...prev, { question: editQ.question.trim(), fieldName: editQ.fieldName.trim().replace(/\s+/g, "_").toLowerCase() }]);
+    setEditQ({ question: "", fieldName: "" });
+    markDirty();
   }
 
-  function toggleStepExpansion(stepId: string) {
-    setExpandedSteps(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(stepId)) {
-        newSet.delete(stepId);
-      } else {
-        newSet.add(stepId);
-      }
-      return newSet;
-    });
+  function addCreateQ() {
+    if (!newQ.question.trim() || !newQ.fieldName.trim()) { toast.error("Fill in both fields"); return; }
+    setCreateQuestions(prev => [...prev, { question: newQ.question.trim(), fieldName: newQ.fieldName.trim().replace(/\s+/g, "_").toLowerCase() }]);
+    setNewQ({ question: "", fieldName: "" });
   }
 
-  // Helper function to check if a time is within business hours (9 AM - 6 PM)
-  function isBusinessHours(date: Date): boolean {
-    const hours = date.getHours();
-    const day = date.getDay(); // 0 = Sunday, 6 = Saturday
-
-    // Not on weekends
-    if (day === 0 || day === 6) return false;
-
-    // Between 9 AM and 6 PM
-    return hours >= 9 && hours < 18;
-  }
-
-  // Helper function to get next business hour time
-  function getNextBusinessHour(from: Date): Date {
-    const next = new Date(from);
-
-    // If already in business hours, return as is
-    if (isBusinessHours(next)) return next;
-
-    // If before 9 AM, set to 9 AM same day
-    if (next.getHours() < 9) {
-      next.setHours(9, 0, 0, 0);
-      if (isBusinessHours(next)) return next;
-    }
-
-    // If after 6 PM or weekend, move to next business day at 9 AM
-    do {
-      next.setDate(next.getDate() + 1);
-      next.setHours(9, 0, 0, 0);
-    } while (!isBusinessHours(next));
-
-    return next;
-  }
-
-  // Format timestamp for display
-  function formatTimestamp(date: Date): string {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  }
-
-  function startTestFlow() {
-    if (!selectedFlow || !selectedFlow.steps || selectedFlow.steps.length === 0) {
-      setModal({
-        isOpen: true,
-        type: 'warning',
-        title: 'Cannot Test',
-        message: 'No steps in flow to test'
-      });
-      return;
-    }
-
-    const now = new Date();
-    setShowTestFlow(true);
-    setCurrentStepIndex(0);
-    setSimulatedTime(now);
-    setLastMessageTime(now);
-
-    // Initialize drip sequence for first step
-    const firstStep = selectedFlow.steps[0];
-    const initialDrips: Array<{message: string, scheduledFor: Date}> = [];
-
-    if (firstStep.dripSequence && firstStep.dripSequence.length > 0) {
-      firstStep.dripSequence.forEach(drip => {
-        const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
-        const businessHourTime = getNextBusinessHour(scheduledTime);
-        initialDrips.push({
-          message: drip.message,
-          scheduledFor: businessHourTime
-        });
-      });
-    }
-
-    setPendingDrips(initialDrips);
-    setTestMessages([
-      { role: 'agent', text: firstStep.yourMessage, timestamp: formatTimestamp(now) }
-    ]);
-    setTestInput("");
-  }
-
-  function resetTestFlow() {
-    setShowTestFlow(false);
-    setTestMessages([]);
-    setCurrentStepIndex(0);
-    setTestInput("");
-    setSimulatedTime(new Date());
-    setLastMessageTime(null);
-    setPendingDrips([]);
-    setCollectedInfo({});
-  }
-
-  // Advance simulated time and trigger any pending drips
-  function advanceTime(hours: number) {
-    const newTime = new Date(simulatedTime.getTime() + hours * 60 * 60 * 1000);
-    setSimulatedTime(newTime);
-
-    // Check if any drips should be sent
-    const dripsToSend = pendingDrips.filter(drip => drip.scheduledFor <= newTime);
-    const remainingDrips = pendingDrips.filter(drip => drip.scheduledFor > newTime);
-
-    if (dripsToSend.length > 0) {
-      const newMessages = dripsToSend.map(drip => ({
-        role: 'agent' as const,
-        text: drip.message,
-        timestamp: formatTimestamp(drip.scheduledFor)
-      }));
-
-      setTestMessages(prev => [...prev, ...newMessages]);
-      setLastMessageTime(newTime);
-    }
-
-    setPendingDrips(remainingDrips);
-  }
-
-  async function sendTestMessage() {
-    if (!testInput.trim() || !selectedFlow) return;
-
-    const userMessage = testInput.trim();
-    const now = simulatedTime;
-
-    // User responded, so clear any pending drip messages
-    setPendingDrips([]);
-
-    setTestMessages(prev => [...prev, { role: 'user', text: userMessage, timestamp: formatTimestamp(now) }]);
-    setTestInput("");
-    setIsTestingAI(true);
-    setLastMessageTime(now);
-
-    try {
-      // Get current step
-      const currentStep = selectedFlow.steps[currentStepIndex];
-
-      // Get conversation history for context
-      const conversationHistory = testMessages.map(m =>
-        `${m.role === 'agent' ? 'Agent' : (m.role === 'user' ? 'User' : 'System')}: ${m.text}`
-      ).join('\n');
-
-      // Send to AI flow handler with calendar integration
-      const payload = {
-        userMessage,
-        currentStep,
-        allSteps: selectedFlow.steps,
-        conversationHistory,
-        collectedInfo,
-        requiredQuestions: selectedFlow.requiredQuestions || [],
-        requiresCall: selectedFlow.requiresCall || false,
-        availableSlots: availableSlots
-      };
-
-      console.log('📤 SENDING TO AI FLOW API:', {
-        currentStep: payload.currentStep?.id,
-        requiresCall: payload.requiresCall,
-        collectedInfo: payload.collectedInfo,
-        userMessage: payload.userMessage
-      });
-
-      const response = await fetch("/api/test-flow-response", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        setTestMessages(prev => [...prev, { role: 'agent', text: `Error: Server returned ${response.status}. Please try again.`, timestamp: formatTimestamp(now) }]);
-        setIsTestingAI(false);
-        return;
-      }
-      const data = await response.json();
-
-      if (data.agentResponse) {
-        setTestMessages(prev => [...prev, { role: 'agent', text: data.agentResponse, timestamp: formatTimestamp(now) }]);
-
-        // Update collected info if AI extracted new information
-        if (data.extractedInfo && Object.keys(data.extractedInfo).length > 0) {
-          setCollectedInfo(prev => ({ ...prev, ...data.extractedInfo }));
-        }
-
-        // Store available slots if returned
-        if (data.availableSlots && data.availableSlots.length > 0) {
-          setAvailableSlots(data.availableSlots);
-        }
-
-        // Show appointment confirmation if booked
-        if (data.appointmentBooked && data.appointmentInfo) {
-          setTestMessages(prev => [...prev, {
-            role: 'system',
-            text: `✅ Appointment booked for ${data.appointmentInfo.time}`,
-            timestamp: formatTimestamp(now)
-          }]);
-        }
-
-        // Create real calendar appointment if enabled and AI mentions booking/scheduling
-        if (enableCalendarAppointments && data.agentResponse) {
-          const appointmentKeywords = ['booked', 'scheduled', 'appointment set', 'meeting confirmed', 'calendar invite'];
-          const hasAppointment = appointmentKeywords.some(keyword =>
-            data.agentResponse.toLowerCase().includes(keyword)
-          );
-
-          if (hasAppointment) {
-            // Extract date and time from AI response
-            let extractedDate = 'Tomorrow';
-            let extractedTime = '2:00 PM';
-
-            const response = data.agentResponse.toLowerCase();
-
-            // Try to extract date
-            if (response.includes('today')) {
-              extractedDate = 'Today';
-            } else if (response.includes('tomorrow')) {
-              extractedDate = 'Tomorrow';
-            } else if (response.includes('monday')) {
-              extractedDate = 'Monday';
-            } else if (response.includes('tuesday')) {
-              extractedDate = 'Tuesday';
-            } else if (response.includes('wednesday')) {
-              extractedDate = 'Wednesday';
-            } else if (response.includes('thursday')) {
-              extractedDate = 'Thursday';
-            } else if (response.includes('friday')) {
-              extractedDate = 'Friday';
-            }
-
-            // Try to extract time (look for patterns like "5 PM", "3:30 PM", "at 5", etc.)
-            const timeMatch = response.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)/);
-            if (timeMatch) {
-              const hour = timeMatch[1];
-              const minutes = timeMatch[2] || '00';
-              const period = timeMatch[3].toUpperCase();
-              extractedTime = `${hour}:${minutes} ${period}`;
-            } else {
-              // Try simpler pattern like "at 5" or "at 3:30"
-              const simpleMatch = response.match(/at\s+(\d{1,2})(?::(\d{2}))?/);
-              if (simpleMatch) {
-                const hour = parseInt(simpleMatch[1]);
-                const minutes = simpleMatch[2] || '00';
-                // Assume PM for business hours (9-6), AM otherwise
-                const period = (hour >= 9 && hour <= 11) || hour <= 6 ? 'PM' : 'AM';
-                extractedTime = `${hour}:${minutes} ${period}`;
-              }
-            }
-
-            // Override with extracted info if available
-            if (data.extractedInfo?.date) extractedDate = data.extractedInfo.date;
-            if (data.extractedInfo?.time) extractedTime = data.extractedInfo.time;
-
-            // Convert to ISO datetime format for Google Calendar API
-            const appointmentDateTime = parseAppointmentDateTime(extractedDate, extractedTime);
-
-            // Build description from collected info
-            let description = `Flow: ${selectedFlow.name}\n\nCollected Information:\n`;
-            Object.entries(collectedInfo).forEach(([key, value]) => {
-              description += `${key}: ${value}\n`;
-            });
-            description += `\nConversation History:\n`;
-            testMessages.forEach((msg) => {
-              description += `${msg.role === 'user' ? 'User' : (msg.role === 'agent' ? 'Agent' : 'System')}: ${msg.text}\n`;
-            });
-
-            // Create the appointment via API
-            try {
-              const createResponse = await fetch('/api/calendar/create-event', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  summary: selectedFlow.name,
-                  description: description,
-                  start: appointmentDateTime.start,
-                  end: appointmentDateTime.end,
-                  attendeeEmail: collectedInfo.email || undefined,
-                  attendeeName: collectedInfo.name || 'Test Lead',
-                  leadId: null // Test mode, no real lead
-                })
-              });
-
-              const createData = await createResponse.json();
-
-              if (createData.success) {
-                const newAppointment = {
-                  title: selectedFlow.name,
-                  date: extractedDate,
-                  time: extractedTime,
-                  eventId: createData.eventId,
-                  htmlLink: createData.htmlLink
-                };
-
-                setCreatedAppointments(prev => [...prev, newAppointment]);
-
-                // Add a system message showing the appointment was created
-                setTestMessages(prev => [...prev, {
-                  role: 'system',
-                  text: `📅 Calendar Appointment Created!\n\nTitle: ${newAppointment.title}\nDate: ${newAppointment.date}\nTime: ${newAppointment.time}\n\nView in Google Calendar: ${createData.htmlLink || 'Check your calendar'}`,
-                  timestamp: formatTimestamp(now)
-                }]);
-              } else {
-                console.error('Failed to create calendar event:', createData.error);
-                setTestMessages(prev => [...prev, {
-                  role: 'system',
-                  text: `⚠️ Failed to create calendar appointment: ${createData.error || 'Unknown error'}`,
-                  timestamp: formatTimestamp(now)
-                }]);
-              }
-            } catch (error: any) {
-              console.error('Error creating calendar event:', error);
-              setTestMessages(prev => [...prev, {
-                role: 'system',
-                text: `⚠️ Error creating calendar appointment. Make sure Google Calendar is connected.`,
-                timestamp: formatTimestamp(now)
-              }]);
-            }
-          }
-        }
-
-        // ALWAYS set up drips if AI provided them (for both custom and preset responses)
-        if (data.customDrips && data.customDrips.length > 0) {
-          const newDrips: Array<{message: string, scheduledFor: Date}> = [];
-
-          data.customDrips.forEach((drip: any) => {
-            const scheduledTime = new Date(now.getTime() + drip.delayHours * 60 * 60 * 1000);
-            const businessHourTime = getNextBusinessHour(scheduledTime);
-            newDrips.push({
-              message: drip.message,
-              scheduledFor: businessHourTime
-            });
-          });
-
-          setPendingDrips(newDrips);
-        }
-
-        // Update current step if AI determined we should move to next step
-        if (data.nextStepIndex !== undefined && data.nextStepIndex !== currentStepIndex) {
-          setCurrentStepIndex(data.nextStepIndex);
-        }
-      } else {
-        setTestMessages(prev => [...prev, { role: 'agent', text: "I'm not sure how to respond to that. Let me try another approach...", timestamp: formatTimestamp(now) }]);
-      }
-    } catch (error) {
-      console.error("Error testing flow:", error);
-      // Provide a natural fallback response instead of showing an error
-      setTestMessages(prev => [...prev, {
-        role: 'agent',
-        text: "I appreciate your interest! Let me get back to you with more information shortly. Is there anything specific you'd like to know in the meantime?",
-        timestamp: formatTimestamp(now)
-      }]);
-    } finally {
-      setIsTestingAI(false);
-    }
-  }
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="card bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-900/20 dark:to-indigo-900/20 border border-sky-200 dark:border-sky-700/50 p-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-sky-400/20">
-            <Bot className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100">Your AI</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Manage your AI flows and receptionist settings</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Bar — underline style */}
-      <div className="border-b border-slate-200 dark:border-slate-700">
-        <div className="flex gap-8">
-          <button
-            onClick={() => setActiveTab('flows')}
-            className={`flex items-center gap-2 px-1 pb-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'flows'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-            }`}
-          >
-            <Bot className="w-4 h-4" />
-            Flows
-            <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'flows' ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>{flows.length}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('receptionist')}
-            className={`flex items-center gap-2 px-1 pb-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === 'receptionist'
-                ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
-            }`}
-          >
-            <Headphones className="w-4 h-4" />
-            Receptionist
-          </button>
-        </div>
-      </div>
-
-      {/* Receptionist Tab */}
-      {activeTab === 'receptionist' && <ReceptionistSettings />}
-
-      {/* Flows Tab */}
-      {activeTab === 'flows' && <>
-      {/* Action Toolbar */}
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAISettings(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            {(aiSettings?.selectedModel || 'v1').toUpperCase()}
-          </button>
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Your AI</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Flows and receptionist settings</p>
         </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="/ai-workflows"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            <Zap className="w-4 h-4" />
-            Templates
-          </a>
-          <button
-            onClick={() => setShowManualFlowDialog(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Manual Flow
-          </button>
-          <button
-            onClick={() => setShowNewFlowDialog(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white shadow-sm transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            + AI Flow
-          </button>
-        </div>
+        <Link
+          href="/demo"
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+        >
+          <FlaskConical className="w-4 h-4" />
+          Test a Flow
+        </Link>
       </div>
 
-      {/* AI Model Settings Modal */}
-      {showAISettings && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={() => setShowAISettings(false)}>
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-sky-50 to-indigo-50 dark:from-sky-900/20 dark:to-indigo-900/20 border-b border-slate-200 dark:border-slate-700 px-6 py-4 sticky top-0 z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-sm">
-                    <Cpu className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI Model Settings</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Choose and configure your AI reply model</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowAISettings(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-6 space-y-6">
-              {/* Model Selection */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100">Select AI Model</label>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Model V1 */}
-                  <button
-                    onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v1' })}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      aiSettings.selectedModel === 'v1'
-                        ? 'border-sky-500 bg-sky-500/10'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-5 h-5 text-sky-600" />
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">Model V1</span>
-                      {aiSettings.selectedModel === 'v1' && (
-                        <span className="ml-auto text-xs bg-sky-500/20 text-sky-600 px-2 py-0.5 rounded">Active</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Original HyveWyre AI - optimized for insurance & real estate conversations</p>
-                  </button>
-
-                  {/* Model V2 */}
-                  <button
-                    onClick={() => setAiSettings({ ...aiSettings, selectedModel: 'v2' })}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      aiSettings.selectedModel === 'v2'
-                        ? 'border-sky-500 bg-sky-500/10'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Settings className="w-5 h-5 text-sky-400" />
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">Model V2</span>
-                      {aiSettings.selectedModel === 'v2' && (
-                        <span className="ml-auto text-xs bg-sky-500/20 text-sky-600 px-2 py-0.5 rounded">Active</span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">Custom AI - build your own prompts from scratch</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* V2 Configuration (only show when V2 is selected) */}
-              {aiSettings.selectedModel === 'v2' && (
-                <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2 text-sky-600">
-                    <Settings className="w-4 h-4" />
-                    <span className="text-sm font-medium">Model V2 Configuration</span>
-                  </div>
-
-                  {/* System Prompt */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-900 dark:text-slate-100">System Prompt</label>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Define how the AI should behave. Leave empty for minimal default.</p>
-                    <textarea
-                      value={aiSettings.v2Config.systemPrompt}
-                      onChange={(e) => setAiSettings({
-                        ...aiSettings,
-                        v2Config: { ...aiSettings.v2Config, systemPrompt: e.target.value }
-                      })}
-                      placeholder="Enter your custom system prompt...
-
-Example:
-You are a helpful sales assistant for [Your Company]. Be friendly and professional. Keep responses short and conversational.
-
-Available variables:
-{{leadName}} - Lead's full name
-{{leadFirstName}} - Lead's first name
-{{leadLocation}} - Lead's state/location
-{{leadStatus}} - Lead's current status
-{{leadTags}} - Lead's tags
-{{flowGuidance}} - Flow step instructions"
-                      className="w-full h-48 px-4 py-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none text-sm font-mono"
-                    />
-                  </div>
-
-                  {/* Advanced Settings */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Advanced Settings</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Temperature */}
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-600 dark:text-slate-400">Temperature: {aiSettings.v2Config.temperature}</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={aiSettings.v2Config.temperature}
-                          onChange={(e) => setAiSettings({
-                            ...aiSettings,
-                            v2Config: { ...aiSettings.v2Config, temperature: parseFloat(e.target.value) }
-                          })}
-                          className="w-full accent-sky-500"
-                        />
-                        <p className="text-xs text-slate-400 dark:text-slate-500">Higher = more creative, Lower = more focused</p>
-                      </div>
-
-                      {/* Max Tokens */}
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-600 dark:text-slate-400">Max Tokens: {aiSettings.v2Config.maxTokens}</label>
-                        <input
-                          type="range"
-                          min="50"
-                          max="300"
-                          step="10"
-                          value={aiSettings.v2Config.maxTokens}
-                          onChange={(e) => setAiSettings({
-                            ...aiSettings,
-                            v2Config: { ...aiSettings.v2Config, maxTokens: parseInt(e.target.value) }
-                          })}
-                          className="w-full accent-sky-500"
-                        />
-                        <p className="text-xs text-slate-400 dark:text-slate-500">Response length limit</p>
-                      </div>
-
-                      {/* Presence Penalty */}
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-600 dark:text-slate-400">Presence Penalty: {aiSettings.v2Config.presencePenalty}</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={aiSettings.v2Config.presencePenalty}
-                          onChange={(e) => setAiSettings({
-                            ...aiSettings,
-                            v2Config: { ...aiSettings.v2Config, presencePenalty: parseFloat(e.target.value) }
-                          })}
-                          className="w-full accent-sky-500"
-                        />
-                        <p className="text-xs text-slate-400 dark:text-slate-500">Encourage new topics</p>
-                      </div>
-
-                      {/* Frequency Penalty */}
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-600 dark:text-slate-400">Frequency Penalty: {aiSettings.v2Config.frequencyPenalty}</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={aiSettings.v2Config.frequencyPenalty}
-                          onChange={(e) => setAiSettings({
-                            ...aiSettings,
-                            v2Config: { ...aiSettings.v2Config, frequencyPenalty: parseFloat(e.target.value) }
-                          })}
-                          className="w-full accent-sky-500"
-                        />
-                        <p className="text-xs text-slate-400 dark:text-slate-500">Reduce repetition</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* V1 Info (only show when V1 is selected) */}
-              {aiSettings.selectedModel === 'v1' && (
-                <div className="p-4 bg-sky-500/10 border border-sky-500/30 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-sky-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-sky-600">Model V1 is Pre-configured</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        This model uses optimized prompts for insurance and real estate conversations.
-                        It's trained to be warm, professional, and never pushy.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end sticky bottom-0">
-              <button
-                onClick={() => setShowAISettings(false)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveAISettings}
-                disabled={savingAISettings}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 transition-colors disabled:opacity-50"
-              >
-                {savingAISettings ? 'Saving...' : 'Save Settings'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      {showDeleteConfirm && flowToDelete && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]" onClick={cancelDeleteFlow}>
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center shadow-sm">
-                  <Trash2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {flowToDelete.isAIGenerated || flowToDelete.is_ai_generated ? 'Delete AI-Generated Flow' : 'Delete Flow'}
-                  </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-6 space-y-4">
-              {(flowToDelete.isAIGenerated || flowToDelete.is_ai_generated) && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
-                  <p className="text-sm font-medium text-red-400">Warning: This is an AI-generated flow</p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">
-                    Deleting it will <span className="font-semibold text-slate-900 dark:text-slate-100">NOT refund your points</span>.
-                    The points used to create this flow are non-refundable.
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <p className="text-sm text-slate-700 dark:text-slate-300">
-                  Are you sure you want to delete <span className="font-semibold text-slate-900 dark:text-slate-100">"{flowToDelete.name}"</span>?
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  All steps and configurations will be permanently removed.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
-              <button
-                onClick={cancelDeleteFlow}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteFlow}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
-              >
-                Delete Flow
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showStepDialog && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999]">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
-            <div className="space-y-4">
-              <div>
-                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Generate New Step with AI</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Describe what this step should accomplish (1 point)
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Step Purpose *</label>
-                <textarea
-                  placeholder="e.g., 'Ask about their budget range', 'Handle price objection', 'Qualify timeline'"
-                  value={stepPurpose}
-                  onChange={e => setStepPurpose(e.target.value)}
-                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                  rows={3}
-                  autoFocus
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Be specific about what this step should ask or accomplish
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={generateAndInsertStep}
-                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isGenerating || !stepPurpose.trim()}
-                >
-                  {isGenerating ? "Generating Step..." : "Generate Step (1 pt)"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowStepDialog(false);
-                    setStepPurpose("");
-                    setInsertAfterIndex(-1);
-                  }}
-                  className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-6 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                  disabled={isGenerating}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showNewFlowDialog && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-sm">
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create New Flow with AI</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                      Tell us about your outreach so AI can generate a customized conversation flow
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowNewFlowDialog(false);
-                    setNewFlowName("");
-                    setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
-                    setRequiredQuestions([]);
-                    setRequiresCall(false);
-                    setAutonomyMode('full_auto');
-                  }}
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
-                  disabled={isGenerating}
-                >
-                  ×
-                </button>
-              </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Flow Name *</label>
-              <input
-                type="text"
-                placeholder="e.g., 'Lead Qualification', 'IUL Sales Outreach', 'Solar Leads'"
-                value={newFlowName}
-                onChange={e => setNewFlowName(e.target.value)}
-                className="input-dark w-full px-4 py-3 rounded-lg"
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Who are you? *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 'Insurance agent', 'Real estate broker'"
-                  value={flowContext.whoYouAre}
-                  onChange={e => setFlowContext({...flowContext, whoYouAre: e.target.value})}
-                  className="input-dark w-full px-4 py-3 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Who are you texting? *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 'Homeowners 40-65', 'Small business owners'"
-                  value={flowContext.whoTexting}
-                  onChange={e => setFlowContext({...flowContext, whoTexting: e.target.value})}
-                  className="input-dark w-full px-4 py-3 rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">What are you offering? *</label>
-              <textarea
-                placeholder="e.g., 'Free IUL policy review with no obligation. We help families protect their future with indexed universal life insurance that builds cash value.'"
-                value={flowContext.whatOffering}
-                onChange={e => setFlowContext({...flowContext, whatOffering: e.target.value})}
-                className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                rows={3}
-              />
-            </div>
-
-            {/* Agent Identity Section */}
-            <div className="p-4 bg-violet-50 dark:bg-violet-900/10 rounded-lg border border-violet-200 dark:border-violet-800 space-y-3">
-              <div>
-                <label className="text-sm font-semibold text-violet-900 dark:text-violet-300 mb-1 block">Agent Identity</label>
-                <p className="text-xs text-violet-600 dark:text-violet-400">Give your flow a name and company so it can introduce itself to leads.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Agent Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Sarah, your insurance specialist"
-                    value={flowContext.agentName}
-                    onChange={e => setFlowContext({...flowContext, agentName: e.target.value})}
-                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Company Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., ABC Insurance Group"
-                    value={flowContext.companyName}
-                    onChange={e => setFlowContext({...flowContext, companyName: e.target.value})}
-                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Why are you reaching out? *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Following up on your request for a health insurance quote"
-                  value={flowContext.contactReason}
-                  onChange={e => setFlowContext({...flowContext, contactReason: e.target.value})}
-                  className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Callback Number (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., (555) 123-4567"
-                    value={flowContext.callbackNumber}
-                    onChange={e => setFlowContext({...flowContext, callbackNumber: e.target.value})}
-                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 block">Website (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., www.abcinsurance.com"
-                    value={flowContext.website}
-                    onChange={e => setFlowContext({...flowContext, website: e.target.value})}
-                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <label className="text-sm font-medium text-slate-900 dark:text-slate-100 block">Required Questions *</label>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Specific information the AI must collect from every client</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRequiredQuestions([...requiredQuestions, { question: '', fieldName: '' }])}
-                  className="text-sky-600 hover:text-sky-700 dark:hover:text-sky-400 text-sm flex items-center gap-1"
-                >
-                  <span className="text-lg leading-none">+</span> Add Question
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {requiredQuestions.map((q, idx) => (
-                  <div key={idx} className="flex gap-2 items-start">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        placeholder="Question (e.g., What's your household income?)"
-                        value={q.question}
-                        onChange={e => {
-                          const updated = [...requiredQuestions];
-                          updated[idx].question = e.target.value;
-                          updated[idx].fieldName = generateFieldName(e.target.value);
-                          setRequiredQuestions(updated);
-                        }}
-                        className="input-dark px-3 py-2 rounded-lg text-sm w-full"
-                      />
-                      {q.fieldName && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 px-1">
-                          Field name: {q.fieldName}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setRequiredQuestions(requiredQuestions.filter((_, i) => i !== idx))}
-                      className="text-red-400 hover:text-red-300 text-xl leading-none px-2 py-1"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {requiredQuestions.length === 0 && (
-                  <div className="text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
-                    No required questions yet. Click "+ Add Question" to add one.
-                  </div>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+        {(["flows", "receptionist"] as Tab[]).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+              tab === t
+                ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            }`}
+          >
+            {t === "flows" ? (
+              <span className="flex items-center gap-1.5">
+                <Bot className="w-4 h-4" />
+                Flows
+                {flows.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    {flows.length}
+                  </span>
                 )}
-              </div>
-            </div>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Headphones className="w-4 h-4" />
+                Receptionist
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
-            <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
-              <input
-                type="checkbox"
-                id="requiresCall"
-                checked={requiresCall}
-                onChange={(e) => setRequiresCall(e.target.checked)}
-                className="w-5 h-5 rounded border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 checked:bg-sky-500 checked:border-sky-500 cursor-pointer"
-              />
-              <label htmlFor="requiresCall" className="text-sm font-medium text-slate-900 dark:text-slate-100 cursor-pointer flex-1">
-                This flow requires a phone call or Zoom meeting with the client
-              </label>
-            </div>
-
-            {/* AI Autonomy Mode */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-600 space-y-3">
-              <div>
-                <label className="text-sm font-semibold text-slate-900 dark:text-slate-100 block">AI Autonomy Mode</label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">How should the AI handle replies from leads in this flow?</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { value: 'full_auto' as const, label: 'Full Auto', desc: 'AI replies automatically', icon: '🤖' },
-                  { value: 'suggest' as const, label: 'Suggest', desc: 'AI drafts, you approve', icon: '✏️' },
-                  { value: 'manual' as const, label: 'Manual', desc: 'You reply yourself', icon: '👤' },
-                ] as const).map(({ value, label, desc, icon }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setAutonomyMode(value)}
-                    className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                      autonomyMode === value
-                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20'
-                        : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
-                    }`}
-                  >
-                    <div className="text-lg mb-1">{icon}</div>
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{label}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Client goals (optional)</label>
-              <textarea
-                placeholder="e.g., 'Protect family income, build retirement savings, leave a legacy, supplement retirement income'"
-                value={flowContext.clientGoals}
-                onChange={e => setFlowContext({...flowContext, clientGoals: e.target.value})}
-                className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                rows={2}
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">What are your clients typically trying to achieve?</p>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={createNewFlow}
-                className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isGenerating || !newFlowName.trim() || !flowContext.whoYouAre || !flowContext.whatOffering || !flowContext.whoTexting || !flowContext.agentName || !flowContext.companyName || !flowContext.contactReason}
-              >
-                {isGenerating ? "Generating Flow..." : "Generate Flow with AI"}
-              </button>
-              <button
-                onClick={() => {
-                  setShowNewFlowDialog(false);
-                  setNewFlowName("");
-                  setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
-                  setRequiredQuestions([]);
-                  setRequiresCall(false);
-                  setAutonomyMode('full_auto');
-                }}
-                className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-6 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                disabled={isGenerating}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-        </div>
+      {/* ── Receptionist tab ── */}
+      {tab === "receptionist" && (
+        <ReceptionistSettings />
       )}
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left: Flow List */}
-        <div className="col-span-12 md:col-span-3">
-          <div className="card p-0 overflow-hidden">
-            <div className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">Your Flows ({flows.length})</div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {flows.length === 0 && (
-                <div className="px-4 py-8 text-sm text-slate-500 dark:text-slate-400 text-center">
-                  No flows yet.<br/>
-                  <span className="text-xs">Click "+ AI Flow" to create one.</span>
-                </div>
-              )}
-              {flows.map(flow => (
-                <div
-                  key={flow.id}
-                  className={`p-3 cursor-pointer transition-colors group ${
-                    selectedFlow?.id === flow.id
-                      ? 'bg-sky-50 dark:bg-sky-900/20 border-l-3 border-l-sky-500'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border-l-3 border-l-transparent'
-                  }`}
-                  onClick={() => setSelectedFlow(flow)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      {editingFlowName && selectedFlow?.id === flow.id ? (
-                        <input
-                          type="text"
-                          value={tempFlowName}
-                          onChange={(e) => setTempFlowName(e.target.value)}
-                          onBlur={() => {
-                            if (tempFlowName.trim()) {
-                              const updatedFlow = { ...flow, name: tempFlowName.trim(), updatedAt: new Date().toISOString() };
-                              const updatedFlows = flows.map(f => f.id === flow.id ? updatedFlow : f);
-                              setFlows(updatedFlows);
-                              saveFlows(updatedFlows, flow.id);
-                              setSelectedFlow(updatedFlow);
-                            }
-                            setEditingFlowName(false);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.currentTarget.blur();
-                            } else if (e.key === 'Escape') {
-                              setTempFlowName(flow.name);
-                              setEditingFlowName(false);
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-sky-500"
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate"
-                          onClick={(e) => {
-                            if (selectedFlow?.id === flow.id) {
-                              e.stopPropagation();
-                              setTempFlowName(flow.name);
-                              setEditingFlowName(true);
-                            }
-                          }}
-                        >
-                          {flow.name}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          flow.isAIGenerated !== false
-                            ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                        }`}>
-                          {flow.isAIGenerated !== false ? <Sparkles className="w-2.5 h-2.5" /> : null}
-                          {flow.isAIGenerated !== false ? 'AI' : 'Manual'}
-                        </span>
-                        <span className="text-xs text-slate-400 dark:text-slate-500">{flow.steps.length} steps</span>
-                      </div>
-                    </div>
+      {/* ── Flows tab ── */}
+      {tab === "flows" && (
+        <div className="grid grid-cols-12 gap-4" style={{ minHeight: "calc(100vh - 240px)" }}>
+          {/* Left: flows list */}
+          <div className="col-span-12 lg:col-span-4 xl:col-span-3 space-y-2">
+            <button
+              onClick={() => { setCreating(true); setSelected(null); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Flow
+            </button>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+              </div>
+            ) : flows.length === 0 ? (
+              <div className="text-center py-10 px-4">
+                <Bot className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-400">No flows yet</p>
+                <p className="text-xs text-slate-400 mt-1">Create your first flow above</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {flows.map(flow => {
+                  const health = flowHealth(flow);
+                  const isSelected = selected?.id === flow.id && !creating;
+                  return (
                     <button
-                      onClick={(e) => { e.stopPropagation(); deleteFlow(flow.id); }}
-                      className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all"
-                      title="Delete flow"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Flow Editor */}
-        <div className="col-span-12 md:col-span-9">
-          {!selectedFlow ? (
-            <div className="card p-8 text-center">
-              <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                <Bot className="w-6 h-6 text-slate-400" />
-              </div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                Select a flow on the left or create a new one to get started.
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Flow Header with Test Button */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedFlow.name}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      selectedFlow.isAIGenerated !== false
-                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                    }`}>
-                      {selectedFlow.isAIGenerated !== false ? <Sparkles className="w-3 h-3" /> : null}
-                      {selectedFlow.isAIGenerated !== false ? 'AI Generated' : 'Manual'}
-                    </span>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">{selectedFlow.steps.length} step{selectedFlow.steps.length !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={startTestFlow}
-                  className="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 px-4 py-2 rounded-lg text-sm text-white font-medium transition-colors shadow-sm"
-                >
-                  <Play className="w-4 h-4" />
-                  Test Flow
-                </button>
-              </div>
-
-              {/* Flow Statistics */}
-              {flowStats && !loadingStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="card bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center">
-                        <MessageSquare className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">{flowStats.messages_sent || 0}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Messages Sent</div>
-                  </div>
-                  <div className="card bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center">
-                        <Users className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">{flowStats.unique_leads || 0}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unique Leads</div>
-                  </div>
-                  <div className="card bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-700/50 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                    </div>
-                    <div className={`text-2xl font-bold ${
-                      flowStats.response_rate >= 50 ? 'text-emerald-600 dark:text-emerald-400' :
-                      flowStats.response_rate >= 25 ? 'text-sky-600 dark:text-sky-400' :
-                      'text-red-500 dark:text-red-400'
-                    }`}>
-                      {flowStats.response_rate || 0}%
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Response Rate</div>
-                  </div>
-                  <div className="card bg-gradient-to-br from-sky-50 to-cyan-50 dark:from-sky-900/20 dark:to-cyan-900/20 border border-sky-200 dark:border-sky-700/50 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center">
-                        <Clock className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                      {flowStats.avg_response_time_minutes ? `${Math.round(flowStats.avg_response_time_minutes)}m` : '-'}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Avg Response Time</div>
-                  </div>
-                </div>
-              )}
-
-              {loadingStats && (
-                <div className="card p-4">
-                  <div className="text-sm text-slate-500 dark:text-slate-400">Loading flow statistics...</div>
-                </div>
-              )}
-
-              {/* Required Questions (Prominent Display) */}
-              {selectedFlow.requiredQuestions && selectedFlow.requiredQuestions.length > 0 && (
-                <div className="card bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-900/20 dark:to-indigo-900/20 border border-sky-200 dark:border-sky-700/50 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Required Questions</div>
-                  </div>
-                  <div className="space-y-2">
-                    {selectedFlow.requiredQuestions.map((q, idx) => (
-                      <div key={idx} className="flex items-start gap-2">
-                        <div className="w-5 h-5 rounded-full bg-sky-100 dark:bg-sky-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-xs font-bold text-sky-600 dark:text-sky-400">{idx + 1}</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm text-slate-900 dark:text-slate-100">{q.question}</div>
-                          <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Field: {q.fieldName}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {selectedFlow.requiresCall && (
-                    <div className="mt-3 pt-3 border-t border-sky-200 dark:border-sky-700/50 flex items-center gap-2 text-sm text-sky-600 dark:text-sky-400">
-                      <Phone className="w-4 h-4" />
-                      <span>This flow requires a phone/Zoom call</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* AI Autonomy Mode Card */}
-              <div className="card p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Bot className="w-5 h-5 text-violet-500 dark:text-violet-400" />
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">AI Autonomy Mode</div>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: 'full_auto' as const, label: 'Full Auto', desc: 'AI replies automatically', icon: '🤖' },
-                    { value: 'suggest' as const, label: 'Suggest', desc: 'AI drafts, you approve', icon: '✏️' },
-                    { value: 'manual' as const, label: 'Manual', desc: 'You handle replies', icon: '👤' },
-                  ] as const).map(({ value, label, desc, icon }) => (
-                    <button
-                      key={value}
-                      onClick={() => updateFlowAutonomyMode(selectedFlow.id, value)}
-                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                        (selectedFlow.autonomyMode || 'full_auto') === value
-                          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
-                          : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                      key={flow.id}
+                      onClick={() => selectFlow(flow)}
+                      className={`w-full text-left px-3 py-3 rounded-xl border transition-all ${
+                        isSelected
+                          ? "bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-700"
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                       }`}
                     >
-                      <div className="text-lg mb-1">{icon}</div>
-                      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{label}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</div>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
-                  {(selectedFlow.autonomyMode || 'full_auto') === 'full_auto' && 'AI will automatically reply to leads when they respond to this flow.'}
-                  {selectedFlow.autonomyMode === 'suggest' && 'AI will draft a reply for your review. You approve before it sends.'}
-                  {selectedFlow.autonomyMode === 'manual' && 'AI will not reply. You handle all conversations in this flow.'}
-                </p>
-              </div>
-
-              {/* Advanced Details Toggle */}
-              <div className="card p-0 overflow-hidden">
-                <button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Advanced Details</span>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
-                  />
-                </button>
-
-                {showAdvanced && (
-                  <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-4">
-                    {/* Rebuttal & Alternate Paths - Only show for AI flows */}
-                    {selectedFlow.isAIGenerated !== false && (
-                      <div className="border border-amber-200 dark:border-amber-700/50 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
-                        <div className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-2">
-                          📋 Rebuttal & Alternate Paths
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                          How objections/questions flow back to main path
-                        </div>
-
-                        {/* Display response flow navigation */}
-                        <div className="space-y-3">
-                          {selectedFlow.steps.map((step, stepIndex) => (
-                            <div key={step.id} className="space-y-2">
-                              {step.responses && step.responses.length > 0 && (
-                                <>
-                                  <div className="text-xs font-semibold text-amber-700 dark:text-amber-300 mt-3 mb-2">
-                                    Step {stepIndex + 1} Rebuttals
-                                  </div>
-                                  {step.responses.map((response, responseIndex) => {
-                                    const nextStepId = (response as any).nextStepId;
-                                    const action = (response as any).action;
-                                    const nextStepIndex = nextStepId
-                                      ? selectedFlow.steps.findIndex(s => s.id === nextStepId)
-                                      : -1;
-
-                                    return (
-                                      <div
-                                        key={responseIndex}
-                                        className="border border-amber-500/30 rounded-lg p-2.5 bg-amber-500/5"
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex-1">
-                                            {response.label || `Response ${responseIndex + 1}`}
-                                          </div>
-                                          {action === 'end' ? (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 whitespace-nowrap">
-                                              ⚠️ Ends
-                                            </div>
-                                          ) : nextStepIndex >= 0 ? (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 whitespace-nowrap">
-                                              → Step {nextStepIndex + 1}
-                                            </div>
-                                          ) : (
-                                            <div className="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 whitespace-nowrap">
-                                              ↻ Loop
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </>
-                              )}
-                            </div>
-                          ))}
-
-                          {selectedFlow.steps.every(s => !s.responses || s.responses.length === 0) && (
-                            <div className="border border-amber-500/30 rounded-lg p-3 bg-amber-500/5">
-                              <div className="text-xs text-amber-700 dark:text-amber-300">
-                                No response options yet. Expand "Client Response Options" to add rebuttal paths.
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Main Flow Steps */}
-              <div className="space-y-4">
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 px-1">Flow Steps</div>
-
-                {selectedFlow.steps.map((step, stepIndex) => (
-                  <div key={step.id}>
-                    {/* Main Step Card */}
-                    <div className={`card p-0 overflow-hidden ${
-                      selectedFlow.isAIGenerated !== false
-                        ? 'border-l-4 border-l-sky-400'
-                        : 'border-l-4 border-l-slate-300 dark:border-l-slate-600'
-                    }`}>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm"
-                              style={{ backgroundColor: step.tag?.color || '#3B82F6' }}
-                            >
-                              {stepIndex + 1}
-                            </div>
-                            {step.tag && (
-                              <span
-                                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                style={{
-                                  backgroundColor: `${step.tag.color}15`,
-                                  color: step.tag.color,
-                                  border: `1px solid ${step.tag.color}30`
-                                }}
-                              >
-                                {step.tag.label}
+                      <div className="flex items-start gap-2">
+                        <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${HEALTH_COLORS[health]}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{flow.name}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                              flow.autonomyMode === "full_auto"
+                                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                                : flow.autonomyMode === "suggest"
+                                ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400"
+                                : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                            }`}>
+                              {flow.autonomyMode === "full_auto" ? "Auto" : flow.autonomyMode === "suggest" ? "Suggest" : "Manual"}
+                            </span>
+                            {flow.requiredQuestions?.length > 0 && (
+                              <span className="text-xs text-slate-400">
+                                {flow.requiredQuestions.length}Q
+                              </span>
+                            )}
+                            {flow.steps?.length > 0 && (
+                              <span className="text-xs text-slate-400">
+                                {flow.steps.length} steps
                               </span>
                             )}
                           </div>
-                          {selectedFlow.steps.length > 1 && (
-                            <button
-                              onClick={() => deleteStep(step.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Delete step"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
                         </div>
-
-                        {/* Your Message — chat bubble style */}
-                        <div className="mb-4">
-                          <div className="text-xs font-medium mb-2 text-slate-500 dark:text-slate-400 uppercase tracking-wide">Your Message</div>
-                          <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700/50 rounded-xl rounded-tl-sm p-3">
-                            <textarea
-                              value={step.yourMessage}
-                              onChange={e => updateStep(step.id, { yourMessage: e.target.value })}
-                              className="w-full bg-transparent text-slate-900 dark:text-slate-100 text-sm resize-none focus:outline-none min-h-[80px] placeholder-slate-400"
-                              placeholder="Type your message here..."
-                            />
-                          </div>
-                        </div>
-
-                        {/* Step Advanced Options - Collapsible */}
-                        <div className="border-t border-slate-100 dark:border-slate-700/50 pt-3">
-                          <button
-                            onClick={() => toggleStepExpansion(step.id)}
-                            className="w-full flex items-center justify-between text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                          >
-                            <span>Advanced Options</span>
-                            <ChevronDown
-                              className={`w-4 h-4 transition-transform ${expandedSteps.has(step.id) ? 'rotate-180' : ''}`}
-                            />
-                          </button>
-
-                        {expandedSteps.has(step.id) && (
-                          <div className="space-y-4 mt-3">
-                            {/* Step Tag Editor */}
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                              <div className="text-xs font-medium text-slate-900 dark:text-slate-100 mb-2">Step Tag (visible to team)</div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                <div>
-                                  <input
-                                    type="text"
-                                    value={step.tag?.label || ''}
-                                    onChange={e => updateStep(step.id, {
-                                      tag: { label: e.target.value, color: step.tag?.color || '#3B82F6' }
-                                    })}
-                                    placeholder="e.g., 'Qualification', 'Follow-up'"
-                                    className="input-dark w-full px-3 py-2 rounded-lg text-sm"
-                                  />
-                                </div>
-                                <div className="flex gap-2">
-                                  {['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'].map(color => (
-                                    <button
-                                      key={color}
-                                      onClick={() => updateStep(step.id, {
-                                        tag: { label: step.tag?.label || `Step ${stepIndex + 1}`, color }
-                                      })}
-                                      className={`w-8 h-8 rounded-lg border-2 ${
-                                        step.tag?.color === color ? 'border-white' : 'border-slate-300 dark:border-slate-600'
-                                      }`}
-                                      style={{ backgroundColor: color }}
-                                      title={color}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Response Options */}
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                              <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-3">Client Response Options ({step.responses.length})</div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {step.responses.map((response, responseIndex) => (
-                                  <div key={responseIndex} className="border border-slate-200 dark:border-slate-600 rounded-lg p-3 bg-white dark:bg-slate-800">
-                                    <div className="text-xs font-semibold mb-2 text-slate-600 dark:text-slate-400">Response {responseIndex + 1}</div>
-
-                                    <input
-                                      type="text"
-                                      value={response.label}
-                                      onChange={e => updateResponse(step.id, responseIndex, { label: e.target.value })}
-                                      className="input-dark w-full px-3 py-2 rounded-lg text-sm mb-2"
-                                      placeholder="Label (e.g., 'Interested')"
-                                    />
-
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Your reply if they say this:</div>
-                                    <textarea
-                                      value={response.followUpMessage}
-                                      onChange={e => updateResponse(step.id, responseIndex, { followUpMessage: e.target.value })}
-                                      className="input-dark w-full px-3 py-2 rounded-lg text-sm min-h-[70px]"
-                                      placeholder="Your follow-up message..."
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                      </div>
-                    </div>
-
-                    {/* Insert Step Connector */}
-                    <div className="flex items-center justify-center py-1 group/insert">
-                      <div className="flex-1 border-t border-dashed border-slate-200 dark:border-slate-700"></div>
-                      <button
-                        onClick={() => insertStepAfter(stepIndex)}
-                        className="mx-3 w-7 h-7 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center text-slate-400 hover:text-sky-500 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-all opacity-40 group-hover/insert:opacity-100"
-                        title="Insert step here"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                      <div className="flex-1 border-t border-dashed border-slate-200 dark:border-slate-700"></div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
 
-      {/* Test Flow Chat Modal */}
-      {showTestFlow && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col p-6">
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
-              <div>
-                <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Test Flow: {selectedFlow?.name}</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  You are the client — respond naturally to test your flow
-                </div>
-                {(selectedFlow?.requiredQuestions || []).length > 0 && (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-sky-600">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Calendar integration enabled ({(selectedFlow?.requiredQuestions || []).length} questions to collect)</span>
+          {/* Right: detail / create panel */}
+          <div className="col-span-12 lg:col-span-8 xl:col-span-9">
+            {/* ── Create panel ── */}
+            {creating && (
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-sky-500" />
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">New Flow</h2>
                   </div>
-                )}
-              </div>
-              <button
-                onClick={resetTestFlow}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium transition-colors"
-              >
-                Close
-              </button>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[300px] max-h-[400px]">
-              {testMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[75%] px-4 py-3 rounded-xl ${
-                      message.role === 'user'
-                        ? 'bg-sky-500 text-white rounded-br-sm'
-                        : message.role === 'system'
-                        ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-amber-800 dark:text-amber-200 rounded-bl-sm'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-bl-sm'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold mb-1 opacity-60 flex items-center justify-between">
-                      <span>{message.role === 'user' ? 'You (Client)' : message.role === 'system' ? 'System' : 'Agent'}</span>
-                      {message.timestamp && <span className="ml-2 font-normal opacity-50">{message.timestamp}</span>}
-                    </div>
-                    <div className="text-sm whitespace-pre-wrap">{message.text}</div>
-                  </div>
-                </div>
-              ))}
-              {isTestingAI && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 px-4 py-3 rounded-xl rounded-bl-sm">
-                    <div className="text-xs font-semibold mb-1 opacity-60">Agent</div>
-                    <div className="text-sm">Thinking...</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Input Area */}
-            <div className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <input
-                type="text"
-                value={testInput}
-                onChange={(e) => setTestInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isTestingAI && testInput.trim()) {
-                    sendTestMessage();
-                  }
-                }}
-                disabled={isTestingAI}
-                placeholder="Type your response as the client..."
-                className="input-dark flex-1 px-4 py-3 rounded-lg text-sm"
-              />
-              <button
-                onClick={sendTestMessage}
-                disabled={isTestingAI || !testInput.trim()}
-                className="bg-sky-500 hover:bg-sky-600 disabled:bg-sky-500/50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium text-sm"
-              >
-                {isTestingAI ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-
-            {/* Time Controls & Drip Visualization */}
-            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
-              {/* Time Display and Controls */}
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  <span className="mr-3">⏰ Current Time: <span className="text-slate-900 dark:text-slate-100 font-semibold">{simulatedTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</span></span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => advanceTime(3)}
-                    className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    +3 hours
-                  </button>
-                  <button
-                    onClick={() => advanceTime(24)}
-                    className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    +1 day
-                  </button>
-                  <button
-                    onClick={() => advanceTime(48)}
-                    className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    +2 days
+                  <button onClick={resetCreate} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition-colors">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
 
-              {/* Pending Drips Display */}
-              {pendingDrips.length > 0 && (
-                <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700/50 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-sky-700 dark:text-sky-300 mb-2">Scheduled Follow-ups ({pendingDrips.length})</div>
-                  <div className="space-y-1">
-                    {pendingDrips.map((drip, idx) => (
-                      <div key={idx} className="text-xs text-sky-600 dark:text-sky-400">
-                        • {drip.scheduledFor.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}: "{drip.message.substring(0, 50)}{drip.message.length > 50 ? '...' : ''}"
-                      </div>
-                    ))}
+                <div className="p-6 space-y-6">
+                  {/* Name */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Flow Name</label>
+                    <input
+                      value={createName}
+                      onChange={e => setCreateName(e.target.value)}
+                      placeholder="e.g. Insurance Qualification"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                    />
                   </div>
-                </div>
-              )}
 
-              {/* Calendar Appointments */}
-              {enableCalendarAppointments && createdAppointments.length > 0 && (
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/50 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Calendar Appointments ({createdAppointments.length})</div>
-                  <div className="space-y-1">
-                    {createdAppointments.map((appt, idx) => (
-                      <div key={idx} className="text-xs text-emerald-600 dark:text-emerald-400">
-                        • <span className="font-medium">{appt.title}</span> - {appt.date} at {appt.time}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {/* Identity */}
+                  <Section title="Identity" subtitle="Tell the AI who it is and what it's doing">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <ContextField icon={User} label="Who you are" placeholder="e.g. an insurance agent at ABC Insurance" value={createContext.whoYouAre || ""} onChange={v => setCreateContext(p => ({ ...p, whoYouAre: v }))} />
+                      <ContextField icon={Target} label="What you're offering" placeholder="e.g. affordable health insurance plans" value={createContext.whatOffering || ""} onChange={v => setCreateContext(p => ({ ...p, whatOffering: v }))} />
+                      <ContextField icon={MessageSquare} label="Who you're texting" placeholder="e.g. people who requested a quote online" value={createContext.whoTexting || ""} onChange={v => setCreateContext(p => ({ ...p, whoTexting: v }))} />
+                      <ContextField icon={Target} label="Client goals" placeholder="e.g. find coverage that fits their budget" value={createContext.clientGoals || ""} onChange={v => setCreateContext(p => ({ ...p, clientGoals: v }))} />
+                      <ContextField icon={User} label="Agent name" placeholder="e.g. Sarah" value={createContext.agentName || ""} onChange={v => setCreateContext(p => ({ ...p, agentName: v }))} />
+                      <ContextField icon={Building2} label="Company name" placeholder="e.g. ABC Insurance" value={createContext.companyName || ""} onChange={v => setCreateContext(p => ({ ...p, companyName: v }))} />
+                      <ContextField icon={MessageSquare} label="Why you're reaching out" placeholder="e.g. following up on their online quote request" value={createContext.contactReason || ""} onChange={v => setCreateContext(p => ({ ...p, contactReason: v }))} />
+                      <ContextField icon={Phone} label="Callback number" placeholder="Optional" value={createContext.callbackNumber || ""} onChange={v => setCreateContext(p => ({ ...p, callbackNumber: v }))} />
+                      <ContextField icon={Globe} label="Website" placeholder="Optional" value={createContext.website || ""} onChange={v => setCreateContext(p => ({ ...p, website: v }))} />
+                    </div>
+                  </Section>
 
-              {/* Collected Client Information */}
-              {Object.keys(collectedInfo).length > 0 && (
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-lg p-3">
-                  <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-2">Collected Client Information</div>
-                  <div className="space-y-1">
-                    {Object.entries(collectedInfo).map(([key, value]) => (
-                      <div key={key} className="text-xs text-indigo-600 dark:text-indigo-400">
-                        <span className="font-medium">{key}:</span> {value}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {/* Required questions */}
+                  <Section title="Required Questions" subtitle="The AI gathers these one at a time. When all are answered, the lead is tagged 'qualified'.">
+                    <QuestionsEditor
+                      questions={createQuestions}
+                      onRemove={i => setCreateQuestions(prev => prev.filter((_, idx) => idx !== i))}
+                      newQ={newQ}
+                      setNewQ={setNewQ}
+                      onAdd={addCreateQ}
+                    />
+                  </Section>
 
-              {/* Current Step Indicator */}
-              {selectedFlow && selectedFlow.steps[currentStepIndex] && (
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                  Current Step: <span className="text-slate-900 dark:text-slate-100 font-semibold">Step {currentStepIndex + 1}</span>
-                  {selectedFlow.steps[currentStepIndex].tag && (
-                    <span
-                      className="ml-2 px-2 py-0.5 rounded text-xs font-medium"
-                      style={{
-                        backgroundColor: `${selectedFlow.steps[currentStepIndex].tag.color}20`,
-                        color: selectedFlow.steps[currentStepIndex].tag.color,
-                        border: `1px solid ${selectedFlow.steps[currentStepIndex].tag.color}40`
-                      }}
+                  {/* Autonomy */}
+                  <Section title="Autonomy Mode" subtitle="How much control does the AI have?">
+                    <AutonomySelector value={createAutonomy} onChange={v => setCreateAutonomy(v)} />
+                  </Section>
+
+                  {/* Requires call */}
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={createRequiresCall} onChange={e => setCreateRequiresCall(e.target.checked)} className="w-4 h-4 rounded accent-sky-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Requires a phone call</p>
+                      <p className="text-xs text-slate-400">The AI will move toward scheduling a call once questions are answered</p>
+                    </div>
+                  </label>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={handleGenerate}
+                      disabled={generating}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors"
                     >
-                      {selectedFlow.steps[currentStepIndex].tag.label}
-                    </span>
+                      {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {generating ? "Generating…" : "Generate with AI (15 pts)"}
+                    </button>
+                    <button
+                      onClick={handleCreateBlank}
+                      disabled={generating}
+                      className="px-4 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 transition-colors"
+                    >
+                      Start Blank
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Edit panel ── */}
+            {selected && !creating && (
+              <div className="space-y-4">
+                {/* Flow name + actions bar */}
+                <div className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3">
+                  <input
+                    value={editName}
+                    onChange={e => { setEditName(e.target.value); markDirty(); }}
+                    className="flex-1 text-lg font-semibold text-slate-900 dark:text-slate-100 bg-transparent outline-none border-b-2 border-transparent focus:border-sky-400 transition-colors py-0.5"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/demo?flowId=${selected.id}`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                    >
+                      <FlaskConical className="w-3.5 h-3.5" />
+                      Test
+                    </Link>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || !dirty}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-lg transition-colors"
+                    >
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => handleDelete(selected.id)}
+                      className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Identity */}
+                <Card title="Identity" subtitle="Who the AI is and what it's doing">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <ContextField icon={User} label="Who you are" placeholder="e.g. an insurance agent at ABC Insurance" value={editContext.whoYouAre || ""} onChange={v => { setEditContext(p => ({ ...p, whoYouAre: v })); markDirty(); }} />
+                    <ContextField icon={Target} label="What you're offering" placeholder="e.g. affordable health insurance plans" value={editContext.whatOffering || ""} onChange={v => { setEditContext(p => ({ ...p, whatOffering: v })); markDirty(); }} />
+                    <ContextField icon={MessageSquare} label="Who you're texting" placeholder="e.g. people who requested a quote online" value={editContext.whoTexting || ""} onChange={v => { setEditContext(p => ({ ...p, whoTexting: v })); markDirty(); }} />
+                    <ContextField icon={Target} label="Client goals" placeholder="e.g. find coverage that fits their budget" value={editContext.clientGoals || ""} onChange={v => { setEditContext(p => ({ ...p, clientGoals: v })); markDirty(); }} />
+                    <ContextField icon={User} label="Agent name" placeholder="e.g. Sarah" value={editContext.agentName || ""} onChange={v => { setEditContext(p => ({ ...p, agentName: v })); markDirty(); }} />
+                    <ContextField icon={Building2} label="Company name" placeholder="e.g. ABC Insurance" value={editContext.companyName || ""} onChange={v => { setEditContext(p => ({ ...p, companyName: v })); markDirty(); }} />
+                    <ContextField icon={MessageSquare} label="Why you're reaching out" placeholder="e.g. following up on their online quote request" value={editContext.contactReason || ""} onChange={v => { setEditContext(p => ({ ...p, contactReason: v })); markDirty(); }} />
+                    <ContextField icon={Phone} label="Callback number" placeholder="Optional" value={editContext.callbackNumber || ""} onChange={v => { setEditContext(p => ({ ...p, callbackNumber: v })); markDirty(); }} />
+                    <ContextField icon={Globe} label="Website" placeholder="Optional" value={editContext.website || ""} onChange={v => { setEditContext(p => ({ ...p, website: v })); markDirty(); }} />
+                  </div>
+                </Card>
+
+                {/* Required Questions — centerpiece */}
+                <Card
+                  title="Required Questions"
+                  subtitle="The AI collects these one at a time during the conversation. When all are answered, the lead is automatically tagged 'qualified'."
+                  accent
+                >
+                  <QuestionsEditor
+                    questions={editQuestions}
+                    onRemove={i => { setEditQuestions(prev => prev.filter((_, idx) => idx !== i)); markDirty(); }}
+                    newQ={editQ}
+                    setNewQ={setEditQ}
+                    onAdd={addEditQ}
+                  />
+                </Card>
+
+                {/* Autonomy */}
+                <Card title="Autonomy Mode" subtitle="How much control does the AI have over replies?">
+                  <AutonomySelector value={editAutonomy} onChange={v => { setEditAutonomy(v); markDirty(); }} />
+                  <label className="flex items-center gap-3 cursor-pointer mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                    <input type="checkbox" checked={editRequiresCall} onChange={e => { setEditRequiresCall(e.target.checked); markDirty(); }} className="w-4 h-4 rounded accent-sky-600" />
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Requires a phone call</p>
+                      <p className="text-xs text-slate-400">AI will move toward scheduling a call once all questions are answered</p>
+                    </div>
+                  </label>
+                </Card>
+
+                {/* Steps — collapsed preview */}
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                  <button
+                    onClick={() => setStepsOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-slate-400" />
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Conversation Steps
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500">
+                        {selected.steps?.length || 0}
+                      </span>
+                    </div>
+                    {stepsOpen ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                  </button>
+
+                  {stepsOpen && (
+                    <div className="px-5 pb-5 space-y-3 border-t border-slate-100 dark:border-slate-700 pt-4">
+                      {!selected.steps?.length ? (
+                        <p className="text-sm text-slate-400 text-center py-4">
+                          No steps yet — generate the flow with AI to create them.
+                        </p>
+                      ) : (
+                        selected.steps.map((step, i) => (
+                          <StepPreview key={step.id} step={step} index={i} />
+                        ))
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            )}
 
-      {/* Manual Flow Creation Dialog */}
-      {showManualFlowDialog && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-2xl w-full shadow-xl">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center shadow-sm">
-                    <Plus className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create New Manual Flow</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                      Create a flow with your first message step
-                    </div>
-                  </div>
+            {/* Empty state */}
+            {!selected && !creating && (
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+                <div className="w-14 h-14 rounded-2xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mb-4">
+                  <Bot className="w-7 h-7 text-sky-500" />
                 </div>
-                <button
-                  onClick={() => {
-                    setShowManualFlowDialog(false);
-                    setManualFlowName("");
-                    setManualFlowMessage("");
-                  }}
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Flow Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 'Welcome Sequence', 'Follow-up Flow'"
-                  value={manualFlowName}
-                  onChange={e => setManualFlowName(e.target.value)}
-                  className="input-dark w-full px-4 py-3 rounded-lg"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">
-                  {manualFlowSteps.length === 0 ? 'First Message *' : 'Next Message *'}
-                </label>
-                <textarea
-                  placeholder="Enter message to the client..."
-                  value={manualFlowMessage}
-                  onChange={e => setManualFlowMessage(e.target.value)}
-                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                  rows={4}
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {manualFlowSteps.length === 0
-                    ? 'This will be the first message sent in your flow'
-                    : `This will be step ${manualFlowSteps.length + 1} in your flow`
-                  }
+                <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-1">Select a flow</h2>
+                <p className="text-sm text-slate-400 max-w-xs">
+                  Pick a flow from the list to edit it, or create a new one.
                 </p>
               </div>
-
-              {manualFlowSteps.length > 0 && (
-                <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3">
-                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Steps Added ({manualFlowSteps.length})</div>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {manualFlowSteps.map((step, index) => (
-                      <div key={index} className="flex items-start gap-2 text-sm bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg">
-                        <span className="text-slate-600 dark:text-slate-400 font-medium">{index + 1}.</span>
-                        <span className="text-slate-700 dark:text-slate-300 flex-1 line-clamp-2">{step}</span>
-                        <button
-                          onClick={() => {
-                            const updatedSteps = manualFlowSteps.filter((_, i) => i !== index);
-                            setManualFlowSteps(updatedSteps);
-                          }}
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    if (!manualFlowMessage.trim()) {
-                      setModal({
-                        isOpen: true,
-                        type: 'warning',
-                        title: 'Missing Information',
-                        message: 'Please enter a message'
-                      });
-                      return;
-                    }
-
-                    // Add step to the list
-                    setManualFlowSteps([...manualFlowSteps, manualFlowMessage]);
-                    setManualFlowMessage("");
-                  }}
-                  className="bg-sky-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-sky-700 disabled:opacity-50"
-                  disabled={!manualFlowMessage.trim()}
-                >
-                  + Add Another Step
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!manualFlowName.trim()) {
-                      setModal({
-                        isOpen: true,
-                        type: 'warning',
-                        title: 'Missing Information',
-                        message: 'Please enter a flow name'
-                      });
-                      return;
-                    }
-
-                    if (manualFlowSteps.length === 0 && !manualFlowMessage.trim()) {
-                      setModal({
-                        isOpen: true,
-                        type: 'warning',
-                        title: 'Missing Information',
-                        message: 'Please add at least one step'
-                      });
-                      return;
-                    }
-
-                    // Collect all steps (existing steps + current message if any)
-                    const allStepMessages = [...manualFlowSteps];
-                    if (manualFlowMessage.trim()) {
-                      allStepMessages.push(manualFlowMessage);
-                    }
-
-                    // Create FlowStep objects
-                    const steps: FlowStep[] = allStepMessages.map((msg, index) => ({
-                      id: `step-${Date.now()}-${index}`,
-                      yourMessage: msg,
-                      responses: [],
-                      dripSequence: []
-                    }));
-
-                    // Save to server first to get the server-generated ID
-                    const tempFlow: ConversationFlow = {
-                      id: `flow-${Date.now()}`,
-                      name: manualFlowName,
-                      steps: steps,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                      isAIGenerated: false
-                    };
-
-                    const saved = await saveFlowToServer(tempFlow);
-                    if (saved) {
-                      // Reload flows from server to get the server-generated ID
-                      const serverFlows = await loadFlows();
-                      setFlows(serverFlows);
-                      const savedFlow = serverFlows.find(f => f.name === manualFlowName);
-                      if (savedFlow) {
-                        setSelectedFlow(savedFlow);
-                      }
-                    } else {
-                      // Fallback: use local flow
-                      const updatedFlows = [...flows, tempFlow];
-                      setFlows(updatedFlows);
-                      setSelectedFlow(tempFlow);
-                    }
-
-                    setShowManualFlowDialog(false);
-                    setManualFlowName("");
-                    setManualFlowMessage("");
-                    setManualFlowSteps([]);
-                  }}
-                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-600 disabled:opacity-50"
-                  disabled={!manualFlowName.trim() || (manualFlowSteps.length === 0 && !manualFlowMessage.trim())}
-                >
-                  Create Flow
-                </button>
-                <button
-                  onClick={() => {
-                    setShowManualFlowDialog(false);
-                    setManualFlowName("");
-                    setManualFlowMessage("");
-                    setManualFlowSteps([]);
-                  }}
-                  className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-6 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Manual Step Editor Dialog */}
-      {showManualStepDialog && (
-        <div className="fixed inset-0 md:left-64 bg-black/50 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 max-w-2xl w-full my-8 shadow-xl">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {editingStepIndex >= 0 ? 'Edit Manual Step' : 'Add Manual Step'}
-                  </div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Create a custom message step for your flow
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowManualStepDialog(false);
-                    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
-                    setEditingStepIndex(-1);
-                    setInsertAfterIndex(-1);
-                  }}
-                  className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
-                >
-                  ×
-                </button>
-              </div>
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-              <div>
-                <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Your Message *</label>
-                <textarea
-                  placeholder="Enter the message you want to send..."
-                  value={manualStep.yourMessage}
-                  onChange={e => setManualStep({...manualStep, yourMessage: e.target.value})}
-                  className="input-dark w-full px-4 py-3 rounded-lg resize-none"
-                  rows={3}
-                  autoFocus
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  This message will be sent to the client at this step
-                </p>
-              </div>
+function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-3">
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={saveManualStep}
-                  className="bg-sky-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-sky-500 disabled:opacity-50"
-                  disabled={!manualStep.yourMessage.trim()}
-                >
-                  {editingStepIndex >= 0 ? 'Update Step' : 'Add Step'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowManualStepDialog(false);
-                    setManualStep({ id: '', yourMessage: '', responses: [], dripSequence: [] });
-                    setEditingStepIndex(-1);
-                    setInsertAfterIndex(-1);
-                  }}
-                  className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-6 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+function Card({ title, subtitle, children, accent }: { title: string; subtitle?: string; children: React.ReactNode; accent?: boolean }) {
+  return (
+    <div className={`bg-white dark:bg-slate-800 border rounded-2xl p-5 ${accent ? "border-sky-200 dark:border-sky-800" : "border-slate-200 dark:border-slate-700"}`}>
+      <div className="mb-4">
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+        {subtitle && <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
-      {/* AI Flow Generation Loading Modal */}
-      {isGenerating && (
-        <div className="fixed inset-0 md:left-64 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[99999]">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-xl border border-slate-200 dark:border-slate-700">
-            <div className="text-center">
-              {/* Animated AI Icon */}
-              <div className="mb-6 relative">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-sky-400 to-sky-400 rounded-2xl flex items-center justify-center animate-pulse shadow-lg shadow-sky-400/50">
-                  <svg className="w-10 h-10 text-slate-900 dark:text-slate-100 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-                {/* Orbiting dots */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-32 h-32 animate-spin-slow">
-                    <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-sky-400 rounded-full"></div>
-                    <div className="absolute bottom-0 left-1/2 -ml-1 w-2 h-2 bg-sky-500 rounded-full"></div>
-                    <div className="absolute left-0 top-1/2 -mt-1 w-2 h-2 bg-sky-400 rounded-full"></div>
-                    <div className="absolute right-0 top-1/2 -mt-1 w-2 h-2 bg-sky-400 rounded-full"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Text */}
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                Generating Your Flow
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 mb-4">
-                Our AI is crafting a personalized conversation flow...
-              </p>
-
-              {/* Progress indicators */}
-              <div className="space-y-2 text-left">
-                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
-                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse"></div>
-                  <span>Analyzing your business context</span>
-                </div>
-                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
-                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                  <span>Building conversation steps</span>
-                </div>
-                <div className="flex items-center text-sm text-slate-400 dark:text-slate-500">
-                  <div className="w-2 h-2 bg-sky-500 rounded-full mr-2 animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                  <span>Optimizing response paths</span>
-                </div>
-              </div>
-
-              {/* Loading bar */}
-              <div className="mt-6 bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-sky-500 via-sky-500 to-sky-500 animate-shimmer bg-[length:200%_100%]"></div>
-              </div>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
-                This usually takes 10-20 seconds
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Modal */}
-      <CustomModal
-        isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-        type={modal.type}
-        title={modal.title}
-        message={modal.message}
+function ContextField({ icon: Icon, label, placeholder, value, onChange }: {
+  icon: React.ElementType; label: string; placeholder: string; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+        <Icon className="w-3 h-3" />
+        {label}
+      </label>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none"
       />
-      </>}
+    </div>
+  );
+}
+
+function QuestionsEditor({ questions, onRemove, newQ, setNewQ, onAdd }: {
+  questions: RequiredQuestion[];
+  onRemove: (i: number) => void;
+  newQ: { question: string; fieldName: string };
+  setNewQ: (v: { question: string; fieldName: string }) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {questions.length === 0 && (
+        <p className="text-sm text-slate-400 text-center py-3 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+          No questions yet — add one below
+        </p>
+      )}
+      {questions.map((q, i) => (
+        <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-800 dark:text-slate-100">{q.question}</p>
+            <p className="text-xs font-mono text-slate-400 mt-0.5">→ saves as <span className="text-sky-500">{q.fieldName}</span></p>
+          </div>
+          <button onClick={() => onRemove(i)} className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-red-500 transition-colors shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+
+      {/* Add new question */}
+      <div className="flex gap-2 pt-1">
+        <div className="flex-1 space-y-2">
+          <input
+            value={newQ.question}
+            onChange={e => setNewQ({ ...newQ, question: e.target.value })}
+            onKeyDown={e => e.key === "Enter" && onAdd()}
+            placeholder="Question to ask (e.g. What's your household size?)"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none"
+          />
+          <input
+            value={newQ.fieldName}
+            onChange={e => setNewQ({ ...newQ, fieldName: e.target.value.replace(/\s+/g, "_").toLowerCase() })}
+            onKeyDown={e => e.key === "Enter" && onAdd()}
+            placeholder="Field name (e.g. household_size)"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none"
+          />
+        </div>
+        <button
+          onClick={onAdd}
+          className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition-colors self-start mt-0 shrink-0"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AutonomySelector({ value, onChange }: {
+  value: "full_auto" | "suggest" | "manual";
+  onChange: (v: "full_auto" | "suggest" | "manual") => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {AUTONOMY_OPTIONS.map(opt => {
+        const Icon = opt.icon;
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`text-left p-4 rounded-xl border-2 transition-all ${
+              active
+                ? `${opt.bg} border-current ${opt.color}`
+                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+            }`}
+          >
+            <div className={`flex items-center gap-2 mb-1.5 ${active ? opt.color : "text-slate-500 dark:text-slate-400"}`}>
+              <Icon className="w-4 h-4" />
+              <span className="text-sm font-semibold">{opt.label}</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{opt.desc}</p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepPreview({ step, index }: { step: FlowStep; index: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+      >
+        <span className="w-5 h-5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+          {index + 1}
+        </span>
+        <p className="flex-1 text-sm text-slate-700 dark:text-slate-200 line-clamp-2">{step.yourMessage}</p>
+        {open ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" /> : <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />}
+      </button>
+      {open && step.responses && step.responses.length > 0 && (
+        <div className="px-4 pb-3 space-y-1.5 border-t border-slate-100 dark:border-slate-700 pt-3">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Response paths</p>
+          {step.responses.map((r, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="shrink-0 font-medium text-slate-400">↳ {r.label}:</span>
+              <span className="italic">{r.followUpMessage}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
