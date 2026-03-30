@@ -1125,6 +1125,12 @@ function InternalDevNotes() {
     'Compliance/DNC — STOP = permanent block: OPT_OUT_KEYWORDS list, DNC insert, sms_opt_in=false, receptionist skipped',
     'Analytics page: full /analytics with overview + automation tabs, campaign performance, charts, CSV export',
     'Preview/Landing page: hero, features, pricing table, demo conversations, industry sections built in PreviewClient.tsx',
+    'Campaigns — lead type category UI: LEAD_TYPES list (15 types), shown as violet badge in table, selectable in create/edit modals, smart flow auto-match on type select',
+    'Onboarding — demographic questions: industry collected via INDUSTRY_PRESETS on step 4, business name/timezone on step 2',
+    'Onboarding — auto-provision phone number: step 3 claims from number pool or purchases via Telnyx, shown formatted with region',
+    'Onboarding — industry-based AI Flow setup: step 5 uses getFlowTemplate(industry) to pre-populate flow context, steps, required questions',
+    'Onboarding — industry-specific pipeline stages & campaigns: step 4 loads INDUSTRY_PRESETS[industry] tags + campaigns, user can toggle on/off before applying',
+    'Onboarding — optional Google Calendar connection: step 6 with OAuth flow, skippable, returns to onboarding after auth',
   ];
 
   // ── 2. TODO — PRE-LAUNCH ──────────────────────────────────────────────────
@@ -1134,16 +1140,7 @@ function InternalDevNotes() {
     { cat: 'Payments & Billing', item: 'Show Scale tier point pack discount clearly on pricing/preview pages' },
     { cat: 'Payments & Billing', item: 'Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack' },
     { cat: 'Payments & Billing', item: 'Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits' },
-    // Onboarding
-    { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
-    { cat: 'Onboarding Rework', item: 'Auto-provision one free local number during onboarding' },
-    { cat: 'Onboarding Rework', item: 'Guide user to set up AI Flows based on their industry' },
-    { cat: 'Onboarding Rework', item: 'Show industry-specific preset pipeline stages (user can customize)' },
-    { cat: 'Onboarding Rework', item: 'Optional Google Calendar connection step' },
-    // Campaigns (partial — backend schema exists, frontend UI incomplete)
-    { cat: 'Campaigns Rework', item: 'Lead type category UI — filter/organize campaigns by industry type (backend lead_type field exists, frontend not wired)' },
     // Phone Numbers
-    { cat: 'Phone Numbers', item: 'One free number provisioned with plan during onboarding' },
     { cat: 'Phone Numbers', item: 'Number porting (bring your own number) — required before launch' },
     // Onboarding still needed
     { cat: 'Onboarding Rework', item: 'Add demographic questions (industry, business type)' },
