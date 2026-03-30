@@ -350,6 +350,8 @@ async function handleInboundSMS(payload: any) {
     media_urls: mediaUrls.length > 0 ? mediaUrls : null,
     channel: mediaUrls.length > 0 ? 'mms' : 'sms',
     provider: 'telnyx',
+    spam_score: spamScore,
+    spam_flags: spamFlags.length > 0 ? spamFlags : null,
     created_at: new Date().toISOString(),
   };
 

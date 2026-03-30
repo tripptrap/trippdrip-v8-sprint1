@@ -164,24 +164,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // For toll-free numbers, they're usually available immediately
-    // For local numbers, may need to wait for provisioning
-    const isTollFree = phoneNumber.startsWith('+1800') ||
-                       phoneNumber.startsWith('+1888') ||
-                       phoneNumber.startsWith('+1877') ||
-                       phoneNumber.startsWith('+1866') ||
-                       phoneNumber.startsWith('+1855') ||
-                       phoneNumber.startsWith('+1844') ||
-                       phoneNumber.startsWith('+1833');
+    const isTollFree = isTollFreeNumber(phoneNumber);
 
-    // Toll-free numbers are instant - activate immediately
-    if (isTollFree) {
-      await supabaseAdmin
-        .from('user_telnyx_numbers')
-        .update({ status: 'active' })
-        .eq('user_id', user.id)
-        .eq('phone_number', phoneNumber);
-    }
+    // Leave status as 'pending' for all numbers — the number-order-webhook activates them
+    // once Telnyx confirms provisioning via phone_number.provisioned or number_order.complete event
 
     return NextResponse.json({
       success: true,

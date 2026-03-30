@@ -37,51 +37,44 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Fetch all leads for current user
-    const { data: all, error } = await supabase
+    // Fetch all tags for the user (lightweight — tags column only)
+    const { data: tagRows } = await supabase
+      .from('leads')
+      .select('tags')
+      .eq('user_id', user.id);
+
+    const tagsAll = uniq(
+      (tagRows || []).flatMap(l => Array.isArray(l.tags) ? l.tags.filter(Boolean) : [])
+    ).sort((a: string, b: string) => a.localeCompare(b));
+
+    // Build filtered query pushed to DB
+    let query = supabase
       .from('leads')
       .select('*')
       .eq('user_id', user.id);
+
+    if (search) {
+      query = query.or(
+        `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+      );
+    }
+
+    if (selectedTags.length > 0) {
+      query = query.overlaps('tags', selectedTags);
+    }
+
+    const { data: filtered, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (error) {
       console.error('Error fetching leads:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    const leads = all || [];
-
-    // Extract all tags
-    const tagsAll = uniq(
-      leads.flatMap(l => Array.isArray(l.tags) ? l.tags.filter(Boolean) : [])
-    ).sort((a, b) => a.localeCompare(b));
-
-    // Filter leads
-    const filtered = leads.filter(l => {
-      const matchesTags =
-        selectedTags.length === 0 ||
-        (Array.isArray(l.tags) && l.tags.some((t: string) => selectedTags.includes(t)));
-
-      if (!matchesTags) return false;
-      if (!search) return true;
-
-      const hay = [
-        l.first_name,
-        l.last_name,
-        l.email,
-        l.phone,
-        l.state,
-        ...(Array.isArray(l.tags) ? l.tags : []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return hay.includes(search);
-    });
-
     return NextResponse.json({
-      items: filtered,
-      total: filtered.length,
+      items: filtered || [],
+      total: (filtered || []).length,
       tagsAll,
     });
   } catch (e: any) {

@@ -169,17 +169,14 @@ export async function POST(req: NextRequest) {
         .select('opt_out_keyword, spam_protection')
         .eq('user_id', userId)
         .single();
-      optOutKeyword = userSettings?.opt_out_keyword || null;
+      optOutKeyword = userSettings?.opt_out_keyword || 'STOP';
       if (userSettings?.spam_protection) {
         spamProtection = { ...spamProtection, ...userSettings.spam_protection };
       }
     }
 
     if (!optOutKeyword) {
-      return NextResponse.json(
-        { error: 'Opt-out keyword not configured. Please set one in Settings > DNC List.' },
-        { status: 400 }
-      );
+      optOutKeyword = 'STOP';
     }
 
     // Check spam risk using full detector

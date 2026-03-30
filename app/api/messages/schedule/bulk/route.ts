@@ -257,10 +257,10 @@ export async function PUT(req: NextRequest) {
                 automation_source: 'scheduled_bulk',
               });
 
-            // Update lead last_contacted
+            // Update lead last_interaction_at
             await adminClient
               .from('leads')
-              .update({ last_contacted: new Date().toISOString() })
+              .update({ last_interaction_at: new Date().toISOString() })
               .eq('id', message.lead_id);
 
             sent++;

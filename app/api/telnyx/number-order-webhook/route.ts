@@ -13,41 +13,23 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
     )
   : null;
 
-// Timing-safe comparison to prevent timing attacks
-function secureCompare(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    // HIGH-1: Pad to equal length before comparison — prevents secret-length leakage via timing.
-    // Both evaluations always run; length mismatch is caught by a separate boolean check.
-    const maxLen = Math.max(bufA.length, bufB.length);
-    const paddedA = Buffer.alloc(maxLen);
-    const paddedB = Buffer.alloc(maxLen);
-    bufA.copy(paddedA);
-    bufB.copy(paddedB);
-    const lengthsMatch = bufA.length === bufB.length;
-    const bytesMatch = crypto.timingSafeEqual(paddedA, paddedB);
-    return lengthsMatch && bytesMatch;
-  } catch {
-    return false;
-  }
-}
-
-// Verify Telnyx webhook signature (HMAC-SHA256)
+// Verify Telnyx webhook signature (Ed25519)
 function verifyTelnyxSignature(
-  payload: string,
+  rawBody: string,
   signature: string,
   timestamp: string,
   publicKey: string
 ): boolean {
   try {
-    const signedPayload = `${timestamp}|${payload}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', publicKey)
-      .update(signedPayload)
-      .digest('base64');
-
-    return secureCompare(signature, expectedSignature);
+    const ed25519Sig = Buffer.from(signature, 'base64');
+    const signedPayload = `${timestamp}|${rawBody}`;
+    const publicKeyBuffer = Buffer.from(publicKey, 'base64');
+    return crypto.verify(
+      null, // Ed25519 doesn't use a digest algorithm
+      Buffer.from(signedPayload),
+      { key: publicKeyBuffer, format: 'der', type: 'spki' },
+      ed25519Sig
+    );
   } catch (error) {
     console.error('Signature verification error:', error);
     return false;
@@ -239,12 +221,38 @@ export async function POST(req: NextRequest) {
       case 'porting_order.status_changed': {
         // Number porting status changed
         const portingStatus = payload?.status;
+        const telnyxPortingId = payload?.id;
         const phoneNumbers = payload?.phone_numbers || [];
+        const statusDetail = payload?.status_detail || null;
 
         console.log('🔄 Porting order status changed:', {
           status: portingStatus,
+          telnyxPortingId,
           phoneNumbers,
         });
+
+        // Map Telnyx status to our DB status
+        const statusMap: Record<string, string> = {
+          pending: 'pending',
+          in_progress: 'in_progress',
+          ported: 'complete',
+          completed: 'complete',
+          rejected: 'failed',
+          cancelled: 'cancelled',
+        };
+        const dbStatus = statusMap[portingStatus] || portingStatus;
+
+        // Update porting_orders table if we have a Telnyx porting order ID
+        if (telnyxPortingId) {
+          await supabaseAdmin
+            .from('porting_orders')
+            .update({
+              status: dbStatus,
+              status_details: statusDetail,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('telnyx_porting_order_id', telnyxPortingId);
+        }
 
         if (portingStatus === 'ported' || portingStatus === 'completed') {
           // Porting complete - activate the numbers
@@ -258,6 +266,9 @@ export async function POST(req: NextRequest) {
               .eq('phone_number', phoneNumber)
               .eq('status', 'pending');
           }
+          console.log(`✅ Porting complete — activated ${phoneNumbers.length} number(s)`);
+        } else if (portingStatus === 'rejected' || portingStatus === 'cancelled') {
+          console.warn(`⚠️ Porting ${portingStatus} for order ${telnyxPortingId}: ${statusDetail}`);
         }
         break;
       }

@@ -71,14 +71,7 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    const optOutKeyword = userSettings?.opt_out_keyword || null;
-
-    if (!optOutKeyword) {
-      return NextResponse.json(
-        { error: 'Opt-out keyword not configured. Please set one in Settings > DNC List.' },
-        { status: 400 }
-      );
-    }
+    const optOutKeyword = userSettings?.opt_out_keyword || 'STOP';
 
     // Check if this is the first message to this lead (no existing thread)
     const { data: existingThreadCheck } = await supabase
@@ -183,23 +176,6 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       console.error('❌ SMS send failed:', result.error);
 
-      // Log failed SMS to database
-      await supabase.from('sms_messages').insert({
-        user_id: user.id,
-        lead_id: leadId || null,
-        campaign_id: campaignId || null,
-        to_phone: toPhone,
-        from_phone: fromPhone || result.from,
-        message_body: messageBody,
-        twilio_status: 'failed',
-        twilio_error_message: result.error,
-        template_id: templateId || null,
-        is_automated: isAutomated,
-        cost_points: isBulk ? 2 : 1,
-        failed_at: new Date().toISOString(),
-        provider: 'telnyx',
-      });
-
       // Log activity for lead if leadId provided
       if (leadId) {
         await supabase.from('lead_activities').insert({
@@ -225,26 +201,6 @@ export async function POST(req: NextRequest) {
     const actualFromPhone = result.from || fromPhone;
 
     console.log(`✅ SMS sent successfully via Telnyx! SID: ${result.messageSid}, Status: ${result.status}, From: ${actualFromPhone}`);
-
-    // Log successful SMS to database
-    const { data: smsMessage } = await supabase
-      .from('sms_messages')
-      .insert({
-        user_id: user.id,
-        lead_id: leadId || null,
-        campaign_id: campaignId || null,
-        to_phone: toPhone,
-        from_phone: actualFromPhone,
-        message_body: messageBody,
-        twilio_sid: result.messageSid,
-        twilio_status: result.status || 'sent',
-        template_id: templateId || null,
-        is_automated: isAutomated,
-        cost_points: isBulk ? 2 : 1,
-        provider: 'telnyx',
-      })
-      .select()
-      .single();
 
     // Create or update thread for this conversation
     const { data: existingThread } = await supabase
@@ -347,7 +303,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Log activity for lead if leadId provided
-    if (leadId && smsMessage) {
+    if (leadId) {
       await supabase.from('lead_activities').insert({
         user_id: user.id,
         lead_id: leadId,
@@ -355,7 +311,6 @@ export async function POST(req: NextRequest) {
         title: 'SMS Sent',
         description: messageBody.substring(0, 100) + (messageBody.length > 100 ? '...' : ''),
         metadata: { toPhone, messageSid: result.messageSid },
-        sms_message_id: smsMessage.id,
       });
     }
 
@@ -368,7 +323,6 @@ export async function POST(req: NextRequest) {
       from: actualFromPhone,
       pointsDeducted: isBulk ? 2 : 1,
       remainingBalance: pointsResult.balance,
-      smsMessageId: smsMessage?.id,
       provider: 'telnyx',
     });
   } catch (error) {

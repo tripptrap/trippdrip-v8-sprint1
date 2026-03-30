@@ -148,7 +148,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, status, filters, fromNumbers, sendWindow, steps, stats, flow_id, tags, lead_type, auto_trigger_flow } = body;
+    const { id, name, status, flow_id, tags, lead_type, auto_trigger_flow } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Campaign ID is required' }, { status: 400 });
@@ -163,11 +163,6 @@ export async function PUT(req: NextRequest) {
       updateData.name = trimmedName;
     }
     if (status !== undefined) updateData.status = status;
-    if (filters !== undefined) updateData.filters = filters;
-    if (fromNumbers !== undefined) updateData.from_numbers = fromNumbers;
-    if (sendWindow !== undefined) updateData.send_window = sendWindow;
-    if (steps !== undefined) updateData.steps = steps;
-    if (stats !== undefined) updateData.stats = stats;
     if (flow_id !== undefined) updateData.flow_id = flow_id;
     if (tags !== undefined) updateData.tags = tags;
     if (lead_type !== undefined) updateData.lead_type = lead_type;

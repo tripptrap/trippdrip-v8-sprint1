@@ -18,8 +18,8 @@ export async function GET(
       }, { status: 401 });
     }
 
-    const threadId = parseInt(params.id);
-    if (isNaN(threadId)) {
+    const threadId = params.id;
+    if (!threadId) {
       return NextResponse.json({
         ok: false,
         thread: null,
@@ -70,8 +70,8 @@ export async function PUT(
       }, { status: 401 });
     }
 
-    const threadId = parseInt(params.id);
-    if (isNaN(threadId)) {
+    const threadId = params.id;
+    if (!threadId) {
       return NextResponse.json({
         ok: false,
         error: 'Invalid thread ID'
@@ -79,11 +79,15 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { flow_config } = body;
+    const { ai_enabled, status } = body;
+
+    const updatePayload: Record<string, unknown> = {};
+    if (ai_enabled !== undefined) updatePayload.ai_enabled = ai_enabled;
+    if (status !== undefined) updatePayload.status = status;
 
     const { data: thread, error } = await supabase
       .from('threads')
-      .update({ flow_config })
+      .update(updatePayload)
       .eq('id', threadId)
       .eq('user_id', user.id)
       .select()
