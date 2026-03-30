@@ -4,6 +4,7 @@ import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
 import { detectSpam } from "@/lib/spam/detector";
 import { sendTelnyxSMS } from "@/lib/telnyx";
+import { createNotification } from "@/lib/createNotification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -524,6 +525,7 @@ export async function POST(req: Request) {
     }
 
     // Update campaign stats after sending
+    let campaignLabel = 'Your campaign';
     if (campaignId) {
       // Get current campaign data for merging
       const { data: currentCampaign } = await supabase
@@ -533,6 +535,7 @@ export async function POST(req: Request) {
         .single();
 
       if (currentCampaign) {
+        campaignLabel = currentCampaign.name || 'Your campaign';
         const currentLeadIds = Array.isArray(currentCampaign.lead_ids) ? currentCampaign.lead_ids : [];
         const currentTags = Array.isArray(currentCampaign.tags_applied) ? currentCampaign.tags_applied : [];
 
@@ -553,6 +556,34 @@ export async function POST(req: Request) {
     const successCount = sendResults.filter(r => r.success).length;
     const failCount = sendResults.filter(r => !r.success).length;
     const dncSkippedCount = sendResults.filter(r => !r.success && r.error?.startsWith('Skipped: On DNC')).length;
+
+    // Fire campaign_done in-app notification if any messages were sent
+    if (successCount > 0) {
+      createNotification(
+        user.id,
+        'campaign_done',
+        `${campaignLabel} finished sending`,
+        `${successCount} message${successCount !== 1 ? 's' : ''} sent${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+        { campaignId, successCount, failCount }
+      ).catch(() => {});
+    }
+
+    // Fire low_credits notification if balance crossed below threshold during this run
+    if (sendSMS && totalCreditsUsed > 0) {
+      const LOW_CREDITS_THRESHOLD = 500;
+      if (userPoints >= LOW_CREDITS_THRESHOLD) {
+        const remainingCredits = userPoints - totalCreditsUsed;
+        if (remainingCredits < LOW_CREDITS_THRESHOLD) {
+          createNotification(
+            user.id,
+            'low_credits',
+            'Running low on credits',
+            `You have ${Math.max(0, remainingCredits).toLocaleString()} credits remaining. Top up to keep SMS features running.`,
+            { remainingCredits: Math.max(0, remainingCredits) }
+          ).catch(() => {});
+        }
+      }
+    }
 
     return NextResponse.json({
       ok: true,
