@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     // Contacted = we sent them at least one message, or status indicates contact
     const contacted = leads.filter(l => {
       const t = threadsMap.get(l.id);
-      return (t && t.messages_from_user > 0) || l.status === 'contacted' || l.status === 'engaged' || l.last_contacted;
+      return (t && t.messages_from_user > 0) || l.status === 'contacted' || l.status === 'engaged' || l.last_interaction_at;
     }).length;
 
     // Engaged = lead replied at least once
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
       }
       acc[src].total++;
       const t = threadsMap.get(lead.id);
-      if ((t && t.messages_from_user > 0) || lead.status === 'contacted' || lead.status === 'engaged' || lead.last_contacted) acc[src].contacted++;
+      if ((t && t.messages_from_user > 0) || lead.status === 'contacted' || lead.status === 'engaged' || lead.last_interaction_at) acc[src].contacted++;
       if ((t && t.messages_from_lead > 0) || lead.status === 'engaged') acc[src].engaged++;
       if (lead.disposition === 'sold' || lead.converted === true || lead.status === 'sold') acc[src].sold++;
       return acc;

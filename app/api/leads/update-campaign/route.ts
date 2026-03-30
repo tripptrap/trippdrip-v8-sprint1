@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       await supabase
         .from('campaigns')
         .update({
-          lead_count: newCount || 0,
+          total_leads: newCount || 0,
           updated_at: new Date().toISOString(),
         })
         .eq('id', campaignId)

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       // Prepare lead data for scoring
       const leadData = {
         disposition: lead.disposition || null,
-        lastEngaged: thread?.last_message_at || null,
+        lastEngaged: thread?.updated_at || null,
         totalSent: thread?.messages_from_user || 0,
         totalReceived: thread?.messages_from_lead || 0,
         responseRate: thread?.messages_from_user > 0

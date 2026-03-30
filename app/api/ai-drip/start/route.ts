@@ -34,12 +34,13 @@ export async function POST(req: NextRequest) {
     // Get user's Telnyx number if not provided
     let senderNumber = fromNumber;
     if (!senderNumber) {
-      const { data: settings } = await supabase
-        .from('user_settings')
-        .select('telnyx_phone_number')
+      const { data: primaryNumber } = await supabase
+        .from('user_telnyx_numbers')
+        .select('phone_number')
         .eq('user_id', user.id)
+        .eq('is_primary', true)
         .single();
-      senderNumber = settings?.telnyx_phone_number;
+      senderNumber = primaryNumber?.phone_number;
     }
 
     if (!senderNumber) {

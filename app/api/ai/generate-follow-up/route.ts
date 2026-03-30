@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate days since contact
-    const daysSinceContact = lead.last_contacted
-      ? Math.floor((Date.now() - new Date(lead.last_contacted).getTime()) / (1000 * 60 * 60 * 24))
+    const daysSinceContact = lead.last_interaction_at
+      ? Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
       : 999;
 
     // Get recent messages for context

@@ -19,7 +19,7 @@ interface Lead {
   temperature?: string;
   notes?: string;
   created_at?: string;
-  last_contacted?: string;
+  last_interaction_at?: string;
   [key: string]: any;
 }
 
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
         'temperature',
         'notes',
         'created_at',
-        'last_contacted',
+        'last_interaction_at',
       ];
 
       // Transform data for CSV
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         ...lead,
         tags: Array.isArray(lead.tags) ? lead.tags.join(';') : '',
         created_at: lead.created_at ? new Date(lead.created_at).toISOString() : '',
-        last_contacted: lead.last_contacted ? new Date(lead.last_contacted).toISOString() : '',
+        last_interaction_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : '',
       }));
 
       const parser = new Parser({ fields });

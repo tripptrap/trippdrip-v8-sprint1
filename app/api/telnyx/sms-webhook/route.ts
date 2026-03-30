@@ -555,12 +555,14 @@ async function handleInboundSMS(payload: any) {
 
               // Log activity
               await supabaseAdmin
-                .from('activity_log')
+                .from('lead_activities')
                 .insert({
                   user_id: userId,
                   lead_id: leadId,
-                  type: 'appointment_cancelled',
+                  activity_type: 'appointment_cancelled',
+                  title: 'Appointment Cancelled',
                   description: 'Appointment cancelled via SMS',
+                  metadata: { source: 'sms' },
                   created_at: new Date().toISOString(),
                 });
 

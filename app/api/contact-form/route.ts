@@ -92,32 +92,11 @@ export async function POST(req: NextRequest) {
         // If table doesn't exist, try storing in a general leads table or log
         console.error('Error creating contact form submission:', insertError);
 
-        // Fallback: Try to store as a general inquiry
-        const { error: fallbackError } = await supabase
-          .from('inquiries')
-          .insert({
-            first_name: firstName,
-            last_name: lastName,
-            email,
-            phone,
-            sms_consent: smsConsent,
-            email_opt_in: emailOptIn,
-            source: 'website_contact_form',
-            created_at: new Date().toISOString(),
-          });
-
-        if (fallbackError) {
-          // Log the submission even if DB fails
-          console.log('Contact form submission (DB unavailable):', {
-            firstName,
-            lastName,
-            email,
-            phone,
-            smsConsent,
-            emailOptIn,
-            timestamp: new Date().toISOString(),
-          });
-        }
+        // Log the submission since DB insert failed
+        console.error('Contact form DB insert failed. Submission data:', {
+          firstName, lastName, email, phone, smsConsent, emailOptIn,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 

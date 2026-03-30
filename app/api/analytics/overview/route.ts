@@ -91,8 +91,8 @@ export async function GET(req: NextRequest) {
       let responseCount = 0;
 
       for (const thread of threads) {
-        if (thread.last_message_at && thread.created_at && thread.messages_from_lead > 0) {
-          const responseTime = new Date(thread.last_message_at).getTime() - new Date(thread.created_at).getTime();
+        if (thread.updated_at && thread.created_at && thread.messages_from_lead > 0) {
+          const responseTime = new Date(thread.updated_at).getTime() - new Date(thread.created_at).getTime();
           totalResponseTime += responseTime;
           responseCount++;
         }

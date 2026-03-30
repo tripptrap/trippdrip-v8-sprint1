@@ -182,16 +182,24 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "Server not configured for sending" }, { status: 500 });
       }
 
-      // Get user's credits and phone number
+      // Get user's credits
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('credits, telnyx_phone_number')
+        .select('credits')
         .eq('id', user.id)
         .single();
 
       if (userError || !userData) {
         return NextResponse.json({ ok: false, error: "Failed to get user data" }, { status: 500 });
       }
+
+      // Get user's primary Telnyx number
+      const { data: primaryNumberRow } = await supabase
+        .from('user_telnyx_numbers')
+        .select('phone_number')
+        .eq('user_id', user.id)
+        .eq('is_primary', true)
+        .single();
 
       // Calculate total credits needed
       const totalCredits = messages.reduce((sum, m) => sum + (m.credits_cost || 0), 0);
@@ -218,7 +226,7 @@ export async function PUT(req: NextRequest) {
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: message.body,
-            from: userData.telnyx_phone_number || undefined,
+            from: primaryNumberRow?.phone_number || undefined,
           });
 
           if (result.success) {

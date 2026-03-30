@@ -319,13 +319,14 @@ export async function POST(req: NextRequest) {
         message = guardrailResult.message;
 
         // Get user's Telnyx number for sending
-        const { data: userSettings } = await supabaseAdmin
-          .from('user_settings')
-          .select('telnyx_phone_number')
+        const { data: primaryNumber } = await supabaseAdmin
+          .from('user_telnyx_numbers')
+          .select('phone_number')
           .eq('user_id', enrollment.user_id)
+          .eq('is_primary', true)
           .single();
 
-        const fromNumber = userSettings?.telnyx_phone_number || '';
+        const fromNumber = primaryNumber?.phone_number || '';
         if (!fromNumber) {
           console.error(`📧 Drip: No from number for user ${enrollment.user_id}`);
           errors++;

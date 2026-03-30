@@ -239,7 +239,7 @@ export async function GET(req: NextRequest) {
       .select('*, leads(first_name, last_name, phone, email)')
       .eq('user_id', user.id)
       .eq('is_archived', archived)
-      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false, nullsFirst: false })
       .limit(limit);
 
     // Filter by tag if provided

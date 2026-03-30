@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // Create transaction record
     const { data: transaction, error: transactionError } = await supabase
-      .from('transactions')
+      .from('points_transactions')
       .insert({
         user_id: user.id,
         action_type: 'spend',
@@ -60,7 +60,8 @@ export async function POST(req: NextRequest) {
         description: description || 'Points spent',
         lead_id: leadId || null,
         message_id: messageId || null,
-        campaign_id: campaignId || null
+        campaign_id: campaignId || null,
+        amount_paid: 0
       })
       .select()
       .single();

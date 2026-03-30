@@ -69,8 +69,8 @@ export async function GET(req: NextRequest) {
       // Calculate average response time
       let avgResponseTime = 0;
       const responseTimes = campaignThreads
-        .filter(t => t.last_message_at && t.created_at && (t.messages_from_lead || 0) > 0)
-        .map(t => new Date(t.last_message_at).getTime() - new Date(t.created_at).getTime());
+        .filter(t => t.updated_at && t.created_at && (t.messages_from_lead || 0) > 0)
+        .map(t => new Date(t.updated_at).getTime() - new Date(t.created_at).getTime());
 
       if (responseTimes.length > 0) {
         const avgMs = responseTimes.reduce((sum, t) => sum + t, 0) / responseTimes.length;

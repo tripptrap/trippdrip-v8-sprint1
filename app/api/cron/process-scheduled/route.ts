@@ -246,10 +246,10 @@ async function processScheduledMessages(supabase: any) {
             })
             .eq('id', message.id);
 
-          // Update lead last_contacted
+          // Update lead last_interaction_at
           await supabase
             .from('leads')
-            .update({ last_contacted: new Date().toISOString() })
+            .update({ last_interaction_at: new Date().toISOString() })
             .eq('id', message.lead_id);
 
           processed++;
@@ -303,7 +303,7 @@ async function processScheduledMessages(supabase: any) {
 
           await supabase
             .from('leads')
-            .update({ last_contacted: new Date().toISOString() })
+            .update({ last_interaction_at: new Date().toISOString() })
             .eq('id', message.lead_id);
 
           processed++;
@@ -456,10 +456,10 @@ async function processScheduledCampaigns(supabase: any) {
                 campaign_id: campaign.id,
               });
 
-            // Update lead last_contacted
+            // Update lead last_interaction_at
             await supabase
               .from('leads')
-              .update({ last_contacted: new Date().toISOString() })
+              .update({ last_interaction_at: new Date().toISOString() })
               .eq('id', leadId);
 
             batchProcessed++;

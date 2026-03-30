@@ -122,7 +122,6 @@ export async function GET(req: NextRequest) {
                 .from('threads')
                 .update({
                   messages_from_user: (existingThread.messages_from_user || 0) + 1,
-                  last_message_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', existingThread.id);
@@ -135,8 +134,7 @@ export async function GET(req: NextRequest) {
                   messages_from_user: 1,
                   messages_from_lead: 0,
                   created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  last_message_at: new Date().toISOString()
+                  updated_at: new Date().toISOString()
                 })
                 .select()
                 .single();

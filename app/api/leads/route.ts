@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   const dateTo = url.searchParams.get("dateTo");
   // MED-2: Allowlist sortBy to prevent schema probing via arbitrary column names
   const SORTABLE_COLUMNS = new Set([
-    'created_at', 'updated_at', 'last_contacted', 'first_name', 'last_name',
+    'created_at', 'updated_at', 'last_interaction_at', 'first_name', 'last_name',
     'phone', 'email', 'status', 'source', 'disposition', 'temperature'
   ]);
   const rawSortBy = url.searchParams.get("sortBy") || "created_at";

@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 
       // Suggestion 1: No response after initial message (sent 2+ days ago)
       if (thread && thread.messages_from_user > 0 && thread.messages_from_lead === 0) {
-        const lastMessageDate = new Date(thread.last_message_at || thread.created_at);
+        const lastMessageDate = new Date(thread.updated_at || thread.created_at);
         const daysSinceMessage = (now.getTime() - lastMessageDate.getTime()) / (1000 * 60 * 60 * 24);
 
         if (daysSinceMessage >= 2) {
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
 
       // Suggestion 2: Lead engaged but no follow-up in 3+ days
       if (thread && thread.messages_from_lead > 0) {
-        const lastMessageDate = new Date(thread.last_message_at || thread.created_at);
+        const lastMessageDate = new Date(thread.updated_at || thread.created_at);
         const daysSinceMessage = (now.getTime() - lastMessageDate.getTime()) / (1000 * 60 * 60 * 24);
 
         if (daysSinceMessage >= 3 && lead.disposition !== 'sold' && lead.disposition !== 'do_not_contact') {
@@ -100,8 +100,8 @@ export async function GET(req: NextRequest) {
 
       // Suggestion 3: Hot leads with no recent contact
       if (lead.disposition === 'hot' || lead.disposition === 'interested') {
-        const lastContactDate = thread?.last_message_at
-          ? new Date(thread.last_message_at)
+        const lastContactDate = thread?.updated_at
+          ? new Date(thread.updated_at)
           : new Date(lead.created_at);
         const daysSinceContact = (now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24);
 

@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
       // This is a simplified approach - ideally we'd have a messages table with timestamps
       for (const thread of threads) {
         const createdDate = format(new Date(thread.created_at), 'yyyy-MM-dd');
-        const lastMessageDate = thread.last_message_at
-          ? format(new Date(thread.last_message_at), 'yyyy-MM-dd')
+        const lastMessageDate = thread.updated_at
+          ? format(new Date(thread.updated_at), 'yyyy-MM-dd')
           : createdDate;
 
         // Add sent messages to creation date

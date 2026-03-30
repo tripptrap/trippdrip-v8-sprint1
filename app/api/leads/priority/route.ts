@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       .not('disposition', 'eq', 'sold') // Exclude already converted
       .not('disposition', 'eq', 'do_not_contact') // Exclude DNC
       .order('score', { ascending: false })
-      .order('last_contacted', { ascending: true, nullsFirst: true })
+      .order('last_interaction_at', { ascending: true, nullsFirst: true })
       .limit(limit);
 
     if (leadsError) {
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
     const { data: threads } = await supabase
       .from('threads')
-      .select('lead_id, messages_from_lead, messages_from_user, last_message_at, last_message_from')
+      .select('lead_id, messages_from_lead, messages_from_user, updated_at, last_sender')
       .eq('user_id', user.id)
       .in('lead_id', leadIds);
 
@@ -70,9 +70,9 @@ export async function GET(req: NextRequest) {
       const leadFollowUps = followUps?.filter(f => f.lead_id === lead.id) || [];
 
       // Calculate priority factors
-      const hasUnansweredMessage = thread?.last_message_from === 'lead';
-      const daysSinceContact = lead.last_contacted
-        ? Math.floor((Date.now() - new Date(lead.last_contacted).getTime()) / (1000 * 60 * 60 * 24))
+      const hasUnansweredMessage = thread?.last_sender === 'lead';
+      const daysSinceContact = lead.last_interaction_at
+        ? Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
         : 999;
       const hasPendingFollowUp = leadFollowUps.length > 0;
       const hasUrgentFollowUp = leadFollowUps.some(f => f.priority === 'urgent');
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
         thread_info: {
           messages_sent: thread?.messages_from_user || 0,
           messages_received: thread?.messages_from_lead || 0,
-          last_message_at: thread?.last_message_at,
+          last_message_at: thread?.updated_at,
           has_unanswered: hasUnansweredMessage,
         },
         follow_ups: leadFollowUps,

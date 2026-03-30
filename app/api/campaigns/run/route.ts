@@ -108,9 +108,9 @@ export async function POST(req: Request) {
         .insert({
           user_id: user.id,
           name: campaignName,
-          tags_applied: addTags,
+          tags: addTags,
           lead_ids: leadIds,
-          lead_count: leadIds.length,
+          total_leads: leadIds.length,
           messages_sent: 0,
           credits_used: 0,
           created_at: new Date().toISOString(),
@@ -537,14 +537,14 @@ export async function POST(req: Request) {
       if (currentCampaign) {
         campaignLabel = currentCampaign.name || 'Your campaign';
         const currentLeadIds = Array.isArray(currentCampaign.lead_ids) ? currentCampaign.lead_ids : [];
-        const currentTags = Array.isArray(currentCampaign.tags_applied) ? currentCampaign.tags_applied : [];
+        const currentTags = Array.isArray(currentCampaign.tags) ? currentCampaign.tags : [];
 
         await supabase
           .from('campaigns')
           .update({
-            tags_applied: Array.from(new Set([...currentTags, ...addTags])),
+            tags: Array.from(new Set([...currentTags, ...addTags])),
             lead_ids: Array.from(new Set([...currentLeadIds, ...leadIds])),
-            lead_count: Array.from(new Set([...currentLeadIds, ...leadIds])).length,
+            total_leads: Array.from(new Set([...currentLeadIds, ...leadIds])).length,
             messages_sent: (currentCampaign.messages_sent || 0) + sendResults.filter(r => r.success).length,
             credits_used: (currentCampaign.credits_used || 0) + totalCreditsUsed,
             updated_at: new Date().toISOString()
