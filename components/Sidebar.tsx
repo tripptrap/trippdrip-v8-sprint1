@@ -43,7 +43,13 @@ const navItems: NavItem[] = [
   { href: "/clients",   label: "Clients", color: 'green' },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/tags",      label: "Tags" },
-  { href: "/templates", label: "Your AI" },
+  {
+    href: "/templates",
+    label: "Your AI",
+    children: [
+      { href: "/demo", label: "Flow Demo" },
+    ]
+  },
   { href: "/quoting",   label: "Quoting" },
   {
     href: "/points",
