@@ -126,9 +126,9 @@ export async function GET(req: NextRequest) {
       // Find appropriate pack
       const pack = findClosestPack(amount);
 
-      // Apply scale discount (30%)
+      // HIGH-5: Scale tier ONLY gets 30% discount on point packs — Growth gets no discount
       const isScale = user.subscription_tier === 'scale';
-      const discount = isScale ? 0.30 : 0.10; // 30% for scale, 10% for growth
+      const discount = isScale ? 0.30 : 0; // 30% for scale only; Growth pays full price
       const finalPrice = Math.round(pack.price * (1 - discount) * 100); // Convert to cents
 
       try {
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
           customer: user.stripe_customer_id,
           off_session: true,
           confirm: true,
-          description: `${pack.name} - Auto-refill (${isScale ? '30%' : '10%'} discount)`,
+          description: `${pack.name} - Auto-refill${isScale ? ' (Scale 30% discount)' : ''}`,
           metadata: {
             user_id: user.id,
             points: pack.points.toString(),
@@ -149,10 +149,12 @@ export async function GET(req: NextRequest) {
         });
 
         if (paymentIntent.status === 'succeeded') {
-          // Add credits to user
+          // Add credits to user (additive, not overwrite — use read-then-add since auto-buy
+          // is a sequential cron, not a concurrent endpoint, so race risk is low here)
+          const { data: freshCredits } = await supabase.from('users').select('credits').eq('id', user.id).single();
           const { error: updateError } = await supabase
             .from('users')
-            .update({ credits: currentCredits + pack.points })
+            .update({ credits: (freshCredits?.credits ?? currentCredits) + pack.points })
             .eq('id', user.id);
 
           if (updateError) {

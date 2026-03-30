@@ -95,7 +95,9 @@ export async function POST(req: NextRequest) {
         priceId = STRIPE_PRICES.pointPacks[userPlan].enterprise;
       }
 
-      successUrl = `${baseUrl}/points?success=true&points=${points}&packName=${encodeURIComponent(packName)}`;
+      // MED-4: Don't put pack details in URL — they appear in logs/analytics and expose purchase info.
+      // The success page looks up the session from Stripe to display purchase details.
+      successUrl = `${baseUrl}/points?success=true`;
     }
 
     if (!priceId) {
