@@ -23,11 +23,15 @@ function secureCompare(a: string, b: string): boolean {
   try {
     const bufA = Buffer.from(a);
     const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) {
-      timingSafeEqual(bufA, bufA);
-      return false;
-    }
-    return timingSafeEqual(bufA, bufB);
+    // HIGH-1: Pad to equal length before comparison — prevents secret-length leakage via timing.
+    const maxLen = Math.max(bufA.length, bufB.length);
+    const paddedA = Buffer.alloc(maxLen);
+    const paddedB = Buffer.alloc(maxLen);
+    bufA.copy(paddedA);
+    bufB.copy(paddedB);
+    const lengthsMatch = bufA.length === bufB.length;
+    const bytesMatch = timingSafeEqual(paddedA, paddedB);
+    return lengthsMatch && bytesMatch;
   } catch {
     return false;
   }
