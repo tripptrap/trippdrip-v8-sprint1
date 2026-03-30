@@ -229,18 +229,20 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Invalid credit amount (must be 1-1,000,000)' }, { status: 400 });
         }
 
-        // Get current user credits
-        let currentCredits = 0;
-        const { data: userData } = await adminClient
+        // MED-12: Fetch current credits — surface error if user not found (don't grant to 0+amount)
+        const { data: userData, error: lookupError } = await adminClient
           .from('users')
           .select('credits')
           .eq('email', (userEmail || '').toLowerCase())
           .single();
 
-        if (userData) {
-          currentCredits = userData.credits || 0;
+        if (lookupError || !userData) {
+          return NextResponse.json({
+            error: `User not found with email: ${userEmail}. Verify the email and try again.`
+          }, { status: 404 });
         }
 
+        const currentCredits = userData.credits ?? 0;
         const newCredits = currentCredits + creditAmount;
 
         // Update credits in users table

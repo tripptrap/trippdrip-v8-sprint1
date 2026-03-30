@@ -28,6 +28,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // MED-13: Verify user has an active paid subscription before allowing number purchase
+    // Unpaid users cannot order Telnyx numbers at company expense
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('subscription_tier, account_status')
+      .eq('id', user.id)
+      .single();
+
+    const isPaidTier = userRow?.subscription_tier === 'growth' || userRow?.subscription_tier === 'scale';
+    const isActive = userRow?.account_status === 'active';
+
+    if (!isPaidTier || !isActive) {
+      return NextResponse.json(
+        { error: 'An active Growth or Scale subscription is required to purchase phone numbers.' },
+        { status: 403 }
+      );
+    }
+
     const { phoneNumber, connectionId } = await req.json();
 
     if (!phoneNumber) {

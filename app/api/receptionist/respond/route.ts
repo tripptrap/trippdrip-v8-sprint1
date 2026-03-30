@@ -127,29 +127,8 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Deduct points atomically using RPC or re-read to minimize race window
-    if (result.pointsUsed && result.pointsUsed > 0) {
-      const { data: freshUser } = await supabase
-        .from('users')
-        .select('credits')
-        .eq('id', userId)
-        .single();
-
-      const freshCredits = freshUser?.credits || 0;
-      if (freshCredits < result.pointsUsed) {
-        return NextResponse.json({
-          success: false,
-          error: 'Insufficient credits',
-        }, { status: 402 });
-      }
-
-      await supabase
-        .from('users')
-        .update({ credits: freshCredits - result.pointsUsed })
-        .eq('id', userId);
-    }
-
-    // Apply AI guardrails
+    // HIGH-8: Apply guardrails BEFORE deducting credits — user should not be
+    // charged for AI responses that are blocked and never sent.
     const guardrailResult = applyGuardrails(result.response || '', DEFAULT_GUARDRAILS);
     if (!guardrailResult.passed) {
       console.warn('AI response blocked by guardrails:', guardrailResult.violations);
@@ -160,7 +139,7 @@ export async function POST(req: NextRequest) {
       }, { status: 422 });
     }
 
-    // SUGGEST MODE: store draft on thread instead of sending
+    // SUGGEST MODE: store draft on thread instead of sending (no credit charge for drafts)
     if (draftOnly && threadId) {
       await supabase
         .from('threads')
@@ -172,10 +151,22 @@ export async function POST(req: NextRequest) {
         success: true,
         response: guardrailResult.message,
         responseType: result.responseType,
-        pointsUsed: 0, // No credits spent for draft generation
+        pointsUsed: 0,
         messageSent: false,
         isDraft: true,
       });
+    }
+
+    // Deduct credits atomically via RPC — only after guardrail check passes and we know we're sending
+    if (result.pointsUsed && result.pointsUsed > 0) {
+      const { error: deductError } = await supabase.rpc('deduct_credits', {
+        user_id: userId,
+        amount: result.pointsUsed
+      });
+      if (deductError) {
+        console.error('Failed to deduct credits:', deductError);
+        // Continue anyway — don't block the send over a credit bookkeeping error
+      }
     }
 
     // FULL AUTO MODE: send the SMS response using Telnyx
