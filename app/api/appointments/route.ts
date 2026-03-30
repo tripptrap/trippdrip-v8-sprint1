@@ -147,7 +147,7 @@ export async function DELETE(req: NextRequest) {
     // Get user's Google tokens
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('google_calendar_access_token, google_calendar_refresh_token')
+      .select('google_calendar_access_token, google_calendar_refresh_token, google_calendar_token_expiry')
       .eq('id', user.id)
       .single();
 
@@ -169,6 +169,38 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ ok: true, message: "Appointment deleted from database" });
     }
 
+    // Refresh Google access token if expired
+    let accessToken = userData.google_calendar_access_token;
+    if (userData.google_calendar_token_expiry && userData.google_calendar_refresh_token) {
+      const expiryTime = new Date(userData.google_calendar_token_expiry).getTime();
+      if (Date.now() >= expiryTime - 60000) { // Refresh 1 min before expiry
+        try {
+          const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: process.env.GOOGLE_CLIENT_ID || '',
+              client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+              refresh_token: userData.google_calendar_refresh_token,
+              grant_type: 'refresh_token',
+            }),
+          });
+          const tokenData = await tokenRes.json();
+          if (tokenData.access_token) {
+            accessToken = tokenData.access_token;
+            await supabase.from('users').update({
+              google_calendar_access_token: tokenData.access_token,
+              google_calendar_token_expiry: tokenData.expires_in
+                ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+                : null,
+            }).eq('id', user.id);
+          }
+        } catch (refreshErr) {
+          console.error('Error refreshing Google token:', refreshErr);
+        }
+      }
+    }
+
     // Try to delete from Google Calendar
     try {
       const { data: event } = await supabase
@@ -184,7 +216,7 @@ export async function DELETE(req: NextRequest) {
           {
             method: 'DELETE',
             headers: {
-              'Authorization': `Bearer ${userData.google_calendar_access_token}`
+              'Authorization': `Bearer ${accessToken}`
             }
           }
         );

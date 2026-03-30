@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Update lead with sold status and client reference
-      const { data: lead } = await supabase
+      const { data: lead, error: leadUpdateError } = await supabase
         .from('leads')
         .update({
           disposition: 'sold',
@@ -93,6 +93,13 @@ export async function POST(req: NextRequest) {
         .eq('user_id', user.id)
         .select()
         .single();
+
+      if (leadUpdateError) {
+        // Rollback: delete the orphaned client record
+        await supabase.from('clients').delete().eq('id', client.id);
+        console.error('Error updating lead after client creation (rolled back):', leadUpdateError);
+        return NextResponse.json({ ok: false, error: leadUpdateError.message }, { status: 500 });
+      }
 
       return NextResponse.json({
         ok: true,

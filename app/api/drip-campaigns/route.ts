@@ -260,15 +260,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Campaign not found' }, { status: 404 });
     }
 
-    // Update steps if provided
+    // Update steps if provided — insert new steps first, then delete old ones
     if (steps && Array.isArray(steps)) {
-      // Delete existing steps
-      await supabase
-        .from('drip_campaign_steps')
-        .delete()
-        .eq('campaign_id', id);
-
-      // Insert new steps
       const stepsToInsert = steps.map((step: any, index: number) => ({
         campaign_id: id,
         step_number: index + 1,
@@ -280,9 +273,24 @@ export async function PUT(req: NextRequest) {
         template_id: step.templateId || null,
       }));
 
+      // Insert new steps first
+      const { data: newSteps, error: insertError } = await supabase
+        .from('drip_campaign_steps')
+        .insert(stepsToInsert)
+        .select('id');
+
+      if (insertError) {
+        console.error('Error inserting new steps:', insertError);
+        return NextResponse.json({ ok: false, error: 'Failed to update campaign steps' }, { status: 500 });
+      }
+
+      // Only delete old steps after new ones are confirmed inserted
+      const newStepIds = (newSteps || []).map((s: any) => s.id);
       await supabase
         .from('drip_campaign_steps')
-        .insert(stepsToInsert);
+        .delete()
+        .eq('campaign_id', id)
+        .not('id', 'in', `(${newStepIds.join(',')})`);
     }
 
     return NextResponse.json({
