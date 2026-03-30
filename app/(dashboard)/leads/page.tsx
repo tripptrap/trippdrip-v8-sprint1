@@ -103,6 +103,7 @@ export default function LeadsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [hideSold, setHideSold] = useState(true); // hide converted leads by default
   const [recalculatingScores, setRecalculatingScores] = useState(false);
 
   /* Pagination */
@@ -852,6 +853,15 @@ export default function LeadsPage() {
       arr = arr.filter(l => l.status === 'archived');
     } else {
       arr = arr.filter(l => l.status !== 'archived');
+
+      // Hide converted/sold leads from the active pipeline (they live in /clients)
+      if (hideSold) {
+        arr = arr.filter(l =>
+          l.status !== 'sold' &&
+          (l as any).disposition !== 'sold' &&
+          !(l as any).converted
+        );
+      }
     }
 
     // Apply campaign filter - filter by lead's campaign_id
@@ -877,7 +887,7 @@ export default function LeadsPage() {
     });
 
     return arr;
-  }, [leads, activeCampaignId, activeTagFilter, campaigns, hotLeadsOnly, showArchived]);
+  }, [leads, activeCampaignId, activeTagFilter, campaigns, hotLeadsOnly, showArchived, hideSold]);
 
   const allVisibleSelected = useMemo(() => {
     if (!filtered.length) return false;
@@ -1686,6 +1696,14 @@ export default function LeadsPage() {
                 title="Recalculate lead scores based on engagement"
               >
                 {recalculatingScores ? '...' : 'Scores'}
+              </button>
+
+              <button
+                className={`rounded-md px-3 py-1.5 text-sm transition ${!hideSold ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                onClick={() => { setHideSold(v => !v); setShowArchived(false); }}
+                title={hideSold ? 'Show converted leads (sold clients)' : 'Hide converted leads'}
+              >
+                {hideSold ? 'Show Sold' : 'Hide Sold'}
               </button>
 
               <button

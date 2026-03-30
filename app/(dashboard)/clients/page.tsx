@@ -282,8 +282,11 @@ export default function ClientsPage() {
       <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Clients</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Sold customers converted from leads</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Clients</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Sold / active customers — managed by your AI Receptionist.{' '}
+              <a href="/leads" className="text-sky-600 dark:text-sky-400 hover:underline">Convert leads →</a>
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -419,7 +422,20 @@ export default function ClientsPage() {
               <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Loading clients...</td></tr>
             )}
             {!loading && clients.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No clients found</td></tr>
+              <tr>
+                <td colSpan={8} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-2xl">🤝</div>
+                    <p className="font-medium text-slate-700 dark:text-slate-200">No clients yet</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+                      Mark a lead as Sold to convert them to a client. Clients are managed by your AI Receptionist.
+                    </p>
+                    <a href="/leads" className="mt-1 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition">
+                      Go to Leads →
+                    </a>
+                  </div>
+                </td>
+              </tr>
             )}
             {!loading && clients.map(c => {
               const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "—";
@@ -457,16 +473,32 @@ export default function ClientsPage() {
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{c.state || "—"}</td>
                   <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-xs">{convertedDate}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingClient({ ...c });
-                        setEditOpen(true);
-                      }}
-                      className="text-sky-600 hover:text-sky-700 text-xs font-medium"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {c.phone && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const params = new URLSearchParams({ phone: c.phone });
+                            const name = [c.first_name, c.last_name].filter(Boolean).join(' ');
+                            if (name) params.set('leadName', name);
+                            router.push(`/texts?${params.toString()}`);
+                          }}
+                          className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 text-xs font-medium"
+                        >
+                          💬 Text
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingClient({ ...c });
+                          setEditOpen(true);
+                        }}
+                        className="text-sky-600 hover:text-sky-700 text-xs font-medium"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

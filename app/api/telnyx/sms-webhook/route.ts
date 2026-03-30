@@ -707,6 +707,12 @@ async function checkAndTriggerReceptionist(
       leadId = lead.id;
       leadName = lead.name;
 
+      // Sold/converted clients skip Flow AI entirely — Receptionist handles them
+      const isSoldEarly = lead.disposition === 'sold' ||
+                          lead.status === 'sold' ||
+                          lead.disposition === 'closed_won';
+
+      if (!isSoldEarly) {
       // Check if lead has a flow assigned — respect its autonomy mode
       // Also check campaign's auto_trigger_flow setting
       const { data: leadDetail } = await supabaseAdmin
@@ -861,6 +867,7 @@ async function checkAndTriggerReceptionist(
         }
         // 'full_auto': proceed normally (flowContext will be passed to receptionist below)
       }
+      } // end !isSoldEarly — flow block
 
       // Check if this is a sold client
       const isSoldClient = lead.disposition === 'sold' ||
