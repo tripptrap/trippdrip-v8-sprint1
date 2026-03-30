@@ -41,6 +41,7 @@ export async function GET() {
       is_ai_generated: true,
       requiredQuestions: flow.required_questions || [],
       requiresCall: flow.requires_call || false,
+      autonomyMode: flow.context?.autonomyMode || 'full_auto',
       context: flow.context
     }));
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context, autonomyMode } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: 'Flow name is required' }, { status: 400 });
@@ -75,7 +76,8 @@ export async function POST(req: NextRequest) {
     const now = new Date().toISOString();
 
     // Build the context object — use provided context if available, otherwise fall back to description-only
-    const flowContext = context || { whatOffering: description || '' };
+    const baseContext = context || { whatOffering: description || '' };
+    const flowContext = autonomyMode ? { ...baseContext, autonomyMode } : baseContext;
 
     // Create flow using conversation_flows table
     const { data, error } = await supabase
@@ -116,7 +118,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context } = body;
+    const { id, name, steps, isAIGenerated, description, requiredQuestions, requiresCall, context, autonomyMode } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Flow ID is required' }, { status: 400 });
@@ -130,7 +132,17 @@ export async function PUT(req: NextRequest) {
     if (name !== undefined) updateData.name = name.trim();
     if (context !== undefined) {
       // Use full context object if provided (includes agent identity fields)
-      updateData.context = context;
+      // If autonomyMode also provided, merge it in
+      updateData.context = autonomyMode ? { ...context, autonomyMode } : context;
+    } else if (autonomyMode !== undefined) {
+      // autonomyMode-only update — need to fetch current context to merge
+      const { data: existing } = await supabase
+        .from('conversation_flows')
+        .select('context')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+      updateData.context = { ...(existing?.context || {}), autonomyMode };
     } else if (description !== undefined) {
       // Fallback: legacy description-only updates
       updateData.context = { whatOffering: description };

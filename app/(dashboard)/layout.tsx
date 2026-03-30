@@ -9,6 +9,7 @@ import OnboardingTour from "@/components/OnboardingTour"
 import OnboardingCongratsModal from "@/components/OnboardingCongratsModal"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { OnboardingProvider } from "@/lib/OnboardingContext"
+import LowCreditsWarning from "@/components/LowCreditsWarning"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="flex-1 flex flex-col w-full md:w-auto relative z-10">
           <Topbar />
+          <LowCreditsWarning />
           <div className="container py-6 px-4 md:px-6">{children}</div>
         </main>
 

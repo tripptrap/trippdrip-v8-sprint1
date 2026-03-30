@@ -655,6 +655,29 @@ async function checkAndTriggerReceptionist(
       leadId = lead.id;
       leadName = lead.name;
 
+      // Check if lead has a flow assigned — respect its autonomy mode
+      const { data: leadDetail } = await supabaseAdmin
+        .from('leads')
+        .select('flow_id')
+        .eq('id', lead.id)
+        .single();
+
+      if (leadDetail?.flow_id) {
+        const { data: flowData } = await supabaseAdmin
+          .from('conversation_flows')
+          .select('context')
+          .eq('id', leadDetail.flow_id)
+          .single();
+
+        const flowAutonomyMode = flowData?.context?.autonomyMode || 'full_auto';
+        if (flowAutonomyMode === 'manual') {
+          console.log('🤖 Receptionist: Skipping — assigned flow is in manual mode');
+          return;
+        }
+        // 'suggest' mode: for now auto-respond (draft UI coming in future sprint)
+        // 'full_auto': proceed normally
+      }
+
       // Check if this is a sold client
       const isSoldClient = lead.disposition === 'sold' ||
                            lead.status === 'sold' ||

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { flowName, context, requiredQuestions, requiresCall } = await req.json();
+    const { flowName, context, requiredQuestions, requiresCall, autonomyMode } = await req.json();
 
     if (!flowName || !context || !context.whoYouAre || !context.whatOffering || !context.whoTexting) {
       return NextResponse.json(
@@ -301,7 +301,7 @@ Important:
         .insert({
           user_id: user.id,
           name: flowName,
-          context: context,
+          context: { ...context, autonomyMode: autonomyMode || 'full_auto' },
           steps: flowData.steps,
           required_questions: requiredQuestions || [],
           requires_call: requiresCall || false,

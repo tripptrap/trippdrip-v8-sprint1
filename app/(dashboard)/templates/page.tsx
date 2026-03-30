@@ -40,6 +40,8 @@ type ConversationFlow = {
   steps: FlowStep[];
   requiredQuestions?: RequiredQuestion[]; // Questions that must be answered
   requiresCall?: boolean; // Whether this flow requires a phone/zoom call
+  autonomyMode?: 'full_auto' | 'suggest' | 'manual'; // How AI handles replies
+  context?: Record<string, any>; // Preserve full context for updates
   createdAt: string;
   updatedAt: string;
   isAIGenerated?: boolean; // Track if flow was created with AI
@@ -65,6 +67,8 @@ async function loadFlows(): Promise<ConversationFlow[]> {
         steps: flow.steps || [],
         requiredQuestions: flow.required_questions || [],
         requiresCall: flow.requires_call || false,
+        autonomyMode: (flow.context?.autonomyMode || 'full_auto') as 'full_auto' | 'suggest' | 'manual',
+        context: flow.context || {},
         createdAt: flow.created_at,
         updatedAt: flow.updated_at,
         isAIGenerated: flow.is_ai_generated
@@ -237,6 +241,7 @@ export default function FlowsPage() {
   });
   const [requiredQuestions, setRequiredQuestions] = useState<RequiredQuestion[]>([]);
   const [requiresCall, setRequiresCall] = useState(false);
+  const [autonomyMode, setAutonomyMode] = useState<'full_auto' | 'suggest' | 'manual'>('full_auto');
   const [isGenerating, setIsGenerating] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [showStepDialog, setShowStepDialog] = useState(false);
@@ -396,6 +401,22 @@ export default function FlowsPage() {
     }
   }
 
+  async function updateFlowAutonomyMode(flowId: string, mode: 'full_auto' | 'suggest' | 'manual') {
+    // Merge new autonomy mode into existing context
+    const flow = flows.find(f => f.id === flowId);
+    const updatedContext = { ...(flow?.context || {}), autonomyMode: mode };
+
+    await fetch('/api/flows', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: flowId, context: updatedContext })
+    });
+
+    // Update local state
+    setFlows(prev => prev.map(f => f.id === flowId ? { ...f, autonomyMode: mode, context: updatedContext } : f));
+    setSelectedFlow(prev => prev?.id === flowId ? { ...prev, autonomyMode: mode, context: updatedContext } : prev);
+  }
+
   function assignStepColors(steps: FlowStep[]): FlowStep[] {
     // Color progression: Blue -> Purple -> Orange -> Green (last step)
     const colors = ['#3B82F6', '#8B5CF6', '#F59E0B']; // Blue, Purple, Orange
@@ -442,7 +463,7 @@ export default function FlowsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           flowName: newFlowName.trim(),
-          context: flowContext,
+          context: { ...flowContext, autonomyMode },
           requiredQuestions: validRequiredQuestions,
           requiresCall: requiresCall
         })
@@ -463,6 +484,8 @@ export default function FlowsPage() {
           steps: stepsWithColors,
           requiredQuestions: validRequiredQuestions,
           requiresCall: requiresCall,
+          autonomyMode: autonomyMode,
+          context: { ...flowContext, autonomyMode },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           isAIGenerated: true
@@ -477,6 +500,7 @@ export default function FlowsPage() {
         setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
         setRequiredQuestions([]);
         setRequiresCall(false);
+        setAutonomyMode('full_auto');
         setShowNewFlowDialog(false);
       } else {
         setModal({
@@ -1644,6 +1668,7 @@ Available variables:
                     setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
                     setRequiredQuestions([]);
                     setRequiresCall(false);
+                    setAutonomyMode('full_auto');
                   }}
                   className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl leading-none"
                   disabled={isGenerating}
@@ -1831,6 +1856,36 @@ Available variables:
               </label>
             </div>
 
+            {/* AI Autonomy Mode */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-600 space-y-3">
+              <div>
+                <label className="text-sm font-semibold text-slate-900 dark:text-slate-100 block">AI Autonomy Mode</label>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">How should the AI handle replies from leads in this flow?</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'full_auto' as const, label: 'Full Auto', desc: 'AI replies automatically', icon: '🤖' },
+                  { value: 'suggest' as const, label: 'Suggest', desc: 'AI drafts, you approve', icon: '✏️' },
+                  { value: 'manual' as const, label: 'Manual', desc: 'You reply yourself', icon: '👤' },
+                ] as const).map(({ value, label, desc, icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAutonomyMode(value)}
+                    className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                      autonomyMode === value
+                        ? 'border-sky-500 bg-sky-50 dark:bg-sky-900/20'
+                        : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="text-lg mb-1">{icon}</div>
+                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{label}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2 block">Client goals (optional)</label>
               <textarea
@@ -1858,6 +1913,7 @@ Available variables:
                   setFlowContext({ whoYouAre: "", whatOffering: "", whoTexting: "", clientGoals: "", agentName: "", companyName: "", contactReason: "", callbackNumber: "", website: "" });
                   setRequiredQuestions([]);
                   setRequiresCall(false);
+                  setAutonomyMode('full_auto');
                 }}
                 className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-6 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
                 disabled={isGenerating}
@@ -2083,6 +2139,40 @@ Available variables:
                   )}
                 </div>
               )}
+
+              {/* AI Autonomy Mode Card */}
+              <div className="card p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Bot className="w-5 h-5 text-violet-500 dark:text-violet-400" />
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">AI Autonomy Mode</div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'full_auto' as const, label: 'Full Auto', desc: 'AI replies automatically', icon: '🤖' },
+                    { value: 'suggest' as const, label: 'Suggest', desc: 'AI drafts, you approve', icon: '✏️' },
+                    { value: 'manual' as const, label: 'Manual', desc: 'You handle replies', icon: '👤' },
+                  ] as const).map(({ value, label, desc, icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => updateFlowAutonomyMode(selectedFlow.id, value)}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        (selectedFlow.autonomyMode || 'full_auto') === value
+                          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
+                          : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="text-lg mb-1">{icon}</div>
+                      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{label}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
+                  {(selectedFlow.autonomyMode || 'full_auto') === 'full_auto' && 'AI will automatically reply to leads when they respond to this flow.'}
+                  {selectedFlow.autonomyMode === 'suggest' && 'AI will draft a reply for your review. You approve before it sends.'}
+                  {selectedFlow.autonomyMode === 'manual' && 'AI will not reply. You handle all conversations in this flow.'}
+                </p>
+              </div>
 
               {/* Advanced Details Toggle */}
               <div className="card p-0 overflow-hidden">
