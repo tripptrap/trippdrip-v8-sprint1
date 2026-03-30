@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { isAdminEmail } from '@/lib/admin';
+import QABacktestTracker from '@/components/QABacktestTracker';
 import { format } from 'date-fns';
 import {
   Users,
@@ -949,6 +950,7 @@ export default function AdminPage() {
           and are planned for future implementation.
       ============================================================ */}
       <InternalDevNotes />
+      <QABacktestTracker />
 
       {/* Grant Credits Modal */}
       {grantCreditsModal && (
