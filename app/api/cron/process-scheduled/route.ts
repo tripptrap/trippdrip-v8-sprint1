@@ -50,7 +50,9 @@ function secureCompare(a: string, b: string): boolean {
 
 export async function GET(req: NextRequest) {
   // SECURITY: Mandatory cron secret validation
-  const cronSecret = req.headers.get('x-cron-secret') || '';
+  // LOW-9: Accept both x-cron-secret (external cron services) and Authorization: Bearer (Vercel cron)
+  const authHeader = req.headers.get('authorization') || '';
+  const cronSecret = req.headers.get('x-cron-secret') || authHeader.replace('Bearer ', '');
   const expectedSecret = process.env.CRON_SECRET;
 
   if (!expectedSecret) {

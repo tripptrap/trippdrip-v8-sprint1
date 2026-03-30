@@ -35,11 +35,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate scheduled time is in the future
+    // Validate scheduled time is in the future and within 1 year (MED-10)
     const scheduledDate = new Date(scheduledFor);
-    if (scheduledDate <= new Date()) {
+    const now = new Date();
+    if (scheduledDate <= now) {
       return NextResponse.json(
         { ok: false, error: "Scheduled time must be in the future" },
+        { status: 400 }
+      );
+    }
+    const oneYearFromNow = new Date(now);
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    if (scheduledDate > oneYearFromNow) {
+      return NextResponse.json(
+        { ok: false, error: "Scheduled time cannot be more than 1 year in the future" },
         { status: 400 }
       );
     }

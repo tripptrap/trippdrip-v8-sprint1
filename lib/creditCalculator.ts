@@ -2,9 +2,9 @@
  * Credit Cost Calculator for SMS Messages
  *
  * Pricing:
- * - 1-140 characters: 1 credit
- * - 141-280 characters: 2 credits
- * - 281+ characters: 3 credits
+ * - 1-160 characters: 1 credit  (LOW-10: corrected from 140 to telecom standard 160)
+ * - 161-320 characters: 2 credits
+ * - 321+ characters: 3 credits
  * - Photos/Media: 6 credits per attachment
  */
 
@@ -32,13 +32,14 @@ export function calculateSMSCredits(
   let segments = 0;
 
   // Calculate text credits based on character count
+  // Standard SMS segment = 160 characters (GSM-7 encoding)
   if (characterCount === 0) {
     textCredits = 0;
     segments = 0;
-  } else if (characterCount <= 140) {
+  } else if (characterCount <= 160) {
     textCredits = 1;
     segments = 1;
-  } else if (characterCount <= 280) {
+  } else if (characterCount <= 320) {
     textCredits = 2;
     segments = 2;
   } else {
@@ -80,21 +81,21 @@ export function getCharacterWarning(currentLength: number): {
   remaining: number;
   nextSegmentCost: number;
 } {
-  if (currentLength <= 140) {
+  if (currentLength <= 160) {
     return {
-      threshold: 140,
-      remaining: 140 - currentLength,
+      threshold: 160,
+      remaining: 160 - currentLength,
       nextSegmentCost: 2
     };
-  } else if (currentLength <= 280) {
+  } else if (currentLength <= 320) {
     return {
-      threshold: 280,
-      remaining: 280 - currentLength,
+      threshold: 320,
+      remaining: 320 - currentLength,
       nextSegmentCost: 3
     };
   } else {
     return {
-      threshold: 280,
+      threshold: 320,
       remaining: 0,
       nextSegmentCost: 3
     };
