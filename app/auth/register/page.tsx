@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [industry, setIndustry] = useState('')
   const [useCase, setUseCase] = useState('')
   const [updatePref, setUpdatePref] = useState<'email' | 'phone' | 'both'>('email')
+  const [smsConsent, setSmsConsent] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const [showSuccess, setShowSuccess] = useState(false)
@@ -56,6 +57,11 @@ export default function RegisterPage() {
       return
     }
 
+    if (phone.trim() && !smsConsent) {
+      toast.error('Please check the SMS consent box to provide a phone number')
+      return
+    }
+
     setLoading(true)
 
     // Create Supabase client inside the event handler to avoid SSR issues
@@ -75,6 +81,8 @@ export default function RegisterPage() {
             industry: industry,
             use_case: useCase,
             update_preference: updatePref,
+            sms_consent: phone.trim() ? smsConsent : false,
+            sms_consent_at: phone.trim() && smsConsent ? new Date().toISOString() : null,
           },
           // Production domain for email verification
           emailRedirectTo: `${baseUrl}/auth/callback`,
@@ -209,6 +217,27 @@ export default function RegisterPage() {
               placeholder="(555) 123-4567"
             />
           </div>
+
+          {phone.trim() && (
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-gray-50 border border-gray-200">
+              <input
+                id="smsConsent"
+                type="checkbox"
+                checked={smsConsent}
+                onChange={(e) => setSmsConsent(e.target.checked)}
+                required
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <label htmlFor="smsConsent" className="text-xs text-gray-600 leading-relaxed">
+                I agree to receive SMS text messages from HyveWyre at the phone number provided, including
+                account notifications and product updates. Message and data rates may apply. Message frequency
+                varies. Reply STOP to opt out at any time, HELP for help. View our{' '}
+                <Link href="/privacy" className="text-teal-600 hover:underline" target="_blank">Privacy Policy</Link>
+                {' '}and{' '}
+                <Link href="/terms" className="text-teal-600 hover:underline" target="_blank">Terms of Service</Link>.
+              </label>
+            </div>
+          )}
 
           <div>
             <label htmlFor="industry" className="block text-sm font-medium mb-2 text-gray-700">
