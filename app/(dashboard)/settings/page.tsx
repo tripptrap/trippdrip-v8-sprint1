@@ -21,11 +21,12 @@ import IntegrationsPage from '../integrations/page';
 import DNCPage from '../dnc/page';
 import CustomModal from '@/components/CustomModal';
 import NotificationSettings from '@/components/NotificationSettings';
+import TenDLCRegistration from '@/components/settings/TenDLCRegistration';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [activeTab, setActiveTab] = useState<'spam' | 'autorefill' | 'notifications' | 'numbers' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account' | 'plan' | 'aihandoff'>('plan');
+  const [activeTab, setActiveTab] = useState<'spam' | 'autorefill' | 'notifications' | 'numbers' | 'messaging' | 'integrations' | 'dnc' | 'privacy' | 'terms' | 'compliance' | 'refund' | 'contact' | 'account' | 'plan' | 'aihandoff'>('plan');
   const [saveMessage, setSaveMessage] = useState('');
 
   // Spam protection form
@@ -533,6 +534,16 @@ export default function Page() {
           }`}
         >
           Phone Numbers
+        </button>
+        <button
+          onClick={() => setActiveTab('messaging')}
+          className={`px-3 py-1.5 text-sm font-medium rounded-t ${
+            activeTab === 'messaging'
+              ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
+        >
+          Messaging Registration
         </button>
         <button
           onClick={() => setActiveTab('spam')}
@@ -1050,6 +1061,8 @@ export default function Page() {
           </div>
         </div>
       )}
+
+      {activeTab === 'messaging' && <TenDLCRegistration />}
 
       {/* Spam Protection Tab */}
       {activeTab === 'spam' && (

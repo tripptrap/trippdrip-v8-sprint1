@@ -250,14 +250,14 @@ export default function PreviewClient() {
             Get Started in Minutes
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-            No complex setup. No waiting for verification. Start sending messages today.
+            No complex setup. Get your number and start building campaigns today.
           </p>
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
           {[
             { step: '1', title: 'Create Account', desc: 'Sign up in under a minute. Choose your plan and get instant access to all features.', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-            { step: '2', title: 'Get Your Number', desc: 'Claim a pre-verified phone number instantly from our shared pool. No A2P wait times.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
+            { step: '2', title: 'Get Your Number', desc: 'Claim your phone number right away, then we handle registering it for compliant messaging under your business.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
             { step: '3', title: 'Import Leads', desc: 'Upload your CSV, connect your CRM, or add leads manually. We handle the rest.', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
             { step: '4', title: 'Start Sending', desc: 'Launch campaigns, set up AI workflows, and watch your response rates soar.', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
           ].map((item, i) => (
@@ -619,7 +619,7 @@ export default function PreviewClient() {
           {[
             {
               q: 'How quickly can I start sending messages?',
-              a: 'Immediately after signup! Unlike other platforms that require 1-7 days for A2P verification, HyveWyre provides pre-verified phone numbers from our shared pool. Choose your plan, claim a number, and start sending in under 5 minutes.'
+              a: 'You get your phone number right after signup. We then register it for compliant SMS messaging under your business, which is required by carriers for every business that sends text campaigns — we handle the registration for you so you don’t have to deal with the paperwork yourself.'
             },
             {
               q: 'Is HyveWyre TCPA compliant?',
@@ -861,9 +861,9 @@ export default function PreviewClient() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Start Messaging Instantly</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Get Set Up Fast</h3>
             <p className="text-gray-500">
-              No waiting days for number verification. Claim a pre-verified number from our shared pool and start sending messages in seconds.
+              Claim your number right away. We handle registering it for compliant messaging under your business — no paperwork on your end.
             </p>
           </motion.div>
 
