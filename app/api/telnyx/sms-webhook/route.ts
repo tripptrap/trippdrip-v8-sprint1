@@ -781,10 +781,10 @@ async function checkAndTriggerReceptionist(
       }
 
       if (effectiveFlowId) {
-        // Fetch full flow data — required_questions, steps, and context (autonomy + identity)
+        // Fetch flow name + context (autonomy + identity) — step content now lives on `tags`
         const { data: flowData } = await supabaseAdmin
           .from('conversation_flows')
-          .select('name, required_questions, context')
+          .select('name, context')
           .eq('id', effectiveFlowId)
           .single();
 
@@ -794,12 +794,17 @@ async function checkAndTriggerReceptionist(
           return;
         }
 
-        // ── Extract answers & update conversation state ──────────────────────
-        const requiredQuestions: Array<{ question: string; fieldName: string }> =
-          flowData?.required_questions || [];
+        // ── Step-gated extraction & advancement (one tag/step at a time) ─────
+        const { data: stepTagRows } = await supabaseAdmin
+          .from('tags')
+          .select('id, name, ai_instruction, field_name')
+          .eq('flow_id', effectiveFlowId)
+          .order('flow_step_order', { ascending: true });
 
-        if (requiredQuestions.length > 0 && lead?.id) {
-          // Load current collected info from lead.conversation_state
+        const steps = (stepTagRows || []).filter(t => !!t.field_name);
+
+        if (steps.length > 0 && lead?.id) {
+          // Load current collected info + tags from lead.conversation_state
           const { data: leadState } = await supabaseAdmin
             .from('leads')
             .select('conversation_state, tags, primary_tag')
@@ -809,30 +814,34 @@ async function checkAndTriggerReceptionist(
           const currentCollected: Record<string, string> =
             (leadState?.conversation_state as any)?.collectedInfo || {};
 
-          // Determine which questions still need answers
-          const remaining = requiredQuestions.filter(
-            q => !currentCollected[q.fieldName]
-          );
+          // Current step = first step (in order) whose field isn't collected yet
+          const current = steps.find(s => !currentCollected[s.field_name]) || null;
 
-          // Extract any answers from this message (non-blocking)
+          // Extract an answer for ONLY the current step's field — deliberately one
+          // step at a time for the baseline (multi-step jump-ahead is issue #27)
           let newlyExtracted: Record<string, string> = {};
-          if (remaining.length > 0) {
+          if (current) {
             try {
               const { extractFlowAnswers } = await import('@/lib/ai/extractFlowAnswers');
-              newlyExtracted = await extractFlowAnswers(messageBody, remaining, currentCollected);
+              newlyExtracted = await extractFlowAnswers(
+                messageBody,
+                [{ question: current.ai_instruction || current.name, fieldName: current.field_name }],
+                currentCollected
+              );
             } catch (extractErr) {
               console.error('🤖 Answer extraction failed (non-fatal):', extractErr);
             }
           }
 
-          // Merge and persist updated collectedInfo
           const updatedCollected = { ...currentCollected, ...newlyExtracted };
-          const updatedRemaining = requiredQuestions.filter(
-            q => !updatedCollected[q.fieldName]
-          );
-          const allAnswered = updatedRemaining.length === 0 && requiredQuestions.length > 0;
+          const justCompletedStep = current && newlyExtracted[current.field_name] ? current : null;
 
-          if (Object.keys(newlyExtracted).length > 0) {
+          if (justCompletedStep) {
+            const existingTags: string[] = leadState?.tags || [];
+            const newTags = existingTags.includes(justCompletedStep.name)
+              ? existingTags
+              : [...existingTags, justCompletedStep.name];
+
             await supabaseAdmin
               .from('leads')
               .update({
@@ -841,38 +850,34 @@ async function checkAndTriggerReceptionist(
                   collectedInfo: updatedCollected,
                   lastUpdated: new Date().toISOString(),
                 },
+                tags: newTags,
+                primary_tag: justCompletedStep.name,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', lead.id);
 
-            console.log('🤖 Flow answers extracted:', newlyExtracted);
+            console.log(`🤖 Flow step complete — advanced to tag "${justCompletedStep.name}"`, newlyExtracted);
           }
 
-          // Auto-tag when all required questions are answered
-          if (allAnswered) {
-            const existingTags: string[] = leadState?.tags || [];
-            const qualifiedTag = 'qualified';
-            if (!existingTags.includes(qualifiedTag)) {
-              const newTags = [...new Set([...existingTags, qualifiedTag])];
-              await supabaseAdmin
-                .from('leads')
-                .update({
-                  tags: newTags,
-                  primary_tag: qualifiedTag,
-                  status: 'qualified',
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', lead.id);
-              console.log('🤖 Flow complete — lead auto-tagged "qualified"');
-            }
-          }
+          // Recompute current step now that this turn's answer (if any) is merged in
+          const newCurrent = steps.find(s => !updatedCollected[s.field_name]) || null;
+          const allAnswered = newCurrent === null;
 
-          // Build flowContext to pass to the AI so it knows what to ask next
+          const toFlowStep = (s: typeof steps[number], completed: boolean) => ({
+            tagId: s.id,
+            tagName: s.name,
+            aiInstruction: s.ai_instruction || s.name,
+            fieldName: s.field_name,
+            completed,
+          });
+
+          // Build flowContext to pass to the AI — full step list for continuity/tone,
+          // plus which single step is live right now
           flowContext = {
             flowName: flowData?.name || 'Qualification Flow',
-            requiredQuestions,
+            steps: steps.map(s => toFlowStep(s, !!updatedCollected[s.field_name])),
             collectedInfo: updatedCollected,
-            remainingQuestions: updatedRemaining,
+            currentStep: newCurrent ? toFlowStep(newCurrent, false) : null,
             allAnswered,
           };
         }

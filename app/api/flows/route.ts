@@ -4,6 +4,65 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+type IncomingStep = {
+  question: string;
+  fieldName: string;
+  tagName?: string;
+  aiInstruction?: string;
+};
+
+/**
+ * Keep `tags` (flow_id, flow_step_order, ai_instruction, field_name) in sync with a
+ * flow's requiredQuestions array — each question is a step, and each step is a tag.
+ * Updates rows in place by position so tag ids (and lead tag-name references) stay
+ * stable across edits; trims/extends rows if the step count changed.
+ */
+async function syncFlowStepTags(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  flowId: string,
+  questions: IncomingStep[]
+) {
+  const { data: existing } = await supabase
+    .from('tags')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('flow_id', flowId)
+    .order('flow_step_order', { ascending: true });
+
+  const existingRows = existing || [];
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    const name = (q.tagName || q.question || `Step ${i + 1}`).trim();
+    const rowData = {
+      name,
+      ai_instruction: q.aiInstruction?.trim() || q.question || name,
+      field_name: q.fieldName,
+      flow_id: flowId,
+      flow_step_order: i,
+      is_pipeline_stage: true,
+    };
+
+    if (existingRows[i]) {
+      await supabase.from('tags').update(rowData).eq('id', existingRows[i].id);
+    } else {
+      await supabase.from('tags').insert({
+        user_id: userId,
+        color: '#3b82f6',
+        position: i,
+        ...rowData,
+      });
+    }
+  }
+
+  // Remove any leftover step-tags if the flow now has fewer steps
+  if (existingRows.length > questions.length) {
+    const staleIds = existingRows.slice(questions.length).map(r => r.id);
+    await supabase.from('tags').delete().in('id', staleIds);
+  }
+}
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -100,6 +159,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
+    if (Array.isArray(requiredQuestions) && requiredQuestions.length > 0) {
+      await syncFlowStepTags(supabase, user.id, data.id, requiredQuestions);
+    }
+
     return NextResponse.json({ ok: true, data });
   } catch (error: any) {
     console.error('Error in POST /api/flows:', error);
@@ -162,6 +225,10 @@ export async function PUT(req: NextRequest) {
     if (error) {
       console.error('Error updating flow:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    if (requiredQuestions !== undefined && Array.isArray(requiredQuestions)) {
+      await syncFlowStepTags(supabase, user.id, id, requiredQuestions);
     }
 
     return NextResponse.json({ ok: true, data });

@@ -183,48 +183,52 @@ SCHEDULING: You can help schedule appointments. When someone wants to book a mee
   if (params.flowContext) {
     const fc = params.flowContext;
 
-    if (fc.allAnswered) {
-      // All info collected — wrap up and offer next step
+    // Full step list, in order, so the AI keeps the whole conversation's shape in
+    // mind even though it only acts on the current step right now
+    const stepList = fc.steps
+      .map((s, i) => `  ${i + 1}. [${s.completed ? 'done' : 'pending'}] ${s.tagName}`)
+      .join('\n');
+
+    if (fc.allAnswered || !fc.currentStep) {
+      // All steps collected — wrap up and offer next step
       const collected = Object.entries(fc.collectedInfo)
         .map(([k, v]) => `  - ${k}: ${v}`)
         .join('\n');
       prompt += `
 
-QUALIFICATION COMPLETE — ALL REQUIRED INFO COLLECTED:
+QUALIFICATION FLOW — "${fc.flowName}" — ALL STEPS COMPLETE:
+${stepList}
+
+Collected info:
 ${collected}
 
-INSTRUCTIONS: All qualifying questions have been answered. Confirm the details with the lead, thank them, and move toward booking an appointment or next step. Do NOT ask any more qualifying questions.`;
+INSTRUCTIONS: Every step in this flow has been completed. Confirm the details with the lead, thank them, and move toward booking an appointment or next step. Do NOT ask any more qualifying questions.`;
     } else {
-      // Still gathering info
+      // Still on one specific step
       const collected = Object.keys(fc.collectedInfo).length > 0
         ? Object.entries(fc.collectedInfo)
             .map(([k, v]) => `  ✓ ${k}: ${v}`)
             .join('\n')
         : '  (none yet)';
 
-      const nextQ = fc.remainingQuestions[0];
-      const remaining = fc.remainingQuestions
-        .map((q, i) => `  ${i + 1}. ${q.question} [${q.fieldName}]`)
-        .join('\n');
-
       prompt += `
 
 QUALIFICATION FLOW — "${fc.flowName}":
-You are gathering specific information from this lead. Ask ONE question at a time, naturally.
+Full flow (for context/tone only — do not jump ahead):
+${stepList}
 
 Already collected:
 ${collected}
 
-Still need (in order):
-${remaining}
-
-NEXT QUESTION TO ASK: "${nextQ.question}"
+YOUR CURRENT STEP: "${fc.currentStep.tagName}"
+INSTRUCTION FOR THIS STEP: ${fc.currentStep.aiInstruction}
 
 INSTRUCTIONS:
-- Acknowledge their last message naturally, then ask the NEXT QUESTION above
-- Do NOT ask multiple questions at once
+- Acknowledge their last message naturally, then work only the CURRENT STEP's instruction above
+- If the lead asks something unrelated or goes off-topic, answer it naturally using everything you know from the conversation so far, THEN steer back to the current step
+- Do NOT skip ahead to a future step or ask multiple steps' worth of questions at once
 - Keep it conversational — do not sound like a form
-- Once all questions are answered, confirm and offer to book an appointment`;
+- Maintain a consistent tone across the whole conversation, even though this instruction only covers one step`;
     }
   }
 

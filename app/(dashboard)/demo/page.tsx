@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Bot, User, Send, RotateCcw, ChevronDown, CheckCircle2, Circle, Loader2, Sparkles, FlaskConical, Tag } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -13,6 +14,27 @@ interface Flow {
   requiredQuestions?: Array<{ question: string; fieldName: string }>;
   autonomyMode?: string;
   steps?: any[];
+  context?: {
+    contactReason?: string;
+    whatOffering?: string;
+    agentName?: string;
+    companyName?: string;
+  };
+}
+
+/**
+ * In production, a lead's first inbound reply is almost always a response to
+ * an outbound message the business already sent (a campaign text, a drip
+ * step) — the flow itself only reacts to inbound messages, it never
+ * originates the first one. This builds that opener so the demo reflects
+ * that instead of implying the lead texts in cold.
+ */
+function buildOpenerMessage(flow: Flow): string {
+  const ctx = flow.context;
+  if (ctx?.contactReason) return ctx.contactReason;
+  const who = ctx?.agentName ? `This is ${ctx.agentName}` : "Hi!";
+  const what = ctx?.whatOffering ? ` I wanted to reach out about ${ctx.whatOffering}.` : " I wanted to follow up with you.";
+  return `${who}${what}`;
 }
 
 interface Message {
@@ -21,11 +43,21 @@ interface Message {
   body: string;
   extracted?: Record<string, string>;  // answers pulled from THIS message
   timestamp: Date;
+  isOpener?: boolean; // the simulated outbound text that precedes the lead's first reply
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function DemoPage() {
+  return (
+    <Suspense fallback={null}>
+      <DemoPageInner />
+    </Suspense>
+  );
+}
+
+function DemoPageInner() {
+  const searchParams = useSearchParams();
   const [flows, setFlows] = useState<Flow[]>([]);
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
   const [flowDropdownOpen, setFlowDropdownOpen] = useState(false);
@@ -60,9 +92,18 @@ export default function DemoPage() {
       .finally(() => setFlowsLoading(false));
   }, []);
 
+  // ── Auto-select a flow when arriving via "Test Flow" (?flowId=...) ─────────
+  useEffect(() => {
+    if (flowsLoading || flows.length === 0 || selectedFlow) return;
+    const flowId = searchParams.get("flowId");
+    if (!flowId) return;
+    const match = flows.find((f) => f.id === flowId);
+    if (match) handleSelectFlow(match);
+  }, [flowsLoading, flows, searchParams, selectedFlow]);
+
   // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
   // ── Select flow ────────────────────────────────────────────────────────────
@@ -74,9 +115,14 @@ export default function DemoPage() {
 
   function resetConversation(flow?: Flow) {
     const f = flow || selectedFlow;
-    setMessages([]);
+    const opener = f ? buildOpenerMessage(f) : "";
+    setMessages(
+      f
+        ? [{ id: crypto.randomUUID(), role: "ai", body: opener, timestamp: new Date(), isOpener: true }]
+        : []
+    );
     setCollectedInfo({});
-    setConversationHistory([]);
+    setConversationHistory(f ? [{ direction: "outbound", body: opener }] : []);
     setRemainingQuestions(f?.requiredQuestions || []);
     setAllAnswered(false);
     setPipelineTag(null);
@@ -275,6 +321,11 @@ export default function DemoPage() {
                       </div>
                     )}
                     <div className={`max-w-[78%] space-y-1 ${msg.role === "lead" ? "items-end" : "items-start"} flex flex-col`}>
+                      {msg.isOpener && (
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400 px-1">
+                          Simulated outbound — what you'd send first
+                        </span>
+                      )}
                       <div
                         className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           msg.role === "lead"
@@ -339,7 +390,7 @@ export default function DemoPage() {
                     handleSend();
                   }
                 }}
-                placeholder="Type as the lead… (Enter to send)"
+                placeholder="Type the lead's reply… (Enter to send)"
                 rows={1}
                 className="flex-1 resize-none px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
                 style={{ maxHeight: 100 }}

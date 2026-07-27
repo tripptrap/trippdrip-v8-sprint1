@@ -109,11 +109,20 @@ export interface FlowQuestion {
   fieldName: string;
 }
 
+/** A single flow step — backed 1:1 by a row in `tags` (flow_id + flow_step_order). */
+export interface FlowStep {
+  tagId: string;
+  tagName: string;          // also the pipeline-stage label shown in tags/dashboard
+  aiInstruction: string;    // what the AI should ask/say while this is the current step
+  fieldName: string;        // key this step writes into leads.conversation_state.collectedInfo
+  completed: boolean;
+}
+
 export interface FlowContext {
   flowName: string;
-  requiredQuestions: FlowQuestion[];
-  collectedInfo: Record<string, string>;   // fieldName → value already gathered
-  remainingQuestions: FlowQuestion[];       // not yet answered
+  steps: FlowStep[];                        // full ordered step list, for continuity/tone
+  collectedInfo: Record<string, string>;    // fieldName → value already gathered
+  currentStep: FlowStep | null;             // step the lead is currently on; null once allAnswered
   allAnswered: boolean;
 }
 

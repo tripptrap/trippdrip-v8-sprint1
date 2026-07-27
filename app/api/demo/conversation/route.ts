@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'flowId and message are required' }, { status: 400 });
     }
 
-    // ── 1. Load the flow ──────────────────────────────────────────────────────
+    // ── 1. Load the flow + its ordered step-tags ────────────────────────────────
     const { data: flow, error: flowError } = await supabase
       .from('conversation_flows')
-      .select('id, name, required_questions, context, steps')
+      .select('id, name, context, steps')
       .eq('id', flowId)
       .eq('user_id', user.id)
       .single();
@@ -50,25 +50,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Flow not found' }, { status: 404 });
     }
 
-    const requiredQuestions: Array<{ question: string; fieldName: string }> =
-      flow.required_questions || [];
+    const { data: stepTagRows } = await supabase
+      .from('tags')
+      .select('id, name, ai_instruction, field_name')
+      .eq('flow_id', flowId)
+      .order('flow_step_order', { ascending: true });
 
-    // ── 2. Extract answers from the message (same as production webhook) ──────
-    const remaining = requiredQuestions.filter(q => !collectedInfo[q.fieldName]);
+    const steps = (stepTagRows || []).filter(t => !!t.field_name);
+
+    // ── 2. Step-gated extraction (same as production webhook — one step at a time) ──
+    const current = steps.find(s => !collectedInfo[s.field_name]) || null;
     let extracted: Record<string, string> = {};
-    if (remaining.length > 0 && message.trim()) {
-      extracted = await extractFlowAnswers(message, remaining, collectedInfo);
+    if (current && message.trim()) {
+      extracted = await extractFlowAnswers(
+        message,
+        [{ question: current.ai_instruction || current.name, fieldName: current.field_name }],
+        collectedInfo
+      );
     }
     const updatedCollected: Record<string, string> = { ...collectedInfo, ...extracted };
-    const updatedRemaining = requiredQuestions.filter(q => !updatedCollected[q.fieldName]);
-    const allAnswered = requiredQuestions.length > 0 && updatedRemaining.length === 0;
+    const justCompletedStep = current && extracted[current.field_name] ? current : null;
+    const newCurrent = steps.find(s => !updatedCollected[s.field_name]) || null;
+    const allAnswered = steps.length > 0 && newCurrent === null;
 
-    // ── 3. Build flowContext (identical to production webhook) ─────────────────
+    const toFlowStep = (s: typeof steps[number], completed: boolean) => ({
+      tagId: s.id,
+      tagName: s.name,
+      aiInstruction: s.ai_instruction || s.name,
+      fieldName: s.field_name,
+      completed,
+    });
+
+    // ── 3. Build flowContext (identical shape to production webhook) ───────────
     const flowContext: FlowContext = {
       flowName: flow.name,
-      requiredQuestions,
+      steps: steps.map(s => toFlowStep(s, !!updatedCollected[s.field_name])),
       collectedInfo: updatedCollected,
-      remainingQuestions: updatedRemaining,
+      currentStep: newCurrent ? toFlowStep(newCurrent, false) : null,
       allAnswered,
     };
 
@@ -126,20 +144,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
     }
 
-    // ── 6. Determine pipeline tag change ─────────────────────────────────────
-    const pipelineTag = allAnswered ? 'qualified' : null;
-
     return NextResponse.json({
       ok: true,
       aiResponse: result.response,
       responseType: result.responseType,
       extracted,                       // only the newly-extracted fields this turn
       updatedCollectedInfo: updatedCollected,
-      remainingQuestions: updatedRemaining,
-      totalRequired: requiredQuestions.length,
+      currentStep: flowContext.currentStep,
+      totalSteps: steps.length,
       answeredCount: Object.keys(updatedCollected).length,
       allAnswered,
-      pipelineTag,                     // tag that would be applied in production
+      pipelineTag: justCompletedStep?.name || null,   // tag that would be applied in production
     });
 
   } catch (err: any) {

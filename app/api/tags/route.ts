@@ -58,6 +58,8 @@ export async function GET(req: NextRequest) {
       color: tag.color,
       position: tag.position ?? 0,
       is_pipeline_stage: tag.is_pipeline_stage ?? false,
+      flow_id: tag.flow_id ?? null,
+      flow_step_order: tag.flow_step_order ?? null,
       count: tagCounts.get(tag.name) || 0,
       created_at: tag.created_at,
       updated_at: tag.updated_at,

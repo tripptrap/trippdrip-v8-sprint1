@@ -34,6 +34,7 @@ interface PipelineTag {
   count: number;
   is_pipeline_stage?: boolean;
   position?: number;
+  flow_id?: string | null;
 }
 
 interface Appointment {
@@ -77,6 +78,7 @@ export default function Dashboard(){
   const [unreadLoading, setUnreadLoading] = useState(true);
   const [pipelineTags, setPipelineTags] = useState<PipelineTag[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(true);
+  const [flowNames, setFlowNames] = useState<Record<string, string>>({});
 
   // Campaign performance & conversion funnel
   const [campaignPerf, setCampaignPerf] = useState<Array<{ id: string; name: string; totalLeads: number; messagesSent: number; responseRate: number; conversionRate: number }>>([]);
@@ -99,6 +101,7 @@ export default function Dashboard(){
     fetchAppointments();
     fetchUnreadThreads();
     fetchPipelineTags();
+    fetchFlowNames();
     fetchCampaignPerformance();
     fetchConversionFunnel();
   }, [demoMode]);
@@ -384,6 +387,21 @@ export default function Dashboard(){
     }
   }
 
+  async function fetchFlowNames() {
+    if (demoMode) return;
+    try {
+      const res = await fetch('/api/flows');
+      const data = await res.json();
+      if (data.ok && data.items) {
+        const names: Record<string, string> = {};
+        for (const flow of data.items) names[flow.id] = flow.name;
+        setFlowNames(names);
+      }
+    } catch (error) {
+      console.error('Failed to fetch flow names:', error);
+    }
+  }
+
   async function fetchCampaignPerformance() {
     try {
       if (demoMode) {
@@ -443,7 +461,37 @@ export default function Dashboard(){
     ? Math.min(100, Math.round((userCredits.credits / Math.max(userCredits.monthly_credits, 1)) * 100))
     : 0;
 
-  const totalPipelineLeads = pipelineTags.reduce((sum, t) => sum + t.count, 0);
+  // Group pipeline stages by flow — each flow gets its own funnel, since the same
+  // step name (e.g. "Step 2") can mean something different in two different flows.
+  // Tags with no flow_id (manual/global tags) fall into a shared "Other" bucket.
+  const pipelineGroups = (() => {
+    const byFlow = new Map<string, PipelineTag[]>();
+    const other: PipelineTag[] = [];
+    for (const tag of pipelineTags) {
+      if (tag.flow_id) {
+        const arr = byFlow.get(tag.flow_id) || [];
+        arr.push(tag);
+        byFlow.set(tag.flow_id, arr);
+      } else {
+        other.push(tag);
+      }
+    }
+    const groups = Array.from(byFlow.entries()).map(([flowId, tags]) => ({
+      key: flowId,
+      label: `${flowNames[flowId] || 'Flow'} Pipeline`,
+      tags,
+      total: tags.reduce((sum, t) => sum + t.count, 0),
+    }));
+    if (other.length > 0) {
+      groups.push({
+        key: '_other',
+        label: groups.length > 0 ? 'Other Tags' : '',
+        tags: other,
+        total: other.reduce((sum, t) => sum + t.count, 0),
+      });
+    }
+    return groups;
+  })();
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -730,41 +778,50 @@ export default function Dashboard(){
             </Link>
           </div>
         ) : (
-          <>
-            {/* Horizontal segmented bar */}
-            <div className="flex rounded-lg overflow-hidden h-10 mb-3">
-              {pipelineTags.map((tag) => {
-                const percent = totalPipelineLeads > 0 ? (tag.count / totalPipelineLeads) * 100 : 0;
-                return (
-                  <Link
-                    key={tag.id}
-                    href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                    className="relative group flex items-center justify-center transition-opacity hover:opacity-80"
-                    style={{ width: `${Math.max(percent, 5)}%`, backgroundColor: tag.color || '#3b82f6' }}
-                    title={`${tag.name}: ${tag.count} leads`}
-                  >
-                    {percent > 12 && (
-                      <span className="text-white text-xs font-medium truncate px-1">{tag.count}</span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3">
-              {pipelineTags.map((tag) => (
-                <Link
-                  key={tag.id}
-                  href={`/leads?tag=${encodeURIComponent(tag.name)}`}
-                  className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
-                  <span>{tag.name}</span>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">{tag.count}</span>
-                </Link>
-              ))}
-            </div>
-          </>
+          <div className="space-y-5">
+            {pipelineGroups.map((group) => (
+              <div key={group.key}>
+                {group.label && (
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                    {group.label}
+                  </h3>
+                )}
+                {/* Horizontal segmented bar */}
+                <div className="flex rounded-lg overflow-hidden h-10 mb-3">
+                  {group.tags.map((tag) => {
+                    const percent = group.total > 0 ? (tag.count / group.total) * 100 : 0;
+                    return (
+                      <Link
+                        key={tag.id}
+                        href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                        className="relative group flex items-center justify-center transition-opacity hover:opacity-80"
+                        style={{ width: `${Math.max(percent, 5)}%`, backgroundColor: tag.color || '#3b82f6' }}
+                        title={`${tag.name}: ${tag.count} leads`}
+                      >
+                        {percent > 12 && (
+                          <span className="text-white text-xs font-medium truncate px-1">{tag.count}</span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3">
+                  {group.tags.map((tag) => (
+                    <Link
+                      key={tag.id}
+                      href={`/leads?tag=${encodeURIComponent(tag.name)}`}
+                      className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#3b82f6' }} />
+                      <span>{tag.name}</span>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">{tag.count}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </motion.div>
 

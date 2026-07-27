@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   Zap,
@@ -20,28 +21,17 @@ import {
   MessageSquare,
   HelpCircle,
   Check,
+  FlaskConical,
 } from 'lucide-react';
 import { FLOW_TEMPLATES, FlowTemplate } from '@/lib/flowTemplates';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type ResponseOption = {
-  label: string;
-  followUpMessage: string;
-  nextStepId?: string;
-  action?: 'continue' | 'end';
-};
-
-type FlowStep = {
-  id: string;
-  yourMessage: string;
-  responses: ResponseOption[];
-  tag?: { label: string; color: string };
-};
-
 type RequiredQuestion = {
   question: string;
   fieldName: string;
+  tagName?: string;
+  aiInstruction?: string;
 };
 
 type FlowContext = {
@@ -59,7 +49,7 @@ type Flow = {
   id: string;
   name: string;
   description?: string;
-  steps: FlowStep[];
+  steps?: any[];
   context?: FlowContext;
   requiredQuestions?: RequiredQuestion[];
   requiresCall?: boolean;
@@ -89,23 +79,22 @@ const AUTONOMY_OPTIONS: { value: AutonomyMode; label: string; description: strin
 
 // ─── Helper ────────────────────────────────────────────────────────────────
 
-function newStepId() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function emptyStep(): FlowStep {
-  return {
-    id: newStepId(),
-    yourMessage: '',
-    responses: [
-      { label: '', followUpMessage: '' },
-      { label: '', followUpMessage: '' },
-    ],
-  };
-}
-
 function emptyQuestion(): RequiredQuestion {
-  return { question: '', fieldName: '' };
+  return { question: '', fieldName: '', tagName: '', aiInstruction: '' };
+}
+
+/** Turns "Step 2 — Health Check" or a question into a camelCase field key. */
+function slugifyFieldName(text: string): string {
+  const words = text
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return '';
+  return words
+    .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+    .join('')
+    .slice(0, 40);
 }
 
 function autonomyBadge(mode?: string) {
@@ -117,6 +106,8 @@ function autonomyBadge(mode?: string) {
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function FlowsPage() {
+  const router = useRouter();
+
   // List state
   const [flows, setFlows] = useState<Flow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,15 +123,34 @@ export default function FlowsPage() {
   const [formOffering, setFormOffering] = useState('');
   const [formAutonomy, setFormAutonomy] = useState<AutonomyMode>('full_auto');
   const [formRequiresCall, setFormRequiresCall] = useState(false);
-  const [formSteps, setFormSteps] = useState<FlowStep[]>([emptyStep()]);
   const [formQuestions, setFormQuestions] = useState<RequiredQuestion[]>([]);
   const [saving, setSaving] = useState(false);
+  const [advancedSteps, setAdvancedSteps] = useState<Set<number>>(new Set());
+
+  // Account industry (set during onboarding) — used to default a new flow's
+  // starting template so steps correlate with the account's line of business
+  const [accountIndustry, setAccountIndustry] = useState<string | null>(null);
 
   // ── Load ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     loadFlows();
+    loadAccountIndustry();
   }, []);
+
+  async function loadAccountIndustry() {
+    try {
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const raw = user?.user_metadata?.industry;
+      if (raw) {
+        setAccountIndustry(String(raw).toLowerCase().replace(/[\s\/]+/g, '_'));
+      }
+    } catch {
+      // Non-fatal — falls back to the manual template picker
+    }
+  }
 
   async function loadFlows() {
     setLoading(true);
@@ -184,7 +194,14 @@ export default function FlowsPage() {
 
   function openNewFlow() {
     setEditingFlow(null);
-    setView('pick-template');
+    // Default straight into the account's industry template when we have one —
+    // still fully editable, and "Use a different starting point" in the editor
+    // reaches the full picker for anyone who wants a different flow.
+    if (accountIndustry && accountIndustry !== 'other' && (FLOW_TEMPLATES as any)[accountIndustry]) {
+      selectTemplate(accountIndustry);
+    } else {
+      setView('pick-template');
+    }
   }
 
   function openEditFlow(flow: Flow) {
@@ -198,14 +215,6 @@ export default function FlowsPage() {
     setFormOffering(flow.context?.whatOffering || flow.description || '');
     setFormAutonomy((flow.autonomyMode || flow.context?.autonomyMode || 'full_auto') as AutonomyMode);
     setFormRequiresCall(flow.requiresCall || false);
-    setFormSteps(
-      flow.steps && flow.steps.length > 0
-        ? flow.steps.map(s => ({
-            ...s,
-            responses: s.responses && s.responses.length > 0 ? s.responses : [{ label: '', followUpMessage: '' }],
-          }))
-        : [emptyStep()]
-    );
     setFormQuestions(flow.requiredQuestions && flow.requiredQuestions.length > 0 ? flow.requiredQuestions : []);
   }
 
@@ -215,7 +224,6 @@ export default function FlowsPage() {
       setFormOffering('');
       setFormAutonomy('full_auto');
       setFormRequiresCall(false);
-      setFormSteps([emptyStep()]);
       setFormQuestions([]);
     } else {
       const tmpl: FlowTemplate | undefined = (FLOW_TEMPLATES as any)[key];
@@ -224,12 +232,6 @@ export default function FlowsPage() {
         setFormOffering(tmpl.context.whatOffering || '');
         setFormAutonomy('full_auto');
         setFormRequiresCall(tmpl.requiresCall);
-        setFormSteps(
-          tmpl.steps.map(s => ({
-            ...s,
-            responses: s.responses || [],
-          }))
-        );
         setFormQuestions(tmpl.requiredQuestions || []);
       }
     }
@@ -238,46 +240,79 @@ export default function FlowsPage() {
 
   // ── Save ────────────────────────────────────────────────────────────────
 
-  async function handleSave() {
+  /**
+   * Persists the current editor state to /api/flows. Shared by "Save Flow"
+   * (navigates back to the list) and "Test Flow" (a silent "soft save" that
+   * stays in the editor and jumps into /demo instead).
+   */
+  async function persistFlow(): Promise<string | null> {
     if (!formName.trim()) {
       toast.error('Flow name is required');
-      return;
-    }
-    if (formSteps.length === 0) {
-      toast.error('At least one step is required');
-      return;
+      return null;
     }
 
+    // Auto-generate any missing field names from the tag name / question text,
+    // so "Advanced" never has to be opened just to satisfy this requirement
+    const usedFieldNames = new Set<string>();
+    const resolvedQuestions = formQuestions.map(q => {
+      let fieldName = q.fieldName?.trim();
+      if (!fieldName) {
+        const base = slugifyFieldName(q.tagName || q.question) || 'field';
+        fieldName = base;
+        let n = 2;
+        while (usedFieldNames.has(fieldName)) {
+          fieldName = `${base}${n}`;
+          n++;
+        }
+      }
+      usedFieldNames.add(fieldName);
+      return { ...q, fieldName };
+    });
+
+    const payload = {
+      id: editingFlow?.id,
+      name: formName.trim(),
+      steps: [],
+      context: {
+        ...(editingFlow?.context || {}),
+        whatOffering: formOffering,
+        autonomyMode: formAutonomy,
+      },
+      requiredQuestions: resolvedQuestions,
+      requiresCall: formRequiresCall,
+      autonomyMode: formAutonomy,
+    };
+
+    const method = editingFlow ? 'PUT' : 'POST';
+    const res = await fetch('/api/flows', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      toast.error(data.error || 'Failed to save flow');
+      return null;
+    }
+
+    const savedId = editingFlow?.id || data.data?.id;
+    // Soft-saves (Test Flow) leave editingFlow set so a second Test/Save
+    // updates the same record instead of creating duplicates each time
+    if (savedId && !editingFlow) {
+      setEditingFlow({ id: savedId } as Flow);
+    }
+    return savedId || null;
+  }
+
+  async function handleSave() {
     setSaving(true);
     try {
-      const payload = {
-        id: editingFlow?.id,
-        name: formName.trim(),
-        steps: formSteps,
-        context: {
-          ...(editingFlow?.context || {}),
-          whatOffering: formOffering,
-          autonomyMode: formAutonomy,
-        },
-        requiredQuestions: formQuestions,
-        requiresCall: formRequiresCall,
-        autonomyMode: formAutonomy,
-      };
-
-      const method = editingFlow ? 'PUT' : 'POST';
-      const res = await fetch('/api/flows', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-
-      if (data.ok) {
+      const savedId = await persistFlow();
+      if (savedId) {
         toast.success(editingFlow ? 'Flow updated' : 'Flow created');
         await loadFlows();
         setView('list');
-      } else {
-        toast.error(data.error || 'Failed to save flow');
       }
     } catch {
       toast.error('Failed to save flow');
@@ -286,51 +321,18 @@ export default function FlowsPage() {
     }
   }
 
-  // ── Step Helpers ────────────────────────────────────────────────────────
-
-  function updateStep(idx: number, patch: Partial<FlowStep>) {
-    setFormSteps(prev => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
-  }
-
-  function addStep() {
-    setFormSteps(prev => [...prev, emptyStep()]);
-  }
-
-  function removeStep(idx: number) {
-    if (formSteps.length <= 1) return;
-    setFormSteps(prev => prev.filter((_, i) => i !== idx));
-  }
-
-  function updateResponse(stepIdx: number, respIdx: number, patch: Partial<ResponseOption>) {
-    setFormSteps(prev =>
-      prev.map((s, i) => {
-        if (i !== stepIdx) return s;
-        return {
-          ...s,
-          responses: s.responses.map((r, j) => (j === respIdx ? { ...r, ...patch } : r)),
-        };
-      })
-    );
-  }
-
-  function addResponse(stepIdx: number) {
-    setFormSteps(prev =>
-      prev.map((s, i) => {
-        if (i !== stepIdx) return s;
-        if (s.responses.length >= 4) return s;
-        return { ...s, responses: [...s.responses, { label: '', followUpMessage: '' }] };
-      })
-    );
-  }
-
-  function removeResponse(stepIdx: number, respIdx: number) {
-    setFormSteps(prev =>
-      prev.map((s, i) => {
-        if (i !== stepIdx) return s;
-        if (s.responses.length <= 1) return s;
-        return { ...s, responses: s.responses.filter((_, j) => j !== respIdx) };
-      })
-    );
+  async function handleTestFlow() {
+    setSaving(true);
+    try {
+      const savedId = await persistFlow();
+      if (savedId) {
+        router.push(`/demo?flowId=${savedId}`);
+      }
+    } catch {
+      toast.error('Failed to save draft for testing');
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ── Question Helpers ────────────────────────────────────────────────────
@@ -345,6 +347,14 @@ export default function FlowsPage() {
 
   function removeQuestion(idx: number) {
     setFormQuestions(prev => prev.filter((_, i) => i !== idx));
+    setAdvancedSteps(prev => {
+      const next = new Set<number>();
+      prev.forEach(i => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
+      return next;
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -373,8 +383,13 @@ export default function FlowsPage() {
             <button
               key={key}
               onClick={() => selectTemplate(key)}
-              className={`card p-4 md:p-6 flex flex-col items-center gap-3 text-center hover:shadow-md transition-all border ${border} ${bg} cursor-pointer`}
+              className={`relative card p-4 md:p-6 flex flex-col items-center gap-3 text-center hover:shadow-md transition-all border ${border} ${bg} cursor-pointer`}
             >
+              {key === accountIndustry && (
+                <span className="absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-sky-600 text-white">
+                  Your industry
+                </span>
+              )}
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bg}`}>
                 <Icon className={`w-6 h-6 ${color}`} />
               </div>
@@ -407,7 +422,24 @@ export default function FlowsPage() {
                 {editingFlow ? 'Edit Flow' : 'New Flow'}
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {editingFlow ? `Editing: ${editingFlow.name}` : 'Configure your AI conversation flow'}
+                {editingFlow ? (
+                  `Editing: ${editingFlow.name}`
+                ) : (
+                  <>
+                    Configure your AI conversation flow
+                    {accountIndustry && accountIndustry !== 'other' && (FLOW_TEMPLATES as any)[accountIndustry] && (
+                      <>
+                        {' · '}
+                        <button
+                          onClick={() => setView('pick-template')}
+                          className="text-sky-600 dark:text-sky-400 hover:underline"
+                        >
+                          Use a different starting point
+                        </button>
+                      </>
+                    )}
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -417,6 +449,15 @@ export default function FlowsPage() {
               className="border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 transition-colors"
             >
               Cancel
+            </button>
+            <button
+              onClick={handleTestFlow}
+              disabled={saving}
+              title="Saves your current draft and opens it in the Flow Demo"
+              className="border border-violet-300 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed text-violet-600 dark:text-violet-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+            >
+              <FlaskConical className="w-4 h-4" />
+              Test Flow
             </button>
             <button
               onClick={handleSave}
@@ -523,164 +564,122 @@ export default function FlowsPage() {
           </div>
         </div>
 
-        {/* ── Section 2: Conversation Steps ── */}
-        <div className="card p-4 md:p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-sky-500" />
-              Conversation Steps
-            </h2>
-          </div>
 
-          <div className="space-y-5">
-            {formSteps.map((step, sIdx) => (
-              <div
-                key={step.id}
-                className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden"
-              >
-                {/* Step header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Step {sIdx + 1}
-                  </span>
-                  {formSteps.length > 1 && (
-                    <button
-                      onClick={() => removeStep(sIdx)}
-                      className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-colors"
-                      title="Remove step"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="p-4 space-y-4">
-                  {/* AI Message */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                      Your Message
-                      <span className="ml-1 text-xs font-normal text-slate-400">(what the AI sends)</span>
-                    </label>
-                    <textarea
-                      value={step.yourMessage}
-                      onChange={e => updateStep(sIdx, { yourMessage: e.target.value })}
-                      placeholder="Hi! I'm reaching out because you expressed interest in..."
-                      rows={3}
-                      className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400 resize-none"
-                    />
-                  </div>
-
-                  {/* Response Options */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Response Options
-                        <span className="ml-1 text-xs font-normal text-slate-400">({step.responses.length}/4)</span>
-                      </label>
-                      {step.responses.length < 4 && (
-                        <button
-                          onClick={() => addResponse(sIdx)}
-                          className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
-                        >
-                          <Plus className="w-3 h-3" /> Add Response
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      {step.responses.map((resp, rIdx) => (
-                        <div key={rIdx} className="flex gap-2 items-start">
-                          <div className="flex-1 grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value={resp.label}
-                              onChange={e => updateResponse(sIdx, rIdx, { label: e.target.value })}
-                              placeholder="Button label"
-                              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400"
-                            />
-                            <input
-                              type="text"
-                              value={resp.followUpMessage}
-                              onChange={e => updateResponse(sIdx, rIdx, { followUpMessage: e.target.value })}
-                              placeholder="Follow-up message"
-                              className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400"
-                            />
-                          </div>
-                          {step.responses.length > 1 && (
-                            <button
-                              onClick={() => removeResponse(sIdx, rIdx)}
-                              className="mt-2 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={addStep}
-            className="mt-4 w-full py-2.5 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-sm text-slate-500 dark:text-slate-400 hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add Step
-          </button>
-        </div>
-
-        {/* ── Section 3: Required Questions ── */}
+        {/* ── Section 3: Pipeline Steps (Tags) ── */}
         <div className="card p-4 md:p-6 mb-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-sky-500" />
-              Required Questions
+              Pipeline Steps
             </h2>
             <button
               onClick={addQuestion}
               className="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
             >
-              <Plus className="w-3 h-3" /> Add Question
+              <Plus className="w-3 h-3" /> Add Step
             </button>
           </div>
 
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            The AI will make sure to collect answers to these questions before booking an appointment.
+            Each step below becomes a tag this lead is advanced through, one at a time, in order.
+            The AI only works the current step until its question is answered, then moves to the next.
           </p>
 
           {formQuestions.length === 0 ? (
             <div className="text-center py-6 text-sm text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-              No required questions yet. Add one above.
+              No steps yet. Add one above.
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {formQuestions.map((q, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={q.question}
-                      onChange={e => updateQuestion(idx, { question: e.target.value })}
-                      placeholder="Question text"
-                      className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400"
-                    />
-                    <input
-                      type="text"
-                      value={q.fieldName}
-                      onChange={e => updateQuestion(idx, { fieldName: e.target.value })}
-                      placeholder="field_name (snake_case)"
-                      className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400 font-mono"
-                    />
+                <div
+                  key={idx}
+                  className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      Step {idx + 1}
+                    </span>
+                    <button
+                      onClick={() => removeQuestion(idx)}
+                      className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-colors"
+                      title="Remove step"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => removeQuestion(idx)}
-                    className="mt-2 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        Tag / step name
+                      </label>
+                      <input
+                        type="text"
+                        value={q.tagName || ''}
+                        onChange={e => updateQuestion(idx, { tagName: e.target.value })}
+                        placeholder='e.g. "Step 2 — Health Check"'
+                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                        What should the AI ask or find out here?
+                      </label>
+                      <textarea
+                        value={q.question}
+                        onChange={e => updateQuestion(idx, { question: e.target.value })}
+                        placeholder="e.g. Ask for their date of birth naturally, and explain it's needed for an accurate quote."
+                        rows={2}
+                        className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400 resize-none"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        setAdvancedSteps(prev => {
+                          const next = new Set(prev);
+                          next.has(idx) ? next.delete(idx) : next.add(idx);
+                          return next;
+                        })
+                      }
+                      className="text-xs text-sky-600 dark:text-sky-400 hover:underline"
+                    >
+                      {advancedSteps.has(idx) ? 'Hide' : 'Show'} advanced options
+                    </button>
+
+                    {advancedSteps.has(idx) && (
+                      <div className="space-y-3 pt-1 pl-3 border-l-2 border-slate-100 dark:border-slate-700">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                            Field name
+                            <span className="ml-1 font-normal text-slate-400">(auto-generated if left blank)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={q.fieldName}
+                            onChange={e => updateQuestion(idx, { fieldName: e.target.value })}
+                            placeholder={slugifyFieldName(q.tagName || q.question) || 'fieldName'}
+                            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                            Override how the AI phrases this
+                            <span className="ml-1 font-normal text-slate-400">(only needed if it should differ from what's above — used in conversation, while the field above is used to extract the answer)</span>
+                          </label>
+                          <textarea
+                            value={q.aiInstruction || ''}
+                            onChange={e => updateQuestion(idx, { aiInstruction: e.target.value })}
+                            placeholder="Leave blank to reuse the text above"
+                            rows={2}
+                            className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-400 resize-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -694,6 +693,15 @@ export default function FlowsPage() {
             className="border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 transition-colors"
           >
             Cancel
+          </button>
+          <button
+            onClick={handleTestFlow}
+            disabled={saving}
+            title="Saves your current draft and opens it in the Flow Demo"
+            className="border border-violet-300 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed text-violet-600 dark:text-violet-400 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <FlaskConical className="w-4 h-4" />
+            Test Flow
           </button>
           <button
             onClick={handleSave}
