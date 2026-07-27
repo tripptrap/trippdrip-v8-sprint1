@@ -150,12 +150,24 @@ export async function POST(req: NextRequest) {
       legalBusinessName: body.legalBusinessName.trim(),
       vertical: body.vertical,
       whatTheyOffer: body.whatTheyOffer,
+      // Telnyx requires the actual opt-in form URL as evidence, and a real
+      // contact method in the HELP reply — see docs/10DLC_REJECTION_HISTORY.md
+      optInUrl: body.optInUrl?.trim() || body.website?.trim() || undefined,
+      helpContact: body.contactEmail?.trim() || undefined,
     });
     const content: CampaignDefaults = { ...defaults, ...(body.campaignOverrides || {}) };
+
+    // Confirmed against Telnyx's live /10dlc/enum/usecase endpoint (2026-07-27):
+    // LOW_VOLUME requires 1-5 subUsecases, MIXED requires 2-5 — omitting them
+    // entirely (as this route used to) fails with "requires minimum of N sub-usecases".
+    const subUsecases = usecase === 'MIXED'
+      ? ['MARKETING', 'ACCOUNT_NOTIFICATION', 'CUSTOMER_CARE']
+      : ['MARKETING', 'ACCOUNT_NOTIFICATION'];
 
     const campaignResult = await createCampaign({
       brandId: brandResult.brandId!,
       usecase,
+      subUsecases,
       description: content.description,
       sample1: content.sample1,
       sample2: content.sample2,

@@ -231,7 +231,9 @@ export default function RegisterPage() {
               <label htmlFor="smsConsent" className="text-xs text-gray-600 leading-relaxed">
                 I agree to receive SMS text messages from HyveWyre at the phone number provided, including
                 account notifications and product updates. Message and data rates may apply. Message frequency
-                varies. Reply STOP to opt out at any time, HELP for help. View our{' '}
+                varies. Consent is not a condition of purchase. Your mobile opt-in information will not be
+                shared with third parties for marketing or promotional purposes. Reply STOP to opt out at any
+                time, HELP for help. View our{' '}
                 <Link href="/privacy" className="text-teal-600 hover:underline" target="_blank">Privacy Policy</Link>
                 {' '}and{' '}
                 <Link href="/terms" className="text-teal-600 hover:underline" target="_blank">Terms of Service</Link>.
