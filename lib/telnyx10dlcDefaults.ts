@@ -37,8 +37,8 @@ export function generateCampaignDefaults(input: CampaignDefaultsInput): Campaign
     helpMessage: `${business}: For help, call us or email us. Reply STOP to unsubscribe. Msg&data rates may apply.`,
     optinMessage: `You are now opted in to receive SMS messages from ${business}. Message and data rates may apply. Message frequency varies. Reply STOP to unsubscribe, HELP for help.`,
     optoutMessage: `You have been unsubscribed from ${business} SMS messages and will not receive any more messages. Reply START to resubscribe.`,
-    optinKeywords: 'START, YES, UNSTOP',
-    optoutKeywords: 'STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT',
-    helpKeywords: 'HELP, INFO',
+    optinKeywords: 'START,YES,UNSTOP',
+    optoutKeywords: 'STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT',
+    helpKeywords: 'HELP,INFO',
   };
 }
