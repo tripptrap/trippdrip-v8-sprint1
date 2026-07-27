@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ShieldCheck, Loader2, AlertTriangle, CheckCircle2, RefreshCw, Link2 } from 'lucide-react';
+import { ShieldCheck, Loader2, AlertTriangle, CheckCircle2, RefreshCw, Link2, Link as LinkIcon } from 'lucide-react';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
 
 type EntityType = 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NON_PROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
@@ -51,6 +51,10 @@ export default function TenDLCRegistration() {
   const [showPreview, setShowPreview] = useState(false);
   const [overrides, setOverrides] = useState<Partial<CampaignDefaults>>({});
 
+  const [optInUrl, setOptInUrl] = useState<string | null>(null);
+  const [needsBusinessName, setNeedsBusinessName] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const [entityType, setEntityType] = useState<EntityType>('PRIVATE_PROFIT');
   const [legalBusinessName, setLegalBusinessName] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -67,7 +71,21 @@ export default function TenDLCRegistration() {
 
   useEffect(() => {
     loadStatus();
+    loadOptInLink();
   }, []);
+
+  async function loadOptInLink() {
+    try {
+      const res = await fetch('/api/opt-in/my-link');
+      const data = await res.json();
+      if (data.ok) {
+        setOptInUrl(data.url);
+        setNeedsBusinessName(!!data.needsBusinessName);
+      }
+    } catch {
+      // Non-fatal — the form still works, the URL just won't be prefilled
+    }
+  }
 
   async function loadStatus() {
     setLoading(true);
@@ -143,6 +161,7 @@ export default function TenDLCRegistration() {
         body: JSON.stringify({
           entityType, legalBusinessName, displayName, taxId, contactPhone, contactEmail,
           website, vertical, whatTheyOffer, street, city, state, postalCode,
+          optInUrl,
           campaignOverrides: overrides,
         }),
       });
@@ -187,6 +206,54 @@ export default function TenDLCRegistration() {
           "10DLC brand and campaign") — this is separate per business, not something HyveWyre can share across
           accounts. This registers <strong>your</strong> business, not HyveWyre.
         </p>
+      </div>
+
+      {/* Carriers require a public opt-in page naming this specific business —
+          this is submitted as consent evidence with the campaign. */}
+      <div className="card p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <LinkIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            Your SMS opt-in page
+          </h3>
+        </div>
+        {needsBusinessName ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Add your business name in Settings → Account first — your opt-in page is named after it.
+          </p>
+        ) : optInUrl ? (
+          <>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Share this link to collect SMS consent. It's submitted with your registration as proof
+              that your contacts opted in, so carriers can verify it.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-300 break-all">
+                {optInUrl}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(optInUrl);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <a
+                href={optInUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0"
+              >
+                View
+              </a>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-slate-400">Loading…</p>
+        )}
       </div>
 
       {registration && (

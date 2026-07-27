@@ -946,23 +946,31 @@ async function checkAndTriggerReceptionist(
 
       // Auto-create lead if enabled
       if (settings.auto_create_leads) {
+        // NOTE: leads has no `name` column, and leads_status_check permits only
+        // active/inactive/archived/deleted — using `name`/'new' here silently
+        // failed, so inbound contacts were never converted into leads.
         const { data: newLead, error: leadError } = await supabaseAdmin
           .from('leads')
           .insert({
             user_id: userId,
             phone: phoneNumber,
-            name: 'New Contact',
+            first_name: 'New',
+            last_name: 'Contact',
             source: 'inbound_sms',
-            status: 'new',
+            status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .select('id, name')
+          .select('id, first_name, last_name')
           .single();
+
+        if (leadError) {
+          console.error('🤖 Receptionist: Auto-create lead failed:', leadError);
+        }
 
         if (newLead && !leadError) {
           leadId = newLead.id;
-          leadName = newLead.name;
+          leadName = [newLead.first_name, newLead.last_name].filter(Boolean).join(' ') || 'New Contact';
           console.log('🤖 Receptionist: Auto-created new lead:', leadId);
 
           // Link the thread to the new lead
