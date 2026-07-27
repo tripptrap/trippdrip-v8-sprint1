@@ -18,6 +18,21 @@ const OPT_OUT_KEYWORDS = [
   'no more texts', 'leave me alone', 'take me off', 'end', 'halt'
 ];
 
+// Standard HELP / START keywords. Required by MNOs and declared in every
+// 10DLC campaign we register — see docs/10DLC_REJECTION_HISTORY.md (rejection
+// #2 cited missing help-command and opt-in support). Exact whole-message
+// matches only, so "help me pick a time" isn't treated as a HELP command.
+const HELP_KEYWORDS = ['help', 'info'];
+const OPT_IN_KEYWORDS = ['start', 'unstop', 'yes'];
+
+function isHelpRequest(message: string): boolean {
+  return HELP_KEYWORDS.includes(message.trim().toLowerCase());
+}
+
+function isOptIn(message: string): boolean {
+  return OPT_IN_KEYWORDS.includes(message.trim().toLowerCase());
+}
+
 function isOptOut(message: string, customKeyword?: string | null): boolean {
   const lower = message.trim().toLowerCase();
   // Check user's custom opt-out keyword first (exact match)
@@ -440,6 +455,88 @@ async function handleInboundSMS(payload: any) {
 
       // Do NOT trigger receptionist for opt-out messages
       return;
+    }
+
+    // ── HELP: MNO-required standard keyword. Must always get a reply, even
+    // for numbers on the DNC list (HELP is not marketing). ──────────────────
+    if (messageBody && isHelpRequest(messageBody)) {
+      console.log(`ℹ️ HELP request from ${from}`);
+      try {
+        const { data: bizRow } = await supabaseAdmin
+          .from('users')
+          .select('business_name, email')
+          .eq('id', userId)
+          .maybeSingle();
+
+        const brand = bizRow?.business_name?.trim() || 'HyveWyre';
+        const contact = bizRow?.email?.trim();
+        await sendTelnyxSMS({
+          to: from,
+          from: to,
+          message:
+            `${brand}: For help, ${contact ? `contact ${contact}` : 'reply to this message'}. ` +
+            `Reply STOP to unsubscribe. Msg&data rates may apply.`,
+        });
+      } catch (helpErr) {
+        console.error('Error sending HELP reply:', helpErr);
+      }
+      return;
+    }
+
+    // ── START/UNSTOP: re-subscribe a previously opted-out number ────────────
+    if (messageBody && isOptIn(messageBody)) {
+      console.log(`✅ Opt-in (re-subscribe) from ${from}`);
+      try {
+        const { data: dncRow } = await supabaseAdmin
+          .from('dnc_list')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('phone_number', from)
+          .maybeSingle();
+
+        // Only treat this as a re-subscribe if they had actually opted out.
+        // Otherwise "yes" is just a normal reply and belongs to the AI flow.
+        if (!dncRow) {
+          // fall through to normal handling below
+        } else {
+          await supabaseAdmin.from('dnc_list').delete().eq('id', dncRow.id);
+
+          await supabaseAdmin.from('dnc_history').insert({
+            user_id: userId,
+            phone_number: from,
+            action: 'removed',
+            reason: 'opt_in',
+            source: 'inbound_sms',
+            notes: `Lead texted: "${messageBody}"`,
+            created_at: new Date().toISOString(),
+          });
+
+          await supabaseAdmin
+            .from('leads')
+            .update({ sms_opt_in: true, updated_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .eq('phone', from);
+
+          const { data: bizRow } = await supabaseAdmin
+            .from('users')
+            .select('business_name')
+            .eq('id', userId)
+            .maybeSingle();
+          const brand = bizRow?.business_name?.trim() || 'HyveWyre';
+
+          await sendTelnyxSMS({
+            to: from,
+            from: to,
+            message:
+              `You are now opted in to receive SMS messages from ${brand}. ` +
+              `Message frequency varies. Msg&data rates may apply. ` +
+              `Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
+          });
+          return;
+        }
+      } catch (optInErr) {
+        console.error('Error handling opt-in:', optInErr);
+      }
     }
 
     // Handle appointment cancel/reschedule via SMS (only if NOT an opt-out)
