@@ -45,6 +45,11 @@ export default function PrivacyPolicyPage() {
             <li><strong>Legal Requirements:</strong> When required by law or to protect our legal rights</li>
             <li><strong>Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets</li>
           </ul>
+          <p className="text-slate-700 dark:text-slate-300 mt-3">
+            Text messaging originator opt-in data and consent are not shared with any third parties for
+            promotional or marketing purposes. We will not share your opt-in to an SMS campaign with any
+            third party for purposes unrelated to providing you with the services of that campaign.
+          </p>
         </section>
 
         <section>
