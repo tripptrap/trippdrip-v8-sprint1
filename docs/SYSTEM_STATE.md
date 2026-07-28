@@ -331,23 +331,21 @@ left in that file.
   uncommitted and unmerged; that worktree still holds the now-redundant copy.
 - **Secrets rotation (#29):** deliberately deferred to pre-launch prep. The app running
   normally is not evidence the current secrets are safe.
-- **GitHub PAT sitting in plaintext in a second clone's git config (found 2026-07-28):**
-  there is a *separate* clone of this repo at
-  `/Applications/MAMP/htdocs/trippdrip-v8-sprint1` (its own `.git`, not a worktree of
-  `/Applications/hyvewyre`). Its `origin` URL has a Personal Access Token embedded
-  directly in it, so `git remote get-url origin` prints a live push credential in
-  plaintext, and any tool or log that echoes the remote leaks it. `/Applications/hyvewyre`'s
-  own remote is clean and no *tracked* file contains a token — the exposure is that one
-  clone's `.git/config`. **Decision 2026-07-28: user deferred rotation** — assessed as
-  low risk because nobody else has access to that machine/file. Folded into the #29
-  rotation pass rather than treated as urgent; **don't re-raise this as an emergency.**
-  When it is rotated: revoke the PAT on GitHub and re-point the MAMP clone at the plain
-  HTTPS URL, using a credential helper or SSH instead of an inline token (an embedded
-  PAT keeps working until explicitly revoked). One caveat recorded for whoever does it:
-  the token was also echoed into a session transcript on 2026-07-28, so the file itself
-  is not the only place it has appeared. Note that clone is a different working copy
-  that may hold its own uncommitted work; don't assume changes made in
-  `/Applications/hyvewyre` are reflected there or vice versa.
+- **GitHub PAT was exposed in the old MAMP clone's git config — mostly resolved
+  2026-07-28.** There used to be a *separate* clone of this repo (the original one) at
+  `/Applications/MAMP/htdocs/trippdrip-v8-sprint1`, with a Personal Access Token
+  embedded in its `origin` URL, so `git remote get-url origin` printed a live push
+  credential. **That clone has been archived and deleted** — verified first that it held
+  nothing unique (52 commits behind, every branch already contained in `main`, identical
+  env keys apart from a local `DATABASE_URL` credential pointing at the same Supabase
+  project). Archive: `~/Archive/trippdrip-v8-sprint1-ORIGINAL-mamp-20260728.tar.gz`
+  (34M, full git history, integrity-verified before deletion). **Two residual notes:**
+  (1) that archive still contains the PAT and the env files, so treat it as sensitive;
+  (2) the token also appeared in a session transcript on 2026-07-28. The token itself was
+  never revoked — the user assessed it as low risk (no one else has machine access) and
+  folded revocation into the #29 rotation pass. **Don't re-raise as an emergency**, but do
+  revoke it when #29 happens; an embedded PAT keeps working until explicitly revoked.
+  `/Applications/hyvewyre` is now the only clone, and its own remote is clean.
 - **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
   SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
   the database but zero real TFV requests on the Telnyx account, so the pool likely
