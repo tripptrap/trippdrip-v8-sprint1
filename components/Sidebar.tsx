@@ -5,11 +5,27 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { findLead as seedFindLead } from "@/lib/db";
 import { motion } from "framer-motion";
-import { Shield } from "lucide-react";
+import {
+  Shield,
+  LayoutDashboard,
+  MessageSquare,
+  Calendar,
+  Users,
+  UserCheck,
+  Megaphone,
+  Tag,
+  Zap,
+  FileText,
+  Wallet,
+  Settings as SettingsIcon,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 type NavItem = {
   href: string;
   label: string;
+  icon: React.ComponentType<{ className?: string }>;
   children?: { href: string; label: string }[];
   badge?: 'premium';
   color?: 'green';
@@ -19,6 +35,7 @@ const navItems: NavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
+    icon: LayoutDashboard,
     children: [
       { href: "/analytics", label: "Analytics" },
       { href: "/sms-analytics", label: "SMS Delivery" },
@@ -31,36 +48,45 @@ const navItems: NavItem[] = [
   {
     href: "/texts",
     label: "Messages",
+    icon: MessageSquare,
     children: [
       { href: "/texts?bulk=true", label: "Bulk SMS" },
       { href: "/scheduled", label: "Scheduled" },
     ]
   },
-  { href: "/appointments", label: "Appointments" },
-  { href: "/leads",     label: "Leads" },
-  { href: "/clients",   label: "Clients", color: 'green' },
-  { href: "/campaigns", label: "Campaigns" },
-  { href: "/tags",      label: "Tags" },
+  { href: "/appointments", label: "Appointments", icon: Calendar },
+  { href: "/leads",     label: "Leads", icon: Users },
+  { href: "/clients",   label: "Clients", icon: UserCheck, color: 'green' },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/tags",      label: "Tags", icon: Tag },
   {
     href: "/flows",
     label: "AI Flows",
+    icon: Zap,
     children: [
       { href: "/receptionist", label: "Receptionist" },
       { href: "/flow-analytics", label: "Flow Analytics" },
     ]
   },
-  { href: "/quoting",   label: "Quoting" },
+  { href: "/quoting",   label: "Quoting", icon: FileText },
   {
     href: "/points",
     label: "Points",
+    icon: Wallet,
     children: [
       { href: "/credit-history", label: "Usage History" },
     ]
   },
-  { href: "/settings",  label: "Settings" },
+  { href: "/settings",  label: "Settings", icon: SettingsIcon },
 ];
 
 function findLead(id:number, leads:any[]){ return (leads||[]).find((l:any)=> l.id===id) || seedFindLead(id); }
+
+const RAIL_STORAGE_KEY = 'hyvewyre_sidebar_collapsed';
+// Below this, the sidebar auto-collapses to an icon rail so it stops
+// squeezing page content at tablet-ish widths — the range the mobile
+// hamburger pattern (md:hidden) never covered (issue #8).
+const AUTO_COLLAPSE_WIDTH = 1024;
 
 export default function Sidebar(){
   const path = usePathname();
@@ -68,6 +94,29 @@ export default function Sidebar(){
   const [userPlan, setUserPlan] = useState<string>('growth');
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Collapse state: an explicit user toggle always wins (persisted); absent
+  // that, auto-collapse below AUTO_COLLAPSE_WIDTH and re-expand above it.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(RAIL_STORAGE_KEY);
+    if (stored !== null) {
+      setCollapsed(stored === 'true');
+      return;
+    }
+    const applyAuto = () => setCollapsed(window.innerWidth < AUTO_COLLAPSE_WIDTH);
+    applyAuto();
+    window.addEventListener('resize', applyAuto);
+    return () => window.removeEventListener('resize', applyAuto);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev;
+      window.localStorage.setItem(RAIL_STORAGE_KEY, String(next));
+      return next;
+    });
+  }
 
   useEffect(()=>{
     const sync = () => { const s = loadStore(); if (s) setStore(s); };
@@ -133,15 +182,23 @@ export default function Sidebar(){
     : '/logo-basic.png';
 
   return (
-    <aside className="w-64 shrink-0 p-3 border-r border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50">
+    <aside className={`relative shrink-0 p-3 border-r border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50 transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
+      <button
+        onClick={toggleCollapsed}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="absolute -right-3 top-6 w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-300 dark:hover:border-sky-600 flex items-center justify-center shadow-sm z-10"
+      >
+        {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+      </button>
+
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-lg font-semibold mb-6 flex items-center gap-3 px-2 text-slate-900 dark:text-slate-100"
+        className={`text-lg font-semibold mb-6 flex items-center gap-3 text-slate-900 dark:text-slate-100 ${collapsed ? 'justify-center px-0' : 'px-2'}`}
       >
         <motion.div
-          className="relative"
+          className="relative shrink-0"
           animate={{
             boxShadow: [
               "0 0 15px rgba(14, 165, 233, 0.3)",
@@ -161,7 +218,7 @@ export default function Sidebar(){
           <motion.img
             src={logoSrc}
             alt="HyveWyre™"
-            className="h-12 w-12 rounded-2xl"
+            className="h-9 w-9 rounded-xl"
             animate={{
               scale: [1, 1.02, 1],
             }}
@@ -173,7 +230,7 @@ export default function Sidebar(){
             whileHover={{ scale: 1.05, rotate: 3 }}
           />
         </motion.div>
-        <span className="text-xl text-slate-900 dark:text-slate-100">HyveWyre™</span>
+        {!collapsed && <span className="text-xl text-slate-900 dark:text-slate-100 whitespace-nowrap">HyveWyre™</span>}
       </motion.div>
 
       <nav className="space-y-1 mb-4">
@@ -198,20 +255,26 @@ export default function Sidebar(){
             }
           };
 
+          const Icon = it.icon;
+          // Submenus don't have room in the rail — collapse them away rather
+          // than trying to squeeze a flyout in for v1. The parent icon still
+          // navigates to its own href.
+          const showChildren = hasChildren && !collapsed;
+
           return (
             <motion.div
               key={it.href}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.03 }}
-              onMouseEnter={() => hasChildren && setExpandedMenus(prev => new Set(prev).add(it.href))}
-              onMouseLeave={() => hasChildren && !childActive && setExpandedMenus(prev => {
+              onMouseEnter={() => showChildren && setExpandedMenus(prev => new Set(prev).add(it.href))}
+              onMouseLeave={() => showChildren && !childActive && setExpandedMenus(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(it.href);
                 return newSet;
               })}
             >
-              {hasChildren ? (
+              {showChildren ? (
                 <div
                   className={`flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-150 ${
                     active || childActive
@@ -219,17 +282,13 @@ export default function Sidebar(){
                       : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}
                 >
-                  <Link href={it.href} className="flex-1">
+                  <Link href={it.href} className="flex-1 flex items-center gap-3">
+                    <Icon className="w-[18px] h-[18px] shrink-0" />
                     <motion.span
                       whileHover={{ x: 2 }}
                       transition={{ type: "spring", stiffness: 400 }}
                     >
-                      {it.label === 'Your AI' ? (
-                        <>
-                          Your{' '}
-                          <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent font-bold italic">AI</span>
-                        </>
-                      ) : it.label}
+                      {it.label}
                     </motion.span>
                   </Link>
                   <motion.span
@@ -243,7 +302,8 @@ export default function Sidebar(){
                 </div>
               ) : (
                 <Link href={it.href}
-                  className={`block px-3 py-2 rounded-lg transition-all duration-150 ${
+                  title={collapsed ? it.label : undefined}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${
                     active
                       ? it.color === 'green'
                         ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30"
@@ -252,20 +312,20 @@ export default function Sidebar(){
                         ? "hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}>
-                  <motion.span
-                    whileHover={{ x: 2 }}
-                    transition={{ type: "spring", stiffness: 400 }}
-                    className="flex items-center justify-between"
-                  >
-                    <span>
+                  <Icon className="w-[18px] h-[18px] shrink-0" />
+                  {!collapsed && (
+                    <motion.span
+                      whileHover={{ x: 2 }}
+                      transition={{ type: "spring", stiffness: 400 }}
+                    >
                       {it.label}
-                    </span>
-                  </motion.span>
+                    </motion.span>
+                  )}
                 </Link>
               )}
 
-              {/* Children submenu */}
-              {hasChildren && (
+              {/* Children submenu — never shown in the collapsed rail */}
+              {showChildren && (
                 <motion.div
                   initial={false}
                   animate={{
@@ -308,20 +368,21 @@ export default function Sidebar(){
           >
             <Link
               href="/admin"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-150 ${
+              title={collapsed ? 'Admin' : undefined}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${
                 path?.startsWith('/admin')
                   ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30"
                   : "hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400"
               }`}
             >
-              <Shield className="w-4 h-4" />
-              <span>Admin</span>
+              <Shield className="w-[18px] h-[18px] shrink-0" />
+              {!collapsed && <span>Admin</span>}
             </Link>
           </motion.div>
         )}
       </nav>
 
-      {showTextList && (
+      {showTextList && !collapsed && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
