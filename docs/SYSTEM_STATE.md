@@ -331,6 +331,19 @@ left in that file.
   uncommitted and unmerged; that worktree still holds the now-redundant copy.
 - **Secrets rotation (#29):** deliberately deferred to pre-launch prep. The app running
   normally is not evidence the current secrets are safe.
+- **GitHub PAT sitting in plaintext in a second clone's git config (found 2026-07-28):**
+  there is a *separate* clone of this repo at
+  `/Applications/MAMP/htdocs/trippdrip-v8-sprint1` (its own `.git`, not a worktree of
+  `/Applications/hyvewyre`). Its `origin` URL has a Personal Access Token embedded
+  directly in it, so `git remote get-url origin` prints a live push credential in
+  plaintext, and any tool or log that echoes the remote leaks it. `/Applications/hyvewyre`'s
+  own remote is clean and no *tracked* file contains a token — the exposure is that one
+  clone's `.git/config`. **Recommended: revoke that PAT on GitHub and re-point the MAMP
+  clone at the plain HTTPS URL, using a credential helper or SSH instead of an inline
+  token.** Rotating it is independent of #29 and shouldn't wait for launch prep — an
+  embedded PAT keeps working until it's explicitly revoked. Note that clone is a
+  different working copy that may hold its own uncommitted work; don't assume changes
+  made in `/Applications/hyvewyre` are reflected there or vice versa.
 - **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
   SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
   the database but zero real TFV requests on the Telnyx account, so the pool likely
