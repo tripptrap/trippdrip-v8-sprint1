@@ -259,7 +259,7 @@ export default function PreviewClient() {
           {[
             { step: '1', title: 'Create Account', desc: 'Sign up in under a minute. Choose your plan and get instant access to all features.', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
             { step: '2', title: 'Get Your Number', desc: 'Claim your phone number right away, then we handle registering it for compliant messaging under your business.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
-            { step: '3', title: 'Import Leads', desc: 'Upload your CSV, connect your CRM, or add leads manually. We handle the rest.', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
+            { step: '3', title: 'Import Leads', desc: 'Upload a CSV, import from a spreadsheet, or add leads manually. We map the fields for you.', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
             { step: '4', title: 'Start Sending', desc: 'Launch campaigns, set up AI workflows, and watch your response rates soar.', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
           ].map((item, i) => (
             <motion.div
@@ -318,7 +318,7 @@ export default function PreviewClient() {
             <div className="text-teal-600 font-semibold mb-2">AI-POWERED CONVERSATIONS</div>
             <h3 className="text-3xl font-bold text-gray-900 mb-4">Let AI Handle the Conversation</h3>
             <p className="text-gray-600 mb-6">
-              Our GPT-4 powered AI doesn't just send canned responses—it understands context, sentiment, and intent. It qualifies leads, answers questions, and hands off to you when the deal is hot.
+              Our GPT-4o powered AI doesn't just send canned responses—it understands context, sentiment, and intent. It qualifies leads, answers questions, and hands off to you when the deal is hot.
             </p>
             <ul className="space-y-3">
               {['Natural, human-like responses', 'Sentiment analysis & lead scoring', 'Smart handoff when leads are ready', 'Custom personality & tone settings', '24/7 automated engagement'].map((item, i) => (
@@ -430,7 +430,7 @@ export default function PreviewClient() {
               Build campaigns in minutes with our intuitive builder. Segment your audience, personalize every message, and schedule sends for optimal times.
             </p>
             <ul className="space-y-3">
-              {['Dynamic personalization (name, location, etc.)', 'Smart audience segmentation', 'A/B testing for optimization', 'Scheduled & drip campaigns', 'Real-time delivery tracking'].map((item, i) => (
+              {['Dynamic personalization (name, location, etc.)', 'Smart audience segmentation', 'Message templates with variables', 'Scheduled & drip campaigns', 'Real-time delivery tracking'].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 text-gray-700">
                   <span className="w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center">
                     <span className="text-teal-600 text-sm">✓</span>
@@ -456,7 +456,7 @@ export default function PreviewClient() {
               No more spreadsheets or switching between apps. HyveWyre keeps all your leads, conversations, and notes in one place with powerful filtering and tagging.
             </p>
             <ul className="space-y-3">
-              {['Import from CSV or connect existing CRM', 'Custom tags & lead temperature scoring', 'Full conversation history per lead', 'Notes, follow-ups & reminders', 'Export anytime—your data is yours'].map((item, i) => (
+              {['Import from CSV or spreadsheet', 'Custom tags & lead temperature scoring', 'Full conversation history per lead', 'Notes, follow-ups & reminders', 'Export anytime—your data is yours'].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 text-gray-700">
                   <span className="w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center">
                     <span className="text-teal-600 text-sm">✓</span>
@@ -628,7 +628,7 @@ export default function PreviewClient() {
           {[
             {
               q: 'How quickly can I start sending messages?',
-              a: 'You get your phone number right after signup. We then register it for compliant SMS messaging under your business, which is required by carriers for every business that sends text campaigns — we handle the registration for you so you don’t have to deal with the paperwork yourself.'
+              a: 'You get your phone number right after signup, and you can set up leads, flows and campaigns straight away. Before any business can send text campaigns in the US, carriers require the number to be registered (10DLC) — we handle that paperwork for you, but approval is the carriers\' call and typically takes a few business days. We\'ll tell you the moment your number is cleared to send.'
             },
             {
               q: 'Is HyveWyre TCPA compliant?',
@@ -636,11 +636,11 @@ export default function PreviewClient() {
             },
             {
               q: 'How does the AI conversation feature work?',
-              a: 'Our AI is powered by GPT-4 and trained specifically for sales conversations. It can qualify leads, answer questions about your services, and intelligently hand off to you when a lead is ready to buy. You customize its personality, knowledge base, and when it should alert you.'
+              a: 'Our AI is powered by OpenAI\'s GPT-4o and tuned specifically for sales conversations. It can qualify leads, answer questions about your services, and intelligently hand off to you when a lead is ready to buy. You customize its personality, knowledge base, and when it should alert you.'
             },
             {
               q: 'Can I use my own phone number?',
-              a: 'Yes! You can purchase a dedicated number through us via Telnyx. Our instant-access pool is great for getting started, and you can upgrade to a dedicated number anytime.'
+              a: 'Yes — you can port an existing number over to HyveWyre, or get a new local or toll-free number through us. Porting keeps the number your customers already know; a new number gets you started immediately while the port completes.'
             },
             {
               q: 'What happens if I run out of credits?',
@@ -648,7 +648,7 @@ export default function PreviewClient() {
             },
             {
               q: 'Can I import my existing leads?',
-              a: 'Yes! Upload a CSV file with your leads and we\'ll map the fields automatically. You can also connect via API or Zapier (coming soon) to sync with your existing CRM.'
+              a: 'Yes! Upload a CSV file with your leads and we\'ll map the fields automatically. You can also add leads one at a time, or capture them with our browser extension. Direct CRM sync is on the roadmap.'
             },
             {
               q: 'Is there a contract or can I cancel anytime?',
@@ -896,7 +896,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">True AI Intelligence</h3>
             <p className="text-gray-500">
-              GPT-4 powered responses, sentiment analysis, and smart replies that actually understand context and tone. Not just basic keyword matching.
+              GPT-4o powered responses, sentiment analysis, and smart replies that actually understand context and tone. Not just basic keyword matching.
             </p>
           </motion.div>
 
