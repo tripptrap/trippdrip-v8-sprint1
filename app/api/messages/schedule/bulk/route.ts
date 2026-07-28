@@ -145,7 +145,7 @@ export async function PUT(req: NextRequest) {
     // Verify all messages belong to this user and are pending
     const { data: messages, error: fetchError } = await supabase
       .from('scheduled_messages')
-      .select('*, leads:lead_id(id, phone, email, first_name, last_name)')
+      .select('*, leads:lead_id(id, phone, email, first_name, last_name, state)')
       .eq('user_id', user.id)
       .eq('status', 'pending')
       .in('id', messageIds);
@@ -226,18 +226,25 @@ export async function PUT(req: NextRequest) {
           // Opt-out gate (#40) — bulk sends previously had no DNC check, so an
           // opted-out lead in the batch still received the message.
           const guard = await checkSmsAllowed(supabase, user.id, lead.phone, {
+            enforceQuietHours: true,
+            recipientState: lead.state,
             context: { source: 'bulk_scheduled', scheduled_message_id: message.id },
           });
 
           if (!guard.allowed) {
             console.log(`Bulk send: skipping ${lead.phone} — ${guard.reason} (${guard.detail})`);
-            await adminClient
-              .from('scheduled_messages')
-              .update({
-                status: 'cancelled',
-                error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
-              })
-              .eq('id', message.id);
+            // Only cancel on a permanent block. A quiet-hours deferral leaves
+            // the message pending so the scheduled-send cron picks it up once
+            // the window opens.
+            if (!guard.retryable) {
+              await adminClient
+                .from('scheduled_messages')
+                .update({
+                  status: 'cancelled',
+                  error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
+                })
+                .eq('id', message.id);
+            }
             failed++;
             continue;
           }
@@ -307,12 +314,17 @@ export async function PUT(req: NextRequest) {
         }
       }
 
-      // Deduct credits
+      // Deduct credits via the atomic RPC (#45). This was a read-then-write
+      // against a `credits` value read before the send loop began, so any
+      // concurrent spend during the loop was silently overwritten.
       if (creditsUsed > 0) {
-        await adminClient
-          .from('users')
-          .update({ credits: userData.credits - creditsUsed })
-          .eq('id', user.id);
+        const { error: deductError } = await adminClient.rpc('deduct_credits', {
+          user_id: user.id,
+          amount: creditsUsed,
+        });
+        if (deductError) {
+          console.error(`❌ Bulk send-now: ${sent} messages sent but ${creditsUsed} credits NOT deducted for user ${user.id}:`, deductError);
+        }
       }
 
       return NextResponse.json({

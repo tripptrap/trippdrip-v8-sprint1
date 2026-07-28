@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest) {
     let sent = 0;
     let completed = 0;
     let errors = 0;
+    let deferred = 0;   // quiet hours or no credits — retried on a later run
 
     for (const enrollment of enrollments) {
       processed++;
@@ -252,7 +254,7 @@ export async function POST(req: NextRequest) {
         // Get lead info
         const { data: lead } = await supabaseAdmin
           .from('leads')
-          .select('id, phone, first_name, last_name, user_id')
+          .select('id, phone, first_name, last_name, user_id, state')
           .eq('id', enrollment.lead_id)
           .single();
 
@@ -344,6 +346,60 @@ export async function POST(req: NextRequest) {
 
         if (existingThread) {
           threadId = existingThread.id;
+        }
+
+        // Opt-out + quiet-hours gate (#50). The coarse gate at the top of this
+        // handler reschedules everything to 9am Eastern; this one additionally
+        // respects the sender's configured window and the lead's own local
+        // time. A quiet-hours block is retryable — next_send_at is left alone
+        // so the enrollment is simply picked up on a later run.
+        const guard = await checkSmsAllowed(supabaseAdmin, enrollment.user_id, lead.phone, {
+          enforceQuietHours: true,
+          recipientState: lead.state,
+          context: { source: 'drip_campaign', enrollment_id: enrollment.id },
+        });
+
+        if (!guard.allowed) {
+          console.log(`Drip: skipping ${lead.phone} — ${guard.reason} (${guard.detail})`);
+          if (!guard.retryable) {
+            await supabaseAdmin
+              .from('drip_campaign_enrollments')
+              .update({ status: 'stopped_opted_out', next_send_at: null })
+              .eq('id', enrollment.id);
+          }
+          deferred++;
+          continue;
+        }
+
+        // Charge credits before sending (#45). Drip messages are SMS and cost
+        // 1pt like any other, but this path never charged — a user could run
+        // unlimited drip sequences for free, and the out-of-credits blocker
+        // never applied to them.
+        const { data: creditRow } = await supabaseAdmin
+          .from('users')
+          .select('credits')
+          .eq('id', enrollment.user_id)
+          .single();
+
+        if (!creditRow || (creditRow.credits ?? 0) < 1) {
+          console.log(`Drip: user ${enrollment.user_id} is out of credits — pausing enrollment ${enrollment.id}`);
+          await supabaseAdmin
+            .from('drip_campaign_enrollments')
+            .update({ status: 'paused_no_credits' })
+            .eq('id', enrollment.id);
+          deferred++;
+          continue;
+        }
+
+        const { error: deductError } = await supabaseAdmin.rpc('deduct_credits', {
+          user_id: enrollment.user_id,
+          amount: 1,
+        });
+
+        if (deductError) {
+          console.error(`Drip: failed to deduct credits for user ${enrollment.user_id} — not sending:`, deductError);
+          errors++;
+          continue;
         }
 
         // Send via Telnyx
@@ -444,6 +500,7 @@ export async function POST(req: NextRequest) {
       sent,
       completed,
       errors,
+      deferred,
     });
 
   } catch (error: any) {

@@ -5,6 +5,7 @@ import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
 import { detectSpam } from "@/lib/spam/detector";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { createNotification } from "@/lib/createNotification";
+import { checkSmsAllowed } from "@/lib/smsGuard";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -286,40 +287,28 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // Check DNC list before sending
-        const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
-          p_user_id: user.id,
-          p_phone_number: lead.phone
+        // Single gate for opt-out and quiet hours (#40, #50). This path had no
+        // quiet-hours check at all before, despite being the bulk sender — a
+        // campaign fired at 2am sent at 2am. Gates on the *lead's* local time
+        // where their state is known, which is what TCPA keys on.
+        const guard = await checkSmsAllowed(supabase, user.id, lead.phone, {
+          enforceQuietHours: true,
+          recipientState: lead.state,
+          context: { campaign_id: campaignId, campaign_name: campaignName, source: 'campaign' },
         });
 
-        if (!dncError && dncCheck) {
-          const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
-          if (dncResult.on_dnc_list) {
-            console.log(`🚫 Campaign skip - ${lead.phone} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list)`);
-            // Log blocked attempt
-            await supabase.from('dnc_history').insert({
-              user_id: user.id,
-              phone_number: lead.phone,
-              normalized_phone: dncResult.normalized_phone,
-              action: 'blocked',
-              list_type: dncResult.on_user_list ? 'user' : 'global',
-              result: true,
-              metadata: {
-                reason: dncResult.reason,
-                source: dncResult.source,
-                campaign_id: campaignId,
-                campaign_name: campaignName
-              }
-            });
-            sendResults.push({
-              leadId: String(lead.id),
-              phone: lead.phone,
-              success: false,
-              error: `Skipped: On DNC list (${dncResult.reason || 'opted out'})`
-            });
-            dncSkipped++;
-            continue;
-          }
+        if (!guard.allowed) {
+          console.log(`Campaign skip — ${lead.phone}: ${guard.reason} (${guard.detail})`);
+          sendResults.push({
+            leadId: String(lead.id),
+            phone: lead.phone,
+            success: false,
+            error: guard.retryable
+              ? `Deferred: ${guard.detail}`
+              : `Skipped: ${guard.detail}`,
+          });
+          dncSkipped++;
+          continue;
         }
 
         // Personalize message

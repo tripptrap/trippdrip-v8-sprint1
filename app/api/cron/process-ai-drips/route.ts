@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -72,14 +73,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Skip during quiet hours
-    if (isInQuietHours()) {
-      return NextResponse.json({
-        ok: true,
-        message: 'Quiet hours — skipping AI drips',
-        processed: 0,
-      });
-    }
+    // Quiet hours are checked per-drip below (#50) rather than as one global
+    // gate. The old check used a hardcoded 9pm-9am *Eastern* window for every
+    // user and recipient, which both ignored the sender's configured hours and
+    // — more importantly — sent to a California lead at 6am their time.
 
     const now = new Date();
 
@@ -100,6 +97,7 @@ export async function POST(req: NextRequest) {
     let sent = 0;
     let completed = 0;
     let errors = 0;
+    let deferred = 0;   // blocked by quiet hours — will retry on a later run
 
     for (const drip of drips) {
       processed++;
@@ -158,13 +156,15 @@ export async function POST(req: NextRequest) {
           .single();
 
         let leadName = '';
+        let leadState: string | null = null;
         if (thread?.lead_id) {
           const { data: lead } = await supabaseAdmin
             .from('leads')
-            .select('first_name, last_name')
+            .select('first_name, last_name, state')
             .eq('id', thread.lead_id)
             .single();
           leadName = lead?.first_name || '';
+          leadState = lead?.state ?? null;
         }
 
         // Build conversation summary for AI context
@@ -207,6 +207,28 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // Opt-out + quiet-hours gate (#50), using the lead's local time where
+        // their state is known. A block here is retryable — next_send_at is
+        // left untouched so the drip is simply picked up on a later run.
+        const guard = await checkSmsAllowed(supabaseAdmin, drip.user_id, drip.phone_number, {
+          enforceQuietHours: true,
+          recipientState: leadState,
+          context: { source: 'ai_drip', drip_id: drip.id },
+        });
+
+        if (!guard.allowed) {
+          console.log(`AI Drip ${drip.id}: skipping — ${guard.reason} (${guard.detail})`);
+          if (!guard.retryable) {
+            // Permanent (DNC / opted out) — stop the drip rather than retrying.
+            await supabaseAdmin
+              .from('ai_drips')
+              .update({ status: 'completed', last_error: `Stopped: ${guard.detail}` })
+              .eq('id', drip.id);
+          }
+          deferred++;
+          continue;
+        }
+
         // Send via Telnyx
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
         const sendResponse = await fetch(`${baseUrl}/api/telnyx/send-sms`, {
@@ -240,18 +262,19 @@ export async function POST(req: NextRequest) {
 
         sent++;
 
-        // Deduct credits (2 points per AI message)
-        const { data: userData } = await supabaseAdmin
-          .from('users')
-          .select('credits')
-          .eq('id', drip.user_id)
-          .single();
+        // Deduct credits (2 points per AI message) via the atomic RPC (#45).
+        // This was a read-then-write, so two concurrent deductions could
+        // interleave and lose one — process-scheduled already uses the RPC for
+        // exactly this reason (see its CRIT-1 comment).
+        const { error: deductError } = await supabaseAdmin.rpc('deduct_credits', {
+          user_id: drip.user_id,
+          amount: 2,
+        });
 
-        if (userData) {
-          await supabaseAdmin
-            .from('users')
-            .update({ credits: Math.max(0, (userData.credits || 0) - 2) })
-            .eq('id', drip.user_id);
+        if (deductError) {
+          // Message already sent, so this can't be undone — but it must be
+          // visible rather than silently free.
+          console.error(`❌ AI drip ${drip.id} sent but credits NOT deducted for user ${drip.user_id}:`, deductError);
         }
 
         // Update drip record
@@ -308,6 +331,7 @@ export async function POST(req: NextRequest) {
       sent,
       completed,
       errors,
+      deferred,
     });
 
   } catch (error: any) {

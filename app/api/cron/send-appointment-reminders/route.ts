@@ -130,18 +130,20 @@ export async function POST(req: NextRequest) {
       try {
         // Determine lead phone number
         let leadPhone = event.lead_phone;
+        let leadState: string | null = null;
         let leadName = '';
 
         // Look up lead info if we have a lead_id
         if (event.lead_id) {
           const { data: lead } = await supabaseAdmin
             .from('leads')
-            .select('id, phone, first_name, last_name')
+            .select('id, phone, first_name, last_name, state')
             .eq('id', event.lead_id)
             .single();
 
           if (lead) {
             leadName = lead.first_name || '';
+            leadState = lead.state ?? null;
             if (!leadPhone && lead.phone) {
               leadPhone = lead.phone;
             }
@@ -191,16 +193,50 @@ export async function POST(req: NextRequest) {
         // Opt-out gate (#40) — this cron previously sent with no DNC check at
         // all, so a lead who texted STOP kept getting reminders every run.
         const guard = await checkSmsAllowed(supabaseAdmin, event.user_id, leadPhone, {
+          enforceQuietHours: true,
+          recipientState: leadState,
           context: { source: 'appointment_reminder', calendar_event_id: event.id },
         });
 
         if (!guard.allowed) {
           console.log(`Appointment reminder: skipping ${leadPhone} — ${guard.reason} (${guard.detail})`);
-          await supabaseAdmin
-            .from('calendar_events')
-            .update({ reminder_status: `skipped_${guard.reason}` })
-            .eq('id', event.id);
+          // Only mark the event when the block is permanent. A quiet-hours
+          // deferral must stay unmarked so the next run can still send it —
+          // this cron runs every 2 hours, so it will retry inside the window.
+          if (!guard.retryable) {
+            await supabaseAdmin
+              .from('calendar_events')
+              .update({ reminder_status: `skipped_${guard.reason}` })
+              .eq('id', event.id);
+          }
           skipped++;
+          continue;
+        }
+
+        // Charge credits (#45). Reminders are SMS and cost 1pt like any other
+        // send; this path never charged. Treating them as billable keeps the
+        // out-of-credits blocker meaningful — otherwise a user at zero credits
+        // still generates outbound traffic.
+        const { data: creditRow } = await supabaseAdmin
+          .from('users')
+          .select('credits')
+          .eq('id', event.user_id)
+          .single();
+
+        if (!creditRow || (creditRow.credits ?? 0) < 1) {
+          console.log(`Appointment reminder: user ${event.user_id} is out of credits — skipping event ${event.id}`);
+          skipped++;
+          continue;
+        }
+
+        const { error: deductError } = await supabaseAdmin.rpc('deduct_credits', {
+          user_id: event.user_id,
+          amount: 1,
+        });
+
+        if (deductError) {
+          console.error(`Appointment reminder: failed to deduct credits for user ${event.user_id} — not sending:`, deductError);
+          errors++;
           continue;
         }
 

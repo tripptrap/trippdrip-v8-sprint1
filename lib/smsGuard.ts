@@ -16,13 +16,20 @@
 // and must not be gated on the recipient's DNC status.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { checkQuietHours } from './quietHours';
 
 export interface SmsGuardResult {
   allowed: boolean;
-  /** Machine-readable reason when blocked: 'dnc' | 'opted_out' | 'check_failed' */
-  reason?: 'dnc' | 'opted_out' | 'check_failed';
+  /** Machine-readable reason when blocked. */
+  reason?: 'dnc' | 'opted_out' | 'quiet_hours' | 'check_failed';
   /** Human-readable detail, safe to log. */
   detail?: string;
+  /**
+   * True when the block is temporary and the caller should try again later
+   * rather than cancelling. Only quiet_hours is retryable — DNC and opt-out
+   * are permanent.
+   */
+  retryable?: boolean;
   /** Present when blocked by DNC. */
   listType?: 'user' | 'global';
   normalizedPhone?: string;
@@ -33,6 +40,19 @@ interface GuardOptions {
   context?: Record<string, unknown>;
   /** Set false to skip writing a dnc_history 'blocked' row. Default true. */
   logBlocked?: boolean;
+  /**
+   * Also enforce quiet hours (#50). Off by default so a user pressing "send"
+   * on a single message isn't blocked by their own sending window — that's a
+   * deliberate human action. Automated paths (crons, campaigns, drips) should
+   * pass true.
+   */
+  enforceQuietHours?: boolean;
+  /**
+   * Recipient's state code, used to gate on *their* local time rather than the
+   * sender's — which is what TCPA actually requires. Falls back to the sender's
+   * timezone when absent or unrecognised.
+   */
+  recipientState?: string | null;
 }
 
 /**
@@ -48,10 +68,40 @@ export async function checkSmsAllowed(
   phone: string,
   options: GuardOptions = {}
 ): Promise<SmsGuardResult> {
-  const { context, logBlocked = true } = options;
+  const { context, logBlocked = true, enforceQuietHours = false, recipientState } = options;
 
   if (!phone) {
     return { allowed: false, reason: 'check_failed', detail: 'No phone number provided' };
+  }
+
+  // Quiet hours first — it's the cheapest check and, unlike DNC, a block here
+  // is temporary, so there's no point writing a dnc_history row for it.
+  if (enforceQuietHours) {
+    const { data: settings, error: settingsError } = await supabase
+      .from('users')
+      .select('quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone')
+      .eq('id', userId)
+      .single();
+
+    if (settingsError) {
+      // Don't block on this — quiet hours is a scheduling concern, and failing
+      // closed here would stall every automated send on a transient error.
+      console.error(`Quiet-hours settings lookup failed for user ${userId}:`, settingsError);
+    } else {
+      const qh = checkQuietHours(settings, recipientState);
+      if (qh.inQuietHours) {
+        console.log(
+          `🌙 Deferred: ${phone} is in quiet hours — ${qh.localTime} ${qh.timezone} ` +
+            `(${qh.basis} time, window ${qh.window.start}-${qh.window.end})`
+        );
+        return {
+          allowed: false,
+          reason: 'quiet_hours',
+          retryable: true,
+          detail: `Outside sending window (${qh.localTime} ${qh.timezone}, ${qh.basis} local time)`,
+        };
+      }
+    }
   }
 
   // 1. DNC list (user-level + global). This is the authoritative gate — it
