@@ -756,7 +756,7 @@ export default function MessagesPage() {
                       onClick={() => setShowDripModal(true)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                         activeDripStatus?.active
-                          ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                          ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500'
                           : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50'
                       }`}
                       title={activeDripStatus?.active ? 'AI Drip Active - Click to manage' : 'Start AI Drip'}
@@ -1003,7 +1003,7 @@ export default function MessagesPage() {
                                           <button
                                             onClick={() => handleSaveEdit(dripMsg.id)}
                                             disabled={savingEdit || !editContent.trim()}
-                                            className="px-2 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded disabled:opacity-50 flex items-center gap-1"
+                                            className="px-2 py-1 text-xs bg-transparent border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 rounded disabled:opacity-50 flex items-center gap-1"
                                           >
                                             <Save className="h-3 w-3" />
                                             {savingEdit ? 'Saving...' : 'Save'}

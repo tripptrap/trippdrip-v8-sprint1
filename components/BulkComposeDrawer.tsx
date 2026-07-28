@@ -574,7 +574,7 @@ export default function BulkComposeDrawer({
                   onClick={() => setSendMode('schedule')}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-colors ${
                     sendMode === 'schedule'
-                      ? 'bg-amber-500 text-white'
+                      ? 'bg-transparent border border-amber-500/50 text-amber-500'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
                   }`}
                 >
@@ -630,7 +630,7 @@ export default function BulkComposeDrawer({
             className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               sendMode === 'now'
                 ? 'bg-sky-500 hover:bg-sky-600 text-white'
-                : 'bg-amber-500 hover:bg-amber-600 text-white'
+                : 'bg-transparent border border-amber-500/60 hover:bg-amber-500/10 text-amber-500'
             }`}
           >
             {sending ? (

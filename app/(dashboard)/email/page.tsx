@@ -179,7 +179,7 @@ export default function CalendarPage() {
             <button
               onClick={handleDisconnectCalendar}
               disabled={disconnectingCalendar}
-              className="bg-red-500 hover:bg-red-600 text-slate-900 dark:text-slate-100 px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              className="bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
             >
               {disconnectingCalendar ? 'Disconnecting...' : 'Disconnect Calendar'}
             </button>

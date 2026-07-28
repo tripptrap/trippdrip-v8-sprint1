@@ -811,7 +811,7 @@ export default function FlowsPage() {
                         <button
                           onClick={() => handleDelete(flow.id)}
                           disabled={isDeleting}
-                          className="px-2 py-1 rounded text-xs bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
+                          className="px-2 py-1 rounded text-xs bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
                         >
                           {isDeleting ? '…' : 'Yes'}
                         </button>

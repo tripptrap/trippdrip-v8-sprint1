@@ -751,7 +751,7 @@ export default function Page() {
               </div>
               <button
                 onClick={handleUpgradePlan}
-                className="mt-4 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors"
+                className="mt-4 px-6 py-2.5 bg-transparent border border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 font-semibold rounded-lg transition-colors"
               >
                 Upgrade to Scale →
               </button>
@@ -952,7 +952,7 @@ export default function Page() {
                 onClick={() => {
                   toast.success('AI handoff settings saved');
                 }}
-                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                className="px-6 py-2 bg-transparent border border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 font-medium rounded-lg transition-colors"
               >
                 Save AI Handoff Settings
               </button>
@@ -1828,7 +1828,7 @@ export default function Page() {
                 {!showDeleteConfirm ? (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+                    className="px-6 py-2 bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 font-medium rounded-lg transition-colors"
                   >
                     Delete My Account
                   </button>
@@ -1851,7 +1851,7 @@ export default function Page() {
                       <button
                         onClick={handleDeleteAccount}
                         disabled={deletingAccount || deleteConfirmText !== 'DELETE MY ACCOUNT'}
-                        className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-6 py-2 bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {deletingAccount ? 'Deleting...' : 'Yes, Delete My Account'}
                       </button>

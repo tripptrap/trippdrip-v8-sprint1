@@ -272,7 +272,7 @@ export default function ClientsPage() {
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{confirmModal.message}</p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setConfirmModal(null)} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400">Cancel</button>
-              <button onClick={() => { confirmModal.action(); setConfirmModal(null); }} className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600">Confirm</button>
+              <button onClick={() => { confirmModal.action(); setConfirmModal(null); }} className="rounded-md bg-transparent border border-red-500/50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10">Confirm</button>
             </div>
           </div>
         </div>
@@ -294,7 +294,7 @@ export default function ClientsPage() {
                 setBulkPreSelectedIds([]);
                 setShowBulkDrawer(true);
               }}
-              className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm"
+              className="rounded-md bg-transparent border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-500 hover:bg-emerald-500/10 transition"
             >
               Text All Clients
             </button>
@@ -305,7 +305,7 @@ export default function ClientsPage() {
                     setBulkPreSelectedIds(Array.from(selectedIds));
                     setShowBulkDrawer(true);
                   }}
-                  className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 transition shadow-sm"
+                  className="rounded-md bg-transparent border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-500 hover:bg-emerald-500/10 transition"
                 >
                   Text Selected ({selectedIds.size})
                 </button>
@@ -317,7 +317,7 @@ export default function ClientsPage() {
                 </button>
                 <button
                   onClick={() => bulkToggleAI(true)}
-                  className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 transition shadow-sm"
+                  className="rounded-md bg-transparent border border-amber-500/50 px-3 py-2 text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition"
                 >
                   Disable AI ({selectedIds.size})
                 </button>
@@ -430,7 +430,7 @@ export default function ClientsPage() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
                       Mark a lead as Sold to convert them to a client. Clients are managed by your AI Receptionist.
                     </p>
-                    <a href="/leads" className="mt-1 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition">
+                    <a href="/leads" className="mt-1 rounded-md bg-transparent border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-500 hover:bg-emerald-500/10 transition">
                       Go to Leads →
                     </a>
                   </div>
@@ -705,7 +705,7 @@ export default function ClientsPage() {
                     message: "This will permanently delete this client. This action cannot be undone.",
                     action: () => handleDelete(selectedClient.id),
                   })}
-                  className="rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+                  className="rounded-md bg-transparent border border-red-500/50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10"
                 >
                   Delete Client
                 </button>

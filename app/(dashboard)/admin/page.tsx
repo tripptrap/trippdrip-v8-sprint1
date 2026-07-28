@@ -930,12 +930,12 @@ export default function AdminPage() {
               <button
                 onClick={() => handleUserAction(confirmAction.userId, confirmAction.email, confirmAction.action)}
                 disabled={actionLoading}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white transition-colors disabled:opacity-50 ${
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-transparent border transition-colors disabled:opacity-50 ${
                   confirmAction.action === 'delete' || confirmAction.action === 'ban'
-                    ? 'bg-red-600 hover:bg-red-700'
+                    ? 'border-red-500/50 text-red-500 hover:bg-red-500/10'
                     : confirmAction.action === 'unsuspend' || confirmAction.action === 'unban'
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-orange-600 hover:bg-orange-700'
+                    ? 'border-green-500/50 text-green-500 hover:bg-green-500/10'
+                    : 'border-orange-500/50 text-orange-500 hover:bg-orange-500/10'
                 }`}
               >
                 {actionLoading ? 'Processing...' : `Yes, ${confirmAction.label}`}
@@ -1045,7 +1045,7 @@ export default function AdminPage() {
               <button
                 onClick={handleGrantCredits}
                 disabled={actionLoading || !grantAmount || Number(grantAmount) <= 0}
-                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-2 text-sm font-medium rounded-lg bg-transparent border border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
               >
                 {actionLoading ? 'Granting...' : `Grant ${Number(grantAmount || 0).toLocaleString()} Credits`}
               </button>

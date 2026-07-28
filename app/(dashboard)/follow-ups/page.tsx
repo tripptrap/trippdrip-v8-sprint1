@@ -987,7 +987,7 @@ export default function FollowUpsPage() {
                 <button
                   onClick={saveCalendarSettings}
                   disabled={savingCalendarUrl}
-                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-transparent border border-emerald-500/50 text-emerald-500 rounded-lg hover:bg-emerald-500/10 disabled:opacity-50"
                 >
                   {savingCalendarUrl ? 'Saving...' : 'Save Settings'}
                 </button>

@@ -745,7 +745,7 @@ export default function TagsPage() {
           {activeTab === 'rules' && (
             <button
               onClick={() => setShowRuleModal(true)}
-              className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 flex items-center gap-2"
+              className="bg-transparent border border-amber-500/50 text-amber-500 px-4 py-2 rounded-lg hover:bg-amber-500/10 flex items-center gap-2"
             >
               <Plus className="w-4 h-4" /> Create Rule
             </button>
@@ -785,7 +785,7 @@ export default function TagsPage() {
           onClick={() => setActiveTab('rules')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-1.5 ${
             activeTab === 'rules'
-              ? 'bg-amber-500 text-white'
+              ? 'bg-transparent border border-amber-500/50 text-amber-500'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700'
           }`}
         >
@@ -1567,7 +1567,7 @@ export default function TagsPage() {
               <button
                 onClick={editingRule ? updateAutoRule : createAutoRule}
                 disabled={!newRuleName.trim() || !newRuleTagName.trim()}
-                className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-transparent border border-amber-500/50 text-amber-500 rounded-lg hover:bg-amber-500/10 disabled:opacity-50"
               >
                 {editingRule ? 'Update' : 'Create'}
               </button>

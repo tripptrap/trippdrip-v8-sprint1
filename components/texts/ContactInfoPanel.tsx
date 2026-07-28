@@ -305,7 +305,7 @@ export default function ContactInfoPanel({
             className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
               lead.status === 'sold'
                 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 border border-emerald-200 dark:border-emerald-800 cursor-default'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-transparent border border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10'
             }`}
           >
             <Check className="w-3.5 h-3.5" />

@@ -528,7 +528,7 @@ export default function QABacktestTracker() {
                 </button>
                 {confirmReset ? (
                   <div className="flex gap-1">
-                    <button onClick={resetAll} className="px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">Confirm Reset</button>
+                    <button onClick={resetAll} className="px-3 py-1.5 text-xs font-medium bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">Confirm Reset</button>
                     <button onClick={() => setConfirmReset(false)} className="px-3 py-1.5 text-xs font-medium bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors">Cancel</button>
                   </div>
                 ) : (

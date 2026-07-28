@@ -37,7 +37,7 @@ export default function CustomModal({
           border: 'border-sky-500/30',
           bg: 'bg-sky-500/10',
           text: 'text-sky-600',
-          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50 text-white'
         };
       case 'error':
         return {
@@ -45,7 +45,7 @@ export default function CustomModal({
           border: 'border-red-500/30',
           bg: 'bg-red-500/10',
           text: 'text-red-400',
-          button: 'bg-red-600 hover:bg-red-700 border-red-500/50'
+          button: 'bg-transparent hover:bg-red-500/10 border-red-500/50 text-red-500'
         };
       case 'warning':
         return {
@@ -53,7 +53,7 @@ export default function CustomModal({
           border: 'border-yellow-500/30',
           bg: 'bg-yellow-500/10',
           text: 'text-yellow-400',
-          button: 'bg-yellow-600 hover:bg-yellow-700 border-yellow-500/50'
+          button: 'bg-transparent hover:bg-yellow-500/10 border-yellow-500/50 text-yellow-500'
         };
       case 'confirm':
         return {
@@ -61,7 +61,7 @@ export default function CustomModal({
           border: 'border-sky-500/30',
           bg: 'bg-sky-500/10',
           text: 'text-sky-600',
-          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50 text-white'
         };
       default:
         return {
@@ -69,7 +69,7 @@ export default function CustomModal({
           border: 'border-white/30',
           bg: 'bg-slate-50 dark:bg-slate-800',
           text: 'text-white',
-          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50'
+          button: 'bg-sky-600 hover:bg-sky-700 border-sky-500/50 text-white'
         };
     }
   };
@@ -132,7 +132,7 @@ export default function CustomModal({
                   onConfirm();
                   onClose();
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${colors.button} border transition-colors`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${colors.button} border transition-colors`}
               >
                 {confirmText}
               </button>
@@ -140,7 +140,7 @@ export default function CustomModal({
           ) : (
             <button
               onClick={onClose}
-              className={`px-4 py-2 rounded-lg text-sm font-medium text-white ${colors.button} border transition-colors`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${colors.button} border transition-colors`}
             >
               {confirmText}
             </button>

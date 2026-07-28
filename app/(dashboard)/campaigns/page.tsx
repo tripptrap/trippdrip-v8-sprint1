@@ -1352,7 +1352,7 @@ export default function CampaignsPage() {
                       <button
                         onClick={moveLeadsFromCampaign}
                         disabled={!sourceCampaignId || movingLeads}
-                        className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition disabled:opacity-50 text-sm font-medium"
+                        className="px-4 py-2 bg-transparent border border-amber-500/50 text-amber-500 rounded-lg hover:bg-amber-500/10 transition disabled:opacity-50 text-sm font-medium"
                       >
                         {movingLeads ? 'Moving...' : 'Move All'}
                       </button>

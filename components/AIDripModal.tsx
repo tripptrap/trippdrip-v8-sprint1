@@ -259,7 +259,7 @@ export default function AIDripModal({
                       onClick={() => setIntervalHours(hours)}
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                         intervalHours === hours
-                          ? 'bg-amber-500 text-white'
+                          ? 'bg-transparent border border-amber-500/60 text-amber-400'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
@@ -283,7 +283,7 @@ export default function AIDripModal({
                       onClick={() => setMaxMessages(count)}
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                         maxMessages === count
-                          ? 'bg-amber-500 text-white'
+                          ? 'bg-transparent border border-amber-500/60 text-amber-400'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
@@ -307,7 +307,7 @@ export default function AIDripModal({
                       onClick={() => setMaxDurationHours(hours)}
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                         maxDurationHours === hours
-                          ? 'bg-amber-500 text-white'
+                          ? 'bg-transparent border border-amber-500/60 text-amber-400'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
@@ -348,7 +348,7 @@ export default function AIDripModal({
             <button
               onClick={handleStopDrip}
               disabled={loading}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 text-sm font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
                 <>
@@ -366,7 +366,7 @@ export default function AIDripModal({
             <button
               onClick={handleStartDrip}
               disabled={loading || checkingStatus}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-transparent border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 text-sm font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
                 <>
