@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { timingSafeEqual } from 'crypto';
 import { sendTelnyxSMS } from "@/lib/telnyx";
+import { attachToThread } from "@/lib/threadForSend";
 
 // MED-7: Use service role client — user-scoped createClient() has no session in cron context
 // and RLS filters all rows to empty. Service role bypasses RLS as intended for cron jobs.
@@ -212,6 +213,26 @@ async function processScheduledMessages(supabase: any) {
 
       // Send the message based on channel
       if (message.channel === 'sms') {
+        // #44: claim the row BEFORE sending. get_messages_ready_to_send()
+        // selects `status = 'pending'`, so if the post-send update to 'sent'
+        // ever failed, the row stayed pending with scheduled_for in the past
+        // and the next run (5 minutes later) sent the same SMS again — forever,
+        // with no attempt cap. Moving the state change ahead of the send turns
+        // that unbounded resend into a single missed message, which is the far
+        // cheaper failure. A row stuck in 'sending' is visible and recoverable;
+        // a lead texted every 5 minutes is not.
+        const { error: claimError } = await supabase
+          .from('scheduled_messages')
+          .update({ status: 'sending', updated_at: new Date().toISOString() })
+          .eq('id', message.id)
+          .eq('status', 'pending');   // lost update = another worker has it
+
+        if (claimError) {
+          console.error(`Could not claim scheduled message ${message.id} — skipping to avoid a double send:`, claimError);
+          failed++;
+          continue;
+        }
+
         // Send SMS via Telnyx
         const smsResult = await sendSMS(lead.phone, message.body, primaryNumber?.phone_number);
 
@@ -233,11 +254,24 @@ async function processScheduledMessages(supabase: any) {
           // points_cost, and has no sender/segments — `direction` already
           // distinguishes agent from lead. Writing the old names silently
           // failed, so none of these sends were ever recorded.
+          // #59: attach to the conversation thread. This cron was the only
+          // send path that never did, so scheduled messages reached the lead
+          // but never showed up in the conversation view and left the thread's
+          // counters and preview stale.
+          const threadId = await attachToThread(supabase, {
+            userId: message.user_id,
+            phone: lead.phone,
+            leadId: message.lead_id,
+            campaignId: message.campaign_id ?? null,
+            lastMessage: message.body,
+          });
+
           const { error: msgInsertError } = await supabase
             .from('messages')
             .insert({
               user_id: message.user_id,
               lead_id: message.lead_id,
+              thread_id: threadId,
               direction: 'out',
               content: message.body,
               body: message.body,

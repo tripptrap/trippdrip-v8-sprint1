@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { loadSettings, isEmailConfigured } from "@/lib/settingsStore";
+import { safeDecrypt } from "@/lib/encryption";
 import nodemailer from 'nodemailer';
 
 export const runtime = "nodejs";
@@ -89,11 +89,32 @@ export async function POST(req: Request) {
 
       leadData = data;
 
-      // Send welcome email to new lead if email is configured and lead has an email
-      if (lead.email && await isEmailConfigured()) {
+      // Send welcome email to new lead if email is configured and lead has an email.
+      //
+      // #49: this used to call isEmailConfigured()/loadSettings() from
+      // lib/settingsStore, which is client-only — on the server its
+      // `typeof window === 'undefined'` guard returns getDefaultSettings(),
+      // an object with no `email` key at all. isEmailConfigured() therefore
+      // always returned false and this block never ran. Same bug that was fixed
+      // in /api/email/send (#16); this route was missed. Load the real config
+      // from Supabase instead.
+      const { data: settingsRow } = await supabase
+        .from('user_settings')
+        .select('email_config')
+        .eq('user_id', user.id)
+        .single();
+
+      const emailConfig = settingsRow?.email_config;
+      const emailIsConfigured =
+        !!emailConfig &&
+        emailConfig.provider !== 'none' &&
+        !!emailConfig.fromEmail &&
+        (emailConfig.provider === 'smtp'
+          ? !!emailConfig.smtpHost && !!emailConfig.smtpUser && !!emailConfig.smtpPass
+          : !!emailConfig.sendgridApiKey);
+
+      if (lead.email && emailIsConfigured) {
         try {
-          const settings = await loadSettings();
-          const emailConfig = settings.email!;
 
           let transporter;
           if (emailConfig.provider === 'smtp') {
@@ -103,7 +124,9 @@ export async function POST(req: Request) {
               secure: emailConfig.smtpSecure || false,
               auth: {
                 user: emailConfig.smtpUser,
-                pass: emailConfig.smtpPass,
+                // Stored encrypted since #16; safeDecrypt passes through any
+                // pre-existing plaintext value unchanged.
+                pass: safeDecrypt(emailConfig.smtpPass),
               },
             });
           } else if (emailConfig.provider === 'sendgrid') {
@@ -113,7 +136,7 @@ export async function POST(req: Request) {
               secure: false,
               auth: {
                 user: 'apikey',
-                pass: emailConfig.sendgridApiKey,
+                pass: safeDecrypt(emailConfig.sendgridApiKey),
               },
             });
           }
