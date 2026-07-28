@@ -2,7 +2,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 import Stripe from 'stripe';
+
+// Admin client to bypass RLS for cross-user ownership checks
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 // Price ID for additional phone number ($1/month)
 // TODO: Create this product/price in Stripe Dashboard and update this ID
@@ -77,9 +87,70 @@ export async function POST(req: NextRequest) {
     });
 
     if (subscriptions.data.length > 0) {
-      // Add to existing subscription as a new item
       const subscription = subscriptions.data[0];
 
+      if (!supabaseAdmin) {
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      }
+
+      // Check ownership before charging or ordering anything
+      const { data: existingNumber } = await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .select('id, user_id')
+        .eq('phone_number', phoneNumber)
+        .single();
+
+      if (existingNumber) {
+        const error = existingNumber.user_id === user.id
+          ? 'You already own this number'
+          : 'This number is already owned by another user';
+        return NextResponse.json({ error }, { status: 400 });
+      }
+
+      // Block unverified toll-free numbers before charging
+      if (isTollFreeNumber(phoneNumber)) {
+        const verifiedNumbers = await getVerifiedTollFreeNumbers();
+        if (!verifiedNumbers.has(phoneNumber)) {
+          return NextResponse.json(
+            { error: 'This toll-free number is not verified for messaging. Please choose a verified number from the available pool.' },
+            { status: 400 }
+          );
+        }
+      }
+
+      const apiKey = process.env.TELNYX_API_KEY;
+      const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
+
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Telnyx API key not configured' }, { status: 500 });
+      }
+
+      // Order the number from Telnyx FIRST — do not charge the customer
+      // until we've confirmed Telnyx actually accepted the order.
+      const orderResponse = await fetch('https://api.telnyx.com/v2/number_orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          phone_numbers: [{ phone_number: phoneNumber }],
+          messaging_profile_id: messagingProfileId,
+          customer_reference: user.id,
+        }),
+      });
+
+      const orderData = await orderResponse.json();
+
+      if (!orderResponse.ok) {
+        console.error('Telnyx order error:', JSON.stringify(orderData, null, 2));
+        return NextResponse.json(
+          { error: orderData.errors?.[0]?.detail || 'Failed to order phone number' },
+          { status: orderResponse.status }
+        );
+      }
+
+      // Telnyx confirmed the order — now it's safe to charge.
       await stripe.subscriptionItems.create({
         subscription: subscription.id,
         price: PHONE_NUMBER_PRICE_ID,
@@ -90,31 +161,8 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      // Order the number from Telnyx
-      const apiKey = process.env.TELNYX_API_KEY;
-      const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
-
-      if (apiKey) {
-        try {
-          await fetch('https://api.telnyx.com/v2/number_orders', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              phone_numbers: [{ phone_number: phoneNumber }],
-              messaging_profile_id: messagingProfileId,
-              customer_reference: user.id,
-            }),
-          });
-        } catch (telnyxError) {
-          console.error('Telnyx order error (non-fatal):', telnyxError);
-        }
-      }
-
-      // Mark the number as purchased (pending until webhook confirms)
-      await supabase
+      // Mark the number as purchased (pending until webhook confirms provisioning)
+      await supabaseAdmin
         .from('user_telnyx_numbers')
         .upsert({
           user_id: user.id,
@@ -129,6 +177,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
+        orderId: orderData.data?.id,
         message: 'Number added to your subscription'
       });
     } else {
