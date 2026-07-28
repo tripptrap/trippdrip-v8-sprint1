@@ -5,6 +5,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { SUBSCRIPTION_FEATURES } from "@/lib/subscriptionFeatures";
 import TelnyxDiamond from "@/components/preview/TelnyxDiamond";
+import HyveLogo from "@/components/HyveLogo";
+
+const LOGO_GRADIENT: [string, string] = ['#38bdf8', '#2563eb'];
 
 export default function PreviewClient() {
   const [selectedPlan, setSelectedPlan] = useState<string>('growth');
@@ -100,9 +103,7 @@ export default function PreviewClient() {
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center">
-                <span className="text-white font-bold text-xs sm:text-sm">HW</span>
-              </div>
+              <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8 sm:w-10 sm:h-10" />
               <span className="text-lg sm:text-2xl font-bold text-gray-900 whitespace-nowrap">HyveWyre</span>
             </div>
 
@@ -272,11 +273,15 @@ export default function PreviewClient() {
               {i < 3 && (
                 <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-emerald-500/50 to-transparent" />
               )}
-              <div className="relative z-10 w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <motion.div
+                whileHover={{ scale: 1.08, rotate: 3 }}
+                transition={{ type: "spring", stiffness: 300 }}
+                className="relative z-10 w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-3 sm:mb-4 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-teal-500/20"
+              >
                 <svg className="w-7 h-7 sm:w-10 sm:h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                 </svg>
-              </div>
+              </motion.div>
               <div className="text-teal-600 text-xs sm:text-sm font-bold mb-1 sm:mb-2">STEP {item.step}</div>
               <h3 className="text-base sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">{item.title}</h3>
               <p className="text-gray-600 text-xs sm:text-base">{item.desc}</p>
@@ -577,11 +582,15 @@ export default function PreviewClient() {
               className="p-6 bg-white border border-gray-200 rounded-xl hover:border-teal-400 transition-all"
             >
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <motion.div
+                  whileHover={{ scale: 1.1, rotate: -4 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                  className="w-12 h-12 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center"
+                >
                   <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                   </svg>
-                </div>
+                </motion.div>
                 <h3 className="text-xl font-bold text-gray-900">{item.industry}</h3>
               </div>
               <ul className="space-y-2 mb-4">
@@ -1488,9 +1497,7 @@ export default function PreviewClient() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">HW</span>
-              </div>
+              <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8" />
               <span className="text-gray-900 font-semibold">HyveWyre™</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-600">
@@ -1526,9 +1533,7 @@ export default function PreviewClient() {
             {/* Demo Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">HW</span>
-                </div>
+                <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8" />
                 <span className="text-gray-900 font-semibold">HyveWyre Demo</span>
               </div>
               <button

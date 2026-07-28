@@ -103,10 +103,13 @@ export async function GET(req: NextRequest) {
 
     // Format numbers for the response
     const numbers = activeNumbers.map((num, index) => ({
+      id: num.id,
       phone_number: num.phone_number,
       friendly_name: num.friendly_name || num.phone_number,
       is_primary: num.is_primary || index === 0,
       status: num.status,
+      capabilities: num.capabilities || { voice: true, sms: true, mms: true },
+      purchased_at: num.created_at,
     }));
 
     return NextResponse.json({

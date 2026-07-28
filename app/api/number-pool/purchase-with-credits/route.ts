@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
         payment_method: 'credits',
         credits_charged: requiredCredits,
         messaging_profile_id: messagingProfileId,
-        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        capabilities: { voice: true, sms: true, mms: true },
       }, {
         onConflict: 'user_id,phone_number'
       });

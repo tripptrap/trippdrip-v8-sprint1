@@ -154,6 +154,7 @@ export async function POST(req: NextRequest) {
         friendly_name: phoneNumber,
         status: 'pending', // Pending until webhook confirms
         messaging_profile_id: messagingProfileId,
+        capabilities: { voice: true, sms: true, mms: true },
       });
 
     if (dbError) {
