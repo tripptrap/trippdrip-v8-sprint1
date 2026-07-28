@@ -11,15 +11,15 @@ html, body {
 
 /* Dark Theme */
 html.dark, html.dark body {
-  background: #0a0f1a;
-  color: #e7eef9;
+  background: #0a0a0a;
+  color: #f2f2f2;
 }
 
 /* CSS Variables for theme colors - Ocean Blue & Coral */
 :root {
-  --primary: #0ea5e9;
-  --primary-hover: #0284c7;
-  --primary-light: #38bdf8;
+  --primary: #525252;
+  --primary-hover: #404040;
+  --primary-light: #737373;
   --accent: #f97316;
   --accent-hover: #ea580c;
   --accent-light: #fb923c;
@@ -34,13 +34,13 @@ html.dark, html.dark body {
 
 /* Dark theme CSS variables */
 html.dark {
-  --background: #0f172a;
-  --background-light: #1e293b;
-  --surface: rgba(30, 41, 59, 0.95);
+  --background: #0a0a0a;
+  --background-light: #161616;
+  --surface: rgba(22, 22, 22, 0.95);
   --border: rgba(255, 255, 255, 0.1);
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
-  --muted: #64748b;
+  --text: #f2f2f2;
+  --text-muted: #a3a3a3;
+  --muted: #737373;
 }
 
 /* Card styles - Light theme */
@@ -57,21 +57,21 @@ html.dark {
 .card:hover {
   background: white;
   border-color: #cbd5e1;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
-/* Card styles - Dark theme */
+/* Card styles - Dark theme (near-black) */
 html.dark .card {
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f1f5f9;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f2f2f2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 html.dark .card:hover {
-  background: #334155;
-  border-color: rgba(14, 165, 233, 0.4);
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+  background: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Light card variant for better contrast */
@@ -139,18 +139,18 @@ html.dark .card-light {
 
 /* Dark inputs (default for dark theme) */
 .input-dark {
-  background: #1e293b;
-  border: 1px solid #334155;
-  color: #f1f5f9 !important;
+  background: #161616;
+  border: 1px solid #262626;
+  color: #f2f2f2 !important;
 }
 
 .input-dark::placeholder {
-  color: #64748b !important;
+  color: #737373 !important;
 }
 
 .input-dark:focus {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+  border-color: #525252;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
   outline: none;
 }
 
@@ -189,11 +189,11 @@ html.dark table {
 }
 
 html.dark table thead {
-  background: rgba(14, 165, 233, 0.1);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 html.dark table tbody tr:hover {
-  background: rgba(14, 165, 233, 0.05);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* Light table */
@@ -220,8 +220,8 @@ html.dark table tbody tr:hover {
 }
 
 .spinner {
-  border: 2px solid rgba(14, 165, 233, 0.2);
-  border-top-color: #0ea5e9;
+  border: 2px solid rgba(115, 115, 115, 0.2);
+  border-top-color: #737373;
   border-radius: 50%;
   width: 1.5rem;
   height: 1.5rem;
@@ -371,13 +371,13 @@ html.dark table tbody tr:hover {
 
 /* Dark mode scrollbar */
 html.dark ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: #161616;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #404040;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #525252;
 }

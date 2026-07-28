@@ -36,6 +36,27 @@ const config: Config = {
           900: '#18181b',
           950: '#09090b',
         },
+        // `slate` is the site's actual page/card/border/text ramp everywhere
+        // (dark:bg-slate-900 page bg, dark:bg-slate-800 cards, dark:border-
+        // slate-700 borders, dark:text-slate-100/300/400 text). Overridden
+        // here to the "near-black" theme the user picked from the theme-
+        // comparison artifact: true near-black surfaces instead of Tailwind's
+        // blue-tinted default. Light-mode stops (50-600) stay a light neutral
+        // grey so light mode itself doesn't get pulled toward black; only the
+        // dark-mode-relevant stops (700-950) are pushed to near-black.
+        slate: {
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e5e5e5',
+          300: '#d4d4d4',
+          400: '#a3a3a3',
+          500: '#737373',
+          600: '#525252',
+          700: '#262626',
+          800: '#161616',
+          900: '#0a0a0a',
+          950: '#000000',
+        },
         // Ocean Blue & Coral Theme
         primary: {
           50: '#f0f9ff',
