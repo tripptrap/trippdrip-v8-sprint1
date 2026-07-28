@@ -309,6 +309,62 @@ left in that file.
 
 ---
 
+## Tenant isolation — how it actually works, and where it doesn't
+
+Mapped during the 2026-07-28 deep audit. **Two separate mechanisms protect tenant data, and
+which one applies depends entirely on which Supabase client a route uses.**
+
+**Request-scoped client** (`createClient()` from `lib/supabase/server`) — carries the user's
+JWT, so RLS applies. Ownership is enforced by the database.
+
+**Service-role client** (`createServiceRoleClient()`, or `createClient(url, SERVICE_ROLE_KEY)`)
+— **bypasses RLS entirely**. Ownership must be enforced in code, by adding
+`.eq('user_id', …)` to every query. 32 routes use this client.
+
+If you move a route from the first to the second — which happened several times on
+2026-07-28 while enabling RLS — **every query in it silently loses its ownership check.**
+That's the trap.
+
+### The RLS subtlety that decides severity
+
+An `UPDATE … WHERE` must first *find* rows, and row visibility is governed by the **SELECT**
+policy. So a restrictive SELECT masks a permissive UPDATE — which is the only reason
+`users UPDATE USING true` (see #65) isn't exploitable today. Add a permissive SELECT policy
+to that table and the hole opens with no other change. Worth knowing before touching
+policies on `users`.
+
+Policies named *"Service role can …"* are a red flag: `service_role` bypasses RLS, so such a
+policy only ever grants access to `anon`/`authenticated`. Several exist and are scoped to
+`{public}` (#65).
+
+### Verified-clean isolation controls
+
+- `messages/threads/[threadId]` 403s on `thread.user_id !== user.id`
+- `send-sms` rejects a body-supplied `userId` without `x-internal-secret`
+- `receptionist/respond` requires the internal secret outright
+- all 5 crons fail **closed** when `CRON_SECRET` is unset
+- `ai/generate-follow-up` filters conversation context by `user_id` — the pattern
+  `process-ai-drips` is missing (#64)
+
+---
+
+## Vocabulary inconsistencies that silently break queries
+
+**`messages.direction` accepts four values** — the CHECK constraint permits `in`, `out`,
+`inbound`, `outbound`. Different routes write different ones and nothing normalises them, so
+`.eq('direction','outbound')` misses everything written as `'out'`. **Nothing ever writes
+`'in'`**, so any query filtering on it returns zero rows forever (#66). Check what a writer
+actually writes before filtering on direction.
+
+**`leads` has two flow columns** — `flow_id` (uuid, has an FK) and `current_flow_id` (text,
+no FK). Both are referenced by code (#68).
+
+**Three internal id columns are `text` pointing at `uuid` keys** — `messages.thread_id`,
+`lead_flows.thread_id`, `leads.current_flow_id`. No FK is possible across mismatched types,
+and joins need an explicit `::text` cast or they silently return nothing (#68).
+
+---
+
 ## Database writes — the failure mode that keeps recurring
 
 **supabase-js returns `{ error }`; it does not throw.** An unchecked write fails
