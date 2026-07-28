@@ -15,6 +15,31 @@ assumes and what's actually true, or ship a change that alters a subsystem's
 behavior end to end. This is a maintenance duty, not a one-time task — treat it the
 same as running tests or type-checking before calling work done.
 
+## MANDATORY: Verify the database against the live database
+**Before writing any code that touches the DB** (queries, inserts, upserts, migrations,
+API routes), confirm the schema against the running database — not from memory, not from
+an exported snapshot, and not by trusting that surrounding code got it right. Snapshots
+go stale, which makes them the same drift problem they were meant to solve.
+
+```bash
+supabase db query --linked "SELECT column_name, is_nullable, column_default FROM information_schema.columns WHERE table_name='<table>' ORDER BY ordinal_position;"
+supabase db query --linked "SELECT indexname, indexdef FROM pg_indexes WHERE tablename='<table>';"
+```
+
+Specific traps, each of which has already shipped a real bug here:
+- **A column the code reads may not exist at all.** `user_telnyx_numbers.capabilities`
+  was read unconditionally by a page and written by 5 routes while absent from the DB.
+- **`onConflict` must name a real unique constraint.** supabase-js doesn't validate it;
+  Postgres returns `42P10` at runtime. Check `pg_indexes` before writing one.
+- **NOT NULL columns with no default must be supplied.** `dnc_list.normalized_phone`
+  was omitted, so every write failed.
+- **supabase-js returns `{ error }`, it does not throw.** An unchecked call fails
+  completely silently — a `try/catch` around it catches nothing. Always check `error`
+  on writes. This is how STOP opt-outs failed for months while logging success.
+- **Prefer an existing RPC over hand-rolled table writes** when one exists (e.g.
+  `add_to_dnc`, not a direct `dnc_list` insert) — the RPC owns normalization and
+  invariants that the enforcement path depends on.
+
 ## QA Communication Guidelines
 When the user provides a QA checklist with categories:
 - If a category is marked **"Undefined"**, everything listed under that category (until the next category) represents items that need to be **asked about or clarified** before implementation
