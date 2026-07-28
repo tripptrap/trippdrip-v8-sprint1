@@ -133,31 +133,30 @@ export default function PointsPage() {
   }
 
   async function refreshData() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Balance and tier come from /api/user/credits — the same authenticated
+    // server route the other 8 credit-reading components already use. This
+    // page used to run its own client-side Supabase query guarded by
+    // `if (!user) return`, so any transient browser-side auth failure bailed
+    // out silently and left every figure at its zero default (issue #6).
+    let loadedCredits: number | null = null;
+    try {
+      const res = await fetch('/api/user/credits');
+      const data = await res.json();
 
-    if (!user) return;
+      if (!res.ok || !data.ok) {
+        console.error('points: failed to load credits', data?.error || res.status);
+      } else {
+        loadedCredits = data.credits ?? 0;
+        setBalance(loadedCredits);
+        setCurrentPlan(data.subscriptionTier === 'scale' ? 'scale' : 'growth');
+      }
+    } catch (err) {
+      console.error('points: failed to load credits', err);
+    }
 
     // Check days until renewal
     const days = await getDaysUntilRenewal();
     setDaysUntilRenewal(days);
-
-    // Fetch user data from Supabase
-    const { data: userData, error } = await supabase
-      .from('users')
-      .select('credits, subscription_tier, monthly_credits')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      // Previously swallowed silently, which left balance at its default and
-      // rendered a false "out of credits" alert (issue #6).
-      console.error('points: failed to load credits', error);
-    } else if (userData) {
-      setBalance(userData.credits ?? 0);
-      const tier = userData.subscription_tier as SubscriptionTier;
-      setCurrentPlan(tier === 'scale' ? 'scale' : 'growth');
-    }
 
     // Fetch transactions from Supabase
     const txns = await getRecentTransactionsSupabase(20);
@@ -175,7 +174,7 @@ export default function PointsPage() {
       .filter((t: any) => t.type === 'earn' || t.type === 'purchase')
       .reduce((sum: number, t: any) => sum + t.amount, 0);
     const avgDailySpend = totalSpent / 7;
-    const daysRemaining = avgDailySpend > 0 ? Math.floor((userData?.credits || 0) / avgDailySpend) : 999;
+    const daysRemaining = avgDailySpend > 0 ? Math.floor((loadedCredits ?? 0) / avgDailySpend) : 999;
 
     setStats({
       totalSpent,
