@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 // Traced from the original logo-basic.png/logo-premium.png artwork (honeycomb
 // pyramid outline) so the shape stays pixel-faithful. Rendered as SVG instead
 // of a flat raster so it can invert with light/dark mode via Tailwind's
@@ -13,9 +15,27 @@ const HEX_PATH =
 
 interface HyveLogoProps {
   className?: string;
+  /** [from, to] hex colors for a static gradient fill. Omit to use the default light/dark-inverting fill. */
+  gradient?: [string, string];
 }
 
-export default function HyveLogo({ className }: HyveLogoProps) {
+export default function HyveLogo({ className, gradient }: HyveLogoProps) {
+  const gid = useId();
+
+  if (gradient) {
+    return (
+      <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradient[0]} />
+            <stop offset="100%" stopColor={gradient[1]} />
+          </linearGradient>
+        </defs>
+        <path d={HEX_PATH} fillRule="evenodd" fill={`url(#${gid})`} />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
       <path d={HEX_PATH} fillRule="evenodd" className="fill-slate-900 dark:fill-slate-50" />

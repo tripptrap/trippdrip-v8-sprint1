@@ -5,6 +5,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { SUBSCRIPTION_FEATURES } from "@/lib/subscriptionFeatures";
 import TelnyxDiamond from "@/components/preview/TelnyxDiamond";
+import HyveLogo from "@/components/HyveLogo";
+
+const LOGO_GRADIENT: [string, string] = ['#38bdf8', '#2563eb'];
 
 export default function PreviewClient() {
   const [selectedPlan, setSelectedPlan] = useState<string>('growth');
@@ -100,9 +103,7 @@ export default function PreviewClient() {
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center">
-                <span className="text-white font-bold text-xs sm:text-sm">HW</span>
-              </div>
+              <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8 sm:w-10 sm:h-10" />
               <span className="text-lg sm:text-2xl font-bold text-gray-900 whitespace-nowrap">HyveWyre</span>
             </div>
 
@@ -1496,9 +1497,7 @@ export default function PreviewClient() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">HW</span>
-              </div>
+              <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8" />
               <span className="text-gray-900 font-semibold">HyveWyre™</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-600">
@@ -1534,9 +1533,7 @@ export default function PreviewClient() {
             {/* Demo Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">HW</span>
-                </div>
+                <HyveLogo gradient={LOGO_GRADIENT} className="w-8 h-8" />
                 <span className="text-gray-900 font-semibold">HyveWyre Demo</span>
               </div>
               <button
