@@ -200,7 +200,7 @@ export default function Sidebar(){
           }}
         >
           <motion.div
-            className="h-9 w-9"
+            className="h-7 w-7"
             animate={{
               scale: [1, 1.02, 1],
             }}
@@ -211,7 +211,7 @@ export default function Sidebar(){
             }}
             whileHover={{ scale: 1.05, rotate: 3 }}
           >
-            <HyveLogo className="h-9 w-9" />
+            <HyveLogo className="h-7 w-7" />
           </motion.div>
         </motion.div>
         {!collapsed && <span className="text-xl text-slate-900 dark:text-slate-100 whitespace-nowrap">HyveWyre™</span>}
