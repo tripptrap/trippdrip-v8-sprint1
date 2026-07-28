@@ -219,7 +219,6 @@ Go to **Settings → Auto-Refill** to configure:
 
 ### AI
 - `POST /api/ai` - General AI chat
-- `POST /api/ai-response` - Generate lead response
 - `POST /api/generate-flow` - Generate conversation flow
 
 ### Leads

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/contact-form
@@ -45,8 +45,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Store in database
-    const supabase = await createClient();
+    // Service-role client: this is a public, unauthenticated form, so there is
+    // no session for RLS to key off. RLS is now enabled on
+    // contact_form_submissions (#56) and denies anonymous access outright —
+    // writes have to come through a trusted server route like this one, which
+    // validates the input above. Same pattern as /api/opt-in/submit.
+    const supabase = createServiceRoleClient();
 
     // Check if this phone number already exists as a contact form submission
     const { data: existingLead } = await supabase
