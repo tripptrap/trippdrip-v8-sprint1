@@ -346,9 +346,13 @@ left in that file.
   folded revocation into the #29 rotation pass. **Don't re-raise as an emergency**, but do
   revoke it when #29 happens; an embedded PAT keeps working until explicitly revoked.
   `/Applications/hyvewyre` is now the only clone, and its own remote is clean.
-- **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
+- **Instant-access pool is unverified + capacity-limited (#35, found 2026-07-28):** see
   SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
   the database but zero real TFV requests on the Telnyx account, so the pool likely
-  doesn't actually solve the new-signup-can't-text problem it exists to solve. Fixing
-  this needs (1) real TFV submissions for the 3 existing numbers, with the user's
-  explicit go-ahead first, and (2) more pool capacity than 3 numbers long-term.
+  doesn't actually solve the new-signup-can't-text problem it exists to solve. Combined
+  with #1 still pending, that means there is currently **no working path for a
+  brand-new account to send SMS at all.** Fixing this needs (1) real TFV submissions for
+  the 3 existing numbers, with the user's explicit go-ahead first, (2) more pool capacity
+  than 3 numbers long-term (#3), and (3) a root-cause fix — `number_pool.is_verified` is
+  set independently of Telnyx's real state, so it can lie; derive it from
+  `getVerifiedTollFreeNumbers()` or reconcile on a schedule.
