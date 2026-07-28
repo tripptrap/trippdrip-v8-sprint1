@@ -595,15 +595,15 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - [x] Deep audit: API routes, database schema, Telnyx integration — all findings fixed
 
 ### In Progress
-_(nothing currently in progress)_
+- [x] ~~Telnyx local number orders being denied~~ — **RESOLVED 2026-07-26**: root cause was the negative account balance (-$23.91), not a code or compliance issue. User added funds (balance now positive, ~$76 before test orders). Confirmed via live test: 1 local number (+18134972176, area code 813) and 3 toll-free numbers ordered successfully once balance was positive. Local orders are not gated by 10DLC campaign status at the ordering stage (only affects message throughput later).
+- [x] ~~Add funds to Telnyx account balance~~ — done by user 2026-07-26.
+- [ ] **10DLC campaign under real carrier review** — campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` submitted 2026-07-27 under the verified "HyveWyre LLC" brand (`4b20019b-eba4-6bfd-8723-dca9058142e8`, status VERIFIED). Passed validation cleanly (`TCR_PENDING`, no failureReasons) — awaiting TCR's actual review outcome. **Full submission history — every prior rejection reason verbatim, what was submitted each time, and exactly how each was fixed — is recorded in [`docs/10DLC_REJECTION_HISTORY.md`](docs/10DLC_REJECTION_HISTORY.md).** If this attempt also fails: read that file first, append the new reason and fix in the same format, and check `docs/10dlc_attempt6_payload.json` (the exact payload sent) against the new failureReasons before touching anything. Do not re-derive this from scratch. If it succeeds: next step is assigning phone number `+18134972176` to the campaign via the "Assign my number" button in Settings → Messaging Registration.
+- [x] Per-user branded opt-in pages (#21) — built as a hard prerequisite for per-agent 10DLC (see above), not post-launch roadmap. Live at `/opt-in/<slug>`. See `docs/10DLC_REJECTION_HISTORY.md` and `lib/optInConsent.ts`.
 
-### Remaining Pre-Launch
-- [ ] Encrypt email API key at rest (deferred — needs SETTINGS_ENCRYPTION_KEY env var)
-- [ ] End-to-end QA: full user flow testing (signup → onboarding → send SMS → receive reply → flow → appointment → sold)
-- [ ] Production verification: confirm Telnyx webhooks, Vercel cron jobs, and Stripe are wired up correctly
+### Open Work — tracked in GitHub Issues
+All open pre-launch bugs, compliance work, retention/pricing decisions, and roadmap items moved to GitHub Issues (2026-07-26) — this file was becoming too long to track against reliably. See https://github.com/tripptrap/trippdrip-v8-sprint1/issues, or `gh issue list --repo tripptrap/trippdrip-v8-sprint1`.
 
-### Roadmap (Post-Launch)
-- [ ] Native iOS/Android mobile app
-- [ ] Browser extension polish and advanced features
-- [ ] Per-user branded opt-in pages
-- [ ] Team/role-based admin access
+- **Pre-Launch milestone**: everything blocking launch — 10DLC per-agent restructuring (#1) and its dependents (#2, #3, #11), the billing bug in create-number-subscription (#4), dark-mode pass (#5), the /points $0 balance bug (#6), floating button overlap (#7), sidebar responsive breakpoint (#8), analytics nav consolidation (#9), number-order webhook persistence bug (#10), the downgrade/retention flow (#12, #13, #14, #15), encryption of email API key (#16), end-to-end QA (#17), and production verification (#18).
+- **Post-Launch Roadmap milestone**: native mobile app (#19), browser extension polish (#20), team/role-based admin access (#22). (#21, per-user branded opt-in pages, was pulled forward and completed 2026-07-27 — see "In Progress" above.)
+
+Filter with `gh issue list --repo tripptrap/trippdrip-v8-sprint1 --label compliance` (or `billing`, `bug`, `retention`, `dark-mode`, `ux`) to narrow by category.
