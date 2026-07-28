@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { SUBSCRIPTION_FEATURES } from "@/lib/subscriptionFeatures";
 import TelnyxDiamond from "@/components/preview/TelnyxDiamond";
 import HyveLogo from "@/components/HyveLogo";
+import { POINT_PACKS, scaleSavingsVsGrowthPct, minScaleSavingsPct, maxScaleSavingsPct } from '@/lib/pointPacks';
 
 const LOGO_GRADIENT: [string, string] = ['#38bdf8', '#2563eb'];
 
@@ -628,7 +629,7 @@ export default function PreviewClient() {
             },
             {
               q: 'What happens if I run out of credits?',
-              a: 'You can purchase additional credit packs anytime at discounted rates (up to 30% off with Scale plan). Your campaigns will pause if you run out, and you\'ll be notified before that happens.'
+              a: 'You can purchase additional credit packs anytime, and Scale members pay less on every pack — between 10% and 18% below Growth pricing depending on the size. Your campaigns pause if you run out, and you\'ll be notified before that happens.'
             },
             {
               q: 'Can I import my existing leads?',
@@ -929,7 +930,7 @@ export default function PreviewClient() {
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
             </svg>
-            Scale Plan: Save up to 30% on credit packs — the more you buy, the more you save!
+            Scale Plan: Save {minScaleSavingsPct()}–{maxScaleSavingsPct()}% on credit packs — the bigger the pack, the more you save.
           </div>
         </motion.div>
 
@@ -1030,7 +1031,7 @@ export default function PreviewClient() {
             <div className="absolute -top-2 -right-2">
               <div className="relative">
                 <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transform rotate-3 animate-pulse">
-                  SAVE UP TO 30%
+                  SAVE UP TO {maxScaleSavingsPct()}%
                 </div>
               </div>
             </div>
@@ -1039,12 +1040,12 @@ export default function PreviewClient() {
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Scale</h3>
               <div className="text-5xl font-bold text-gray-900 mb-1">${SUBSCRIPTION_FEATURES.scale.price}</div>
               <div className="text-gray-600">per month</div>
-              {/* Prominent 30% credit pack savings badge */}
+              {/* Credit pack savings badge — range derived from lib/pointPacks.ts */}
               <div className="mt-3 inline-flex items-center gap-2 bg-emerald-50 border-2 border-emerald-400 text-emerald-700 text-sm font-bold px-4 py-2 rounded-xl shadow-sm shadow-emerald-200">
                 <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
-                SAVE 30% on every credit pack
+                SAVE UP TO {maxScaleSavingsPct()}% on every credit pack
               </div>
               <div className="mt-2 space-y-1">
                 <div className="text-sm text-teal-600 font-semibold">3.3x more credits than Growth</div>
@@ -1080,10 +1081,10 @@ export default function PreviewClient() {
                 <span className="text-teal-600 text-xl">✓</span>
                 <span className="text-gray-700">Advanced analytics</span>
               </div>
-              {/* Key differentiator: flat 30% off all credit packs */}
+              {/* Key differentiator: lower credit-pack pricing on Scale */}
               <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-300 rounded-lg px-3 py-2.5 -mx-1">
                 <span className="text-emerald-600 text-xl font-bold">✓</span>
-                <span className="text-emerald-800 font-semibold text-sm">30% off all credit pack purchases</span>
+                <span className="text-emerald-800 font-semibold text-sm">Lower prices on every credit pack</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-teal-600 text-xl">✓</span>
@@ -1097,10 +1098,10 @@ export default function PreviewClient() {
                 <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
-                <span className="font-bold text-emerald-800">Scale members save 30% on every credit pack</span>
+                <span className="font-bold text-emerald-800">Scale members pay less on every credit pack</span>
               </div>
               <p className="text-xs text-emerald-700">
-                Every credit pack you buy is automatically discounted 30% — no matter the size. Growth members pay standard pricing. Upgrade to Scale and keep more money in your pocket every time you top up.
+                Every credit pack costs less on Scale — {minScaleSavingsPct()}% to {maxScaleSavingsPct()}% below Growth pricing, with the bigger packs saving the most. Upgrade to Scale and keep more in your pocket every time you top up.
               </p>
             </div>
 
@@ -1128,7 +1129,7 @@ export default function PreviewClient() {
               <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
             </svg>
             <span>
-              <span className="font-bold text-emerald-700">Scale members save 30%</span> on every credit pack purchase vs <span className="font-semibold">standard pricing for Growth</span>
+              <span className="font-bold text-emerald-700">Scale members save {minScaleSavingsPct()}–{maxScaleSavingsPct()}%</span> on every credit pack purchase vs <span className="font-semibold">Growth pricing</span>
             </span>
           </div>
         </motion.div>
@@ -1146,90 +1147,49 @@ export default function PreviewClient() {
             <p className="text-gray-600">Purchase additional credit packs anytime. Scale plan members get the best rates.</p>
           </div>
 
+          {/* Prices come from lib/pointPacks.ts — the same table the app charges
+              from — so this can't drift from what Stripe actually bills. It
+              previously hardcoded a "30% off" column showing $28/$70/$175 when
+              the real Scale prices are $36/$80/$187.50, and listed Growth at a
+              list price Growth doesn't pay either (#41). */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-lg">
             <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-200">
               <div className="p-4 font-semibold text-gray-700">Credit Pack</div>
-              <div className="p-4 font-semibold text-gray-700 text-center">Base Price</div>
-              <div className="p-4 font-semibold text-gray-700 text-center">
-                Growth
-              </div>
+              <div className="p-4 font-semibold text-gray-700 text-center">Growth</div>
               <div className="p-4 font-semibold text-center">
-                <span className="text-emerald-600">Scale</span> <span className="text-emerald-400 font-normal text-xs">(30% off)</span>
+                <span className="text-emerald-600">Scale</span>
               </div>
+              <div className="p-4 font-semibold text-gray-700 text-center">You save</div>
             </div>
 
             <div className="divide-y divide-gray-100">
-              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors">
-                <div className="p-4">
-                  <div className="font-medium text-gray-900">Starter</div>
-                  <div className="text-sm text-gray-500">4,000 credits</div>
-                </div>
-                <div className="p-4 text-center text-gray-600">$40</div>
-                <div className="p-4 text-center">
-                  <span className="text-gray-700">$40</span>
-                </div>
-                <div className="p-4 text-center">
-                  <span className="font-semibold text-emerald-600">$28</span>
-                  <span className="ml-1 text-xs text-emerald-600">(-$12)</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-teal-50/30">
-                <div className="p-4">
-                  <div className="font-medium text-gray-900 flex items-center gap-2">
-                    Pro
-                    <span className="bg-teal-100 text-teal-700 text-xs px-2 py-0.5 rounded-full">Popular</span>
+              {POINT_PACKS.map((pack) => {
+                const saved = pack.basePrice - pack.premiumPrice;
+                // Floor, matching maxScaleSavingsPct() — rounding here would
+                // print 18% on a row while the headline range says "10–17%",
+                // and would overstate the saving.
+                const pct = Math.floor(scaleSavingsVsGrowthPct(pack));
+                return (
+                  <div key={pack.name} className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors">
+                    <div className="p-4">
+                      <div className="font-medium text-gray-900">{pack.name}</div>
+                      <div className="text-sm text-gray-500">{pack.points.toLocaleString()} credits</div>
+                    </div>
+                    <div className="p-4 text-center text-gray-700">${pack.basePrice}</div>
+                    <div className="p-4 text-center">
+                      <span className="font-semibold text-emerald-600">${pack.premiumPrice.toFixed(2).replace(/\.00$/, '')}</span>
+                    </div>
+                    <div className="p-4 text-center text-emerald-600 text-sm">
+                      ${saved.toFixed(2).replace(/\.00$/, '')} ({pct}%)
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">10,000 credits</div>
-                </div>
-                <div className="p-4 text-center text-gray-600">$100</div>
-                <div className="p-4 text-center">
-                  <span className="text-gray-700">$100</span>
-                </div>
-                <div className="p-4 text-center">
-                  <span className="font-semibold text-emerald-600">$70</span>
-                  <span className="ml-1 text-xs text-emerald-600">(-$30)</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors">
-                <div className="p-4">
-                  <div className="font-medium text-gray-900">Business</div>
-                  <div className="text-sm text-gray-500">25,000 credits</div>
-                </div>
-                <div className="p-4 text-center text-gray-600">$250</div>
-                <div className="p-4 text-center">
-                  <span className="text-gray-700">$250</span>
-                </div>
-                <div className="p-4 text-center">
-                  <span className="font-semibold text-emerald-600">$175</span>
-                  <span className="ml-1 text-xs text-emerald-600">(-$75)</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 items-center hover:bg-gray-50 transition-colors bg-gradient-to-r from-emerald-50/50 to-teal-50/50">
-                <div className="p-4">
-                  <div className="font-medium text-gray-900 flex items-center gap-2">
-                    Enterprise
-                    <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs px-2 py-0.5 rounded-full">Best Deal</span>
-                  </div>
-                  <div className="text-sm text-gray-500">60,000 credits</div>
-                </div>
-                <div className="p-4 text-center text-gray-600">$600</div>
-                <div className="p-4 text-center">
-                  <span className="text-gray-700">$600</span>
-                </div>
-                <div className="p-4 text-center">
-                  <span className="font-bold text-emerald-600">$420</span>
-                  <span className="ml-1 text-xs text-emerald-600 font-semibold">(-$180)</span>
-                  <div className="text-xs text-emerald-700 font-semibold mt-1">Save $180!</div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
           <div className="mt-4 text-center text-sm text-gray-500">
-            Credits never expire. Scale members save 30% on every pack — exclusive to the Scale plan.
+            Credits never expire. Scale members save {minScaleSavingsPct()}–{maxScaleSavingsPct()}% on every pack — exclusive to the Scale plan.
           </div>
         </motion.div>
 

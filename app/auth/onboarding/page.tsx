@@ -586,7 +586,7 @@ function OnboardingContent() {
                   <div className="flex items-start"><CheckIcon /><div className="font-semibold text-gray-900">AI Responses & Receptionist</div></div>
                   <div className="flex items-start"><CheckIcon /><div className="font-semibold text-gray-900">Bulk Messaging & Drips</div></div>
                   <div className="flex items-start"><CheckIcon /><div className="font-semibold text-gray-900">Advanced Analytics</div></div>
-                  <div className="flex items-start"><CheckIcon /><div><div className="font-semibold text-gray-900">30% Off Point Packs</div><div className="text-sm text-gray-500">Best rates on additional credits</div></div></div>
+                  <div className="flex items-start"><CheckIcon /><div><div className="font-semibold text-gray-900">Lower Point Pack Pricing</div><div className="text-sm text-gray-500">Save 10–18% on every credit pack vs Growth</div></div></div>
                   <div className="flex items-start"><CheckIcon /><div className="font-semibold text-gray-900">Priority Support</div></div>
                 </div>
               </div>
