@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { encrypt } from '@/lib/encryption';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createAdminClient(
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('porting_orders')
-      .select('*')
+      .select('id, user_id, phone_number, carrier_name, account_number, authorized_name, billing_street, billing_city, billing_state, billing_zip, telnyx_porting_order_id, status, status_details, submitted_at, completed_at, created_at, updated_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -37,6 +38,20 @@ export async function POST(req: NextRequest) {
     if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     if (!supabaseAdmin) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+
+    // Preflight: account_pin is encrypted at rest, so a missing key means we
+    // cannot accept the request at all. Without this check, encrypt() throws
+    // mid-insert and the raw error (naming the env var) reaches the client.
+    if (!process.env.ENCRYPTION_KEY) {
+      console.error(
+        'port-number: ENCRYPTION_KEY is not set — porting is disabled. ' +
+        'Set it in the Vercel project environment variables and redeploy.'
+      );
+      return NextResponse.json(
+        { error: 'Number porting is temporarily unavailable. Please contact support.' },
+        { status: 503 }
+      );
+    }
 
     // Require paid subscription
     const { data: userRow } = await supabase
@@ -110,7 +125,7 @@ export async function POST(req: NextRequest) {
         phone_number: e164,
         carrier_name: carrierName,
         account_number: accountNumber,
-        account_pin: accountPin,
+        account_pin: encrypt(accountPin),
         authorized_name: authorizedName,
         billing_street: billingStreet,
         billing_city: billingCity,

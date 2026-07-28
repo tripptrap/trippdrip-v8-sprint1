@@ -70,7 +70,10 @@ function getPlanDetails(planType: SubscriptionTier): { price: number; monthlyPoi
 }
 
 export default function PointsPage() {
-  const [balance, setBalance] = useState(0);
+  // null = not loaded yet. Distinguishing this from a real 0 matters: a
+  // failed/incomplete load must never render the "you're out of credits,
+  // top up" alert and push someone to buy credits they already have.
+  const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [currentPlan, setCurrentPlan] = useState<SubscriptionTier>('growth');
   const [showCelebration, setShowCelebration] = useState(false);
@@ -145,8 +148,12 @@ export default function PointsPage() {
       .eq('id', user.id)
       .single();
 
-    if (!error && userData) {
-      setBalance(userData.credits || 0);
+    if (error) {
+      // Previously swallowed silently, which left balance at its default and
+      // rendered a false "out of credits" alert (issue #6).
+      console.error('points: failed to load credits', error);
+    } else if (userData) {
+      setBalance(userData.credits ?? 0);
       const tier = userData.subscription_tier as SubscriptionTier;
       setCurrentPlan(tier === 'scale' ? 'scale' : 'growth');
     }
@@ -327,7 +334,7 @@ export default function PointsPage() {
           <div>
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Current Balance</div>
             <div className="text-4xl font-bold flex items-center gap-2">
-              {balance.toLocaleString()}
+              {balance === null ? '—' : balance.toLocaleString()}
               <span className="text-lg text-slate-600 dark:text-slate-400">points</span>
             </div>
           </div>
@@ -389,7 +396,7 @@ export default function PointsPage() {
       </div>
 
       {/* Low Balance Alert */}
-      {balance <= 200 && (
+      {balance !== null && balance <= 200 && (
         <div className="card bg-sky-500/10 border-sky-400/30">
           <div className="flex items-center gap-3">
             <div className="flex-1">

@@ -99,13 +99,14 @@ export async function POST(req: NextRequest) {
 
           if (!phoneNumber) continue;
 
-          // Check if we have a pending record for this number
+          // maybeSingle(), not single(): single() errors when zero rows match,
+          // which is the normal case for an order placed outside the app.
           const { data: pendingNumber } = await supabaseAdmin
             .from('user_telnyx_numbers')
             .select('*')
             .eq('phone_number', phoneNumber)
             .eq('status', 'pending')
-            .single();
+            .maybeSingle();
 
           if (pendingNumber) {
             // Update existing pending record to active
@@ -140,6 +141,18 @@ export async function POST(req: NextRequest) {
             } else {
               console.log(`✅ Number ${phoneNumber} added for user ${userId}`);
             }
+          } else {
+            // Unattributable: no pending row AND no customer_reference on the
+            // order (e.g. ordered directly via the Telnyx API/dashboard rather
+            // than through the app). This previously fell through silently and
+            // the number never landed in the DB at all — issue #10, where 3 of
+            // 3 toll-free numbers went missing with no error anywhere.
+            console.error(
+              `❌ ORPHANED NUMBER — ${phoneNumber} completed on order ${orderId} but ` +
+              `could not be attributed to a user: no pending row and no ` +
+              `customer_reference on the order. It must be inserted into ` +
+              `user_telnyx_numbers manually.`
+            );
           }
         }
         break;
