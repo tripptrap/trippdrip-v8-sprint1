@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
         phone_number: poolNumber.phone_number,
         friendly_name: poolNumber.friendly_name || `Shared ${poolNumber.number_type}`,
         status: 'active',
+        capabilities: poolNumber.capabilities || { voice: true, sms: true, mms: true },
       });
 
     if (telnyxNumberError) {

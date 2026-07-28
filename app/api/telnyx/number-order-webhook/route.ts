@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
                 friendly_name: phoneData?.friendly_name || phoneNumber,
                 status: 'active',
                 telnyx_connection_id: phoneData?.connection_id,
+                capabilities: { voice: true, sms: true, mms: true },
               });
 
             if (insertError) {

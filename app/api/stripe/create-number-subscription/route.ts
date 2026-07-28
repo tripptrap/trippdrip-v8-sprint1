@@ -171,6 +171,7 @@ export async function POST(req: NextRequest) {
           payment_method: 'stripe',
           stripe_subscription_id: subscription.id,
           messaging_profile_id: messagingProfileId || undefined,
+          capabilities: { voice: true, sms: true, mms: true },
         }, {
           onConflict: 'user_id,phone_number'
         });
