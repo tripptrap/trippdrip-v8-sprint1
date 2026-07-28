@@ -1,0 +1,42 @@
+{
+  "attempt": 4,
+  "campaignId": "4b30019f-a211-5044-960e-8212c4af0d4e",
+  "tcrCampaignId": "CA12CQ0",
+  "createDate": "2026-07-27T05:34:51.000Z",
+  "outcome": "FAILED_TELNYX_REVIEW",
+  "failureReasons": [
+    "Please add a link/screenshot of the opt-in form to the opt-in workflow showing the phone number field and full SMS opt-in language provided in the example here - https://support.telnyx.com/en/articles/10684260-10dlc-opt-in-form\n\nNote: The reviewed public signup form shows a phone number field but no SMS opt-in checkbox or SMS consent language. The account onboarding path is not publicly verifiable and no screenshot of the SMS opt-in step was provided."
+  ],
+  "payload": {
+    "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
+    "usecase": "MIXED",
+    "subUsecases": [
+      "CUSTOMER_CARE",
+      "ACCOUNT_NOTIFICATION",
+      "MARKETING"
+    ],
+    "description": "HyveWyre LLC sends SMS messages to prospective customers who requested a demo or started a free trial of the HyveWyre SaaS platform, and to new customers during onboarding. Messages include trial reminders, demo scheduling, and onboarding tips. HyveWyre does not send messages on behalf of other businesses under this campaign — this covers HyveWyre's own direct marketing and customer communications only.",
+    "messageFlow": "Contacts opt in by submitting a demo request or trial signup form on hyvewyre.com, or by providing their phone number during account onboarding. HyveWyre then sends a limited number of SMS messages related to that specific signup or trial. Message and data rates may apply. Message frequency varies. Reply STOP to opt out at any time, HELP for help.",
+    "sample1": "Hi {name}, thanks for requesting a demo of HyveWyre! Do you have a few minutes this week for a quick walkthrough? Reply STOP to opt out.",
+    "sample2": "Hi {name}, your HyveWyre free trial is active! Need help getting set up? Reply HELP for assistance or STOP to opt out.",
+    "sample3": null,
+    "sample4": null,
+    "sample5": null,
+    "optinKeywords": "START,YES,UNSTOP",
+    "optinMessage": "You are now opted in to receive SMS messages from HyveWyre about your demo/trial. Message and data rates may apply. Message frequency varies. Reply STOP to unsubscribe, HELP for help.",
+    "optoutKeywords": "STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT",
+    "optoutMessage": "You have been unsubscribed from HyveWyre SMS messages and will not receive any more messages. Reply START to resubscribe.",
+    "helpKeywords": "HELP,INFO",
+    "helpMessage": "HyveWyre: For help, email support@hyvewyre.com. Reply STOP to unsubscribe. Msg&data rates may apply.",
+    "subscriberOptin": true,
+    "subscriberOptout": true,
+    "subscriberHelp": true,
+    "numberPool": false,
+    "embeddedLink": false,
+    "embeddedPhone": false,
+    "ageGated": false,
+    "directLending": false,
+    "privacyPolicyLink": "https://hyvewyre.com/privacy",
+    "termsAndConditionsLink": "https://hyvewyre.com/terms"
+  }
+}

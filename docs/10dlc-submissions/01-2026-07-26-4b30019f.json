@@ -1,0 +1,42 @@
+{
+  "attempt": 1,
+  "campaignId": "4b30019f-9cb7-9e4d-ac9b-40cb503f3615",
+  "tcrCampaignId": "CPPQRSP",
+  "createDate": "2026-07-26T04:38:41.000Z",
+  "outcome": "FAILED_TELNYX_REVIEW",
+  "failureReasons": [
+    "Who is the perceived sender of the messages? If it's a business using your platform, then each business will need a brand and campaign created specifically for them.\n\nOpt-in workflow mentions multiple methods of opt-in, each requiring specific details that need to be added. Please update with information provided here - https://support.telnyx.com/en/articles/10562019-guide-to-10dlc-message-flow-field\n\nPlease add a link/screenshot of the opt-in form to the opt-in workflow showing the phone number field and full SMS opt-in language provided in the example here - https://support.telnyx.com/en/articles/10684260-10dlc-opt-in-form\n\nPrivacy Policy needs to be compliant. Please update with information found here - https://support.telnyx.com/en/articles/10645583-10dlc-privacy-policy\n\nSubscriber/Auto-response Opt-in Message needs updating with information provided here - https://support.telnyx.com/en/articles/10645338-10dlc-keywords-and-confirmation-messages\n\nSubscriber/Auto-response Opt-out Message needs updating with information provided here - https://support.telnyx.com/en/articles/10645338-10dlc-keywords-and-confirmation-messages\n\nSubscriber/Auto-response Help Message needs updating with information provided here - https://support.telnyx.com/en/articles/10645338-10dlc-keywords-and-confirmation-messages"
+  ],
+  "payload": {
+    "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
+    "usecase": "MIXED",
+    "subUsecases": [
+      "CUSTOMER_CARE",
+      "MARKETING",
+      "ACCOUNT_NOTIFICATION"
+    ],
+    "description": "HyveWyre is a CRM/SaaS platform for licensed insurance agents and real estate professionals. Agents use SMS to reach out to leads who submitted inquiries through ads or web forms, to qualify them and schedule appointments, and to send appointment reminders, policy renewal notifications, and follow-up/support messages to their existing clients. All contacts have opted in to receive SMS.",
+    "messageFlow": "Leads: customers submit inquiries via agent website contact forms or ad landing pages with an SMS consent checkbox, disclosure: 'I agree to receive SMS from my sales representative. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out.' Only contacts who check the box receive messages, consent logged with timestamp and source. Existing clients: consent collected at time of service engagement, documented in the agent's CRM.",
+    "sample1": "Hi {FirstName}, this is {AgentName} from {AgencyName}. We just received your request for additional information on {Date}. Reply YES to schedule an appointment or STOP to unsubscribe.",
+    "sample2": "Hi {FirstName}, this is {AgentName} from {AgencyName}. Reminder: You have an appointment scheduled for {Date} at {Time}. Reply STOP to opt out. Msg & data rates may apply.",
+    "sample3": "Hi {FirstName}, following up on your recent request. Let us know if you have any questions! Reply STOP to unsubscribe or HELP for info.",
+    "sample4": null,
+    "sample5": null,
+    "optinKeywords": "START,YES",
+    "optinMessage": "You have successfully subscribed. Reply STOP to unsubscribe. Msg & data rates may apply.",
+    "optoutKeywords": "STOP",
+    "optoutMessage": "You have been unsubscribed and will not receive further messages.",
+    "helpKeywords": "HELP",
+    "helpMessage": "For support, contact your agent directly. Reply STOP to unsubscribe. Msg & data rates may apply.",
+    "subscriberOptin": true,
+    "subscriberOptout": true,
+    "subscriberHelp": true,
+    "numberPool": true,
+    "embeddedLink": false,
+    "embeddedPhone": false,
+    "ageGated": false,
+    "directLending": false,
+    "privacyPolicyLink": "https://hyvewyre.com/privacy",
+    "termsAndConditionsLink": "https://hyvewyre.com/terms"
+  }
+}

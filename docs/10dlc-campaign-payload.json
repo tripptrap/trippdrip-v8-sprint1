@@ -1,0 +1,30 @@
+{
+  "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
+  "usecase": "MIXED",
+  "subUsecases": [
+    "ACCOUNT_NOTIFICATION",
+    "MARKETING",
+    "CUSTOMER_CARE"
+  ],
+  "description": "HyveWyre LLC operates hyvewyre.com, a SaaS platform for SMS lead management. This campaign covers only HyveWyre LLC's own first-party messages to consumers who opted in on HyveWyre's own web form — account notifications, onboarding help, follow-ups, product updates, and promotional offers about HyveWyre's own service. Businesses that use the HyveWyre platform to message their own customers are not covered by this campaign; each such business registers its own separate 10DLC brand and campaign.",
+  "messageFlow": "Consumers opt in through the lead form at https://hyvewyre.com/opt-in/hyvewyre-llc. The form includes a phone number field and a separate, unchecked SMS consent checkbox reading verbatim: \"I agree to receive SMS text messages from HyveWyre LLC at the phone number provided, including follow-up messages, appointment reminders, account notifications, and promotional and marketing messages. Message and data rates may apply. Message frequency varies. Consent is not a condition of purchase. Your mobile opt-in information will not be shared with third parties for marketing or promotional purposes. Reply STOP to opt out at any time, HELP for help.\" The checkbox links to the Privacy Policy and Terms of Service, is separate from any terms-of-service agreement, and the form can be submitted without opting in to SMS. HyveWyre LLC then follows up by SMS only with consumers who checked that box. This is the only opt-in method for this campaign.",
+  "sample1": "Hi {name}, this is HyveWyre LLC! Thanks for reaching out about SMS lead management software. Do you have a few minutes to chat about your options? Reply STOP to opt out.",
+  "sample2": "Hi {name}, this is a reminder from HyveWyre LLC about your upcoming appointment on {date} at {time}. Reply YES to confirm or call us to reschedule. Reply STOP to opt out.",
+  "sample3": "HyveWyre LLC: Save 20% on your first 3 months when you upgrade to Scale before Friday. Reply STOP to opt out, HELP for help.",
+  "optinKeywords": "START,YES,UNSTOP",
+  "optinMessage": "You are now opted in to receive SMS messages from HyveWyre LLC, including follow-ups, appointment reminders, account notifications, and promotional and marketing messages. Message frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.",
+  "optoutKeywords": "STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT",
+  "optoutMessage": "You have been unsubscribed from HyveWyre LLC SMS messages and will not receive any more messages. Reply START to resubscribe.",
+  "helpKeywords": "HELP,INFO",
+  "helpMessage": "HyveWyre LLC: For help, contact support@hyvewyre.com. Reply STOP to unsubscribe. Msg&data rates may apply.",
+  "subscriberOptin": true,
+  "subscriberOptout": true,
+  "subscriberHelp": true,
+  "numberPool": false,
+  "embeddedLink": false,
+  "embeddedPhone": false,
+  "ageGated": false,
+  "directLending": false,
+  "privacyPolicyLink": "https://hyvewyre.com/privacy",
+  "termsAndConditionsLink": "https://hyvewyre.com/terms"
+}

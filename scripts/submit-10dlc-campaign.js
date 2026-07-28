@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 /**
- * 10DLC campaign submission — attempt 6, prepared 2026-07-28.
+ * 10DLC campaign submission — current payload.
+ *
+ * Holds the payload for the NEXT submission. After each run, snapshot the
+ * result with scripts/archive-10dlc-submissions.js so the attempt is preserved
+ * in docs/10dlc-submissions/ and stays diffable against the ones before it.
  *
  * Every prior attempt's rejection reason was pulled from the live Telnyx API
  * and cross-referenced; this payload addresses all of them. See
  * docs/10DLC_REJECTION_HISTORY.md for the running log.
  *
- *   run:  node scripts/submit-10dlc-campaign-attempt6.js
- *   dry:  node scripts/submit-10dlc-campaign-attempt6.js --dry-run
+ *   run:  node scripts/submit-10dlc-campaign.js
+ *   dry:  node scripts/submit-10dlc-campaign.js --dry-run
  *
  * THIS PLACES A REAL SUBMISSION AND MAY INCUR A CARRIER FEE. Run it only when
  * you actually intend to submit.
@@ -48,83 +52,39 @@
 
 // Resolve .env.local from the repo root, not process.cwd(), so this runs from
 // any directory.
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const key = process.env.TELNYX_API_KEY;
 
-// Must match lib/optInConsent.ts buildConsentText('HyveWyre LLC') exactly,
-// which is what renders on the live opt-in page.
-const CONSENT =
-  'I agree to receive SMS text messages from HyveWyre LLC at the phone number provided, ' +
-  'including follow-up messages, appointment reminders, account notifications, and ' +
-  'promotional and marketing messages. Message and data rates may apply. ' +
-  'Message frequency varies. Consent is not a condition of purchase. Your mobile opt-in ' +
-  'information will not be shared with third parties for marketing or promotional purposes. ' +
-  'Reply STOP to opt out at any time, HELP for help.';
+// The payload lives in docs/10dlc-campaign-payload.json so it can be edited
+// without touching code. Edit that file, then run this script.
+//
+// One rule when editing: `messageFlow` quotes the opt-in consent text VERBATIM,
+// and Telnyx compares it against the live form at
+// https://hyvewyre.com/opt-in/hyvewyre-llc. Attempt 6 was rejected for exactly
+// that drift. If you change the consent wording, change it in
+// lib/optInConsent.ts first, deploy, confirm it live, and only then mirror it
+// here — the check below will refuse to submit if they disagree.
+const PAYLOAD_FILE = path.join(__dirname, '..', 'docs', '10dlc-campaign-payload.json');
+const payload = JSON.parse(fs.readFileSync(PAYLOAD_FILE, 'utf8'));
 
-const payload = {
-  brandId: '4b20019b-eba4-6bfd-8723-dca9058142e8', // HyveWyre LLC, VERIFIED
-  usecase: 'MIXED',
-  subUsecases: ['ACCOUNT_NOTIFICATION', 'MARKETING', 'CUSTOMER_CARE'],
-
-  description:
-    "HyveWyre LLC operates hyvewyre.com, a SaaS platform for SMS lead management. This " +
-    "campaign covers only HyveWyre LLC's own first-party messages to consumers who opted " +
-    "in on HyveWyre's own web form — account notifications, onboarding help, follow-ups, " +
-    "product updates, and promotional offers about HyveWyre's own service. Businesses that " +
-    "use the HyveWyre platform to message their own customers are not covered by this " +
-    "campaign; each such business registers its own separate 10DLC brand and campaign.",
-
-  messageFlow:
-    'Consumers opt in through the lead form at https://hyvewyre.com/opt-in/hyvewyre-llc. ' +
-    'The form includes a phone number field and a separate, unchecked SMS consent checkbox ' +
-    'reading verbatim: "' + CONSENT + '" The checkbox links to the Privacy Policy and Terms ' +
-    'of Service, is separate from any terms-of-service agreement, and the form can be ' +
-    'submitted without opting in to SMS. HyveWyre LLC then follows up by SMS only with ' +
-    'consumers who checked that box. This is the only opt-in method for this campaign.',
-
-  sample1:
-    'Hi {name}, this is HyveWyre LLC! Thanks for reaching out about SMS lead management ' +
-    'software. Do you have a few minutes to chat about your options? Reply STOP to opt out.',
-  sample2:
-    'Hi {name}, this is a reminder from HyveWyre LLC about your upcoming appointment on ' +
-    '{date} at {time}. Reply YES to confirm or call us to reschedule. Reply STOP to opt out.',
-  // Added so each declared sub-usecase has a representative sample — MARKETING
-  // was declared with no promotional example in earlier attempts.
-  sample3:
-    'HyveWyre LLC: Save 20% on your first 3 months when you upgrade to Scale before Friday. ' +
-    'Reply STOP to opt out, HELP for help.',
-
-  optinKeywords: 'START,YES,UNSTOP',
-  optinMessage:
-    'You are now opted in to receive SMS messages from HyveWyre LLC, including follow-ups, ' +
-    'appointment reminders, account notifications, and promotional and marketing messages. ' +
-    'Message frequency varies. Msg&data rates may apply. Consent is not a condition of ' +
-    'purchase. Reply HELP for help, STOP to unsubscribe.',
-
-  optoutKeywords: 'STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT',
-  optoutMessage:
-    'You have been unsubscribed from HyveWyre LLC SMS messages and will not receive any ' +
-    'more messages. Reply START to resubscribe.',
-
-  helpKeywords: 'HELP,INFO',
-  helpMessage:
-    'HyveWyre LLC: For help, contact support@hyvewyre.com. Reply STOP to unsubscribe. ' +
-    'Msg&data rates may apply.',
-
-  subscriberOptin: true,
-  subscriberOptout: true,
-  subscriberHelp: true,
-  numberPool: false,
-  embeddedLink: false,
-  embeddedPhone: false,
-  ageGated: false,
-  directLending: false,
-  privacyPolicyLink: 'https://hyvewyre.com/privacy',
-  termsAndConditionsLink: 'https://hyvewyre.com/terms',
-};
+/** Refuse to submit if messageFlow's quoted consent isn't what the form shows. */
+async function consentMatchesLiveForm() {
+  const quoted = (payload.messageFlow.match(/reading verbatim: "([^"]+)"/) || [])[1];
+  if (!quoted) return { ok: false, why: 'no verbatim consent quote found in messageFlow' };
+  try {
+    const res = await fetch('https://hyvewyre.com/opt-in/hyvewyre-llc');
+    const html = await res.text();
+    return html.includes(quoted)
+      ? { ok: true }
+      : { ok: false, why: 'the consent text in messageFlow does not appear on the live opt-in page' };
+  } catch (e) {
+    return { ok: false, why: `could not fetch the live opt-in page: ${e.message}` };
+  }
+}
 
 async function main() {
   if (!key) {
@@ -133,6 +93,13 @@ async function main() {
   }
 
   console.log(JSON.stringify(payload, null, 2));
+
+  const consent = await consentMatchesLiveForm();
+  console.log('\nconsent text matches the live opt-in form:', consent.ok ? 'yes' : `NO — ${consent.why}`);
+  if (!consent.ok && !DRY_RUN) {
+    console.error('\nRefusing to submit — fix the mismatch first (this is what attempt 6 was rejected for).');
+    process.exit(1);
+  }
 
   if (DRY_RUN) {
     console.log('\n--dry-run: nothing submitted.');

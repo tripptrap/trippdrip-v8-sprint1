@@ -1,0 +1,42 @@
+{
+  "attempt": 2,
+  "campaignId": "4b30019f-a115-f6f7-3081-00a41955e269",
+  "tcrCampaignId": "CFRVGSO",
+  "createDate": "2026-07-27T01:00:05.000Z",
+  "outcome": "FAILED_TELNYX_REVIEW",
+  "failureReasons": [
+    "Who is the perceived sender of the messages? If it's a business using your platform, then each business will need a brand and campaign created specifically for them.\nNote: The public HyveWyre website presents the service as an SMS marketing platform for agents, sales teams, and other businesses to import leads and send campaigns, including use of a shared pool of pre-verified numbers.\n\nPrivacy Policy needs to be compliant. Please update with information found here - https://support.telnyx.com/en/articles/10645583-10dlc-privacy-policy\nNote: The linked privacy policy says personal information is not sold, but it does not state that mobile/SMS opt-in information will not be shared with third parties for marketing or promotional purposes."
+  ],
+  "payload": {
+    "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
+    "usecase": "MIXED",
+    "subUsecases": [
+      "ACCOUNT_NOTIFICATION",
+      "CUSTOMER_CARE",
+      "MARKETING"
+    ],
+    "description": "HyveWyre LLC is a software platform used to text leads who have submitted inquiries via our website contact form, to qualify them and schedule calls, and to send appointment reminders, account notifications, and follow-up/support messages to existing contacts. All contacts have opted in to receive SMS via our website opt-in form.",
+    "messageFlow": "Digital consent via website contact form: brand name HyveWyre, form located at https://www.hyvewyre.com/opt-in. Subscribers check an unchecked-by-default SMS consent checkbox reading: 'SMS Consent: By checking this box, I agree to receive SMS text messages from my sales representative. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe at any time. Reply HELP for assistance. View our Privacy Policy and Terms of Service.' The phone number field is on the same form. No confirmation SMS is sent automatically; opt-in is confirmed by an inbound reply.",
+    "sample1": "Hi FirstName, this is HyveWyre. Thanks for your inquiry on Date! Reply YES to schedule a call or STOP to unsubscribe.",
+    "sample2": "Hi FirstName, reminder: your appointment with HyveWyre is on Date at Time. Reply STOP to opt out.",
+    "sample3": "Hi FirstName, following up on your recent request. Let us know if you have questions! Reply STOP to unsubscribe or HELP for info.",
+    "sample4": null,
+    "sample5": null,
+    "optinKeywords": "START,YES",
+    "optinMessage": "HyveWyre: Thanks for subscribing! Reply HELP for help. Message frequency may vary. Msg&data rates may apply. Consent is not a condition of purchase. Reply STOP to opt out.",
+    "optoutKeywords": "STOP",
+    "optoutMessage": "HyveWyre: You are unsubscribed and will receive no further messages.",
+    "helpKeywords": "HELP",
+    "helpMessage": "HyveWyre: Please reach out to us at support@hyvewyre.com for help.",
+    "subscriberOptin": true,
+    "subscriberOptout": true,
+    "subscriberHelp": true,
+    "numberPool": true,
+    "embeddedLink": false,
+    "embeddedPhone": false,
+    "ageGated": false,
+    "directLending": false,
+    "privacyPolicyLink": "https://www.hyvewyre.com/privacy",
+    "termsAndConditionsLink": "https://www.hyvewyre.com/terms"
+  }
+}
