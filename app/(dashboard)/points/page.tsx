@@ -82,6 +82,7 @@ export default function PointsPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [pauseResumesAt, setPauseResumesAt] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
+  const [planValue, setPlanValue] = useState<{ creditsUsedThisCycle: number; monthlyCredits: number; savedThisCycle: number } | null>(null);
   const [stats, setStats] = useState({
     totalSpent: 0,
     totalEarned: 0,
@@ -162,6 +163,21 @@ export default function PointsPage() {
     // Check days until renewal
     const days = await getDaysUntilRenewal();
     setDaysUntilRenewal(days);
+
+    // This cycle's usage/savings, for the plan-value nudge (issue #15)
+    try {
+      const pvRes = await fetch('/api/user/plan-value');
+      const pvData = await pvRes.json();
+      if (pvRes.ok && pvData.ok) {
+        setPlanValue({
+          creditsUsedThisCycle: pvData.creditsUsedThisCycle,
+          monthlyCredits: pvData.monthlyCredits,
+          savedThisCycle: pvData.savedThisCycle,
+        });
+      }
+    } catch (err) {
+      console.error('points: failed to load plan value', err);
+    }
 
     // Fetch transactions from Supabase
     const txns = await getRecentTransactionsSupabase(20);
@@ -472,6 +488,39 @@ export default function PointsPage() {
           </div>
         )}
       </div>
+
+      {/* Plan Value — surfaces real value before the renewal decision, not just at cancellation (#15) */}
+      {planValue && planValue.monthlyCredits > 0 && (
+        <div className={`card ${daysUntilRenewal !== null && daysUntilRenewal <= 7 ? 'border-sky-500/40 bg-sky-500/5' : ''}`}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Your Plan This Cycle
+            </h3>
+            {daysUntilRenewal !== null && daysUntilRenewal <= 7 && (
+              <span className="text-xs text-sky-600 dark:text-sky-400 font-medium">
+                Renews in {daysUntilRenewal} day{daysUntilRenewal === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+          <div className="mb-2">
+            <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
+              <span>Credits used</span>
+              <span>{planValue.creditsUsedThisCycle.toLocaleString()} / {planValue.monthlyCredits.toLocaleString()}</span>
+            </div>
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+              <div
+                className="h-2 bg-sky-500 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (planValue.creditsUsedThisCycle / planValue.monthlyCredits) * 100)}%` }}
+              />
+            </div>
+          </div>
+          {planValue.savedThisCycle > 0 && (
+            <div className="text-sm text-emerald-600 dark:text-emerald-400 mt-3">
+              You've saved ${planValue.savedThisCycle.toFixed(2)} on point pack purchases this cycle with your {currentPlan === 'scale' ? 'Scale' : 'Growth'} discount.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Usage Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
