@@ -62,7 +62,10 @@ export function generateCampaignDefaults(input: CampaignDefaultsInput): Campaign
     helpMessage: helpContact
       ? `${business}: For help, contact ${helpContact}. Reply STOP to unsubscribe. Msg&data rates may apply.`
       : `${business}: For help, reply to this message or visit our website. Reply STOP to unsubscribe. Msg&data rates may apply.`,
-    optinMessage: `You are now opted in to receive SMS messages from ${business} about ${offer}. Message frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
+    // Must name every message type the campaign declares — Telnyx rejected
+    // campaign 4b30019f on 2026-07-28 partly because this response omitted
+    // marketing/promotional while MARKETING was a selected sub-use-case.
+    optinMessage: `You are now opted in to receive SMS messages from ${business} about ${offer}, including follow-ups, appointment reminders, account notifications, and promotional and marketing messages. Message frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
     optoutMessage: `You have been unsubscribed from ${business} SMS messages and will not receive any more messages. Reply START to resubscribe.`,
     optinKeywords: 'START,YES,UNSTOP',
     optoutKeywords: 'STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT',

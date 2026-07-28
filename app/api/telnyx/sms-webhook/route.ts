@@ -522,8 +522,15 @@ async function handleInboundSMS(payload: any) {
           await sendTelnyxSMS({
             to: from,
             from: to,
+            // Must name every message type the campaign declares. Telnyx
+            // flagged this on campaign 4b30019f (2026-07-28): the START
+            // auto-response didn't mention marketing/promotional messages even
+            // though MARKETING is a selected sub-use-case. Keep in step with
+            // buildConsentText() in lib/optInConsent.ts.
             message:
-              `You are now opted in to receive SMS messages from ${brand}. ` +
+              `You are now opted in to receive SMS messages from ${brand}, ` +
+              `including follow-ups, appointment reminders, account notifications, ` +
+              `and promotional and marketing messages. ` +
               `Message frequency varies. Msg&data rates may apply. ` +
               `Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
           });
