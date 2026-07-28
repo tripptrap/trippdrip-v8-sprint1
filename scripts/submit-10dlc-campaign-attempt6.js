@@ -46,7 +46,10 @@
  *    -> `optinMessage` now names every message type the campaign declares.
  */
 
-require('dotenv').config({ path: '.env.local' });
+// Resolve .env.local from the repo root, not process.cwd(), so this runs from
+// any directory.
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const key = process.env.TELNYX_API_KEY;
