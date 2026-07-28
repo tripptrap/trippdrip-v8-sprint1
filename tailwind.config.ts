@@ -4,7 +4,38 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      borderRadius: {
+        // Tighter corners site-wide. `full` is untouched — pills, avatars,
+        // and dots should stay circular, "sharper" only means the rectangular
+        // card/button/modal radii.
+        md: '4px',
+        lg: '6px',
+        xl: '8px',
+        '2xl': '10px',
+        '3xl': '14px',
+      },
       colors: {
+        // `sky` is the site's actual accent color everywhere (buttons, active
+        // nav state, links, focus rings) — overridden here to a neutral grey
+        // ramp instead of blue. Every existing bg-sky-*/text-sky-*/border-sky-*
+        // class across the app picks this up automatically; no component
+        // files were touched. Values are Tailwind's own `zinc` scale, chosen
+        // so it stays visibly distinct in lightness from `slate` (the
+        // neutral/background ramp) — otherwise active/selected states would
+        // become indistinguishable from the page background.
+        sky: {
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+          950: '#09090b',
+        },
         // Ocean Blue & Coral Theme
         primary: {
           50: '#f0f9ff',

@@ -202,9 +202,9 @@ export default function Sidebar(){
           className="relative shrink-0"
           animate={{
             boxShadow: [
-              "0 0 15px rgba(14, 165, 233, 0.3)",
-              "0 0 20px rgba(14, 165, 233, 0.4)",
-              "0 0 15px rgba(14, 165, 233, 0.3)",
+              "0 0 15px rgba(161, 161, 170, 0.3)",
+              "0 0 20px rgba(161, 161, 170, 0.4)",
+              "0 0 15px rgba(161, 161, 170, 0.3)",
             ],
           }}
           transition={{
