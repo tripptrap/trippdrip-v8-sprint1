@@ -95,6 +95,9 @@ export async function PUT(req: NextRequest) {
     if (body.emailAlertAppointment !== undefined) {
       updates.email_alert_appointment = body.emailAlertAppointment;
     }
+    if (body.showLeadTemperature !== undefined) {
+      updates.show_lead_temperature = body.showLeadTemperature;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No valid fields to update' }, { status: 400 });

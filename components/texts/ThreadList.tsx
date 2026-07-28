@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Search, Tag, X, Archive, ArchiveRestore, CheckSquare, Square, Bot } from 'lucide-react';
 import type { Thread, ThreadCounts } from '@/lib/hooks/useTextsState';
+import { calculateLeadScore, getTemperatureDisplay } from '@/lib/leadScoring';
 
 interface TagItem {
   id: string;
@@ -35,6 +36,7 @@ interface ThreadListProps {
   receptionistActive?: boolean;
   onToggleFlowAI?: (enable: boolean) => void;
   onToggleReceptionist?: (enable: boolean) => void;
+  showLeadTemperature?: boolean;
 }
 
 function relativeTime(dateStr: string): string {
@@ -86,6 +88,7 @@ export default function ThreadList({
   receptionistActive = false,
   onToggleFlowAI,
   onToggleReceptionist,
+  showLeadTemperature = false,
 }: ThreadListProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<TagItem[]>([]);
@@ -333,6 +336,17 @@ export default function ThreadList({
             const hasUnread = thread.unread && thread.messages_from_lead > 0;
             const leadTags = thread.leads?.tags;
             const isSelected = selectedThreadIds.has(thread.id);
+            const tempDisplay = showLeadTemperature && !isClient
+              ? getTemperatureDisplay(calculateLeadScore({
+                  lastEngaged: thread.updated_at,
+                  totalSent: thread.messages_from_user,
+                  totalReceived: thread.messages_from_lead,
+                  responseRate: thread.messages_from_user > 0
+                    ? thread.messages_from_lead / thread.messages_from_user
+                    : 0,
+                  createdAt: thread.created_at,
+                }).temperature)
+              : null;
             return (
               <div
                 key={thread.id}
@@ -392,6 +406,11 @@ export default function ThreadList({
                         ) : (
                           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-600 border border-sky-200 dark:border-sky-800 shrink-0">
                             Lead
+                          </span>
+                        )}
+                        {tempDisplay && (
+                          <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${tempDisplay.bg} ${tempDisplay.color}`}>
+                            <span>{tempDisplay.icon}</span>
                           </span>
                         )}
                         {/* AI active indicator */}
@@ -504,7 +523,7 @@ export default function ThreadList({
                 </button>
                 <button
                   onClick={() => onBulkToggleAI(Array.from(selectedThreadIds), true)}
-                  className="px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium bg-transparent border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
                 >
                   AI Off
                 </button>
@@ -512,7 +531,7 @@ export default function ThreadList({
             )}
             <button
               onClick={() => onBulkArchive(Array.from(selectedThreadIds))}
-              className="px-3 py-1.5 text-xs font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"
+              className="px-3 py-1.5 text-xs font-medium bg-transparent border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors flex items-center gap-1"
             >
               <Archive className="w-3 h-3" />
               Archive ({selectedCount})

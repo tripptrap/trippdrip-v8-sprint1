@@ -1,7 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getTemperatureDisplay } from "@/lib/leadScoring";
 import CustomModal from "@/components/CustomModal";
 import BulkComposeDrawer from "@/components/BulkComposeDrawer";
 
@@ -101,10 +100,8 @@ export default function LeadsPage() {
   const [q, setQ] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [hotLeadsOnly, setHotLeadsOnly] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [hideSold, setHideSold] = useState(true); // hide converted leads by default
-  const [recalculatingScores, setRecalculatingScores] = useState(false);
 
   /* Pagination */
   const [currentPage, setCurrentPage] = useState(1);
@@ -739,30 +736,6 @@ export default function LeadsPage() {
     }
   }
 
-  async function recalculateLeadScores() {
-    setRecalculatingScores(true);
-    try {
-      const res = await fetch('/api/leads/recalculate-scores', {
-        method: 'POST',
-      });
-      const data = await res.json();
-
-      if (data.ok) {
-        setToast(`✓ ${data.message}`);
-        setTimeout(()=>setToast(''), 3000);
-        await fetchLeads();
-      } else {
-        setToast(`Error: ${data.error || 'Failed to recalculate scores'}`);
-        setTimeout(()=>setToast(''), 3500);
-      }
-    } catch (e: any) {
-      setToast(`Error: ${e?.message || 'Failed to recalculate scores'}`);
-      setTimeout(()=>setToast(''), 3500);
-    } finally {
-      setRecalculatingScores(false);
-    }
-  }
-
   async function viewLeadDetails(leadId: string) {
     setSelectedLeadDetails(leadId);
     setLoadingDetails(true);
@@ -874,20 +847,8 @@ export default function LeadsPage() {
       arr = arr.filter(l => Array.isArray(l.tags) && l.tags.includes(activeTagFilter));
     }
 
-    // Apply hot leads only filter
-    if (hotLeadsOnly) {
-      arr = arr.filter(l => l.temperature === 'hot');
-    }
-
-    // Auto-sort by score (highest first)
-    arr.sort((a, b) => {
-      const scoreA = a.score ?? 0;
-      const scoreB = b.score ?? 0;
-      return scoreB - scoreA;
-    });
-
     return arr;
-  }, [leads, activeCampaignId, activeTagFilter, campaigns, hotLeadsOnly, showArchived, hideSold]);
+  }, [leads, activeCampaignId, activeTagFilter, campaigns, showArchived, hideSold]);
 
   const allVisibleSelected = useMemo(() => {
     if (!filtered.length) return false;
@@ -1587,7 +1548,7 @@ export default function LeadsPage() {
               Run Campaign
             </button>
             <button
-              className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition shadow-sm"
+              className="rounded-md bg-transparent border border-amber-500/50 px-4 py-2 text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition"
               onClick={() => setComposeDrawerOpen(true)}
             >
               Compose
@@ -1671,14 +1632,6 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              <button
-                className={`rounded-md px-3 py-1.5 text-sm transition ${hotLeadsOnly ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                onClick={() => { setHotLeadsOnly(v => !v); if (!hotLeadsOnly) setShowArchived(false); }}
-                title="Filter for hot leads (score >= 70)"
-              >
-                Hot Leads
-              </button>
-
               <label className={`rounded-md px-3 py-1.5 text-sm cursor-pointer transition text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700`}>
                 AI Parse
                 <input
@@ -1690,15 +1643,6 @@ export default function LeadsPage() {
               </label>
 
               <button
-                className="rounded-md px-3 py-1.5 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 transition"
-                onClick={recalculateLeadScores}
-                disabled={recalculatingScores}
-                title="Recalculate lead scores based on engagement"
-              >
-                {recalculatingScores ? '...' : 'Scores'}
-              </button>
-
-              <button
                 className={`rounded-md px-3 py-1.5 text-sm transition ${!hideSold ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                 onClick={() => { setHideSold(v => !v); setShowArchived(false); }}
                 title={hideSold ? 'Show converted leads (sold clients)' : 'Hide converted leads'}
@@ -1708,7 +1652,7 @@ export default function LeadsPage() {
 
               <button
                 className={`rounded-md px-3 py-1.5 text-sm transition ${showArchived ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                onClick={() => { setShowArchived(v => !v); if (!showArchived) setHotLeadsOnly(false); }}
+                onClick={() => setShowArchived(v => !v)}
                 title="Show archived leads"
               >
                 Archived
@@ -1896,43 +1840,28 @@ export default function LeadsPage() {
                 <th className="border-b border-slate-200 dark:border-slate-700 px-3 py-2">
                   <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                 </th>
-                {["Score","Name","Campaign","Email","Phone","State","Tags","Status",""].map(h => (
+                {["Name","Campaign","Email","Phone","State","Tags","Status",""].map(h => (
                   <th key={h} className="border-b border-slate-200 dark:border-slate-700 px-3 py-2 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={11}>Loading…</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={10}>Loading…</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={11}>No leads found.</td></tr>
+                <tr><td className="px-3 py-4 text-slate-600 dark:text-slate-400" colSpan={10}>No leads found.</td></tr>
               )}
               {!loading && filtered.map((l, i) => {
                 const name = [l.first_name, l.last_name].filter(Boolean).join(" ") || "—";
                 const id = String(l.id ?? i);
                 const checked = selectedIds.has(id);
                 const isMenuOpen = dispositionMenuOpen[id] || false;
-                const score = l.score ?? null;
-                const temperature = l.temperature || null;
-                const tempDisplay = temperature ? getTemperatureDisplay(temperature) : null;
 
                 return (
                   <tr key={id} className="border-t border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800 cursor-pointer transition" onClick={() => viewLeadDetails(id)}>
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={checked} onChange={()=>toggleRow(id)} />
-                    </td>
-                    <td className="px-3 py-2">
-                      {score !== null && tempDisplay ? (
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${tempDisplay.bg} ${tempDisplay.color}`}>
-                            <span>{tempDisplay.icon}</span>
-                            <span>{score}</span>
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-600 dark:text-slate-400 text-xs">—</span>
-                      )}
                     </td>
                     <td className="px-3 py-2">{name}</td>
                     <td className="px-3 py-2">

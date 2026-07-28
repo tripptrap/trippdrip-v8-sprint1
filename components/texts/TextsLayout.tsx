@@ -57,6 +57,15 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
   const [showBulkDrawer, setShowBulkDrawer] = useState(false);
   const [bulkContactType, setBulkContactType] = useState<'leads' | 'clients' | 'both'>('both');
   const [userCredits, setUserCredits] = useState<number | null>(null);
+  const [showLeadTemperature, setShowLeadTemperature] = useState(false);
+
+  // Fetch the lead-temperature display preference (off by default, set in Settings)
+  useEffect(() => {
+    fetch('/api/user/preferences')
+      .then(res => res.json())
+      .then(data => setShowLeadTemperature(data.preferences?.show_lead_temperature ?? false))
+      .catch(() => {});
+  }, []);
 
   // Fetch user credits on mount and periodically
   useEffect(() => {
@@ -218,7 +227,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
           <div className="relative group">
             <button
               onClick={() => setShowBulkDrawer(true)}
-              className="px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 font-medium text-sm"
+              className="px-4 py-2.5 bg-transparent border border-amber-500/50 text-amber-500 rounded-lg hover:bg-amber-500/10 transition-colors flex items-center gap-2 font-medium text-sm"
             >
               <Users className="w-4 h-4" />
               Bulk SMS
@@ -282,6 +291,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
             receptionistActive={receptionistActive}
             onToggleFlowAI={handleToggleFlowAI}
             onToggleReceptionist={handleToggleReceptionist}
+            showLeadTemperature={showLeadTemperature}
             onBulkToggleAI={async (ids, disable) => {
               try {
                 const isAll = ids.length === 0;

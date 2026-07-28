@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play, Smartphone, Mail } from 'lucide-react';
+import { Bell, BellOff, Volume2, VolumeX, Check, X, AlertTriangle, Play, Smartphone, Mail, Flame } from 'lucide-react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   NotificationType,
@@ -39,6 +39,10 @@ export default function NotificationSettings() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [emailPrefsSaving, setEmailPrefsSaving] = useState(false);
 
+  // Messages display state
+  const [showLeadTemperature, setShowLeadTemperature] = useState(false);
+  const [tempPrefSaving, setTempPrefSaving] = useState(false);
+
   // Load SMS + email preferences and user profile on mount
   useEffect(() => {
     async function loadPrefs() {
@@ -59,6 +63,7 @@ export default function NotificationSettings() {
             setEmailAlertLowCredits(p.email_alert_low_credits ?? true);
             setEmailAlertOptOut(p.email_alert_opt_out ?? false);
             setEmailAlertAppointment(p.email_alert_appointment ?? true);
+            setShowLeadTemperature(p.show_lead_temperature ?? false);
           }
         }
         if (profileRes.ok) {
@@ -121,6 +126,22 @@ export default function NotificationSettings() {
   function toggleEmailAlertType(key: string, setter: (v: boolean) => void, val: boolean) {
     setter(val);
     saveEmailPrefs({ [key]: val });
+  }
+
+  async function toggleShowLeadTemperature(val: boolean) {
+    setShowLeadTemperature(val);
+    setTempPrefSaving(true);
+    try {
+      await fetch('/api/user/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showLeadTemperature: val }),
+      });
+    } catch (err) {
+      console.error('Error saving lead temperature preference:', err);
+    } finally {
+      setTempPrefSaving(false);
+    }
   }
 
   const handleTestSound = () => {
@@ -516,6 +537,35 @@ export default function NotificationSettings() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Messages Display Section */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-2">
+          Messages Display
+        </h3>
+
+        <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <Flame className={`w-5 h-5 ${showLeadTemperature ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400'}`} />
+            <div>
+              <h3 className="font-medium">Lead engagement badge</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Show a hot/warm/cold badge next to each conversation in Messages, based on how that lead is texting and responding
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showLeadTemperature}
+              onChange={(e) => toggleShowLeadTemperature(e.target.checked)}
+              disabled={tempPrefSaving}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500 peer-disabled:opacity-50"></div>
+          </label>
+        </div>
       </div>
 
       {/* Info Box */}
