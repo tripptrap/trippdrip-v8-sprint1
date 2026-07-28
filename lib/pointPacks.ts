@@ -28,8 +28,8 @@ export interface PointPack {
 export const POINT_PACKS: PointPack[] = [
   { name: 'Starter', points: 4000, basePrice: 40, premiumPrice: 36 },
   { name: 'Pro', points: 10000, basePrice: 95, premiumPrice: 80, popular: true },
-  { name: 'Business', points: 25000, basePrice: 225, premiumPrice: 187.5 },
-  { name: 'Enterprise', points: 60000, basePrice: 510, premiumPrice: 420 },
+  { name: 'Business', points: 25000, basePrice: 225, premiumPrice: 180 },
+  { name: 'Enterprise', points: 60000, basePrice: 510, premiumPrice: 382.5 },
 ];
 
 /** What a given tier pays for a pack. */

@@ -24,8 +24,8 @@ const STRIPE_PRICES = {
     scale: {
       starter: process.env.STRIPE_PRICE_PACK_SCALE_STARTER || 'price_1SQtduFyk0lZUopFApnLorDd',
       pro: process.env.STRIPE_PRICE_PACK_SCALE_PRO || 'price_1SQteQFyk0lZUopF63RURC72',
-      business: process.env.STRIPE_PRICE_PACK_SCALE_BUSINESS || 'price_1SQteyFyk0lZUopFH9S2ebtD',
-      enterprise: process.env.STRIPE_PRICE_PACK_SCALE_ENTERPRISE || 'price_1SQtfRFyk0lZUopFlv2sFszH'
+      business: process.env.STRIPE_PRICE_PACK_SCALE_BUSINESS || 'price_1TyGHZFyk0lZUopF5ZSER77Y',
+      enterprise: process.env.STRIPE_PRICE_PACK_SCALE_ENTERPRISE || 'price_1TyGHZFyk0lZUopFUlexYwA1'
     }
   }
 };
