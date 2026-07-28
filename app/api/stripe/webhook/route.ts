@@ -112,6 +112,26 @@ export async function POST(req: NextRequest) {
             break;
           }
 
+          // Anchor next_renewal_date to the real Stripe billing period rather
+          // than a client-side "now + 30 days" guess — current_period_end
+          // lives on the subscription item, not the top-level Subscription
+          // object, in this account's API version.
+          let renewalDates: { last_renewal_date: string; next_renewal_date: string } | null = null;
+          if (session.subscription) {
+            try {
+              const newSub = await stripe.subscriptions.retrieve(session.subscription as string);
+              const periodEnd = newSub.items.data[0]?.current_period_end;
+              if (periodEnd) {
+                renewalDates = {
+                  last_renewal_date: new Date().toISOString(),
+                  next_renewal_date: new Date(periodEnd * 1000).toISOString(),
+                };
+              }
+            } catch (e: any) {
+              console.error('Could not retrieve subscription for renewal date:', e.message);
+            }
+          }
+
           // Check if user row exists
           const { data: existingUser } = await supabaseAdmin
             .from('users')
@@ -133,6 +153,7 @@ export async function POST(req: NextRequest) {
                 account_status: 'active',
                 stripe_customer_id: session.customer,
                 stripe_subscription_id: session.subscription,
+                ...renewalDates,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               });
@@ -156,6 +177,7 @@ export async function POST(req: NextRequest) {
                 account_status: 'active',
                 stripe_customer_id: session.customer,
                 stripe_subscription_id: session.subscription,
+                ...renewalDates,
                 updated_at: new Date().toISOString()
               })
               .eq('id', userId);
@@ -225,6 +247,73 @@ export async function POST(req: NextRequest) {
       case 'payment_intent.succeeded':
         console.log('PaymentIntent succeeded:', event.data.object.id);
         break;
+
+      case 'invoice.paid': {
+        // The actual monthly renewal grant. checkout.session.completed only
+        // fires once, for the first invoice (billing_reason
+        // 'subscription_create') — every renewal after that is this event
+        // with billing_reason 'subscription_cycle'. Previously there was no
+        // server-side renewal handling at all; credits were granted by a
+        // client-side check that ran on page load and was disconnected from
+        // whether Stripe actually charged the customer that month.
+        const invoice = event.data.object as Stripe.Invoice;
+        if (!supabaseAdmin) break;
+        if (invoice.billing_reason !== 'subscription_cycle') break;
+
+        const subId = (invoice as any).parent?.subscription_details?.subscription as string | undefined;
+        if (!subId) {
+          console.error('invoice.paid: no subscription id on invoice', invoice.id);
+          break;
+        }
+
+        const { data: renewingUser, error: renewingUserError } = await supabaseAdmin
+          .from('users')
+          .select('id, credits, subscription_tier')
+          .eq('stripe_subscription_id', subId)
+          .single();
+
+        if (renewingUserError || !renewingUser) {
+          console.error(`invoice.paid: no user found for subscription ${subId}`);
+          break;
+        }
+
+        const monthlyCredits = renewingUser.subscription_tier === 'scale' ? 10000 : 3000;
+
+        // Idempotency: unique index on stripe_session_id (non-null values
+        // only) rejects a duplicate insert if Stripe redelivers this event.
+        const { error: renewalTxError } = await supabaseAdmin.from('points_transactions').insert({
+          user_id: renewingUser.id,
+          points_amount: monthlyCredits,
+          action_type: 'subscription',
+          description: `${renewingUser.subscription_tier === 'scale' ? 'Scale' : 'Growth'} monthly renewal`,
+          stripe_session_id: invoice.id,
+          amount_paid: invoice.amount_paid,
+          created_at: new Date().toISOString(),
+        });
+
+        if (renewalTxError) {
+          console.log(`⚠️ Invoice ${invoice.id} already processed — skipping duplicate renewal`);
+          break;
+        }
+
+        const periodEnd = invoice.lines.data[0]?.period?.end;
+        const { error: renewalUpdateError } = await supabaseAdmin
+          .from('users')
+          .update({
+            credits: (renewingUser.credits || 0) + monthlyCredits,
+            last_renewal_date: new Date().toISOString(),
+            next_renewal_date: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', renewingUser.id);
+
+        if (renewalUpdateError) {
+          console.error('Error applying renewal credits:', renewalUpdateError);
+        } else {
+          console.log(`Renewed user ${renewingUser.id}: +${monthlyCredits} credits`);
+        }
+        break;
+      }
 
       case 'customer.subscription.updated': {
         // Keeps Supabase in sync when the subscription changes anywhere

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import toast from "react-hot-toast";
-import { checkAndRenewCredits } from "@/lib/renewalSystem";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Headphones } from "lucide-react";
 import NotificationBell from './NotificationBell';
@@ -37,15 +36,6 @@ export default function Topbar(){
           email: user.email,
           avatar: null
         });
-
-        // Check for automatic monthly renewal
-        const renewalResult = await checkAndRenewCredits();
-        if (renewalResult.renewed) {
-          toast.success(renewalResult.message || 'Credits renewed!', {
-            duration: 5000,
-            icon: '✨'
-          });
-        }
 
         // Fetch user credits from Supabase
         const { data: userData, error } = await supabase
