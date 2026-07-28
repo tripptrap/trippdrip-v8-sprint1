@@ -92,16 +92,43 @@ real production number: `"messaging_campaign_id": null`. Even after a campaign i
 approved, a number isn't auto-linked to it — linking is a manual step ("Assign my
 number" in Settings → Messaging Registration).
 
-**The workaround, and its real limit:** the "Instant Access" shared number pool
-(`number_pool` table) holds pre-verified toll-free numbers — toll-free verification is
-a separate, faster carrier process, unrelated to 10DLC brand/campaign status. Onboarding
-tries to claim from this pool first, before falling back to ordering a fresh (unverified)
-local number. **As of 2026-07-28 there are only 3 numbers in the pool, all toll-free.**
+**The workaround, and why it's currently fake too:** the "Instant Access" shared number
+pool (`number_pool` table) is supposed to hold pre-verified toll-free numbers — toll-free
+verification (TFV) is a separate, faster carrier process, unrelated to 10DLC brand/campaign
+status. Onboarding tries to claim from this pool first, before falling back to ordering a
+fresh (unverified) local number. **As of 2026-07-28 there are only 3 numbers in the pool,
+all toll-free, and NONE of them are actually TFV-verified**, despite `is_verified: true`
+and `friendly_name: "Verified Toll-Free #N"` in the database. Verified by querying Telnyx's
+real verification endpoint (`GET /v2/messaging_tollfree/verification/requests`) directly:
+**zero verification requests exist on the account, for these numbers or any others.**
+The numbers themselves are real and active (`+18887062631`, `+18886638510`, `+18884610148`,
+purchased 2026-07-26, on messaging profile "HyveWyre LLC", A2P-eligible) — only the
+verification step was skipped. The `number_pool` rows were created 2026-02-05 (five months
+before the numbers were actually purchased) with placeholder `phone_sid` values like
+`"telnyx-tf-verified-1"` instead of real Telnyx IDs — almost certainly seed/aspirational
+rows from before the numbers existed, never reconciled with reality once they were bought.
+**Practical effect: the "Instant Access" pool most likely does not currently bypass carrier
+filtering any better than an unregistered local number does** — a new signup claiming one
+of these still probably hits throughput problems, just via unverified-toll-free filtering
+instead of missing-`messaging_campaign_id` filtering. Don't assume claiming a pool number
+during onboarding actually lets a new user send SMS reliably until this is fixed (submit
+real TFV requests for these 3 numbers) and re-verified live. **Do not submit a TFV request
+without the user's unambiguous, explicit instruction** — same rule as 10DLC submissions,
+see below.
+
+Separately, even if TFV is fixed: **as of 2026-07-28 there are only 3 numbers in the pool**.
 Past the first few signups, or for anyone who searches a specific area code instead of
 taking a pool number, onboarding falls back to the broken local-number path. This is a
 real capacity ceiling, not just a marketing-copy issue — related to GitHub issues #2/#3
 (scaling number ordering in batches), though neither issue currently states this
 consequence explicitly.
+
+**Recycling risk:** both `app/api/telnyx/release-number/route.ts:94-100` and account
+deletion (`app/api/user/delete-account/route.ts:84-87`) flip a released pool number back
+to `is_assigned: false`, returning it to the pool for a **different, unrelated business**
+to claim later. Even once TFV is real, a number that picked up spam reports or carrier
+flags under one tenant's traffic carries that reputation into the next tenant — a
+practical throughput/reputation risk on top of the verification gap above.
 
 **10DLC campaign status:** see `docs/10DLC_REJECTION_HISTORY.md` for the full
 submission history, every verbatim rejection reason, and the fix for each. As of
@@ -239,5 +266,9 @@ left in that file.
   whether this was ever actually started. Check before assuming it's handled.
 - **Secrets rotation (#29):** deliberately deferred to pre-launch prep. The app running
   normally is not evidence the current secrets are safe.
-- **Pool capacity:** see SMS/Telnyx section above — only 3 toll-free numbers exist in
-  the instant-access pool right now.
+- **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
+  SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
+  the database but zero real TFV requests on the Telnyx account, so the pool likely
+  doesn't actually solve the new-signup-can't-text problem it exists to solve. Fixing
+  this needs (1) real TFV submissions for the 3 existing numbers, with the user's
+  explicit go-ahead first, and (2) more pool capacity than 3 numbers long-term.
