@@ -75,7 +75,8 @@ export default function PointsPage() {
   // top up" alert and push someone to buy credits they already have.
   const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
-  const [currentPlan, setCurrentPlan] = useState<SubscriptionTier>('growth');
+  // null = not loaded yet (see balance above — same failure mode).
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionTier | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [daysUntilRenewal, setDaysUntilRenewal] = useState<number | null>(null);
   const [stats, setStats] = useState({
@@ -194,6 +195,14 @@ export default function PointsPage() {
     }
 
     const oldPlan = currentPlan;
+
+    // Defensive: the switch buttons only render once the plan is known, but a
+    // null plan here would compare false below and skip the downgrade
+    // confirmation entirely — silently downgrading a Scale customer.
+    if (oldPlan === null) {
+      console.error('points: plan switch attempted before plan loaded');
+      return;
+    }
 
     // Confirm downgrade if going from scale to growth
     if (oldPlan === 'scale' && planType === 'growth') {
@@ -340,7 +349,7 @@ export default function PointsPage() {
           </div>
           <div className="text-right">
             <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-              {getPlanDetails(currentPlan).name}
+              {currentPlan === null ? '—' : getPlanDetails(currentPlan).name}
               {currentPlan === 'growth' && (
                 <button
                   onClick={() => handlePlanSwitch('scale')}
@@ -350,8 +359,12 @@ export default function PointsPage() {
                 </button>
               )}
             </div>
-            <div className="text-2xl font-bold">${getPlanDetails(currentPlan).price}/mo</div>
-            <div className="text-xs text-slate-600 dark:text-slate-400">+{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts monthly</div>
+            {currentPlan !== null && (
+              <>
+                <div className="text-2xl font-bold">${getPlanDetails(currentPlan).price}/mo</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">+{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts monthly</div>
+              </>
+            )}
             {currentPlan === 'scale' && (
               <button
                 onClick={() => handlePlanSwitch('growth')}
@@ -390,7 +403,7 @@ export default function PointsPage() {
             {daysUntilRenewal !== null ? (daysUntilRenewal <= 0 ? 'Today!' : `${daysUntilRenewal}d`) : '---'}
           </div>
           <div className="text-xs text-slate-600 dark:text-slate-400">
-            +{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts incoming
+            +{currentPlan === null ? '—' : getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts incoming
           </div>
         </div>
       </div>
@@ -637,11 +650,11 @@ export default function PointsPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-600 dark:text-slate-400">Plan:</span>
-            <span className="font-medium">{getPlanDetails(currentPlan).name} - ${getPlanDetails(currentPlan).price}/month</span>
+            <span className="font-medium">{currentPlan === null ? '—' : `${getPlanDetails(currentPlan).name} - $${getPlanDetails(currentPlan).price}/month`}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600 dark:text-slate-400">Includes:</span>
-            <span className="font-medium">{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} points monthly</span>
+            <span className="font-medium">{currentPlan === null ? '—' : `${getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} points monthly`}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-600 dark:text-slate-400">Next renewal:</span>
