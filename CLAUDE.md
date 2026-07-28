@@ -1,5 +1,20 @@
 # HyveWyre - Project Context
 
+## MANDATORY: Read docs/SYSTEM_STATE.md before non-trivial work
+That file tracks how the system *actually* behaves right now — what's confirmed
+working, what's confirmed broken, and gotchas that cost real time to rediscover
+(a Stripe API shape that doesn't match training data, a DB column code assumed
+existed but didn't, etc.). This CLAUDE.md file covers what the product is *supposed*
+to be; SYSTEM_STATE.md covers what it *actually* currently is. They drift apart
+without active upkeep — that drift is exactly what caused the 10DLC campaign to fail
+the same way more than once.
+
+**Update SYSTEM_STATE.md yourself, without being asked, whenever you:** fix a bug
+whose root cause reveals how something really works, find a gap between what code
+assumes and what's actually true, or ship a change that alters a subsystem's
+behavior end to end. This is a maintenance duty, not a one-time task — treat it the
+same as running tests or type-checking before calling work done.
+
 ## QA Communication Guidelines
 When the user provides a QA checklist with categories:
 - If a category is marked **"Undefined"**, everything listed under that category (until the next category) represents items that need to be **asked about or clarified** before implementation
@@ -604,6 +619,8 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 
 ### Open Work — tracked in GitHub Issues
 All open pre-launch bugs, compliance work, retention/pricing decisions, and roadmap items moved to GitHub Issues (2026-07-26) — this file was becoming too long to track against reliably. See https://github.com/tripptrap/trippdrip-v8-sprint1/issues, or `gh issue list --repo tripptrap/trippdrip-v8-sprint1`.
+
+For *how things currently actually behave* (as opposed to a list of open tickets), see `docs/SYSTEM_STATE.md` — required reading before non-trivial work, see the top of this file.
 
 - **Launch blocker, decided 2026-07-27**: rotate **all** production secrets before launch (#29) — Vercel flags many env vars "Needs Attention", most likely fallout from the April 2026 incident where non-"sensitive" variables were exposed. Deliberately deferred until launch prep. **Ordering constraint:** rotate `ENCRYPTION_KEY` *before* the first real number-port order exists, or the stored `account_pin` needs a decrypt/re-encrypt migration. Note the app running normally is not evidence the secrets are safe — leaked credentials keep working.
 - **Pre-Launch milestone**: everything blocking launch — 10DLC per-agent restructuring (#1) and its dependents (#2, #3, #11), end-to-end QA (#17), and production verification (#18). Landing page accuracy pass (#33) — audit `/preview` against what the product actually does today. (#4 billing bug, #5 dark-mode pass, #6 /points balance, #7 floating button, #8 sidebar breakpoint, #9 analytics nav, #10 number-order webhook, #12-#15 downgrade/retention flow, and #16 email API key encryption are all closed — see issue history for what changed.)
