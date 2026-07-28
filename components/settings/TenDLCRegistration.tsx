@@ -22,6 +22,32 @@ type Registration = {
   assigned_phone_number: string | null;
 };
 
+// Confirmed against Telnyx's live enum endpoint (GET /v2/10dlc/enum/vertical,
+// 2026-07-27) — free-text here caused avoidable risk of invalid submissions.
+const VERTICAL_OPTIONS: { value: string; label: string }[] = [
+  { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'REAL_ESTATE', label: 'Real Estate' },
+  { value: 'FINANCIAL', label: 'Financial Services' },
+  { value: 'HEALTHCARE', label: 'Healthcare and Life Sciences' },
+  { value: 'CONSTRUCTION', label: 'Construction, Materials & Trade Services' },
+  { value: 'ENERGY', label: 'Energy and Utilities' },
+  { value: 'RETAIL', label: 'Retail and Consumer Products' },
+  { value: 'PROFESSIONAL', label: 'Professional Services' },
+  { value: 'TECHNOLOGY', label: 'Information Technology Services' },
+  { value: 'HOSPITALITY', label: 'Hospitality and Travel' },
+  { value: 'TRANSPORTATION', label: 'Transportation or Logistics' },
+  { value: 'AGRICULTURE', label: 'Agriculture' },
+  { value: 'MANUFACTURING', label: 'Manufacturing' },
+  { value: 'EDUCATION', label: 'Education' },
+  { value: 'LEGAL', label: 'Legal' },
+  { value: 'COMMUNICATION', label: 'Media and Communication' },
+  { value: 'ENTERTAINMENT', label: 'Entertainment' },
+  { value: 'HUMAN_RESOURCES', label: 'HR, Staffing or Recruitment' },
+  { value: 'POSTAL', label: 'Postal and Delivery' },
+  { value: 'NGO', label: 'Non-profit Organization' },
+  { value: 'GOVERNMENT', label: 'Government Services and Agencies' },
+];
+
 const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'PRIVATE_PROFIT', label: 'Private for-profit company' },
   { value: 'PUBLIC_PROFIT', label: 'Public for-profit company' },
@@ -338,7 +364,16 @@ export default function TenDLCRegistration() {
             )}
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vertical / industry</label>
-              <input value={vertical} onChange={e => setVertical(e.target.value)} placeholder="INSURANCE, REAL_ESTATE, HEALTHCARE…" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100" />
+              <select
+                value={vertical}
+                onChange={e => setVertical(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100"
+              >
+                <option value="">Select industry…</option>
+                {VERTICAL_OPTIONS.map(v => (
+                  <option key={v.value} value={v.value}>{v.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Contact phone</label>

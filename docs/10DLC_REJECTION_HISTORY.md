@@ -96,6 +96,26 @@ separate from ToS agreement · submittable without opting in.
 
 ---
 
+## Additional findings from the pre-attempt-6 full review (2026-07-27)
+
+- **The reviewer visits the public website.** Rejections #3 and #5 both quote things
+  found on hyvewyre.com itself (the marketing copy, the signup form). Assume every
+  linked URL — privacy, terms, opt-in form — and the homepage get read by a human.
+- **Terms of Service had zero SMS program terms** (no frequency, rates, STOP/HELP,
+  carrier disclaimer). Same gap-shape as the privacy-policy rejection. Fixed: §5a
+  "SMS Messaging Terms" added to /terms.
+- **HELP and START were declared but not implemented.** Every campaign declares
+  help/opt-in auto-responses; the webhook only handled STOP. Rejection #2 cited
+  exactly this. Fixed in the SMS webhook (exact whole-message keyword matches).
+- **Checkbox text drift.** The messageFlow quote and the live opt-in page text are
+  now both generated from `buildConsentText()` — byte-identical, verified by diff.
+- **`vertical` is now a dropdown** of the 23 values confirmed via
+  `GET /v2/10dlc/enum/vertical` — free text risked invalid submissions.
+- **Auto-response spec confirmed** against the keywords/confirmation-messages
+  article (previously only inferred): opt-in msg needs brand + use case + HELP +
+  frequency + rates + consent-not-condition + STOP; opt-out needs brand +
+  no-further-messages; help needs brand + real contact. All three comply.
+
 ## Reference docs
 - Opt-in form: https://support.telnyx.com/en/articles/10684260-10dlc-opt-in-form
 - Message flow field: https://support.telnyx.com/en/articles/10562019-guide-to-10dlc-message-flow-field

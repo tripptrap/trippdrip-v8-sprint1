@@ -72,6 +72,24 @@ export default function TermsOfServicePage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold mb-3">5a. SMS Messaging Terms</h2>
+          <p className="text-slate-700 dark:text-slate-300 mb-3">
+            The following terms apply to any SMS text-messaging program operated through HyveWyre,
+            whether messages are sent by HyveWyre or by a business using the HyveWyre platform:
+          </p>
+          <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
+            <li>Message frequency varies by program and by your interaction with the sender.</li>
+            <li>Message and data rates may apply, depending on your mobile carrier plan.</li>
+            <li>Consent to receive SMS messages is not a condition of any purchase.</li>
+            <li>Reply <strong>STOP</strong> at any time to opt out of a messaging program. You will receive one final message confirming your opt-out, after which no further messages will be sent.</li>
+            <li>Reply <strong>HELP</strong> at any time for assistance, or contact support@hyvewyre.com.</li>
+            <li>Reply <strong>START</strong> to re-subscribe after a previous opt-out.</li>
+            <li>Carriers are not liable for delayed or undelivered messages.</li>
+            <li>Mobile opt-in data and SMS consent are not shared with third parties for marketing or promotional purposes. See our Privacy Policy for details.</li>
+          </ul>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold mb-3">6. Pricing and Payment</h2>
           <p className="text-slate-700 dark:text-slate-300 mb-3">
             <strong>Subscription Plans:</strong>
