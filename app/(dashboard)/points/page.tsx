@@ -539,7 +539,10 @@ export default function PointsPage() {
             // percentages off an unpublished list price nobody is charged, so
             // they overstated the real saving — e.g. "20% off" on a pack where
             // Scale genuinely saves 15.8% versus what Growth pays.
-            const savingsPct = Math.round(scaleSavingsVsGrowthPct(pack));
+            // Floor, matching the landing page and maxScaleSavingsPct(), so the
+            // same pack never reads 16% here and 15% there — and so no figure
+            // shown to a customer overstates what they actually save.
+            const savingsPct = Math.floor(scaleSavingsVsGrowthPct(pack));
             const savingsLabel = currentPlan === 'scale'
               ? `You save ${savingsPct}% vs Growth`
               : `Scale pays $${pack.premiumPrice} — save ${savingsPct}%`;
