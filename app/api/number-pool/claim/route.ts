@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 
 // Admin client to bypass RLS for database operations
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -72,6 +73,32 @@ export async function POST(req: NextRequest) {
         { error: 'Number not available or already claimed' },
         { status: 404 }
       );
+    }
+
+    // Confirm verification against Telnyx, not just the DB flag (#36).
+    // `number_pool.is_verified` is written once by a seed migration and never
+    // reconciled, so it can't notice a verification being rejected, revoked, or
+    // lost (this account has already lost numbers to an account deactivation).
+    // Handing out a number the carrier no longer considers verified fails
+    // silently — messages get filtered and it reads as "SMS is flaky".
+    if (isTollFreeNumber(poolNumber.phone_number)) {
+      const verified = await getVerifiedTollFreeNumbers();
+      if (!verified.has(poolNumber.phone_number)) {
+        console.error(
+          `❌ Pool number ${poolNumber.phone_number} is marked is_verified in the DB but is NOT verified with Telnyx — refusing to assign it to user ${user.id}.`
+        );
+
+        // Correct the stale flag so it stops being offered to anyone else.
+        await supabaseAdmin
+          .from('number_pool')
+          .update({ is_verified: false })
+          .eq('id', numberId);
+
+        return NextResponse.json(
+          { error: 'That number is not currently verified for messaging. Please choose another.' },
+          { status: 409 }
+        );
+      }
     }
 
     // Assign the number to the user
