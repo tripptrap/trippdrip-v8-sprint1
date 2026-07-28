@@ -8,6 +8,7 @@ import { ContactType } from '@/lib/receptionist/types';
 import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
+import { cancelPendingDripMessages } from '@/lib/drip/materialize';
 
 // Opt-out keywords that trigger permanent DNC (STOP, UNSUBSCRIBE, etc.)
 // LOW-5: "cancel" removed — it's too common in normal sentences ("cancel my appointment").
@@ -441,6 +442,21 @@ async function handleInboundSMS(payload: any) {
           .eq('phone', from)
           .select('id');
 
+        // Cancel any queued drip messages. The DNC list already blocks these at
+        // send time, but leaving them pending means the scheduled view keeps
+        // showing messages that will never go out — and it relies on the DNC
+        // check being the only thing standing between an opted-out lead and a
+        // send. Removing them is both clearer and safer.
+        if (updatedLead && updatedLead.length > 0) {
+          const cancelled = await cancelPendingDripMessages(supabaseAdmin, {
+            leadId: updatedLead[0].id,
+            reason: 'Lead opted out',
+          });
+          if (cancelled > 0) {
+            console.log(`Cancelled ${cancelled} queued drip message(s) for opted-out lead ${updatedLead[0].id}`);
+          }
+        }
+
         if (updatedLead && updatedLead.length > 0) {
           console.log(`✅ Set sms_opt_in=false for lead with phone ${from}`);
         }
@@ -716,6 +732,17 @@ async function handleInboundSMS(payload: any) {
 
         if (pausedEnrollments && pausedEnrollments.length > 0) {
           console.log(`⏸️ Paused ${pausedEnrollments.length} drip enrollment(s) for lead ${replyLead.id} due to reply`);
+
+          // Drip steps are now materialised as real scheduled_messages rows, so
+          // pausing the enrollment alone no longer stops anything — the queued
+          // rows would still be picked up by process-scheduled. Cancel them.
+          const cancelled = await cancelPendingDripMessages(supabaseAdmin, {
+            leadId: replyLead.id,
+            reason: 'Lead replied — drip stopped',
+          });
+          if (cancelled > 0) {
+            console.log(`⏸️ Cancelled ${cancelled} queued drip message(s) for lead ${replyLead.id}`);
+          }
         }
       }
     } catch (stopErr) {

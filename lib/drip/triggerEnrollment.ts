@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { materializeDripSteps } from './materialize';
 
 /**
  * Check for drip campaigns with matching triggers and auto-enroll the lead.
@@ -94,8 +95,10 @@ export async function checkAndEnrollDripTriggers(
                       ((firstStep.delay_hours || 0) * 60 * 60 * 1000);
       const nextSendAt = new Date(now.getTime() + delayMs).toISOString();
 
-      // Enroll the lead
-      await supabase
+      // Enroll the lead. next_send_at is set here so the enrollment is still
+      // valid if materialisation below fails — the drip cron would then pick it
+      // up as before, rather than the sequence silently never sending.
+      const { data: enrollment, error: enrollError } = await supabase
         .from('drip_campaign_enrollments')
         .upsert({
           campaign_id: campaign.id,
@@ -108,9 +111,38 @@ export async function checkAndEnrollDripTriggers(
         }, {
           onConflict: 'campaign_id,lead_id',
           ignoreDuplicates: true,
-        });
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (enrollError) {
+        console.error(`Drip: failed to enroll lead ${leadId} in campaign ${campaign.id}:`, enrollError);
+        continue;
+      }
+      if (!enrollment) continue; // ignoreDuplicates swallowed it — already enrolled
 
       console.log(`📧 Drip: Auto-enrolled lead ${leadId} in campaign ${campaign.id} (trigger: ${triggerType})`);
+
+      // Materialise the whole sequence as scheduled_messages so the user can
+      // see and edit every upcoming step, and so delivery runs through
+      // process-scheduled (quiet hours, DNC, credits, threads) rather than a
+      // second send path. This also clears next_send_at, which is what takes
+      // the enrollment out of the drip cron.
+      const { created, error: materializeError } = await materializeDripSteps(supabase, {
+        enrollmentId: enrollment.id,
+        campaignId: campaign.id,
+        leadId,
+        userId,
+        from: now,
+      });
+
+      if (materializeError) {
+        // Left with next_send_at intact, so the drip cron still delivers it —
+        // degraded to the old behaviour rather than dropping the sequence.
+        console.error(`Drip: could not materialise steps for enrollment ${enrollment.id}, falling back to the drip cron:`, materializeError);
+      } else {
+        console.log(`📧 Drip: scheduled ${created} message(s) for lead ${leadId}`);
+      }
     }
   } catch (err) {
     console.error('Error in drip trigger enrollment:', err);
