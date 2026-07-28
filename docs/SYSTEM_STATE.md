@@ -355,7 +355,10 @@ left in that file.
   limit is inventory under the declared 1:1 ISV model — scaling it means submitting new TFV
   batches, not just buying numbers. **Never submit a TFV or 10DLC request without the
   user's explicit instruction.**
-- **`number_pool.is_verified` is unreconciled (worth fixing, no issue filed):** it's set by
-  hand and never checked against Telnyx, so it can drift in either direction. Derive it
-  from `getVerifiedTollFreeNumbers()` or surface real TFV status in the admin UI, so this
-  is verifiable rather than assumed.
+- **`number_pool.is_verified` is unreconciled (#36):** written once by a seed migration
+  that hardcodes `true`, never checked against Telnyx, but gates claim/availability and an
+  RLS policy. It happened to be correct, but nothing makes it *checkable* — which is what
+  let a bad script masquerade as a discovery for half a day. TFV can also be revoked, and
+  this account has already lost numbers to a deactivation once. Fix: gate on
+  `getVerifiedTollFreeNumbers()` at claim time, reconcile on a schedule, and surface real
+  TFV status somewhere in the UI (there is currently no page showing it at all).
