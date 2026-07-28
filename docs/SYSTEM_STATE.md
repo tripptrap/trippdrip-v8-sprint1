@@ -102,11 +102,20 @@ and `friendly_name: "Verified Toll-Free #N"` in the database. Verified by queryi
 real verification endpoint (`GET /v2/messaging_tollfree/verification/requests`) directly:
 **zero verification requests exist on the account, for these numbers or any others.**
 The numbers themselves are real and active (`+18887062631`, `+18886638510`, `+18884610148`,
-purchased 2026-07-26, on messaging profile "HyveWyre LLC", A2P-eligible) — only the
-verification step was skipped. The `number_pool` rows were created 2026-02-05 (five months
-before the numbers were actually purchased) with placeholder `phone_sid` values like
-`"telnyx-tf-verified-1"` instead of real Telnyx IDs — almost certainly seed/aspirational
-rows from before the numbers existed, never reconciled with reality once they were bought.
+on messaging profile "HyveWyre LLC", A2P-eligible) — only the verification step is missing
+right now. **Explanation for the 5-month gap between the `number_pool` row creation date
+(2026-02-05) and the Telnyx `purchased_at` date (2026-07-26), per the user 2026-07-28:**
+5 toll-free numbers were originally purchased around Feb 2026 (matching the `number_pool`
+row creation date — the DB rows and `is_verified: true` reflect that original purchase,
+not fake seed data as first suspected). The Telnyx account was later deactivated for
+non-payment; on reactivation 2 of the 5 numbers had already been taken by other customers,
+and only 3 were recoverable — hence `purchased_at: 2026-07-26` on the Telnyx side for
+numbers whose DB rows are 5 months older. **Open question, not yet confirmed either way:**
+whether TFV was actually completed for the original 5 back in February and got invalidated
+by the deactivation/recovery cycle, or whether it was never completed and `is_verified: true`
+was set without ever actually submitting to Telnyx. Doesn't change the fix either way — see
+below — but matters for whether this is "redo lost verification" or "do it for the first
+time."
 **Practical effect: the "Instant Access" pool most likely does not currently bypass carrier
 filtering any better than an unregistered local number does** — a new signup claiming one
 of these still probably hits throughput problems, just via unverified-toll-free filtering
