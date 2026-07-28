@@ -318,10 +318,17 @@ left in that file.
   the Leads→Clients conversion flow, pause-billing as an alternative to downgrading,
   the near-black theme/redesign. Don't assume any specific landing-page claim is
   accurate without checking it against this doc or the actual running app first.
-- **Number-purchase checkout doesn't fulfill:** noted in `CLAUDE.md`'s In Progress
-  section as being worked on in worktree `priceless-kowalevski-e9b46d` — that worktree
-  had not diverged from a commit already on `main` as of 2026-07-28, so it's unclear
-  whether this was ever actually started. Check before assuming it's handled.
+- **Live Telnyx number-order call is still unverified (2026-07-28):** the
+  number-purchase checkout bug itself is fixed (commit `b28e8cb`, see Phone Numbers
+  section), and every surrounding path is tested with signed Stripe events — but the
+  actual `POST /v2/number_orders` call inside the `phoneNumberPurchase` branch has
+  never run against real Telnyx, because executing it places a real billable order.
+  To verify: buy a **local** number (toll-free is correctly blocked while TFV is
+  missing) via checkout as a user with no active subscription, then confirm the row
+  lands in `user_telnyx_numbers` with `status: 'pending'` and the number shows on the
+  Telnyx account. **Needs the user's explicit go-ahead — it spends money.** Note the
+  fix was ported from worktree `priceless-kowalevski-e9b46d`, where it had been left
+  uncommitted and unmerged; that worktree still holds the now-redundant copy.
 - **Secrets rotation (#29):** deliberately deferred to pre-launch prep. The app running
   normally is not evidence the current secrets are safe.
 - **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
