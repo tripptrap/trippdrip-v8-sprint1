@@ -217,24 +217,40 @@ async function processScheduledMessages(supabase: any) {
 
         if (smsResult.success) {
           // CRIT-1: Atomic credit deduction via RPC — prevents race condition from read-then-write
-          await supabase.rpc('deduct_credits', { user_id: message.user_id, amount: message.credits_cost });
+          const { error: deductError } = await supabase.rpc('deduct_credits', {
+            user_id: message.user_id,
+            amount: message.credits_cost,
+          });
 
-          // Create message record with automation tracking
-          await supabase
+          if (deductError) {
+            // The SMS has already gone out, so this can't be undone — but it
+            // must be visible, otherwise the message was effectively free.
+            console.error(`❌ Credits NOT deducted for user ${message.user_id} after sending message ${message.id}:`, deductError);
+          }
+
+          // Create message record with automation tracking.
+          // Column names verified against the live schema (#53): messages uses
+          // points_cost, and has no sender/segments — `direction` already
+          // distinguishes agent from lead. Writing the old names silently
+          // failed, so none of these sends were ever recorded.
+          const { error: msgInsertError } = await supabase
             .from('messages')
             .insert({
               user_id: message.user_id,
               lead_id: message.lead_id,
               direction: 'out',
-              sender: 'agent',
+              content: message.body,
               body: message.body,
               channel: 'sms',
               status: 'sent',
-              credits_cost: message.credits_cost,
-              segments: message.segments,
+              points_cost: message.credits_cost,
               is_automated: true,
               automation_source: 'scheduled',
             });
+
+          if (msgInsertError) {
+            console.error(`❌ Sent message ${message.id} but failed to record it:`, msgInsertError);
+          }
 
           // Mark scheduled message as sent
           await supabase

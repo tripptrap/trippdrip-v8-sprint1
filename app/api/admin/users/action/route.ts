@@ -263,15 +263,21 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: updateError.message }, { status: 500 });
         }
 
-        // Log the transaction
-        await adminClient.from('points_transactions').insert({
+        // Log the transaction. `balance_after` was dropped (#55) — the column
+        // doesn't exist and nothing read it, so including it made Postgres
+        // reject the insert and admin grants went unrecorded. The resulting
+        // balance is recoverable from users.credits plus this row's amount.
+        const { error: txError } = await adminClient.from('points_transactions').insert({
           user_id: userId,
           points_amount: creditAmount,
           action_type: 'admin_grant',
-          description: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits`,
-          balance_after: newCredits,
+          description: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits (balance after: ${newCredits.toLocaleString()})`,
           created_at: new Date().toISOString(),
         });
+
+        if (txError) {
+          console.error(`❌ Admin granted ${creditAmount} credits to ${userId} but failed to log the transaction:`, txError);
+        }
 
         // Send notification email
         if (userEmail) {

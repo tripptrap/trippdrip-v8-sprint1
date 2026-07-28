@@ -140,18 +140,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Failed to send SMS' }, { status: 500 });
     }
 
-    // Log the message
-    await supabase.from('messages').insert({
+    // Log the message. Columns verified against the live schema (#53) — the
+    // table uses from_phone/to_phone/message_sid, not
+    // from_number/to_number/telnyx_message_id, so this insert was being
+    // rejected outright and calendar links never appeared in the thread.
+    const { error: msgInsertError } = await supabase.from('messages').insert({
       user_id: user.id,
       lead_id: leadId,
-      from_number: telnyxNumber.phone_number,
-      to_number: lead.phone,
+      from_phone: telnyxNumber.phone_number,
+      to_phone: lead.phone,
+      content: messageBody,
       body: messageBody,
       direction: 'outbound',
       status: 'sent',
       channel: 'sms',
-      telnyx_message_id: telnyxData.data?.id,
+      message_sid: telnyxData.data?.id,
     });
+
+    if (msgInsertError) {
+      console.error(`❌ Sent calendar link to lead ${leadId} but failed to record it:`, msgInsertError);
+    }
 
     // Deduct credits (1 segment = 2 credits)
     const segments = Math.ceil(messageBody.length / 160);

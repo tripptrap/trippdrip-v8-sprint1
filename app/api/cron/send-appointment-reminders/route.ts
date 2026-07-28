@@ -247,16 +247,27 @@ export async function POST(req: NextRequest) {
         }
 
         if (threadId) {
-          await supabaseAdmin.from('messages').insert({
+          // Columns verified against the live schema (#53) — the table uses
+          // from_phone/to_phone, not from_number/to_number. The old names made
+          // Postgres reject the whole insert, so reminders were sent but never
+          // recorded in the thread.
+          const { error: msgInsertError } = await supabaseAdmin.from('messages').insert({
             thread_id: threadId,
+            user_id: event.user_id,
+            content: message,
             body: message,
             direction: 'outbound',
             status: 'sent',
-            from_number: fromNumber,
-            to_number: leadPhone,
+            from_phone: fromNumber,
+            to_phone: leadPhone,
             is_automated: true,
+            automation_source: 'appointment_reminder',
             created_at: new Date().toISOString(),
           });
+
+          if (msgInsertError) {
+            console.error(`❌ Sent appointment reminder for event ${event.id} but failed to record it:`, msgInsertError);
+          }
         }
 
         sent++;

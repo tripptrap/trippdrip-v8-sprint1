@@ -260,22 +260,26 @@ export async function PUT(req: NextRequest) {
               })
               .eq('id', message.id);
 
-            // Create message record
-            await adminClient
+            // Create message record. Columns verified against the live schema
+            // (#53) — messages uses points_cost and has no sender/segments.
+            const { error: msgInsertError } = await adminClient
               .from('messages')
               .insert({
                 user_id: user.id,
                 lead_id: message.lead_id,
                 direction: 'out',
-                sender: 'agent',
+                content: message.body,
                 body: message.body,
                 channel: 'sms',
                 status: 'sent',
-                credits_cost: message.credits_cost,
-                segments: message.segments,
+                points_cost: message.credits_cost,
                 is_automated: true,
                 automation_source: 'scheduled_bulk',
               });
+
+            if (msgInsertError) {
+              console.error(`❌ Sent bulk message ${message.id} but failed to record it:`, msgInsertError);
+            }
 
             // Update lead last_interaction_at
             await adminClient

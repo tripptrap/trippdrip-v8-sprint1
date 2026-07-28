@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
     const questionsAnswered = session.questions_answered || 0;
     const questionsTotal = session.questions_total || 0;
 
-    await supabase.from('flow_completion_log').insert({
+    // flow_id and completion_type were missing from the table until #51, so
+    // every completion silently failed to log and the table had 0 rows. Both
+    // columns now exist; the error check makes any future drift visible.
+    const { error: logError } = await supabase.from('flow_completion_log').insert({
       user_id: user.id,
       lead_id: session.lead_id,
       flow_id: session.flow_id,
@@ -73,6 +76,10 @@ export async function POST(req: NextRequest) {
       completion_type: completionType,
       completed_at: new Date().toISOString(),
     });
+
+    if (logError) {
+      console.error(`❌ Failed to log flow completion for lead ${session.lead_id}:`, logError);
+    }
 
     // 3. Track lead activity
     if (session.lead_id) {

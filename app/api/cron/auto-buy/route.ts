@@ -161,14 +161,27 @@ export async function GET(req: NextRequest) {
             throw new Error(`Failed to update credits: ${updateError.message}`);
           }
 
-          // Log transaction
-          await supabase.from('points_transactions').insert({
+          // Log transaction. The column is stripe_session_id (#55) — it already
+          // stores checkout session ids and invoice ids, so it's the generic
+          // "Stripe object this transaction came from". Using it also picks up
+          // the partial unique index on that column, so a repeated auto-buy for
+          // the same PaymentIntent can't double-grant.
+          const { error: txError } = await supabase.from('points_transactions').insert({
             user_id: user.id,
             action_type: 'purchase',
             points_amount: pack.points,
             description: `Auto-buy: ${pack.name} (${isScale ? 'Scale' : 'Growth'} discount)`,
-            stripe_payment_intent: paymentIntent.id
+            stripe_session_id: paymentIntent.id,
+            amount_paid: finalPrice,
           });
+
+          if (txError) {
+            // Credits were already granted and the card already charged, so
+            // this can't be rolled back here — but it must not stay silent:
+            // without this row there's no audit trail linking the charge to the
+            // grant, and /api/user/plan-value under-reports.
+            console.error(`❌ Auto-buy charged and credited user ${user.id} but failed to log the transaction:`, txError);
+          }
 
           results.push({
             userId: user.id,
