@@ -205,43 +205,51 @@ export default function PointsPage() {
 
     // Confirm downgrade if going from scale to growth
     if (oldPlan === 'scale' && planType === 'growth') {
+      const from = SUBSCRIPTION_FEATURES.scale;
+      const to = SUBSCRIPTION_FEATURES.growth;
+      const balanceLine = balance !== null
+        ? `Your current balance of ${balance.toLocaleString()} credits will be preserved.`
+        : 'Your current credit balance will be preserved.';
+
       setModal({
         isOpen: true,
         type: 'confirm',
-        title: 'Confirm Downgrade',
-        message: 'Are you sure you want to downgrade to Growth plan? You will lose Scale discounts on point packs and monthly credits will drop from 10,000 to 3,000. Your existing point balance will be preserved.',
+        title: 'Confirm Downgrade to Growth',
+        message: [
+          `• Monthly credits: ${from.monthlyCredits.toLocaleString()} → ${to.monthlyCredits.toLocaleString()}`,
+          `• Point pack discount: ${from.pointPackDiscount}% → ${to.pointPackDiscount}%`,
+          `• Price: $${from.price}/mo → $${to.price}/mo`,
+          '',
+          balanceLine,
+        ].join('\n'),
         onConfirm: async () => {
-          await performPlanSwitch(planType, oldPlan, supabase, user.id);
+          await performPlanSwitch(planType, oldPlan);
         }
       });
       return;
     }
 
-    await performPlanSwitch(planType, oldPlan, supabase, user.id);
+    await performPlanSwitch(planType, oldPlan);
   }
 
-  async function performPlanSwitch(planType: SubscriptionTier, oldPlan: SubscriptionTier, supabase: any, userId: string) {
-    // Update subscription tier in Supabase
-    const newMonthlyCredits = planType === 'scale' ? 10000 : 3000;
-
-    // Only reset credits if upgrading - preserve existing balance when downgrading
-    const updateData: any = {
-      subscription_tier: planType,
-      monthly_credits: newMonthlyCredits
-    };
-
-    // If upgrading to scale, grant the new monthly credits immediately
-    if (planType === 'scale' && oldPlan === 'growth') {
-      updateData.credits = newMonthlyCredits;
+  async function performPlanSwitch(planType: SubscriptionTier, oldPlan: SubscriptionTier) {
+    // Actually changes the Stripe subscription's price, then updates
+    // Supabase to match — see /api/stripe/change-plan for details.
+    let res: Response;
+    try {
+      res = await fetch('/api/stripe/change-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planType }),
+      });
+    } catch (e: any) {
+      setModal({ isOpen: true, type: 'error', title: 'Plan Switch Failed', message: `Failed to switch plan: ${e?.message || 'Network error'}` });
+      return;
     }
 
-    const { error } = await supabase
-      .from('users')
-      .update(updateData)
-      .eq('id', userId);
-
-    if (error) {
-      setModal({isOpen: true, type: 'error', title: 'Plan Switch Failed', message: `Failed to switch plan: ${error.message}`});
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setModal({ isOpen: true, type: 'error', title: 'Plan Switch Failed', message: data.error || 'Failed to switch plan' });
       return;
     }
 

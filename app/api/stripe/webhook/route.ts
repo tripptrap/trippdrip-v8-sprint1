@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
+// Must match the fallbacks in app/api/stripe/create-checkout/route.ts —
+// these env vars aren't set in every environment, so both places need
+// the same fallback or price-based tier detection breaks silently.
+const STRIPE_PRICE_GROWTH = process.env.STRIPE_PRICE_GROWTH || 'price_1SQtYHFyk0lZUopFNa0lT81K';
+const STRIPE_PRICE_SCALE = process.env.STRIPE_PRICE_SCALE || 'price_1SQtaUFyk0lZUopFRJnuLftL';
+
 // Create Supabase admin client for webhook (bypasses RLS)
 // Only create if keys are available
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -125,6 +131,8 @@ export async function POST(req: NextRequest) {
                 monthly_credits: monthlyCredits,
                 credits: monthlyCredits,
                 account_status: 'active',
+                stripe_customer_id: session.customer,
+                stripe_subscription_id: session.subscription,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               });
@@ -146,6 +154,8 @@ export async function POST(req: NextRequest) {
                 monthly_credits: monthlyCredits,
                 credits: currentCredits + monthlyCredits,
                 account_status: 'active',
+                stripe_customer_id: session.customer,
+                stripe_subscription_id: session.subscription,
                 updated_at: new Date().toISOString()
               })
               .eq('id', userId);
@@ -215,6 +225,63 @@ export async function POST(req: NextRequest) {
       case 'payment_intent.succeeded':
         console.log('PaymentIntent succeeded:', event.data.object.id);
         break;
+
+      case 'customer.subscription.updated': {
+        // Keeps Supabase in sync when the subscription changes anywhere
+        // outside the app's own change-plan route — the Stripe Customer
+        // Portal, a pause/resume, or a manual change in the Stripe dashboard.
+        const subscription = event.data.object as Stripe.Subscription;
+        if (!supabaseAdmin) break;
+
+        const priceId = subscription.items.data[0]?.price?.id;
+        const tierFromPrice = priceId === STRIPE_PRICE_SCALE
+          ? 'scale'
+          : priceId === STRIPE_PRICE_GROWTH
+          ? 'growth'
+          : null;
+
+        const statusUpdate: Record<string, any> = {
+          subscription_status: subscription.pause_collection ? 'paused' : subscription.status,
+          updated_at: new Date().toISOString(),
+        };
+        if (tierFromPrice) {
+          statusUpdate.subscription_tier = tierFromPrice;
+          statusUpdate.plan_type = tierFromPrice;
+          statusUpdate.monthly_credits = tierFromPrice === 'scale' ? 10000 : 3000;
+        }
+
+        const { error: subUpdateError } = await supabaseAdmin
+          .from('users')
+          .update(statusUpdate)
+          .eq('stripe_subscription_id', subscription.id);
+
+        if (subUpdateError) {
+          console.error('Error syncing subscription update:', subUpdateError);
+        } else {
+          console.log(`Synced subscription ${subscription.id}: status=${statusUpdate.subscription_status}${tierFromPrice ? `, tier=${tierFromPrice}` : ''}`);
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const canceledSub = event.data.object as Stripe.Subscription;
+        if (!supabaseAdmin) break;
+
+        const { error: cancelError } = await supabaseAdmin
+          .from('users')
+          .update({
+            subscription_status: 'canceled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('stripe_subscription_id', canceledSub.id);
+
+        if (cancelError) {
+          console.error('Error recording subscription cancellation:', cancelError);
+        } else {
+          console.log(`Recorded cancellation for subscription ${canceledSub.id}`);
+        }
+        break;
+      }
 
       case 'payment_intent.payment_failed':
         const failedIntent = event.data.object;
