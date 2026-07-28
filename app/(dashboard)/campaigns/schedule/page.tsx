@@ -289,7 +289,7 @@ export default function ScheduleCampaignPage() {
               ) : (
                 <div className="space-y-2">
                   {filteredLeads.map(lead => (
-                    <label key={lead.id} className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer">
+                    <label key={lead.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selectedLeads.includes(lead.id)}
@@ -468,7 +468,7 @@ export default function ScheduleCampaignPage() {
                 case 'paused': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
                 case 'completed': return 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-8000/10 border-gray-500/20';
                 case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
-                default: return 'text-slate-600 dark:text-slate-400 bg-white border-slate-200 dark:border-slate-700';
+                default: return 'text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700';
               }
             };
 

@@ -685,7 +685,7 @@ export default function FollowUpsPage() {
       {/* Suggestions Panel */}
       {showSuggestionsPanel && (
         <div className="fixed inset-0 md:left-64 bg-black/60 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Smart Follow-up Suggestions</h2>

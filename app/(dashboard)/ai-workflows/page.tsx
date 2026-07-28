@@ -438,7 +438,7 @@ export default function AIWorkflowsPage() {
                       <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-lg">{template.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                         {template.tags.map((tag) => (
-                          <span key={tag} className="text-xs px-2 py-1 rounded bg-white text-slate-600 dark:text-slate-400">
+                          <span key={tag} className="text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
                             {tag}
                           </span>
                         ))}
@@ -448,7 +448,7 @@ export default function AIWorkflowsPage() {
 
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{template.description}</p>
 
-                  <div className="bg-white rounded-lg p-3 mb-3">
+                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 mb-3">
                     <div className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400 mb-2">Use Case</div>
                     <div className="text-sm text-slate-900 dark:text-slate-100">{template.useCase}</div>
                   </div>
@@ -458,11 +458,11 @@ export default function AIWorkflowsPage() {
                       Conversation Flow ({template.questions.length} questions)
                     </div>
                     <div className="space-y-2">
-                      <div className="text-sm text-slate-600 dark:text-slate-400 bg-white rounded p-2">
+                      <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded p-2">
                         <span className="text-sky-600">Initial:</span> {template.initialMessage.substring(0, 100)}...
                       </div>
                       {template.questions.slice(0, 2).map((q, idx) => (
-                        <div key={idx} className="text-sm text-slate-600 dark:text-slate-400 bg-white rounded p-2">
+                        <div key={idx} className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded p-2">
                           <span className="text-sky-600">Q{idx + 1}:</span> {q.question}
                         </div>
                       ))}

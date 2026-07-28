@@ -2140,7 +2140,7 @@ export default function LeadsPage() {
         )}
 
         {lastSummary?.ok && (
-          <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
+          <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-600 dark:text-slate-400">
             <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Last import</div>
             <div className="flex flex-wrap gap-x-6">
               <div><b>Incoming:</b> {lastSummary.incoming}</div>
@@ -2192,7 +2192,7 @@ export default function LeadsPage() {
                               value={newCampaignInput}
                               onChange={(e) => setNewCampaignInput(e.target.value)}
                               placeholder="Create new campaign..."
-                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1 text-sm outline-none focus:border-sky-500"
+                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-sm outline-none focus:border-sky-500"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
@@ -2295,7 +2295,7 @@ export default function LeadsPage() {
                               value={newTagInput}
                               onChange={(e) => setNewTagInput(e.target.value)}
                               placeholder="Create new tag..."
-                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500"
+                              className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm outline-none focus:border-sky-500"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <button
@@ -2400,7 +2400,7 @@ export default function LeadsPage() {
                             key={col}
                             draggable
                             onDragStart={(e)=>{ e.dataTransfer.setData("text/plain", col); }}
-                            className="cursor-grab rounded-full border border-slate-200 dark:border-slate-700 bg-white px-3 py-1 text-xs"
+                            className="cursor-grab rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-xs"
                           >
                             {col}
                           </div>
@@ -2416,7 +2416,7 @@ export default function LeadsPage() {
                           <div key={field}
                                onDrop={(e)=>{ e.preventDefault(); const col=e.dataTransfer.getData("text/plain"); if(col) assignMapping(field,col); }}
                                onDragOver={(e)=>e.preventDefault()}
-                               className="rounded-md border border-dashed border-slate-300 dark:border-slate-600 bg-white p-2">
+                               className="rounded-md border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-2">
                             <div className="mb-1 text-[11px] uppercase tracking-widest text-slate-600 dark:text-slate-400">{field}</div>
                             {mapping[field] ? (
                               <div className="flex items-center justify-between rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-xs">
@@ -2967,7 +2967,7 @@ export default function LeadsPage() {
                             value={bulkNewTagInput}
                             onChange={(e) => setBulkNewTagInput(e.target.value)}
                             placeholder="Create new tag..."
-                            className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white px-2 py-1.5 text-sm outline-none focus:border-sky-500"
+                            className="flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-sm outline-none focus:border-sky-500"
                             onClick={(e) => e.stopPropagation()}
                           />
                           <button

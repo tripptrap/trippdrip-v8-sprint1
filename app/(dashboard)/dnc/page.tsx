@@ -549,7 +549,7 @@ export default function DNCPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search phone numbers..."
-                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400"
               />
             </div>
           </div>
@@ -602,7 +602,7 @@ export default function DNCPage() {
                 </tr>
               ) : (
                 filteredEntries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-white/5 hover:bg-white">
+                  <tr key={entry.id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5">
                     <td className="py-3 px-4">
                       <div className="font-mono text-slate-900 dark:text-slate-100">{entry.phone_number}</div>
                       <div className="text-xs text-slate-600 dark:text-slate-400">{entry.normalized_phone}</div>
@@ -652,7 +652,7 @@ export default function DNCPage() {
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="+1 (555) 123-4567"
-                  className="w-full px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div>
@@ -660,7 +660,7 @@ export default function DNCPage() {
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
                 >
                   <option value="manual">Manual</option>
                   <option value="opt_out">Opt-Out</option>
@@ -675,7 +675,7 @@ export default function DNCPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any notes..."
                   rows={3}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="flex gap-2 justify-end">
@@ -713,7 +713,7 @@ export default function DNCPage() {
                   onChange={(e) => setBulkNumbers(e.target.value)}
                   placeholder={"+1 (555) 123-4567\n+1 (555) 987-6543\n..."}
                   rows={10}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono"
                 />
               </div>
               <div>
@@ -721,7 +721,7 @@ export default function DNCPage() {
                 <select
                   value={bulkReason}
                   onChange={(e) => setBulkReason(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
                 >
                   <option value="manual">Manual</option>
                   <option value="opt_out">Opt-Out</option>

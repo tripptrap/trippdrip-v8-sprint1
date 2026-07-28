@@ -224,8 +224,8 @@ export default function AppointmentsPage() {
           <RefreshCw className="w-8 h-8 text-sky-600 animate-spin" />
         </div>
       ) : appointments.length === 0 ? (
-        <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center">
-          <Calendar className="w-12 h-12 text-gray-900/20 mx-auto mb-4" />
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center">
+          <Calendar className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">No {filter} appointments</h3>
           <p className="text-slate-600 dark:text-slate-400 text-sm max-w-md mx-auto">
             {filter === 'upcoming'
@@ -265,7 +265,7 @@ export default function AppointmentsPage() {
                 {dayAppointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:border-sky-500/30 transition-colors"
+                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:border-sky-500/30 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -376,17 +376,17 @@ export default function AppointmentsPage() {
       {/* Summary Stats */}
       {appointments.length > 0 && (
         <div className="grid grid-cols-3 gap-4 mt-8">
-          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
             <div className="text-sm text-slate-600 dark:text-slate-400">Total {filter}</div>
           </div>
-          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-sky-600">
               {appointments.filter(a => isToday(a.start_time)).length}
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-400">Today</div>
           </div>
-          <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
             <div className="text-2xl font-bold text-blue-400">
               {appointments.filter(a => isTomorrow(a.start_time)).length}
             </div>

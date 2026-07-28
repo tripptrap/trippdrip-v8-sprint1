@@ -227,7 +227,7 @@ export default function ScheduledMessagesPage() {
       case 'sent': return 'text-emerald-600 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800';
       case 'failed': return 'text-red-400 bg-red-500/10 border-red-500/20';
       case 'cancelled': return 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/10 border-slate-200 dark:border-slate-700';
-      default: return 'text-slate-600 dark:text-slate-400 bg-white border-slate-200 dark:border-slate-700';
+      default: return 'text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
   }
 

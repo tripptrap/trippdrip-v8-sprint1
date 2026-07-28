@@ -180,7 +180,7 @@ export default function TestPointsPage() {
             {transactions.map((txn) => (
               <div
                 key={txn.id}
-                className="flex items-center justify-between p-3 bg-white rounded-lg"
+                className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
               >
                 <div>
                   <div className="font-medium">{txn.description}</div>

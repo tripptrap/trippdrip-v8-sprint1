@@ -474,14 +474,14 @@ export default function PointsPage() {
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-white">
+              <thead className="bg-slate-50 dark:bg-slate-800">
                 <tr>
                   <th className="text-left px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400">Date</th>
                   <th className="text-left px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400">Description</th>
                   <th className="text-right px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400">Points</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-slate-200 dark:divide-white/10">
                 {transactions.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="px-4 py-8 text-center text-slate-600 dark:text-slate-400">
@@ -490,7 +490,7 @@ export default function PointsPage() {
                   </tr>
                 ) : (
                   transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-white">
+                    <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-white/5">
                       <td className="px-4 py-3 text-sm">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </td>
@@ -514,7 +514,7 @@ export default function PointsPage() {
         <h2 className="text-lg font-semibold mb-4">Choose Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
           {/* Growth Plan */}
-          <div className={`card relative ${currentPlan === 'growth' ? 'ring-2 ring-sky-500 bg-sky-500/10' : 'bg-white'}`}>
+          <div className={`card relative ${currentPlan === 'growth' ? 'ring-2 ring-sky-500 bg-sky-500/10' : ''}`}>
             {currentPlan === 'growth' && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-sky-500 text-white text-xs font-bold px-3 py-1 rounded-full">
                 CURRENT PLAN
@@ -644,7 +644,7 @@ export default function PointsPage() {
       </div>
 
       {/* Subscription Info */}
-      <div className="card bg-white">
+      <div className="card">
         <h3 className="font-semibold mb-3">Subscription Details</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">

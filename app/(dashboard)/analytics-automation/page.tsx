@@ -102,7 +102,7 @@ export default function AutomationAnalyticsPage() {
         <select
           value={daysBack}
           onChange={(e) => setDaysBack(parseInt(e.target.value))}
-          className="px-4 py-2 bg-white border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500/50"
+          className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500/50"
         >
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
@@ -204,7 +204,7 @@ export default function AutomationAnalyticsPage() {
               </thead>
               <tbody>
                 {flowPerformance.map((flow) => (
-                  <tr key={flow.flow_id} className="border-b border-white/5 hover:bg-white">
+                  <tr key={flow.flow_id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5">
                     <td className="py-3 px-4 text-slate-900 dark:text-slate-100">{flow.flow_name}</td>
                     <td className="py-3 px-4 text-right text-slate-900 dark:text-slate-100">{flow.messages_sent}</td>
                     <td className="py-3 px-4 text-right text-slate-900 dark:text-slate-100">{flow.unique_leads}</td>
@@ -261,7 +261,7 @@ export default function AutomationAnalyticsPage() {
                     </span>
                     <span className="text-slate-900 dark:text-slate-100">{day.total} messages</span>
                   </div>
-                  <div className="h-8 bg-white rounded-lg overflow-hidden flex">
+                  <div className="h-8 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden flex">
                     {day.automated > 0 && (
                       <div
                         className="bg-sky-500/50 flex items-center justify-center text-xs text-white"

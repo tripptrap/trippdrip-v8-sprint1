@@ -59,7 +59,7 @@ export default function RoadmapPage() {
     future: {
       label: 'Coming Soon',
       color: 'text-teal-700',
-      bgColor: 'bg-white',
+      bgColor: '',
       borderColor: 'border-slate-200 dark:border-slate-700',
       icon: Gift
     }
@@ -88,7 +88,7 @@ export default function RoadmapPage() {
       </div>
 
       {/* Referral Program Section */}
-      <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="card border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 py-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-sky-100 flex items-center justify-center">
@@ -131,7 +131,7 @@ export default function RoadmapPage() {
       </div>
 
       {/* Stats */}
-      <div className="card bg-white border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="card border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
             <Gift className="h-5 w-5 text-teal-700" />

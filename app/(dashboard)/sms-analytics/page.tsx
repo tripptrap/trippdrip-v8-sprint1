@@ -107,7 +107,7 @@ export default function SMSAnalyticsPage() {
   const getStatusBadge = (status: string | null, failedAt: string | null, deliveredAt: string | null) => {
     if (failedAt || status === 'failed') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
           <XCircle className="w-3 h-3" />
           Failed
         </span>
@@ -115,7 +115,7 @@ export default function SMSAnalyticsPage() {
     }
     if (deliveredAt || status === 'delivered') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
           <CheckCircle className="w-3 h-3" />
           Delivered
         </span>
@@ -123,14 +123,14 @@ export default function SMSAnalyticsPage() {
     }
     if (status === 'sent') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-sky-700">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-sky-700 dark:text-sky-400">
           <CheckCircle className="w-3 h-3" />
           Sent
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
         <Clock className="w-3 h-3" />
         Pending
       </span>
@@ -167,7 +167,7 @@ export default function SMSAnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">SMS Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">SMS Analytics</h1>
           <p className="text-slate-600 dark:text-slate-400">Track your SMS campaigns and delivery rates</p>
         </div>
         <button
@@ -182,69 +182,69 @@ export default function SMSAnalyticsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <MessageSquare className="w-5 h-5 text-sky-600" />
             </div>
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Total Sent</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalSent}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.totalSent}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-sky-100 rounded-lg">
+            <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg">
               <CheckCircle className="w-5 h-5 text-sky-600" />
             </div>
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Delivered</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalDelivered}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.totalDelivered}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
+            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Failed</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalFailed}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.totalFailed}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-sky-100 rounded-lg">
+            <div className="p-2 bg-sky-100 dark:bg-sky-900/30 rounded-lg">
               <TrendingUp className="w-5 h-5 text-sky-600" />
             </div>
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Delivery Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.deliveryRate.toFixed(1)}%</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.deliveryRate.toFixed(1)}%</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-100 rounded-lg">
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
               <DollarSign className="w-5 h-5 text-yellow-600" />
             </div>
             <div>
               <p className="text-sm text-slate-600 dark:text-slate-400">Total Cost</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalCost} pts</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stats.totalCost} pts</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -289,13 +289,13 @@ export default function SMSAnalyticsPage() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
       {/* Messages Table */}
-      <div className="bg-white rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
@@ -323,7 +323,7 @@ export default function SMSAnalyticsPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
@@ -338,7 +338,7 @@ export default function SMSAnalyticsPage() {
                 </tr>
               ) : (
                 messages.map((message) => (
-                  <tr key={message.id} className="hover:bg-slate-50 dark:bg-slate-800">
+                  <tr key={message.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {formatDate(message.sent_at)}
                     </td>

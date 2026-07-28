@@ -578,7 +578,7 @@ export default function PhoneNumbersPage() {
                   className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                     numberType === 'tollfree'
                       ? 'bg-sky-600 text-white'
-                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:text-slate-100 hover:bg-white'
+                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700'
                   }`}
                 >
                   Toll-Free (Recommended)
@@ -591,7 +591,7 @@ export default function PhoneNumbersPage() {
                   className={`flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                     numberType === 'local'
                       ? 'bg-sky-600 text-white'
-                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:text-slate-100 hover:bg-white'
+                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-700'
                   }`}
                 >
                   Local (Requires A2P)
