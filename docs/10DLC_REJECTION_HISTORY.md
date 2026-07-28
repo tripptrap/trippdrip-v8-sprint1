@@ -18,6 +18,8 @@ Brand: **HyveWyre LLC** — `4b20019b-eba4-6bfd-8723-dca9058142e8` — status **
 | 3 | `4b30019f-a115-f6f7-3081-00a41955e269` | 2026-07-27 01:00 | MIXED | TELNYX_FAILED | sender identity + privacy policy |
 | 4 | `4b30019f-a1d4-686f-b131-a9fa2c7ff808` | 2026-07-27 04:28 | LOW_VOLUME | TCR_FAILED | missing `subUsecases` |
 | 5 | `4b30019f-a211-5044-960e-8212c4af0d4e` | 2026-07-27 05:34 | MIXED | TELNYX_FAILED | opt-in form had no consent checkbox |
+| 6 | `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` | 2026-07-28 01:00 | MIXED | TELNYX_FAILED | consent text didn't cover MARKETING |
+| 7 | `4b30019f-a9aa-5d53-15ff-8fab24597ea8` | 2026-07-28 16:59 | MIXED | **submitted, awaiting review** | — (`failureReasons: null` at submit) |
 
 ### #1 — verbatim reasons
 > Who is the perceived sender of the messages? If it's a business using your platform, then each business will need a brand and campaign created specifically for them.
@@ -41,6 +43,27 @@ Brand: **HyveWyre LLC** — `4b20019b-eba4-6bfd-8723-dca9058142e8` — status **
 > Who is the perceived sender of the messages? … Note: The public HyveWyre website presents the service as an SMS marketing platform for agents, sales teams, and other businesses to import leads and send campaigns, including use of a shared pool of pre-verified numbers.
 >
 > Privacy Policy needs to be compliant. … Note: The linked privacy policy says personal information is not sold, but it does not state that mobile/SMS opt-in information will not be shared with third parties for marketing or promotional purposes.
+
+### #6 — verbatim reasons
+> The opt-in consent language does not cover all selected use cases for this campaign. Please update the consent text on your opt-in form to include all message types, or update the campaign use cases to match the consent provided.
+> Note: The live opt-in form at https://hyvewyre.com/opt-in/hyvewyre-llc authorizes follow-up messages and appointment reminders, but MARKETING is selected and the campaign description includes product updates/account notifications.
+>
+> Subscriber/Auto-response Opt-in Message needs updating.
+> Note: The START/opt-in auto-response does not explicitly mention marketing/promotional messages even though MARKETING is selected.
+
+**Fix (commit `813d49b`):** both are the same root cause — the declared message
+types have to cover *every* sub-usecase on the campaign. `buildConsentText()` now
+names account notifications and promotional/marketing messages, which flows to all
+three places at once (the live checkbox, the stored `consent_text` audit record, and
+the `messageFlow` quoted to Telnyx). The webhook's START reply and the per-agent
+campaign defaults were updated to match.
+
+Kept MARKETING rather than narrowing the campaign — outbound prospecting is the
+product, so dropping it would restrict what users can legitimately send.
+
+Note the pre-existing "will not be shared with third parties for marketing" sentence
+is about not passing the number *onward*; it authorises nothing, so it never covered
+receiving promotional messages. Easy to misread as already handling this.
 
 ### #4 — verbatim reason
 > Usecase LOW_VOLUME requires minimum of 1 sub-usecases
@@ -115,6 +138,32 @@ separate from ToS agreement · submittable without opting in.
   article (previously only inferred): opt-in msg needs brand + use case + HELP +
   frequency + rates + consent-not-condition + STOP; opt-out needs brand +
   no-further-messages; help needs brand + real contact. All three comply.
+
+## Reading campaign status correctly — this misled a session
+
+`GET /10dlc/campaign/{id}` returns a `status` field that is **not** the review
+outcome. It reflects the TCR record's lifecycle, so a campaign the portal shows as
+**"Failed Telnyx Review"** still reports `status: "ACTIVE"` over the API. On
+2026-07-28 that was read as "the campaign passed" and reported as such; the portal
+said otherwise.
+
+**Check `failureReasons`.** Non-empty means Telnyx's own review rejected it, which is
+what the portal renders as "Failed Telnyx Review". `Numbers: 0` on the campaign row is
+a second confirmation that it isn't usable.
+
+Also note the list endpoint requires `brandId`:
+`GET /10dlc/campaign?brandId=<id>&page=1&recordsPerPage=50` — without it you get a
+`10004 Missing required parameter`, and `/10dlc/campaigns` (plural) is a 404.
+
+Campaigns are **create-only** — `OPTIONS` on a campaign returns `GET` alone, so a
+rejected campaign can't be edited and every fix means a new submission via
+`POST /10dlc/campaignBuilder`.
+
+**Submission is scripted:** `scripts/submit-10dlc-campaign-attempt6.js` holds the
+current payload with each historical rejection mapped to its fix inline, and a
+`--dry-run` flag. Per the user (2026-07-28), a failed *Telnyx review* is not billed —
+only a campaign that actually reaches the carriers is — so iterating on rejections is
+cheap and shouldn't be over-thought.
 
 ## Reference docs
 - Opt-in form: https://support.telnyx.com/en/articles/10684260-10dlc-opt-in-form
