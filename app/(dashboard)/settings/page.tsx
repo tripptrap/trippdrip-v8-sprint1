@@ -1606,7 +1606,7 @@ export default function Page() {
 
           {/* Appearance */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">🌓 Appearance</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Appearance</h2>
 
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
@@ -1666,7 +1666,7 @@ export default function Page() {
 
           {/* Demo Mode */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">🎭 Demo Mode</h2>
+            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Demo Mode</h2>
 
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
@@ -1705,7 +1705,7 @@ export default function Page() {
                     <li>Pre-configured conversation flows</li>
                   </ul>
                   <p className="text-xs text-sky-500 dark:text-sky-400 mt-3">
-                    💡 Perfect for exploring features, taking screenshots, or demonstrating the platform to clients.
+                    Perfect for exploring features, taking screenshots, or demonstrating the platform to clients.
                   </p>
                 </div>
               </div>
@@ -1714,7 +1714,7 @@ export default function Page() {
 
           {/* Quiet Hours */}
           <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">🌙 Quiet Hours</h2>
+            <h2 className="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Quiet Hours</h2>
 
             <div className="space-y-4">
               <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
