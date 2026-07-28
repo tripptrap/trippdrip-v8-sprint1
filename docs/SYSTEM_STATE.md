@@ -110,12 +110,15 @@ row creation date — the DB rows and `is_verified: true` reflect that original 
 not fake seed data as first suspected). The Telnyx account was later deactivated for
 non-payment; on reactivation 2 of the 5 numbers had already been taken by other customers,
 and only 3 were recoverable — hence `purchased_at: 2026-07-26` on the Telnyx side for
-numbers whose DB rows are 5 months older. **Open question, not yet confirmed either way:**
-whether TFV was actually completed for the original 5 back in February and got invalidated
-by the deactivation/recovery cycle, or whether it was never completed and `is_verified: true`
-was set without ever actually submitting to Telnyx. Doesn't change the fix either way — see
-below — but matters for whether this is "redo lost verification" or "do it for the first
-time."
+numbers whose DB rows are 5 months older. **Unconfirmed (user recalls submitting TFV
+originally, will verify 2026-07-28):** the user's recollection is that verification *was*
+required and submitted for the original 5 numbers back in February — which would mean the
+deactivation/recovery cycle is what wiped it, not that it was skipped entirely. Not yet
+confirmed against any record on either side (Telnyx currently shows zero verification
+requests on the account, as noted above, which cuts against the recollection but doesn't
+rule out Telnyx having purged the record on deactivation). Treat as unconfirmed until
+checked. Doesn't change the fix either way — see below — but matters for whether this is
+"redo lost verification" or "do it for the first time."
 **Practical effect: the "Instant Access" pool most likely does not currently bypass carrier
 filtering any better than an unregistered local number does** — a new signup claiming one
 of these still probably hits throughput problems, just via unverified-toll-free filtering
