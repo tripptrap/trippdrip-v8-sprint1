@@ -6,52 +6,15 @@ import { addPoints as addPointsSupabase, getRecentTransactions as getRecentTrans
 import { type PointTransaction } from "@/lib/pointsStore";
 import { getDaysUntilRenewal } from "@/lib/renewalSystem";
 import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscriptionFeatures";
+import {
+  POINT_PACKS,
+  priceFor,
+  scaleSavingsVsGrowthPct,
+  maxScaleSavingsPct,
+  type PointPack,
+} from "@/lib/pointPacks";
 import CustomModal from "@/components/CustomModal";
 
-type PointPack = {
-  name: string;
-  points: number;
-  basePrice: number;
-  premiumPrice: number;
-  baseDiscount?: string;
-  premiumDiscount?: string;
-  popular?: boolean;
-};
-
-const POINT_PACKS: PointPack[] = [
-  {
-    name: "Starter",
-    points: 4000,
-    basePrice: 40,
-    premiumPrice: 36,
-    premiumDiscount: "10% off",
-  },
-  {
-    name: "Pro",
-    points: 10000,
-    basePrice: 95,
-    premiumPrice: 80,
-    baseDiscount: "5% off",
-    premiumDiscount: "20% off",
-    popular: true,
-  },
-  {
-    name: "Business",
-    points: 25000,
-    basePrice: 225,
-    premiumPrice: 187.5,
-    baseDiscount: "10% off",
-    premiumDiscount: "25% off",
-  },
-  {
-    name: "Enterprise",
-    points: 60000,
-    basePrice: 510,
-    premiumPrice: 420,
-    baseDiscount: "15% off",
-    premiumDiscount: "30% off",
-  },
-];
 
 // Helper function to get plan details
 function getPlanDetails(planType: SubscriptionTier): { price: number; monthlyPoints: number; name: string } {
@@ -238,7 +201,7 @@ export default function PointsPage() {
         title: 'Confirm Downgrade to Growth',
         message: [
           `• Monthly credits: ${from.monthlyCredits.toLocaleString()} → ${to.monthlyCredits.toLocaleString()}`,
-          `• Point pack discount: ${from.pointPackDiscount}% → ${to.pointPackDiscount}%`,
+          `• Point pack savings: ${to === SUBSCRIPTION_FEATURES.scale ? `save up to ${maxScaleSavingsPct()}% vs Growth pricing` : 'standard pack pricing'}`,
           `• Price: $${from.price}/mo → $${to.price}/mo`,
           '',
           balanceLine,
@@ -343,7 +306,7 @@ export default function PointsPage() {
   }
 
   async function handlePurchase(pack: PointPack) {
-    const price = currentPlan === 'scale' ? pack.premiumPrice : pack.basePrice;
+    const price = priceFor(pack, currentPlan === 'scale' ? 'scale' : 'growth');
     console.log('Purchase initiated:', {
       currentPlan,
       pack: pack.name,
@@ -570,8 +533,16 @@ export default function PointsPage() {
         <h2 className="text-lg font-semibold mb-4">Buy More Points</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {POINT_PACKS.map((pack) => {
-            const price = currentPlan === 'scale' ? pack.premiumPrice : pack.basePrice;
-            const discount = currentPlan === 'scale' ? pack.premiumDiscount : pack.baseDiscount;
+            const price = priceFor(pack, currentPlan === 'scale' ? 'scale' : 'growth');
+            // Show what the tier difference is actually worth on this pack
+            // (#39/#41). The old `premiumDiscount`/`baseDiscount` strings were
+            // percentages off an unpublished list price nobody is charged, so
+            // they overstated the real saving — e.g. "20% off" on a pack where
+            // Scale genuinely saves 15.8% versus what Growth pays.
+            const savingsPct = Math.round(scaleSavingsVsGrowthPct(pack));
+            const savingsLabel = currentPlan === 'scale'
+              ? `You save ${savingsPct}% vs Growth`
+              : `Scale pays $${pack.premiumPrice} — save ${savingsPct}%`;
             return (
             <div
               key={pack.name}
@@ -588,8 +559,8 @@ export default function PointsPage() {
                 <div className="text-3xl font-bold mb-1">
                   {pack.points.toLocaleString()}
                 </div>
-                {discount && (
-                  <div className="text-xs text-sky-600 font-medium">{discount}</div>
+                {savingsPct > 0 && (
+                  <div className="text-xs text-sky-600 font-medium">{savingsLabel}</div>
                 )}
               </div>
 
@@ -702,7 +673,7 @@ export default function PointsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
-                <span>Up to {SUBSCRIPTION_FEATURES.growth.pointPackDiscount}% off point packs</span>
+                <span>Standard point pack pricing</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
@@ -768,7 +739,7 @@ export default function PointsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sky-600">✓</span>
                 <div>
-                  <span className="font-semibold">Up to {SUBSCRIPTION_FEATURES.scale.pointPackDiscount}% off point packs</span>
+                  <span className="font-semibold">Save up to {maxScaleSavingsPct()}% on point packs</span>
                   <div className="text-xs text-sky-600 mt-0.5">Best rates on additional credits</div>
                 </div>
               </div>

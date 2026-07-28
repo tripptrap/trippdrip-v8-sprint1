@@ -1,4 +1,11 @@
 // Subscription Features and Benefits System
+//
+// Point-pack pricing deliberately does NOT live here. This file used to carry a
+// `pointPackDiscount` (flat 10% / 30%) that disagreed with the real per-pack
+// prices, so "the discount" depended on which constant a caller happened to
+// read (#39). Pricing and every derived percentage now come from
+// lib/pointPacks.ts, computed from the actual prices. Don't reintroduce a
+// standalone discount number here.
 import { createClient } from "@/lib/supabase/client";
 
 export type SubscriptionTier = 'unpaid' | 'growth' | 'scale';
@@ -38,9 +45,6 @@ export interface SubscriptionFeatures {
   apiAccess: boolean;
   webhooks: boolean;
 
-  // Point Discounts
-  pointPackDiscount: number; // Percentage discount on point purchases
-
   // Additional Features
   priorityDelivery: boolean;
   dedicatedNumber: boolean;
@@ -74,7 +78,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     customBranding: false,
     apiAccess: false,
     webhooks: false,
-    pointPackDiscount: 0,
     priorityDelivery: false,
     dedicatedNumber: false,
     customIntegrations: false,
@@ -104,7 +107,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     customBranding: true,
     apiAccess: true,
     webhooks: true,
-    pointPackDiscount: 10,
     priorityDelivery: true,
     dedicatedNumber: true,
     customIntegrations: true,
@@ -134,7 +136,6 @@ export const SUBSCRIPTION_FEATURES: Record<SubscriptionTier, SubscriptionFeature
     customBranding: true,
     apiAccess: true,
     webhooks: true,
-    pointPackDiscount: 30,
     priorityDelivery: true,
     dedicatedNumber: true,
     customIntegrations: true,
@@ -276,7 +277,6 @@ export const FEATURE_NAMES: Record<keyof SubscriptionFeatures, string> = {
   customBranding: 'Custom Branding',
   apiAccess: 'API Access',
   webhooks: 'Webhooks',
-  pointPackDiscount: 'Point Pack Discount',
   priorityDelivery: 'Priority Message Delivery',
   dedicatedNumber: 'Dedicated Phone Number',
   customIntegrations: 'Custom Integrations',
