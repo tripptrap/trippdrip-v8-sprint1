@@ -347,7 +347,79 @@ NOT NULL one, and most code writes `body`. Always set both.
 
 ---
 
+## Outbound SMS — the gates every send must pass
+
+As of 2026-07-28 there are **two shared helpers**, and new send paths should use them
+rather than reimplementing the checks. Three separate bugs came from each path having
+its own copy (or none): #34, #40, #50.
+
+**`lib/smsGuard.ts` → `checkSmsAllowed(supabase, userId, phone, opts)`** — the single gate
+for lead-facing sends. Checks, in order: quiet hours (optional), the `check_dnc` RPC, then
+`leads.sms_opt_in` as defense-in-depth.
+
+- **Fails closed** on a DNC lookup error. Sending to a possibly-opted-out number is a
+  legal problem; not sending during a transient DB error is an availability problem.
+- Returns `retryable: true` for quiet-hours blocks only. **Callers must honour this** — a
+  deferred message stays pending, a DNC/opt-out block cancels. The bulk path used to
+  cancel outright, permanently dropping a message for being sent at the wrong hour.
+- Writes blocked attempts to `dnc_history` for audit.
+- Pass `enforceQuietHours: true` and `recipientState: lead.state` from automated paths.
+  Human-initiated single sends (`/api/sms/send`) are deliberately exempt from quiet hours.
+
+**`lib/quietHours.ts` → `checkQuietHours(settings, recipientState, now?)`** — reads the
+user's configured `quiet_hours_enabled/start/end/timezone` (defaults 08:00–20:00,
+America/New_York).
+
+**The important part: it gates on the *recipient's* local time**, resolved from
+`leads.state`, falling back to the sender's timezone only when unknown. TCPA keys on the
+called party's local time. Every pre-2026-07-28 implementation was sender-relative, so a
+California lead texted at 9am Eastern received at 6am Pacific from a path that believed
+it was compliant. States spanning zones map to their **westernmost** zone deliberately —
+guessing east risks sending before the morning cutoff; guessing west only errs
+conservative. `leads.state` is free text and contains junk (`"NOW"`), so unrecognised
+values fall back rather than guess.
+
+**Credits: always use the `deduct_credits` RPC, never read-then-write.** Two paths had
+read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
+read *before* its send loop began and discarding any concurrent spend.
+
+Current coverage — every automated path has all three gates:
+
+| path | DNC | quiet hours | credits |
+|---|---|---|---|
+| `cron/process-scheduled` | ✓ | ✓ | ✓ |
+| `cron/process-drips` | ✓ | ✓ | ✓ |
+| `cron/process-ai-drips` | ✓ | ✓ | ✓ |
+| `cron/send-appointment-reminders` | ✓ | ✓ | ✓ |
+| `campaigns/run` | ✓ | ✓ | ✓ |
+| `sms/send` | ✓ | exempt (human-initiated) | ✓ |
+| `messages/schedule/bulk` | ✓ | ✓ | ✓ |
+
+Known limitation: timezone resolution is state-level. `leads.zip_code` would be more
+precise for split states; `lib/geo/selectClosestNumber.ts` already does zip-based work if
+that's ever wanted.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
+
+**Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
+`audit` label / "Audit — needs triage" milestone. **10 are fixed and closed**; 3 remain
+open and untriaged:
+
+- **#44** — the scheduled-send cron can resend the same SMS every 5 minutes if the
+  `status: 'sent'` update fails, with no retry cap. Latent (0 stuck rows). Worth deciding
+  whether to mark sent *before* sending, so the failure mode is a missed message rather
+  than a loop.
+- **#46** — `/api/messages/send-scheduled` is an unregistered duplicate of
+  `cron/process-scheduled` with no auth and no quiet-hours check. RLS blocks anonymous
+  use; a logged-in user can flush their own queue early. Probably just delete it.
+- **#49** — the welcome email to new leads never sends: `app/api/leads/upsert/route.ts`
+  calls the client-only `settingsStore`, which always returns defaults server-side. Same
+  bug fixed in `/api/email/send` under #16; this route was missed.
+
+Everything else from the audit is closed — see #57 for the index and what each fix was.
+
 
 - **10DLC campaign-tier-by-subscription-tier (#11):** blocked on the current campaign
   (#1) clearing carrier review — don't build this yet, see #11's own text for why.
