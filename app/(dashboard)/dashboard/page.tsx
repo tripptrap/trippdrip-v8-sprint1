@@ -494,7 +494,10 @@ export default function Dashboard(){
   })();
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    // pb-24 clears the fixed floating Send Message button (56px + offset) at
+    // the bottom of the scroll — without it, the last card's content sits
+    // directly under the button once scrolled all the way down (issue #7).
+    <div className="space-y-4 md:space-y-6 pb-24">
       <motion.h1
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
