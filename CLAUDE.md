@@ -40,6 +40,12 @@ Specific traps, each of which has already shipped a real bug here:
   `add_to_dnc`, not a direct `dnc_list` insert) — the RPC owns normalization and
   invariants that the enforcement path depends on.
 
+**Migrations:** don't write one for something that already exists — check the live DB
+first (above), and use `IF NOT EXISTS` regardless. When you do add a column, apply the
+migration against the linked project and note the change in `docs/SYSTEM_STATE.md`; a
+committed migration file is not evidence it ran. A migration sat unapplied for a full
+day this way while the deployed code wrote to a column that didn't exist yet.
+
 ## QA Communication Guidelines
 When the user provides a QA checklist with categories:
 - If a category is marked **"Undefined"**, everything listed under that category (until the next category) represents items that need to be **asked about or clarified** before implementation
