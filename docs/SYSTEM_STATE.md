@@ -92,55 +92,58 @@ real production number: `"messaging_campaign_id": null`. Even after a campaign i
 approved, a number isn't auto-linked to it — linking is a manual step ("Assign my
 number" in Settings → Messaging Registration).
 
-**The workaround, and why it's currently fake too:** the "Instant Access" shared number
-pool (`number_pool` table) is supposed to hold pre-verified toll-free numbers — toll-free
-verification (TFV) is a separate, faster carrier process, unrelated to 10DLC brand/campaign
-status. Onboarding tries to claim from this pool first, before falling back to ordering a
-fresh (unverified) local number. **As of 2026-07-28 there are only 3 numbers in the pool,
-all toll-free, and NONE of them are actually TFV-verified**, despite `is_verified: true`
-and `friendly_name: "Verified Toll-Free #N"` in the database. Verified by querying Telnyx's
-real verification endpoint (`GET /v2/messaging_tollfree/verification/requests`) directly:
-**zero verification requests exist on the account, for these numbers or any others.**
-The numbers themselves are real and active (`+18887062631`, `+18886638510`, `+18884610148`,
-on messaging profile "HyveWyre LLC", A2P-eligible) — only the verification step is missing
-right now. **Explanation for the 5-month gap between the `number_pool` row creation date
-(2026-02-05) and the Telnyx `purchased_at` date (2026-07-26), per the user 2026-07-28:**
-5 toll-free numbers were originally purchased around Feb 2026 (matching the `number_pool`
-row creation date — the DB rows and `is_verified: true` reflect that original purchase,
-not fake seed data as first suspected). The Telnyx account was later deactivated for
-non-payment; on reactivation 2 of the 5 numbers had already been taken by other customers,
-and only 3 were recoverable — hence `purchased_at: 2026-07-26` on the Telnyx side for
-numbers whose DB rows are 5 months older. **Unconfirmed (user recalls submitting TFV
-originally, will verify 2026-07-28):** the user's recollection is that verification *was*
-required and submitted for the original 5 numbers back in February — which would mean the
-deactivation/recovery cycle is what wiped it, not that it was skipped entirely. Not yet
-confirmed against any record on either side (Telnyx currently shows zero verification
-requests on the account, as noted above, which cuts against the recollection but doesn't
-rule out Telnyx having purged the record on deactivation). Treat as unconfirmed until
-checked. Doesn't change the fix either way — see below — but matters for whether this is
-"redo lost verification" or "do it for the first time."
-**Practical effect: the "Instant Access" pool most likely does not currently bypass carrier
-filtering any better than an unregistered local number does** — a new signup claiming one
-of these still probably hits throughput problems, just via unverified-toll-free filtering
-instead of missing-`messaging_campaign_id` filtering. Don't assume claiming a pool number
-during onboarding actually lets a new user send SMS reliably until this is fixed (submit
-real TFV requests for these 3 numbers) and re-verified live. **Do not submit a TFV request
-without the user's unambiguous, explicit instruction** — same rule as 10DLC submissions,
-see below.
+**The workaround, and it genuinely works:** the "Instant Access" shared number pool
+(`number_pool` table) holds TFV-verified toll-free numbers — toll-free verification (TFV)
+is a separate, faster carrier process, unrelated to 10DLC brand/campaign status. Onboarding
+tries to claim from this pool first, before falling back to ordering a fresh (unverified)
+local number. **All 3 pool numbers (`+18887062631`, `+18886638510`, `+18884610148`) are
+confirmed TFV-Verified** under request `6723e639-83ee-5c48-9ec7-b550fdce868c` (status
+`Verified`, created 2026-01-10, covering all 5 originally-purchased numbers). Two earlier
+requests (`65ad888e`, `e719b1df`) were Rejected before that one passed — so TFV, like 10DLC,
+took multiple attempts here.
 
-Separately, even if TFV is fixed: **as of 2026-07-28 there are only 3 numbers in the pool**.
-Past the first few signups, or for anyone who searches a specific area code instead of
-taking a pool number, onboarding falls back to the broken local-number path. This is a
-real capacity ceiling, not just a marketing-copy issue — related to GitHub issues #2/#3
-(scaling number ordering in batches), though neither issue currently states this
-consequence explicitly.
+> ⚠️ **Read this before "discovering" that the numbers are unverified.** On 2026-07-28 this
+> file asserted the exact opposite — that zero TFV requests existed and the pool was fake.
+> **That was wrong**, and the cause is a trap worth not repeating: `GET
+> /v2/messaging_tollfree/verification/requests` returns its array under **`records`**, not
+> `data`. An ad-hoc script reading `body.data` gets `undefined` → reports zero → looks like
+> conclusive proof that nothing was ever submitted. `lib/telnyx.ts`'s
+> `getVerifiedTollFreeNumbers()` handles this correctly (`data.records || data.data`), so
+> **the app was always right and the throwaway verification script was wrong.** Also note
+> the endpoint 400s without explicit `page`/`page_size` params. If a quick script ever
+> contradicts a working code path, suspect the script first.
+
+**Declared use-case (from the approved TFV request) — this is the compliance model:**
+HyveWyre is registered as an **ISV/reseller**, `ISV Reseller: HyveWyre LLC`, use-case
+`Conversational / Alerts`, expected volume 10,000/month. The submission states each client
+business gets **its own dedicated toll-free number, provisioned 1:1** ("one insurance agency
+= one toll-free number… No single business uses more than one number"), that HyveWyre does
+not send messages itself — clients do, to their own prior-express-written-consent contacts —
+and that consent is enforced at the platform level. **This answers whether pooling numbers
+across different businesses is legitimate: yes, in the 1:1 form that's declared.** The claim
+route (`app/api/number-pool/claim/route.ts`) enforces exactly that — a guarded
+`UPDATE … WHERE is_assigned = false` gives one number to one user at a time. Do not change
+the pool to share a single number across concurrent businesses; that would contradict the
+approved filing.
+
+**Real capacity ceiling: 3 verified numbers = 3 client businesses**, given the declared 1:1
+model. Past that, or for anyone who searches a specific area code instead of taking a pool
+number, onboarding falls back to the local-number path that's still gated on 10DLC. That's
+the substance of #2/#3 — scaling inventory means submitting *new TFV batches*, not just
+buying more numbers.
 
 **Recycling risk:** both `app/api/telnyx/release-number/route.ts:94-100` and account
 deletion (`app/api/user/delete-account/route.ts:84-87`) flip a released pool number back
 to `is_assigned: false`, returning it to the pool for a **different, unrelated business**
-to claim later. Even once TFV is real, a number that picked up spam reports or carrier
-flags under one tenant's traffic carries that reputation into the next tenant — a
-practical throughput/reputation risk on top of the verification gap above.
+to claim later. Sequential reassignment doesn't break the declared 1:1 model, but a number
+that picked up spam reports or carrier flags under one tenant's traffic carries that
+reputation into the next tenant.
+
+**Worth fixing regardless:** `number_pool.is_verified` is set by hand and never reconciled
+against Telnyx. It happened to be *correct* here, but it's an independent flag that can
+drift from reality in either direction — and the whole scare above came from nobody being
+able to check it easily. Deriving it from `getVerifiedTollFreeNumbers()`, or surfacing real
+TFV status somewhere in the admin UI, would make this verifiable instead of assumed.
 
 **10DLC campaign status:** see `docs/10DLC_REJECTION_HISTORY.md` for the full
 submission history, every verbatim rejection reason, and the fix for each. As of
@@ -346,13 +349,13 @@ left in that file.
   folded revocation into the #29 rotation pass. **Don't re-raise as an emergency**, but do
   revoke it when #29 happens; an embedded PAT keeps working until explicitly revoked.
   `/Applications/hyvewyre` is now the only clone, and its own remote is clean.
-- **Instant-access pool is unverified + capacity-limited (#35, found 2026-07-28):** see
-  SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
-  the database but zero real TFV requests on the Telnyx account, so the pool likely
-  doesn't actually solve the new-signup-can't-text problem it exists to solve. Combined
-  with #1 still pending, that means there is currently **no working path for a
-  brand-new account to send SMS at all.** Fixing this needs (1) real TFV submissions for
-  the 3 existing numbers, with the user's explicit go-ahead first, (2) more pool capacity
-  than 3 numbers long-term (#3), and (3) a root-cause fix — `number_pool.is_verified` is
-  set independently of Telnyx's real state, so it can lie; derive it from
-  `getVerifiedTollFreeNumbers()` or reconcile on a schedule.
+- **Instant-access pool capacity — 3 verified numbers, so 3 client businesses (#3):** the
+  pool numbers *are* TFV-verified and the workaround works (see SMS/Telnyx section; an
+  earlier claim here that they were unverified was wrong and is corrected there). The real
+  limit is inventory under the declared 1:1 ISV model — scaling it means submitting new TFV
+  batches, not just buying numbers. **Never submit a TFV or 10DLC request without the
+  user's explicit instruction.**
+- **`number_pool.is_verified` is unreconciled (worth fixing, no issue filed):** it's set by
+  hand and never checked against Telnyx, so it can drift in either direction. Derive it
+  from `getVerifiedTollFreeNumbers()` or surface real TFV status in the admin UI, so this
+  is verifiable rather than assumed.
