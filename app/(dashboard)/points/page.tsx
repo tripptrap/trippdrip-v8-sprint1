@@ -79,6 +79,9 @@ export default function PointsPage() {
   const [currentPlan, setCurrentPlan] = useState<SubscriptionTier | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [daysUntilRenewal, setDaysUntilRenewal] = useState<number | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [pauseResumesAt, setPauseResumesAt] = useState<string | null>(null);
+  const [pausing, setPausing] = useState(false);
   const [stats, setStats] = useState({
     totalSpent: 0,
     totalEarned: 0,
@@ -149,6 +152,8 @@ export default function PointsPage() {
         loadedCredits = data.credits ?? 0;
         setBalance(loadedCredits);
         setCurrentPlan(data.subscriptionTier === 'scale' ? 'scale' : 'growth');
+        setSubscriptionStatus(data.subscriptionStatus ?? null);
+        setPauseResumesAt(data.pauseResumesAt ?? null);
       }
     } catch (err) {
       console.error('points: failed to load credits', err);
@@ -270,6 +275,57 @@ export default function PointsPage() {
     setModal({isOpen: true, type: 'success', title: 'Plan Changed', message: `Successfully switched to ${planType === 'scale' ? 'Scale' : 'Growth'} plan!`});
   }
 
+  function confirmPauseBilling(cycles: 1 | 2) {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: `Pause Billing for ${cycles} Month${cycles > 1 ? 's' : ''}`,
+      message: [
+        `Your Scale plan and current features stay exactly as they are — nothing downgrades.`,
+        `No charge for the next ${cycles} billing cycle${cycles > 1 ? 's' : ''}.`,
+        `Billing resumes automatically after that; you can also resume early at any time.`,
+      ].join('\n'),
+      onConfirm: () => doPauseBilling(cycles),
+    });
+  }
+
+  async function doPauseBilling(cycles: 1 | 2) {
+    setPausing(true);
+    try {
+      const res = await fetch('/api/stripe/pause-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cycles }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setModal({ isOpen: true, type: 'error', title: 'Pause Failed', message: data.error || 'Failed to pause billing' });
+        return;
+      }
+      await refreshData();
+      const resumeDate = data.resumesAt ? new Date(data.resumesAt).toLocaleDateString() : 'your next renewal';
+      setModal({ isOpen: true, type: 'success', title: 'Billing Paused', message: `Billing is paused. It will resume automatically on ${resumeDate}.` });
+    } finally {
+      setPausing(false);
+    }
+  }
+
+  async function handleResumeBilling() {
+    setPausing(true);
+    try {
+      const res = await fetch('/api/stripe/pause-subscription', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setModal({ isOpen: true, type: 'error', title: 'Resume Failed', message: data.error || 'Failed to resume billing' });
+        return;
+      }
+      await refreshData();
+      setModal({ isOpen: true, type: 'success', title: 'Billing Resumed', message: 'Billing has resumed on your plan.' });
+    } finally {
+      setPausing(false);
+    }
+  }
+
   async function handlePurchase(pack: PointPack) {
     const price = currentPlan === 'scale' ? pack.premiumPrice : pack.basePrice;
     console.log('Purchase initiated:', {
@@ -372,16 +428,49 @@ export default function PointsPage() {
                 <div className="text-xs text-slate-600 dark:text-slate-400">+{getPlanDetails(currentPlan).monthlyPoints.toLocaleString()} pts monthly</div>
               </>
             )}
-            {currentPlan === 'scale' && (
+            {currentPlan === 'scale' && subscriptionStatus === 'paused' && (
               <button
-                onClick={() => handlePlanSwitch('growth')}
-                className="mt-2 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors underline"
+                onClick={handleResumeBilling}
+                disabled={pausing}
+                className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors underline disabled:opacity-50"
               >
-                Downgrade to Growth
+                {pausing ? 'Resuming...' : 'Resume Now'}
               </button>
+            )}
+            {currentPlan === 'scale' && subscriptionStatus !== 'paused' && (
+              <div className="mt-2 flex flex-col items-end gap-1">
+                <button
+                  onClick={() => handlePlanSwitch('growth')}
+                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors underline"
+                >
+                  Downgrade to Growth
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-500">or pause instead:</span>
+                  <button
+                    onClick={() => confirmPauseBilling(1)}
+                    disabled={pausing}
+                    className="text-[11px] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors underline disabled:opacity-50"
+                  >
+                    1 month
+                  </button>
+                  <button
+                    onClick={() => confirmPauseBilling(2)}
+                    disabled={pausing}
+                    className="text-[11px] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 transition-colors underline disabled:opacity-50"
+                  >
+                    2 months
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
+        {currentPlan === 'scale' && subscriptionStatus === 'paused' && (
+          <div className="mt-4 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+            Billing is paused{pauseResumesAt ? ` — resumes automatically on ${new Date(pauseResumesAt).toLocaleDateString()}` : ''}. Your plan and credits are unaffected.
+          </div>
+        )}
       </div>
 
       {/* Usage Stats */}

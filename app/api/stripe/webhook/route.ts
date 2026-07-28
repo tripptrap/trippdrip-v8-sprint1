@@ -242,6 +242,9 @@ export async function POST(req: NextRequest) {
 
         const statusUpdate: Record<string, any> = {
           subscription_status: subscription.pause_collection ? 'paused' : subscription.status,
+          pause_resumes_at: subscription.pause_collection?.resumes_at
+            ? new Date(subscription.pause_collection.resumes_at * 1000).toISOString()
+            : null,
           updated_at: new Date().toISOString(),
         };
         if (tierFromPrice) {

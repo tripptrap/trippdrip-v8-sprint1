@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     // auth check transiently failed (issue #6).
     const { data: userData, error: fetchError } = await supabase
       .from('users')
-      .select('credits, subscription_tier, monthly_credits')
+      .select('credits, subscription_tier, monthly_credits, subscription_status, pause_resumes_at')
       .eq('id', user.id)
       .single();
 
@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       credits: userData?.credits || 0,
       subscriptionTier: userData?.subscription_tier ?? null,
       monthlyCredits: userData?.monthly_credits ?? null,
+      subscriptionStatus: userData?.subscription_status ?? null,
+      pauseResumesAt: userData?.pause_resumes_at ?? null,
     });
   } catch (error: any) {
     console.error('Error in credits API:', error);
