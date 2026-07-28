@@ -347,6 +347,44 @@ NOT NULL one, and most code writes `body`. Always set both.
 
 ---
 
+## Drips — materialised, not a cursor
+
+**Changed 2026-07-28.** A drip used to store only a cursor
+(`drip_campaign_enrollments.current_step` + `next_send_at`), with `process-drips`
+computing the next send after each one went out. Only ever one future send existed, so
+the scheduled view couldn't show a lead's queue and no individual step could be edited.
+
+**Now:** enrollment writes every step as a real `scheduled_messages` row
+(`source: 'drip'`, `drip_enrollment_id`, `drip_step_id`), with cumulative
+`scheduled_for` — each step's delay is relative to the previous message, matching the
+old cursor arithmetic. Delivery runs through `cron/process-scheduled`, which is where
+quiet hours, DNC, credits, the claim-before-send guard and thread attachment live.
+
+**How double-sending is prevented, with no change to the drip cron:**
+`get_drip_enrollments_ready_to_send()` requires `next_send_at IS NOT NULL`, so
+`materializeDripSteps()` clears it and the enrollment drops out of that cron. If
+materialisation fails, `next_send_at` is left intact and the drip cron still delivers —
+degraded to the old behaviour rather than a dropped sequence. If the handoff itself
+fails, the rows are rolled back rather than risk both systems sending.
+
+**Cancellation is now explicit.** Pausing an enrollment no longer stops anything — the
+queued rows stand on their own. `cancelPendingDripMessages()` is called from the SMS
+webhook on **reply** and on **opt-out**. It only touches `pending` rows that have a
+`drip_enrollment_id`, so a manually scheduled message isn't binned by a lead replying.
+**Any new "stop this drip" path must call it**, or the queue keeps sending.
+
+**Trade-off:** step content is personalised at enrollment, not at send, so a later name
+change isn't picked up. That's the cost of the message existing — and being editable —
+in advance.
+
+Tag-triggered enrollment (`trigger_type: 'tag_added'` + `trigger_config.tag`, fired from
+`app/api/leads/[id]/route.ts`) and `delay_days`/`delay_hours` both predate this and were
+already working; materialisation is what made them visible. The `/scheduled` page's
+source badge and filter also already existed — they were dead only because the `source`
+column didn't exist (#54) and drips never wrote rows.
+
+---
+
 ## Outbound SMS — the gates every send must pass
 
 As of 2026-07-28 there are **two shared helpers**, and new send paths should use them
