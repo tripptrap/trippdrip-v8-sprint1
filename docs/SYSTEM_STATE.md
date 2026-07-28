@@ -155,6 +155,59 @@ the preview server before concluding the change is wrong.
 
 ---
 
+## Tags, AI Flows, and Campaigns — how they actually connect
+
+These three used to be independent concepts (per the original CLAUDE.md design docs).
+As of the "AI overhaul" work (flow_id/flow_step_order/ai_instruction/field_name
+migration), **Tags are now the actual step data for Flows** — verified directly
+against the `tags` table schema and `app/api/telnyx/sms-webhook/route.ts`'s
+step-advancement logic:
+
+- `tags.flow_id` + `tags.flow_step_order`: a tag with a non-null `flow_id` *is* one
+  step of that flow, ordered by `flow_step_order`. A tag with `flow_id = null` is a
+  plain pipeline-stage tag, unrelated to any flow.
+- `tags.field_name` + `tags.ai_instruction`: only tags with a `field_name` set count
+  as *collectible* steps. `field_name` is the key the extracted answer gets saved
+  under on the lead; `ai_instruction` (falling back to the tag's own `name` if unset)
+  is literally what's injected into the AI's system prompt as the current step's
+  instruction.
+- Step gating (`app/api/telnyx/sms-webhook/route.ts` around the flow-advancement
+  block): on each inbound message, the webhook loads the lead's assigned flow's step
+  tags ordered by `flow_step_order`, finds the *first* step whose `field_name` isn't
+  yet present in the lead's collected data — that's the only step whose
+  `ai_instruction` gets surfaced to the AI this turn. When the AI extracts a value for
+  that field from the reply, the step is marked complete and `primary_tag` is set to
+  that step's tag name (this is what drives the visible pipeline-stage badge on the
+  lead). It only ever exposes the *current* step, not future ones — hence
+  "step-gated."
+- **Campaigns connect to Flows via `campaigns.flow_id` + `campaigns.auto_trigger_flow`**
+  (both real, both wired into the webhook — verified, not just present in the schema):
+  when an inbound reply comes from a lead with no flow assigned yet, the webhook
+  checks the lead's campaign; if `auto_trigger_flow` is true and the campaign has a
+  `flow_id`, that flow gets auto-assigned to the lead on the spot. This is the actual
+  mechanism behind "user chooses whether AI Flow takes over automatically or stays
+  manual (configurable per campaign)" — it's real, not aspirational.
+- Tags are still independently assignable outside of any flow (manual pipeline-stage
+  tagging in the Leads UI) — the flow-step relationship is additive, not exclusive.
+
+---
+
+## Leads vs. Clients — how the split actually works
+
+Verified against `app/api/leads/disposition/route.ts` and `app/api/texts/threads/route.ts`:
+
+- Marking a lead "sold" (`disposition: 'sold'`) **inserts a new row into `clients`**
+  (copying name/phone/email/tags/campaign/etc. from the lead) and updates the
+  *original* `leads` row with `status: 'sold', converted: true, client_id: <new client
+  id>`. The lead row is never deleted — `leads` and `clients` are two separate tables
+  connected by `leads.client_id`.
+- The Messages inbox's Leads/Clients tab split (`contact_type`) is **not a stored
+  column** — it's computed on every read in `/api/texts/threads` as
+  `(isConverted || hasClientRecord || phoneClient) ? 'client' : 'lead'`. This means a
+  thread automatically reclassifies from the Leads tab to the Clients tab the moment
+  its lead is marked sold, with no separate migration/backfill step needed — the
+  design is self-correcting by construction, not something that can drift out of sync.
+
 ## Credits / Points System
 
 Costs and tier amounts are documented in the main `CLAUDE.md`. Renewal (monthly credit
@@ -172,9 +225,14 @@ left in that file.
 
 - **10DLC campaign-tier-by-subscription-tier (#11):** blocked on the current campaign
   (#1) clearing carrier review — don't build this yet, see #11's own text for why.
-- **Landing page accuracy (#33):** `/preview` likely has feature claims that don't
-  match current reality (Flows/Receptionist split, pause-billing, near-black theme,
-  etc.) — not yet audited.
+- **Landing page needs a real capability audit (#33), user flagged 2026-07-28:**
+  `/preview` (`app/(public)/preview/PreviewClient.tsx`) needs to actually describe what
+  HyveWyre does today, not an older or aspirational version of it. Concretely stale as
+  of this writing: the Tags/Flows/Campaigns step-driven AI progression (see section
+  above — this is a real, working mechanism the landing page doesn't describe at all),
+  the Leads→Clients conversion flow, pause-billing as an alternative to downgrading,
+  the near-black theme/redesign. Don't assume any specific landing-page claim is
+  accurate without checking it against this doc or the actual running app first.
 - **Number-purchase checkout doesn't fulfill:** noted in `CLAUDE.md`'s In Progress
   section as being worked on in worktree `priceless-kowalevski-e9b46d` — that worktree
   had not diverged from a commit already on `main` as of 2026-07-28, so it's unclear
