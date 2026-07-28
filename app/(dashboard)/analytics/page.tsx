@@ -17,6 +17,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Zap, MessageSquare, Users, Activity, Clock, Download, ChevronDown } from 'lucide-react';
+// Consolidated in as tabs here (issue #9) — kept as their own components
+// rather than merged, so each still works standalone at its original route.
+import SMSAnalyticsPage from '../sms-analytics/page';
+import FlowAnalyticsPage from '../flow-analytics/page';
 
 interface OverviewData {
   totalLeads: number;
@@ -92,7 +96,7 @@ interface FlowPerformance {
 const COLORS = ['#34d399', '#3b82f6', '#f59e0b', '#ef4444', '#14b8a6', '#ec4899'];
 
 export default function AnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'automation'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'automation' | 'sms' | 'flows'>('overview');
   const [daysBack, setDaysBack] = useState(30);
 
   // Overview tab state
@@ -417,9 +421,33 @@ export default function AnalyticsPage() {
           >
             Automation
           </button>
+          <button
+            onClick={() => setActiveTab('sms')}
+            className={`px-6 py-3 font-medium transition-all ${
+              activeTab === 'sms'
+                ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 dark:hover:text-gray-300'
+            }`}
+          >
+            SMS Delivery
+          </button>
+          <button
+            onClick={() => setActiveTab('flows')}
+            className={`px-6 py-3 font-medium transition-all ${
+              activeTab === 'flows'
+                ? 'text-sky-600 dark:text-sky-400 border-b-2 border-sky-500'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 dark:hover:text-gray-300'
+            }`}
+          >
+            Flow Analytics
+          </button>
         </div>
 
-        {loading ? (
+        {activeTab === 'sms' ? (
+          <SMSAnalyticsPage />
+        ) : activeTab === 'flows' ? (
+          <FlowAnalyticsPage />
+        ) : loading ? (
           <div className="text-center py-12">
             <div className="text-slate-400 dark:text-slate-500">Loading analytics...</div>
           </div>

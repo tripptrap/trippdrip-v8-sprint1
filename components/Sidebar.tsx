@@ -37,10 +37,11 @@ const navItems: NavItem[] = [
     label: "Dashboard",
     icon: LayoutDashboard,
     children: [
-      { href: "/analytics", label: "Analytics" },
-      { href: "/sms-analytics", label: "SMS Delivery" },
-      { href: "/analytics-automation", label: "Automation" },
-      { href: "/flow-analytics", label: "Flow Analytics" },
+      // Overview/Automation/SMS Delivery/Flow Analytics now live as tabs on
+      // one page instead of 4 separate sidebar entries (issue #9). The
+      // standalone routes still work if something else links to them
+      // directly — only the nav entries were consolidated.
+      { href: "/analytics", label: "Advanced Analytics" },
       { href: "/best-times", label: "Best Times" },
       { href: "/follow-ups", label: "Follow-ups" },
     ]
