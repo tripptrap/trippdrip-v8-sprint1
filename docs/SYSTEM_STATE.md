@@ -338,12 +338,16 @@ left in that file.
   directly in it, so `git remote get-url origin` prints a live push credential in
   plaintext, and any tool or log that echoes the remote leaks it. `/Applications/hyvewyre`'s
   own remote is clean and no *tracked* file contains a token — the exposure is that one
-  clone's `.git/config`. **Recommended: revoke that PAT on GitHub and re-point the MAMP
-  clone at the plain HTTPS URL, using a credential helper or SSH instead of an inline
-  token.** Rotating it is independent of #29 and shouldn't wait for launch prep — an
-  embedded PAT keeps working until it's explicitly revoked. Note that clone is a
-  different working copy that may hold its own uncommitted work; don't assume changes
-  made in `/Applications/hyvewyre` are reflected there or vice versa.
+  clone's `.git/config`. **Decision 2026-07-28: user deferred rotation** — assessed as
+  low risk because nobody else has access to that machine/file. Folded into the #29
+  rotation pass rather than treated as urgent; **don't re-raise this as an emergency.**
+  When it is rotated: revoke the PAT on GitHub and re-point the MAMP clone at the plain
+  HTTPS URL, using a credential helper or SSH instead of an inline token (an embedded
+  PAT keeps working until explicitly revoked). One caveat recorded for whoever does it:
+  the token was also echoed into a session transcript on 2026-07-28, so the file itself
+  is not the only place it has appeared. Note that clone is a different working copy
+  that may hold its own uncommitted work; don't assume changes made in
+  `/Applications/hyvewyre` are reflected there or vice versa.
 - **Instant-access pool is unverified + capacity-limited (found 2026-07-28):** see
   SMS/Telnyx section above — the 3 toll-free pool numbers have `is_verified: true` in
   the database but zero real TFV requests on the Telnyx account, so the pool likely
