@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadStore, STORE_UPDATED_EVENT } from "@/lib/localStore";
 import { findLead as seedFindLead } from "@/lib/db";
 import { motion } from "framer-motion";
+import HyveLogo from "@/components/HyveLogo";
 import {
   Shield,
   LayoutDashboard,
@@ -92,7 +93,6 @@ const AUTO_COLLAPSE_WIDTH = 1024;
 export default function Sidebar(){
   const path = usePathname();
   const [store, setStore] = useState<any>({ leads:[], threads:[] });
-  const [userPlan, setUserPlan] = useState<string>('growth');
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -133,16 +133,13 @@ export default function Sidebar(){
     };
   }, []);
 
-  // Detect user plan type + admin status and listen for changes
+  // Detect admin status and listen for plan changes that might affect it
   useEffect(() => {
     const updatePlan = async () => {
       try {
         const response = await fetch('/api/user/plan');
         const data = await response.json();
 
-        if (data.ok && data.planType) {
-          setUserPlan(data.planType);
-        }
         if (data.isAdmin) {
           setIsAdmin(true);
         }
@@ -153,20 +150,11 @@ export default function Sidebar(){
 
     updatePlan();
 
-    // Listen for plan type changes
-    const handlePlanChange = (event: any) => {
-      if (event.detail?.planType) {
-        setUserPlan(event.detail.planType);
-      } else {
-        updatePlan();
-      }
-    };
-
-    window.addEventListener('planTypeChanged', handlePlanChange);
+    window.addEventListener('planTypeChanged', updatePlan);
     window.addEventListener(STORE_UPDATED_EVENT, updatePlan);
 
     return () => {
-      window.removeEventListener('planTypeChanged', handlePlanChange);
+      window.removeEventListener('planTypeChanged', updatePlan);
       window.removeEventListener(STORE_UPDATED_EVENT, updatePlan);
     };
   }, []);
@@ -176,11 +164,6 @@ export default function Sidebar(){
   const recent = useMemo(()=> {
     return [...smsThreads].sort((a:any,b:any)=> new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()).slice(0, 10);
   }, [smsThreads]);
-
-  // Determine which logo to show
-  const logoSrc = userPlan === 'scale'
-    ? '/logo-premium.png'
-    : '/logo-basic.png';
 
   return (
     <aside className={`relative shrink-0 p-3 border-r border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50 transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}>
@@ -216,10 +199,8 @@ export default function Sidebar(){
             borderRadius: "1rem",
           }}
         >
-          <motion.img
-            src={logoSrc}
-            alt="HyveWyre™"
-            className="h-9 w-9 rounded-xl"
+          <motion.div
+            className="h-9 w-9"
             animate={{
               scale: [1, 1.02, 1],
             }}
@@ -229,7 +210,9 @@ export default function Sidebar(){
               ease: "easeInOut"
             }}
             whileHover={{ scale: 1.05, rotate: 3 }}
-          />
+          >
+            <HyveLogo className="h-9 w-9" />
+          </motion.div>
         </motion.div>
         {!collapsed && <span className="text-xl text-slate-900 dark:text-slate-100 whitespace-nowrap">HyveWyre™</span>}
       </motion.div>
@@ -283,8 +266,8 @@ export default function Sidebar(){
                       : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}
                 >
-                  <Link href={it.href} className="flex-1 flex items-center gap-3">
-                    <Icon className="w-[18px] h-[18px] shrink-0" />
+                  <Link href={it.href} className="flex-1 flex items-center gap-3 group">
+                    <Icon className={`w-[18px] h-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-6 ${active || childActive ? 'scale-110' : ''}`} />
                     <motion.span
                       whileHover={{ x: 2 }}
                       transition={{ type: "spring", stiffness: 400 }}
@@ -304,7 +287,7 @@ export default function Sidebar(){
               ) : (
                 <Link href={it.href}
                   title={collapsed ? it.label : undefined}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 ${collapsed ? 'justify-center px-0' : ''} ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 group ${collapsed ? 'justify-center px-0' : ''} ${
                     active
                       ? it.color === 'green'
                         ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30"
@@ -313,7 +296,7 @@ export default function Sidebar(){
                         ? "hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300"
                   }`}>
-                  <Icon className="w-[18px] h-[18px] shrink-0" />
+                  <Icon className={`w-[18px] h-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:-rotate-6 ${active ? 'scale-110' : ''}`} />
                   {!collapsed && (
                     <motion.span
                       whileHover={{ x: 2 }}
