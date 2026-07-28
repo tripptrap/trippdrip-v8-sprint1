@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
+import { checkSmsAllowed } from "@/lib/smsGuard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -218,6 +219,25 @@ export async function PUT(req: NextRequest) {
         try {
           const lead = message.leads as any;
           if (!lead?.phone) {
+            failed++;
+            continue;
+          }
+
+          // Opt-out gate (#40) — bulk sends previously had no DNC check, so an
+          // opted-out lead in the batch still received the message.
+          const guard = await checkSmsAllowed(supabase, user.id, lead.phone, {
+            context: { source: 'bulk_scheduled', scheduled_message_id: message.id },
+          });
+
+          if (!guard.allowed) {
+            console.log(`Bulk send: skipping ${lead.phone} — ${guard.reason} (${guard.detail})`);
+            await adminClient
+              .from('scheduled_messages')
+              .update({
+                status: 'cancelled',
+                error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
+              })
+              .eq('id', message.id);
             failed++;
             continue;
           }

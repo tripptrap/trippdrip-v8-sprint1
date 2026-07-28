@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -186,6 +187,22 @@ export async function POST(req: NextRequest) {
         // Build reminder message
         const greeting = leadName ? `Hi ${leadName}!` : 'Hi!';
         const message = `${greeting} Just a reminder about your appointment tomorrow at ${appointmentTime}. Reply RESCHEDULE to change the time or CANCEL to cancel.`;
+
+        // Opt-out gate (#40) — this cron previously sent with no DNC check at
+        // all, so a lead who texted STOP kept getting reminders every run.
+        const guard = await checkSmsAllowed(supabaseAdmin, event.user_id, leadPhone, {
+          context: { source: 'appointment_reminder', calendar_event_id: event.id },
+        });
+
+        if (!guard.allowed) {
+          console.log(`Appointment reminder: skipping ${leadPhone} — ${guard.reason} (${guard.detail})`);
+          await supabaseAdmin
+            .from('calendar_events')
+            .update({ reminder_status: `skipped_${guard.reason}` })
+            .eq('id', event.id);
+          skipped++;
+          continue;
+        }
 
         // Send via Telnyx
         const sendResult = await sendTelnyxSMS({

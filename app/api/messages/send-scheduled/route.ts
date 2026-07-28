@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendTelnyxSMS } from "@/lib/telnyx";
+import { checkSmsAllowed } from "@/lib/smsGuard";
 
 /**
  * Cron job endpoint to send scheduled messages
@@ -80,6 +81,24 @@ export async function GET(req: NextRequest) {
 
         if (!lead || !lead.phone) {
           throw new Error('Lead phone number not found');
+        }
+
+        // Opt-out gate (#40) — a message scheduled before the lead opted out
+        // must not go out afterwards.
+        const guard = await checkSmsAllowed(supabase, msg.user_id, lead.phone, {
+          context: { source: 'scheduled_message', scheduled_message_id: msg.id },
+        });
+
+        if (!guard.allowed) {
+          console.log(`Scheduled message ${msg.id}: blocked — ${guard.reason} (${guard.detail})`);
+          await supabase
+            .from('scheduled_messages')
+            .update({
+              status: 'cancelled',
+              error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
+            })
+            .eq('id', msg.id);
+          continue;
         }
 
         // Send via Telnyx
