@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { encrypt, safeDecrypt } from "@/lib/encryption";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,9 +43,18 @@ export async function GET() {
       return NextResponse.json({ ok: true, settings: defaultSettings });
     }
 
+    const emailConfig = settings.email_config;
+    const decryptedEmailConfig = emailConfig
+      ? {
+          ...emailConfig,
+          smtpPass: emailConfig.smtpPass ? safeDecrypt(emailConfig.smtpPass) : emailConfig.smtpPass,
+          sendgridApiKey: emailConfig.sendgridApiKey ? safeDecrypt(emailConfig.sendgridApiKey) : emailConfig.sendgridApiKey,
+        }
+      : emailConfig;
+
     const mappedSettings = {
       stripe: settings.stripe_config,
-      email: settings.email_config,
+      email: decryptedEmailConfig,
       optOutKeyword: settings.opt_out_keyword || undefined,
       spamProtection: settings.spam_protection,
       autoRefill: settings.auto_refill
@@ -75,10 +85,19 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
+    // Encrypt secrets before they ever touch the database
+    const encryptedEmailConfig = email
+      ? {
+          ...email,
+          smtpPass: email.smtpPass ? encrypt(email.smtpPass) : email.smtpPass,
+          sendgridApiKey: email.sendgridApiKey ? encrypt(email.sendgridApiKey) : email.sendgridApiKey,
+        }
+      : email;
+
     const settingsData: any = {
       user_id: user.id,
       stripe_config: stripe,
-      email_config: email,
+      email_config: encryptedEmailConfig,
       spam_protection: spamProtection,
       auto_refill: autoRefill,
     };

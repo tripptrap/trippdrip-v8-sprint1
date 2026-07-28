@@ -59,6 +59,7 @@ export default function Page() {
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
   const [replyTo, setReplyTo] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
 
   // Free number pool
   const [poolNumbers, setPoolNumbers] = useState<Array<{ id: string; phone_number: string; friendly_name: string | null; number_type: string; region: string | null }>>([]);
@@ -320,27 +321,45 @@ export default function Page() {
   };
 
   const saveEmailSettings = async () => {
-    const config: EmailConfig = {
-      provider: emailProvider,
-      fromEmail,
-      fromName,
-      replyTo,
-    };
-
-    if (emailProvider === 'smtp') {
-      config.smtpHost = smtpHost;
-      config.smtpPort = smtpPort;
-      config.smtpUser = smtpUser;
-      config.smtpPass = smtpPass;
-      config.smtpSecure = smtpSecure;
-    } else if (emailProvider === 'sendgrid') {
-      config.sendgridApiKey = sendgridApiKey;
+    if (emailProvider !== 'none' && (!fromEmail || !fromName)) {
+      showSaveMessage('From email and from name are required');
+      return;
+    }
+    if (emailProvider === 'smtp' && (!smtpHost || !smtpUser || !smtpPass)) {
+      showSaveMessage('SMTP host, username, and password are required');
+      return;
+    }
+    if (emailProvider === 'sendgrid' && !sendgridApiKey) {
+      showSaveMessage('SendGrid API key is required');
+      return;
     }
 
-    await updateEmailConfig(config);
-    const updated = await loadSettings();
-    setSettings(updated);
-    showSaveMessage('Email settings saved!');
+    setSavingEmail(true);
+    try {
+      const config: EmailConfig = {
+        provider: emailProvider,
+        fromEmail,
+        fromName,
+        replyTo,
+      };
+
+      if (emailProvider === 'smtp') {
+        config.smtpHost = smtpHost;
+        config.smtpPort = smtpPort;
+        config.smtpUser = smtpUser;
+        config.smtpPass = smtpPass;
+        config.smtpSecure = smtpSecure;
+      } else if (emailProvider === 'sendgrid') {
+        config.sendgridApiKey = sendgridApiKey;
+      }
+
+      await updateEmailConfig(config);
+      const updated = await loadSettings();
+      setSettings(updated);
+      showSaveMessage('Email settings saved!');
+    } finally {
+      setSavingEmail(false);
+    }
   };
 
   const handleOpenBillingPortal = async () => {
@@ -1800,6 +1819,142 @@ export default function Page() {
                   Save Quiet Hours
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Outbound Email */}
+          <div className="card border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Outbound Email</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Connect your own SMTP or SendGrid account to send email directly to leads. Not required — SMS is the primary channel.
+            </p>
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Provider</label>
+                <select
+                  value={emailProvider}
+                  onChange={(e) => setEmailProvider(e.target.value as 'smtp' | 'sendgrid' | 'none')}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                >
+                  <option value="none">Not connected</option>
+                  <option value="smtp">SMTP</option>
+                  <option value="sendgrid">SendGrid</option>
+                </select>
+              </div>
+
+              {emailProvider !== 'none' && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">From Email</label>
+                      <input
+                        type="email"
+                        value={fromEmail}
+                        onChange={(e) => setFromEmail(e.target.value)}
+                        placeholder="you@yourbusiness.com"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">From Name</label>
+                      <input
+                        type="text"
+                        value={fromName}
+                        onChange={(e) => setFromName(e.target.value)}
+                        placeholder="Your Business"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Reply-To (optional)</label>
+                    <input
+                      type="email"
+                      value={replyTo}
+                      onChange={(e) => setReplyTo(e.target.value)}
+                      placeholder="Defaults to From Email"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </>
+              )}
+
+              {emailProvider === 'smtp' && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">SMTP Host</label>
+                      <input
+                        type="text"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        placeholder="smtp.yourprovider.com"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Port</label>
+                      <input
+                        type="number"
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(Number(e.target.value) || 587)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Username</label>
+                      <input
+                        type="text"
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Password</label>
+                      <input
+                        type="password"
+                        value={smtpPass}
+                        onChange={(e) => setSmtpPass(e.target.value)}
+                        autoComplete="new-password"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={smtpSecure}
+                      onChange={(e) => setSmtpSecure(e.target.checked)}
+                    />
+                    Use TLS/SSL
+                  </label>
+                </>
+              )}
+
+              {emailProvider === 'sendgrid' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">SendGrid API Key</label>
+                  <input
+                    type="password"
+                    value={sendgridApiKey}
+                    onChange={(e) => setSendgridApiKey(e.target.value)}
+                    autoComplete="new-password"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={saveEmailSettings}
+                disabled={savingEmail}
+                className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingEmail ? 'Saving...' : 'Save Email Settings'}
+              </button>
             </div>
           </div>
 
