@@ -309,6 +309,44 @@ left in that file.
 
 ---
 
+## Database writes — the failure mode that keeps recurring
+
+**supabase-js returns `{ error }`; it does not throw.** An unchecked write fails
+completely silently, and a `try/catch` around it catches nothing. This single fact is
+behind more shipped bugs here than anything else: the DNC opt-out failure (#34, months
+of "success" logs while writing nothing), `user_telnyx_numbers.capabilities`, and the
+entire 2026-07-28 audit cluster (#51–#55).
+
+**Fixed 2026-07-28 (commit `db54fa7`)** — five tables where the code wrote columns that
+didn't exist, so Postgres rejected the statement and nobody noticed:
+
+| Table | What was wrong | Resolution |
+|---|---|---|
+| `scheduled_messages` | `source`, `campaign_id` missing → **scheduling never worked**, 0 rows ever | columns added (`source` has a real reader) |
+| `messages` | `credits_cost`/`from_number`/`to_number`/`telnyx_message_id`/`sender`/`segments` | code corrected to `points_cost`/`from_phone`/`to_phone`/`message_sid`; `sender`+`segments` dropped |
+| `flow_completion_log` | `flow_id`, `completion_type` missing → 0 rows ever | columns added; `campaign_id` NOT NULL also dropped |
+| `user_preferences` | `calendar_booking_url`, `calendar_type` missing | columns added (both documented in CLAUDE.md) |
+| `points_transactions` | `stripe_payment_intent`, `balance_after` | code uses `stripe_session_id` (gains the idempotency index); `balance_after` dropped |
+
+**The lesson worth keeping — diffing column lists is not enough.** Comparing code against
+`information_schema.columns` found the missing columns, but *two further bugs* only
+appeared when the writes were actually executed against the live database:
+
+- `messages.content` is **NOT NULL with no default**, and the four broken inserts wrote
+  only `body`. Renaming the columns would have left them all still failing on `23502`.
+  The paths that already worked set **both** `content` and `body` to the same text.
+- `flow_completion_log.campaign_id` was **NOT NULL**, so a flow completion outside a
+  campaign failed even after the new columns existed.
+
+So: when fixing a write, run it end-to-end against the real database and delete the test
+row, rather than trusting that the column names now line up. Both of those would have
+shipped otherwise.
+
+`content` vs `body` on `messages` is a live trap — the table has both, `content` is the
+NOT NULL one, and most code writes `body`. Always set both.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 - **10DLC campaign-tier-by-subscription-tier (#11):** blocked on the current campaign
