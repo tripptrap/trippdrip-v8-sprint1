@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
         capabilities: { voice: true, sms: true, mms: true },
       }, {
-        onConflict: 'user_id,phone_number'
+        onConflict: 'phone_number'
       });
 
     if (numberError) {

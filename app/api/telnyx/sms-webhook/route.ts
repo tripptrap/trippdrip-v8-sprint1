@@ -404,36 +404,31 @@ async function handleInboundSMS(payload: any) {
       console.log(`🚫 Opt-out detected from ${from}: "${messageBody}"`);
 
       try {
-        // Add to user's DNC list
-        await supabaseAdmin
-          .from('dnc_list')
-          .upsert({
-            user_id: userId,
-            phone_number: from,
-            reason: 'opt_out',
-            source: 'inbound_sms',
-            created_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,phone_number' });
+        // Use the add_to_dnc RPC rather than writing dnc_list/dnc_history directly.
+        // check_dnc (what every send path gates on) matches on normalized_phone, so
+        // an entry written without it is invisible to enforcement. The RPC owns
+        // normalization, dedup, and dnc_history logging in one place.
+        const { data: dncResult, error: dncAddError } = await supabaseAdmin
+          .rpc('add_to_dnc', {
+            p_user_id: userId,
+            p_phone_number: from,
+            p_reason: 'opt_out',
+            p_source: 'inbound_sms',
+            p_notes: `Lead texted: "${messageBody}"`,
+          });
 
-        console.log(`✅ Added ${from} to DNC list for user ${userId}`);
+        if (dncAddError) {
+          // Loud: a silent failure here means the lead keeps receiving messages
+          // after texting STOP, which is a legal problem, not just a data problem.
+          console.error(`❌ CRITICAL: failed to add ${from} to DNC list for user ${userId} after opt-out:`, dncAddError);
+        } else {
+          console.log(`✅ Added ${from} to DNC list for user ${userId} (${(dncResult as any)?.action ?? 'added'})`);
+        }
 
         // Send SMS alert to user's personal phone (opt-out)
         sendSmsAlertToUser(userId, 'opt_out', {
           leadPhone: from,
         }).catch(err => console.error('SMS alert (opt_out) failed:', err));
-
-        // Log DNC history
-        await supabaseAdmin
-          .from('dnc_history')
-          .insert({
-            user_id: userId,
-            phone_number: from,
-            action: 'added',
-            reason: 'opt_out',
-            source: 'inbound_sms',
-            notes: `Lead texted: "${messageBody}"`,
-            created_at: new Date().toISOString(),
-          });
 
         // Update lead's sms_opt_in to false
         const { data: updatedLead } = await supabaseAdmin

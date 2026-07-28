@@ -155,6 +155,26 @@ these keywords were declared in every 10DLC campaign submission for months befor
 actually being wired up in code, which was itself one of the rejection causes. Fixed
 2026-07-27.
 
+**STOP opt-outs were never actually persisted — TCPA-level bug, fixed 2026-07-28.**
+Detection worked; persistence did not. The opt-out handler wrote to `dnc_list` directly
+with `onConflict: 'user_id,phone_number'` (no such constraint → `42P10`) and omitted
+`normalized_phone` (NOT NULL, no default, no trigger), then separately inserted into
+`dnc_history` with three columns that don't exist on that table (`reason`, `source`,
+`notes`) while omitting two that are NOT NULL (`normalized_phone`, `list_type`). Both
+writes failed every time. Neither return value was error-checked, and supabase-js
+returns `{ error }` instead of throwing, so the surrounding `try/catch` never fired and
+the handler logged `✅ Added to DNC list` on every failure. **Confirmed by the data:
+`dnc_list` had 0 rows — no opt-out had ever been recorded.** The only surviving effect
+was `leads.sms_opt_in = false`, which **nothing reads** — grep confirms no send path
+checks it. Every send path gates on the `check_dnc` RPC, which matches on
+`normalized_phone` in `dnc_list`, so it returned `on_dnc_list: false` forever and leads
+kept receiving messages after texting STOP. Fixed by calling the purpose-built
+`add_to_dnc` RPC (owns normalization, dedup, and `dnc_history` logging) with a loud
+error check. **Rules this leaves behind:** (1) write DNC entries only via `add_to_dnc`,
+never direct table writes — `check_dnc` matches on `normalized_phone`, so an entry
+missing it is invisible to enforcement; (2) `leads.sms_opt_in` is currently decorative,
+so don't treat it as a compliance backstop unless you also wire it into the send paths.
+
 ---
 
 ## Phone Numbers
@@ -170,6 +190,32 @@ provisioned here is SMS-filtered at order time), backfills existing null rows, a
 5 insert/upsert paths into this table now set it. **If you see a route or migration
 that assumes a column exists, don't trust it — query `information_schema.columns`
 directly before relying on it.**
+
+**`onConflict` targets must match a real unique constraint (fixed 2026-07-28).** Three
+upserts into `user_telnyx_numbers` used `onConflict: 'user_id,phone_number'`, but the
+table's only unique index is on `phone_number` alone — so every one of them failed at
+runtime with Postgres `42P10` ("no unique or exclusion constraint matching the ON
+CONFLICT specification"). Fixed to `onConflict: 'phone_number'` in
+`app/api/stripe/webhook`, `app/api/stripe/create-number-subscription`, and
+`app/api/number-pool/purchase-with-credits`. **The generalizable lesson: supabase-js
+`onConflict` is not validated at build time and the failure comes back as a returned
+`{ error }` rather than a thrown exception — so an unchecked upsert fails completely
+silently.** Verify the constraint exists (`pg_indexes` / `pg_constraint`) before
+writing an `onConflict`, and always check the returned error.
+
+**Number-purchase checkout fulfillment (fixed 2026-07-28, was GitHub #10's sibling
+bug).** `create-number-subscription`'s checkout-session branch (used when the user has
+no existing active subscription) creates a Stripe Checkout Session with
+`metadata: { phone_number, type: 'additional_number' }` and relies entirely on the
+webhook to fulfill. The webhook had no handling for it at all — customer got charged,
+number never ordered. Worse: that session uses `mode: 'subscription'`, so it fell
+through into the plan-subscription branch and would have been treated as a **Growth
+plan purchase** (granting 3000 credits and setting a tier). Now handled by a
+`phoneNumberPurchase` branch that runs *before* the `session.mode` check — order that
+matters, don't reorder it. The branch is idempotent (checks `user_telnyx_numbers` by
+phone first), refuses to reassign a number already owned by a different user, and
+**blocks the order entirely for toll-free numbers that aren't TFV-verified** — which,
+given the pool findings above, is currently every toll-free number on the account.
 
 ---
 

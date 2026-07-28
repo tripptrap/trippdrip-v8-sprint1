@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 
 // Must match the fallbacks in app/api/stripe/create-checkout/route.ts —
 // these env vars aren't set in every environment, so both places need
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
         const points = parseInt(session.metadata?.points || '0');
         const packName = session.metadata?.packName || 'Unknown';
         const planType = session.metadata?.planType || 'growth';
+        const phoneNumberPurchase = session.metadata?.phone_number;
         const sessionId = session.id;
 
         console.log('Payment successful!', {
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
           points,
           packName,
           planType,
+          phoneNumberPurchase,
           customerId: session.customer,
           subscriptionId: session.subscription,
           paymentIntent: session.payment_intent
@@ -87,6 +90,87 @@ export async function POST(req: NextRequest) {
         if (!userId) {
           console.error('No user ID found in session metadata');
           return NextResponse.json({ error: 'No user ID' }, { status: 400 });
+        }
+
+        // Additional-number checkout (create-number-subscription's checkout-session
+        // branch, used when the user has no existing active subscription). This also
+        // uses mode: 'subscription', so it MUST be handled before the mode check
+        // below or it gets mistaken for a plan purchase and wrongly grants plan credits.
+        if (phoneNumberPurchase) {
+          // Idempotency: webhook retries/duplicate deliveries must not re-order
+          // the number from Telnyx.
+          const { data: existingNumber } = await supabaseAdmin
+            .from('user_telnyx_numbers')
+            .select('id, user_id')
+            .eq('phone_number', phoneNumberPurchase)
+            .maybeSingle();
+
+          if (existingNumber) {
+            if (existingNumber.user_id === userId) {
+              console.log(`⚠️ Number ${phoneNumberPurchase} already recorded for user ${userId} — skipping duplicate webhook for session ${sessionId}`);
+            } else {
+              console.error(`❌ User ${userId} paid for number ${phoneNumberPurchase} (session ${sessionId}) but it is already owned by a different user (${existingNumber.user_id}). Needs manual review/refund.`);
+            }
+            break;
+          }
+
+          if (isTollFreeNumber(phoneNumberPurchase)) {
+            const verifiedNumbers = await getVerifiedTollFreeNumbers();
+            if (!verifiedNumbers.has(phoneNumberPurchase)) {
+              console.error(`❌ User ${userId} paid for unverified toll-free number ${phoneNumberPurchase} (session ${sessionId}) — order blocked. Needs manual refund or a verified replacement number.`);
+              break;
+            }
+          }
+
+          const apiKey = process.env.TELNYX_API_KEY;
+          const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
+
+          if (!apiKey) {
+            console.error(`❌ TELNYX_API_KEY not configured — cannot fulfill paid number ${phoneNumberPurchase} for user ${userId} (session ${sessionId})`);
+            break;
+          }
+
+          const orderResponse = await fetch('https://api.telnyx.com/v2/number_orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              phone_numbers: [{ phone_number: phoneNumberPurchase }],
+              messaging_profile_id: messagingProfileId,
+              customer_reference: userId,
+            }),
+          });
+
+          const orderData = await orderResponse.json();
+
+          if (!orderResponse.ok) {
+            console.error(`❌ Telnyx order failed for paid number ${phoneNumberPurchase} (user ${userId}, session ${sessionId}):`, JSON.stringify(orderData, null, 2));
+            break;
+          }
+
+          const { error: numberInsertError } = await supabaseAdmin
+            .from('user_telnyx_numbers')
+            .upsert({
+              user_id: userId,
+              phone_number: phoneNumberPurchase,
+              status: 'pending',
+              payment_method: 'stripe',
+              stripe_subscription_id: session.subscription,
+              messaging_profile_id: messagingProfileId || undefined,
+              capabilities: { voice: true, sms: true, mms: true },
+            }, {
+              onConflict: 'phone_number'
+            });
+
+          if (numberInsertError) {
+            console.error(`❌ Telnyx order ${orderData.data?.id} succeeded but saving ${phoneNumberPurchase} to user_telnyx_numbers failed for user ${userId}:`, numberInsertError);
+          } else {
+            console.log(`✅ Ordered and saved number ${phoneNumberPurchase} for user ${userId} (order ${orderData.data?.id}, session ${sessionId})`);
+          }
+
+          break;
         }
 
         // Check if this is a subscription or one-time payment
