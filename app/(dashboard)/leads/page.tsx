@@ -2274,7 +2274,7 @@ export default function LeadsPage() {
                                 const newTags = currentTags.filter((t: string) => t !== tag.trim());
                                 setBulkTags(newTags.join(', '));
                               }}
-                              className="hover:text-gray-900"
+                              className="hover:text-gray-900 dark:hover:text-slate-100"
                             >
                               ×
                             </button>
@@ -2329,7 +2329,7 @@ export default function LeadsPage() {
                             </button>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-900/50">Color:</span>
+                            <span className="text-xs text-slate-600 dark:text-slate-400">Color:</span>
                             <div className="flex gap-1.5">
                               {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map((color) => (
                                 <button
@@ -2525,7 +2525,7 @@ export default function LeadsPage() {
                             <button
                               type="button"
                               onClick={() => setRunTags(runTags.filter(t => t !== tag))}
-                              className="hover:text-gray-900"
+                              className="hover:text-gray-900 dark:hover:text-slate-100"
                             >
                               ✕
                             </button>
@@ -2947,7 +2947,7 @@ export default function LeadsPage() {
                                 const currentTags = bulkAddTags.split(',').map(t => t.trim()).filter(Boolean);
                                 setBulkAddTags(currentTags.filter(t => t !== tag.trim()).join(', '));
                               }}
-                              className="hover:text-gray-900"
+                              className="hover:text-gray-900 dark:hover:text-slate-100"
                             >×</button>
                           </span>
                         );
@@ -2997,7 +2997,7 @@ export default function LeadsPage() {
                           >Add</button>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-900/50">Color:</span>
+                          <span className="text-xs text-slate-600 dark:text-slate-400">Color:</span>
                           <div className="flex gap-1.5">
                             {['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'].map(color => (
                               <button
@@ -3151,7 +3151,7 @@ export default function LeadsPage() {
                           <button
                             type="button"
                             onClick={() => setBulkReplaceTags(bulkReplaceTags.filter(t => t !== tag))}
-                            className="hover:text-gray-900"
+                            className="hover:text-gray-900 dark:hover:text-slate-100"
                           >
                             ✕
                           </button>
@@ -3666,7 +3666,7 @@ export default function LeadsPage() {
                   {leadName.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="text-lg font-semibold text-gray-900">{leadName}</div>
+                  <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{leadName}</div>
                   <div className="text-sm text-slate-600 dark:text-slate-400">{selectedLead?.phone || 'No phone'}</div>
                 </div>
               </div>

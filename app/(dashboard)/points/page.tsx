@@ -689,7 +689,7 @@ export default function PointsPage() {
             <div className="relative z-10">
               <div className="text-6xl mb-4">🎉</div>
               <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">Thank You!</h2>
-              <p className="text-lg text-gray-900/90 mb-4">
+              <p className="text-lg text-slate-700 dark:text-slate-300 mb-4">
                 Welcome to Scale! Enjoy better pricing on all point packs.
               </p>
               <div className="flex items-center justify-center gap-2 text-slate-700 dark:text-slate-300">

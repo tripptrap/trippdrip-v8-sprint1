@@ -513,7 +513,7 @@ export default function FollowUpsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Follow-ups & Reminders</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Follow-ups & Reminders</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage your lead follow-up schedule</p>
         </div>
         <div className="flex gap-2">
@@ -564,7 +564,7 @@ export default function FollowUpsPage() {
         </div>
         <div className="card">
           <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total</div>
-          <div className="text-3xl font-bold text-gray-900">{followUps.length}</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">{followUps.length}</div>
         </div>
       </div>
 
@@ -625,7 +625,7 @@ export default function FollowUpsPage() {
                         {followUp.status.toUpperCase()}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-lg mb-1 text-gray-900">{followUp.title}</h3>
+                    <h3 className="font-semibold text-lg mb-1 text-gray-900 dark:text-slate-100">{followUp.title}</h3>
                     {followUp.leads && (
                       <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                         Lead: {followUp.leads.first_name} {followUp.leads.last_name} • {followUp.leads.phone}
@@ -688,7 +688,7 @@ export default function FollowUpsPage() {
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">Smart Follow-up Suggestions</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Smart Follow-up Suggestions</h2>
                 <button
                   onClick={() => setShowSuggestionsPanel(false)}
                   className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 text-2xl"

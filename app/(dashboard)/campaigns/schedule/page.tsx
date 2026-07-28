@@ -204,7 +204,7 @@ export default function ScheduleCampaignPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Schedule Bulk Campaigns</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Schedule Bulk Campaigns</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Schedule campaigns to send messages to leads over time
           </p>
@@ -219,7 +219,7 @@ export default function ScheduleCampaignPage() {
 
       {showScheduler && (
         <div className="card space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Schedule New Campaign</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Schedule New Campaign</h2>
 
           {/* Campaign Name */}
           <div>
@@ -249,7 +249,7 @@ export default function ScheduleCampaignPage() {
           {/* Lead Selection */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-900">Select Leads *</label>
+              <label className="text-sm font-medium text-gray-900 dark:text-slate-100">Select Leads *</label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={selectAll}
@@ -297,7 +297,7 @@ export default function ScheduleCampaignPage() {
                         className="w-4 h-4"
                       />
                       <div className="flex-1">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-gray-900 dark:text-slate-100">
                           {lead.first_name} {lead.last_name}
                         </div>
                         <div className="text-xs text-slate-600 dark:text-slate-400">{lead.phone}</div>
@@ -420,7 +420,7 @@ export default function ScheduleCampaignPage() {
               className="w-4 h-4"
             />
             <div>
-              <div className="text-sm font-medium text-gray-900">Auto-repeat until all leads are sent</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Auto-repeat until all leads are sent</div>
               <div className="text-xs text-slate-600 dark:text-slate-400">
                 Automatically schedule the next batch until all selected leads have been contacted
               </div>
@@ -447,10 +447,10 @@ export default function ScheduleCampaignPage() {
 
       {/* Scheduled Campaigns List */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-gray-900">Active Scheduled Campaigns</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Active Scheduled Campaigns</h2>
         {campaigns.length === 0 ? (
           <div className="card text-center py-12">
-            <svg className="w-16 h-16 mx-auto text-gray-900/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Scheduled Campaigns</h3>
@@ -477,7 +477,7 @@ export default function ScheduleCampaignPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">{campaign.name}</h3>
                       <div className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(campaign.status)}`}>
                         {campaign.status.toUpperCase()}
                       </div>

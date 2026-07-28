@@ -155,7 +155,7 @@ export default function AppointmentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Appointments</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Appointments</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             View and manage your scheduled appointments
           </p>
@@ -377,7 +377,7 @@ export default function AppointmentsPage() {
       {appointments.length > 0 && (
         <div className="grid grid-cols-3 gap-4 mt-8">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{appointments.length}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-slate-100">{appointments.length}</div>
             <div className="text-sm text-slate-600 dark:text-slate-400">Total {filter}</div>
           </div>
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center">

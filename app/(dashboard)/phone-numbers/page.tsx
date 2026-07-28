@@ -372,7 +372,7 @@ export default function PhoneNumbersPage() {
                 <div className="px-3 py-1 bg-sky-600 text-white text-xs font-bold rounded-full uppercase">
                   Instant Access
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">Start Sending Messages Now!</h2>
+                <h2 className="text-2xl font-bold text-white">Start Sending Messages Now!</h2>
               </div>
               <p className="text-sky-200 mb-4">
                 Claim a pre-verified number from our shared pool and send messages immediately - no waiting for verification!
@@ -382,7 +382,7 @@ export default function PhoneNumbersPage() {
                   <div key={poolNum.id} className="flex-1 min-w-[250px] p-4 bg-gray-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <div className="font-mono font-semibold text-lg text-gray-900">
+                        <div className="font-mono font-semibold text-lg text-white">
                           {poolNum.phone_number}
                         </div>
                         <div className="text-xs text-slate-400 dark:text-slate-500">
@@ -527,22 +527,22 @@ export default function PhoneNumbersPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {number.capabilities.sms && number.capabilities.voice && (
+                      {number.capabilities?.sms && number.capabilities?.voice && (
                         <span className="px-3 py-1 bg-sky-900/30 border border-sky-700 text-sky-600 rounded text-xs font-medium">
                           📱 Unified: SMS + Voice
                         </span>
                       )}
-                      {number.capabilities.sms && !number.capabilities.voice && (
+                      {number.capabilities?.sms && !number.capabilities?.voice && (
                         <span className="px-2 py-1 bg-blue-900/30 border border-sky-700 text-sky-600 rounded text-xs">
                           SMS
                         </span>
                       )}
-                      {number.capabilities.mms && (
+                      {number.capabilities?.mms && (
                         <span className="px-2 py-1 bg-sky-800/60 border border-sky-600 text-sky-600 rounded text-xs">
                           MMS
                         </span>
                       )}
-                      {number.capabilities.voice && !number.capabilities.sms && (
+                      {number.capabilities?.voice && !number.capabilities?.sms && (
                         <span className="px-2 py-1 bg-orange-900/30 border border-orange-700 text-sky-600 rounded text-xs">
                           Voice
                         </span>
@@ -709,17 +709,17 @@ export default function PhoneNumbersPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-1">
-                        {number.capabilities.sms && (
+                        {number.capabilities?.sms && (
                           <span className="px-2 py-1 bg-gray-700/30 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded text-xs">
                             SMS
                           </span>
                         )}
-                        {number.capabilities.mms && (
+                        {number.capabilities?.mms && (
                           <span className="px-2 py-1 bg-gray-700/30 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded text-xs">
                             MMS
                           </span>
                         )}
-                        {number.capabilities.voice && (
+                        {number.capabilities?.voice && (
                           <span className="px-2 py-1 bg-gray-700/30 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded text-xs">
                             Voice
                           </span>
