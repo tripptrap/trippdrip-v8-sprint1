@@ -165,10 +165,17 @@ export async function POST(req: NextRequest) {
     const segments = Math.ceil(messageBody.length / 160);
     const creditsCost = segments * 2;
 
-    await supabase.rpc('deduct_credits', {
-      user_id_param: user.id,
-      amount: creditsCost
+    // The parameter is `user_id`, not `user_id_param` — PostgREST matches RPC
+    // arguments by NAME, so the old spelling failed even once the function
+    // existed (#90). The SMS has already gone out above, so a failure here
+    // can't be undone; it must be loud rather than silent.
+    const { error: deductError } = await supabase.rpc('deduct_credits', {
+      user_id: user.id,
+      amount: creditsCost,
     });
+    if (deductError) {
+      console.error(`❌ Calendar link sent to lead ${leadId} but ${creditsCost} credits NOT deducted for user ${user.id}:`, deductError);
+    }
 
     // If followUpId provided, mark it as completed
     if (followUpId) {

@@ -350,7 +350,11 @@ export async function POST(req: Request) {
             const messageCredits = personalizedCreditCalc.credits;
 
             // CRIT-5: Deduct credits server-side after each successful send
-            await supabase.rpc('deduct_credits', { user_id: user.id, amount: messageCredits });
+            const { error: deductError } = await supabase.rpc('deduct_credits', { user_id: user.id, amount: messageCredits });
+            if (deductError) {
+              // Already sent — can't be rolled back, so make it visible (#90).
+              console.error(`❌ Campaign message sent to lead ${lead.id} but ${messageCredits} credits NOT deducted for user ${user.id}:`, deductError);
+            }
 
             sendResults.push({
               leadId: String(lead.id),

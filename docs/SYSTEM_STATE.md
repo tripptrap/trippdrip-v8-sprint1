@@ -709,8 +709,7 @@ the live 08:00–20:00 window: at 20:45 Eastern a Florida lead computed as 19:45
 If you touch `STATE_TIMEZONES`, keep it a list per state and keep the any-zone-blocks rule
 — a window has two edges and a one-zone guess can only be safe at one of them.
 
-**Credits: always use the `deduct_credits` RPC, never read-then-write** — but note that RPC
-**does not currently exist** (#90), so this is the target state, not today's. Two paths had
+**Credits: always use the `deduct_credits` RPC, never read-then-write.** Two paths had
 read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
 read *before* its send loop began and discarding any concurrent spend.
 
@@ -744,13 +743,30 @@ precise for split states and would remove the both-zones conservatism above;
 
 ## Audit 2026-07-29 (overnight) — what it found
 
-**`deduct_credits` does not exist (#90).** Ten code paths call it; `pg_proc` has no function
-matching `%credit%` in any schema, and no migration defines one. Verified live:
-`PGRST202 — Could not find the function public.deduct_credits(amount, user_id)`.
+**`deduct_credits` did not exist — created 2026-07-29 (#90).** Ten code paths called it while
+`pg_proc` had no function matching `%credit%` in any schema and no migration defined one.
+Verified at the time: `PGRST202 — Could not find the function`. CLAUDE.md listed it under Key
+RPC Functions and this file instructed "always use the `deduct_credits` RPC" — both described
+a function that was never created.
 
-This file previously instructed *"always use the `deduct_credits` RPC, never read-then-write"*
-and CLAUDE.md lists it under Key RPC Functions. **Both were describing a function that was
-never created.** Corrected here; that instruction is only valid once #90 lands.
+Now created by `supabase/migrations/create_deduct_credits_rpc.sql` and applied to the linked
+project. **Four things about it are load-bearing:**
+
+1. **Parameter names must stay `user_id` / `amount`.** PostgREST matches RPC arguments by
+   name. `follow-ups/send-calendar-link` was passing `user_id_param` and would have kept
+   failing even after the function existed — the same bug in a second costume.
+2. **Parameters are qualified `deduct_credits.<name>` throughout.** Unqualified, plpgsql
+   resolves `user_id` to a *column*, which is how a function like this silently updates the
+   wrong rows.
+3. **The balance check lives in the UPDATE's WHERE clause**, so read and write are one
+   statement. Verified: 50 concurrent deductions lost nothing, and 30×100 against a 1000
+   balance stopped at exactly 10 without going negative.
+4. **`SECURITY DEFINER` bypasses RLS, so it enforces ownership itself.** service_role may
+   deduct for any user; an authenticated caller may only spend their own balance — two
+   callers (`campaigns/run`, `follow-ups/send-calendar-link`) are request-scoped, so
+   `authenticated` needs EXECUTE, and without the guard any logged-in user could drain
+   anyone's credits by passing their id. Verified: cross-user deduction returns 42501 and
+   leaves the balance untouched; own-balance deduction still works. `anon` has no EXECUTE.
 
 Consequences split by caller: `telnyx/send-sms` and `cron/process-drips` **fail closed** (the
 send is blocked — UI sending returns HTTP 500), everything else **fails open** (message goes
