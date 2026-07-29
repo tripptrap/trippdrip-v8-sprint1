@@ -9,6 +9,7 @@ import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 import { cancelPendingDripMessages } from '@/lib/drip/materialize';
+import { isAffirmative, isAwaitingConfirmation, markAwaitingConfirmation, confirmAndBookAppointment } from '@/lib/flows/completeFlow';
 
 // Opt-out keywords that trigger permanent DNC (STOP, UNSUBSCRIBE, etc.)
 // LOW-5: "cancel" removed — it's too common in normal sentences ("cancel my appointment").
@@ -937,6 +938,42 @@ async function checkAndTriggerReceptionist(
             .eq('id', lead.id)
             .single();
 
+          // #70: if the flow already finished and we asked the lead to confirm,
+          // an affirmative reply books the appointment. This runs before step
+          // extraction because there are no steps left to advance — without it
+          // the AI just keeps re-offering and nothing is ever recorded.
+          if (isAwaitingConfirmation(leadState?.conversation_state as any)) {
+            if (messageBody && isAffirmative(messageBody)) {
+              const { data: fullLead } = await supabaseAdmin
+                .from('leads')
+                .select('id, first_name, last_name, phone, email, tags, conversation_state, campaign_id')
+                .eq('id', lead.id)
+                .single();
+
+              if (fullLead) {
+                const collected = (fullLead.conversation_state as any)?.collectedInfo || {};
+                const result = await confirmAndBookAppointment({
+                  supabase: supabaseAdmin,
+                  userId,
+                  lead: fullLead as any,
+                  flowId: effectiveFlowId,
+                  campaignId: fullLead.campaign_id ?? null,
+                  stepsCompleted: Object.keys(collected).length,
+                  totalSteps: steps.length,
+                });
+
+                if (result.booked) {
+                  sendSmsAlertToUser(userId, 'appointment', {
+                    leadPhone: phoneNumber,
+                    leadName: [fullLead.first_name, fullLead.last_name].filter(Boolean).join(' ') || undefined,
+                  }).catch(err => console.error('SMS alert (appointment) failed:', err));
+                }
+              }
+            }
+            // Either way the AI still replies below — confirming the booking, or
+            // handling a "no"/"can we do Tuesday" as a reschedule request.
+          }
+
           const currentCollected: Record<string, string> =
             (leadState?.conversation_state as any)?.collectedInfo || {};
 
@@ -988,6 +1025,17 @@ async function checkAndTriggerReceptionist(
           // Recompute current step now that this turn's answer (if any) is merged in
           const newCurrent = steps.find(s => !updatedCollected[s.field_name]) || null;
           const allAnswered = newCurrent === null;
+
+          // #70: everything is collected — move into the confirm-then-book
+          // stage so the next affirmative reply actually creates the
+          // appointment. Idempotent, so re-running on later turns is harmless.
+          if (allAnswered) {
+            await markAwaitingConfirmation({
+              supabase: supabaseAdmin,
+              leadId: lead.id,
+              conversationState: { ...(leadState?.conversation_state as any || {}), collectedInfo: updatedCollected },
+            });
+          }
 
           const toFlowStep = (s: typeof steps[number], completed: boolean) => ({
             tagId: s.id,
