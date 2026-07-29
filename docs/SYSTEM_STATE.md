@@ -754,6 +754,29 @@ Now `export const GET = handleCron; export const POST = handleCron;` on all thre
   `x-cron-secret`; the rest are `Authorization: Bearer` only. Fine for Vercel Cron, a trap the
   moment the trigger changes.
 
+### Cron auth is one helper now (#96, 2026-07-29)
+
+`lib/cronAuth.ts` — `requireCronAuth(req)` for the five cron routes, `isInternalCaller(req)`
+for service-to-service calls, `secureCompare(a, b)` under both.
+
+There were five hand-rolled copies and they had drifted: only `process-scheduled` read
+`x-cron-secret`; the rest were `Authorization: Bearer` only. Both forms now work everywhere.
+`requireCronAuth` returns `null` when authorised or the response to return as-is.
+
+**`CRON_SECRET` is also the internal service-to-service secret**, sent as `x-internal-secret`
+(cron → `telnyx/send-sms`, sms-webhook → `receptionist/respond`). Those two receivers compared
+it with `===` while the crons went to lengths to compare the identical value in constant time.
+Both use `secureCompare` now. The `send-sms` one matters most: passing that gate is what lets
+a caller supply an arbitrary `userId` in the body and send as that user.
+
+**The fail-open to remember:** `secureCompare('', '')` returns **true**. An unset `CRON_SECRET`
+must be caught *before* the comparison, not by it — `requireCronAuth` returns 500 in that case
+and never authorises. Verified 19/19, including that path.
+
+Deliberately lenient and unchanged: `authHeader.replace('Bearer ', '')` is a no-op on a bare
+value, so `Authorization: <secret>` without the prefix is also accepted. Knowing the secret is
+the boundary, so this costs nothing and tolerates odd clients.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
