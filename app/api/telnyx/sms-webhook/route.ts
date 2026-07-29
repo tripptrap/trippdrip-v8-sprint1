@@ -113,6 +113,23 @@ export async function POST(req: NextRequest) {
       has_timestamp: !!timestamp,
     });
 
+    // #67: refuse to run unverified in production. CRIT-3 closed the
+    // "skipped in dev" hole by verifying whenever the key is set — but left the
+    // case where the key is MISSING, which skipped both branches below and
+    // processed every unsigned request as genuine.
+    //
+    // This is the most powerful unauthenticated surface in the app: a forged
+    // request can create leads and messages, trigger billable AI replies, and
+    // write a permanent DNC entry for a number that never opted out. The
+    // number-order webhook already fails closed this way; this one didn't.
+    if (!publicKey) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('❌ TELNYX_PUBLIC_KEY not configured — refusing to process an unverified webhook in production');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      }
+      console.warn('⚠️ TELNYX_PUBLIC_KEY unset — accepting unsigned webhook (non-production only)');
+    }
+
     // CRIT-3: Verify signature whenever TELNYX_PUBLIC_KEY is set — not just in production.
     // Skipping verification in dev/staging allows forged webhooks to be accepted.
     if (publicKey && (!signature || !timestamp)) {
