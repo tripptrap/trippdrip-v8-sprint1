@@ -10,6 +10,7 @@ import { sendTelnyxSMS } from '@/lib/telnyx';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 import { cancelPendingDripMessages } from '@/lib/drip/materialize';
 import { isAffirmative, isAwaitingConfirmation, markAwaitingConfirmation, confirmAndBookAppointment } from '@/lib/flows/completeFlow';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 // Opt-out keywords that trigger permanent DNC (STOP, UNSUBSCRIBE, etc.)
 // LOW-5: "cancel" removed — it's too common in normal sentences ("cancel my appointment").
@@ -447,8 +448,18 @@ async function handleInboundSMS(payload: any) {
     .select();
 
   if (messageError) {
+    // The lead's reply is gone. Telnyx has already accepted the webhook, so it
+    // will not be redelivered, and the customer sees nothing in their inbox —
+    // no error, just a lead who apparently never replied (#80).
     console.error('❌ Error saving inbound message:', messageError);
     console.error('❌ Message data was:', JSON.stringify(messageData));
+    await alertAdminsThrottled({
+      key: `inbound_message_lost:${userId}`,
+      title: 'Inbound replies are being lost',
+      body: `An inbound SMS from ${from} could not be saved (${messageError.message}). Telnyx does not redeliver, so the reply is unrecoverable and the account owner has no way to know a lead replied.`,
+      data: { route: 'telnyx/sms-webhook', user_id: userId, from, error: messageError.message },
+      windowMinutes: 30,
+    });
   } else {
     console.log('✅ Telnyx inbound message saved:', insertedMsg);
 
@@ -492,6 +503,16 @@ async function handleInboundSMS(payload: any) {
           // Loud: a silent failure here means the lead keeps receiving messages
           // after texting STOP, which is a legal problem, not just a data problem.
           console.error(`❌ CRITICAL: failed to add ${from} to DNC list for user ${userId} after opt-out:`, dncAddError);
+          // Keyed per number, not per route: the remedy is adding *this* number
+          // to the DNC list by hand, so each affected person needs its own alert
+          // (#80). The key still collapses webhook redeliveries of the same STOP.
+          await alertAdminsThrottled({
+            key: `dnc_write_failed:${userId}:${from}`,
+            title: 'URGENT: a STOP was not recorded — the lead can still be messaged',
+            body: `${from} texted STOP to user ${userId} and the add_to_dnc write failed (${dncAddError.message}). Enforcement reads the DNC list, so this number is still sendable. Add it manually before the next send.`,
+            data: { route: 'telnyx/sms-webhook', user_id: userId, phone: from, error: dncAddError.message },
+            windowMinutes: 1440,
+          });
         } else {
           console.log(`✅ Added ${from} to DNC list for user ${userId} (${(dncResult as any)?.action ?? 'added'})`);
         }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -115,6 +116,12 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching calendar events:', fetchError);
+      await alertAdminsThrottled({
+        key: 'cron_fetch_failed:send-appointment-reminders',
+        title: 'Appointment reminders are not being sent',
+        body: `The reminder cron cannot read upcoming calendar events (${fetchError.message}). Leads with appointments in the next 24h are not being reminded, and a missed reminder cannot be sent late.`,
+        data: { route: 'cron/send-appointment-reminders', error: fetchError.message },
+      });
       return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
     }
 
@@ -352,6 +359,12 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in appointment reminders cron:', error);
+    await alertAdminsThrottled({
+      key: 'cron_run_failed:send-appointment-reminders',
+      title: 'Appointment reminder cron is failing',
+      body: `The reminder cron threw and processed nothing: ${error.message}. A reminder for an appointment that has already passed cannot be sent late.`,
+      data: { route: 'cron/send-appointment-reminders', error: error.message },
+    });
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

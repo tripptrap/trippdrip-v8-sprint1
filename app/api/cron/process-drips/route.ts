@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -144,6 +145,12 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching enrollments:', fetchError);
+      await alertAdminsThrottled({
+        key: 'cron_fetch_failed:process-drips',
+        title: 'Drip campaigns are not being sent',
+        body: `The drip cron cannot read its due enrollments (${fetchError.message}), so every enrolled lead is stuck on its current step.`,
+        data: { route: 'cron/process-drips', error: fetchError.message },
+      });
       return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
     }
 
@@ -505,6 +512,12 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in drip campaign cron:', error);
+    await alertAdminsThrottled({
+      key: 'cron_run_failed:process-drips',
+      title: 'Drip campaign cron is failing',
+      body: `The drip cron threw and processed nothing: ${error.message}. Enrolled leads stop advancing until this is fixed.`,
+      data: { route: 'cron/process-drips', error: error.message },
+    });
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }

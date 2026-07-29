@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'crypto';
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 // MED-7: Use service role client — user-scoped createClient() has no session in cron context
 // and RLS filters all rows to empty. Service role bypasses RLS as intended for cron jobs.
@@ -89,6 +90,13 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Cron job error:', error);
+    // The whole run died, so nothing scheduled went out this cycle (#80).
+    await alertAdminsThrottled({
+      key: 'cron_run_failed:process-scheduled',
+      title: 'Scheduled-message cron is failing',
+      body: `The cron that sends scheduled messages and campaign batches threw and processed nothing: ${error.message}. Scheduled sends are stalled until this is fixed.`,
+      data: { route: 'cron/process-scheduled', error: error.message },
+    });
     return NextResponse.json({
       ok: false,
       error: error.message,
@@ -106,7 +114,15 @@ async function processScheduledMessages(supabase: any) {
     .rpc('get_messages_ready_to_send');
 
   if (error) {
+    // The route still returns ok:true when this happens, so an uptime check
+    // sees green while zero messages go out. Nothing else would surface it (#80).
     console.error('Error fetching ready messages:', error);
+    await alertAdminsThrottled({
+      key: 'cron_fetch_failed:process-scheduled:messages',
+      title: 'Scheduled messages are not being sent',
+      body: `get_messages_ready_to_send() is failing (${error.message}), so no scheduled message has been sent since this started. The cron still reports success, so nothing else will surface it.`,
+      data: { route: 'cron/process-scheduled', rpc: 'get_messages_ready_to_send', error: error.message },
+    });
     return { processed: 0, failed: 0, error: error.message };
   }
 
@@ -387,6 +403,12 @@ async function processScheduledCampaigns(supabase: any) {
 
   if (error) {
     console.error('Error fetching ready campaigns:', error);
+    await alertAdminsThrottled({
+      key: 'cron_fetch_failed:process-scheduled:campaigns',
+      title: 'Campaign batches are not being sent',
+      body: `get_campaigns_ready_for_batch() is failing (${error.message}), so no campaign batch has gone out since this started. The cron still reports success.`,
+      data: { route: 'cron/process-scheduled', rpc: 'get_campaigns_ready_for_batch', error: error.message },
+    });
     return { processed: 0, batches: 0, error: error.message };
   }
 

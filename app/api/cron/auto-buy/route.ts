@@ -7,6 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import crypto from 'crypto';
 import { packForPointsAmount, priceFor } from '@/lib/pointPacks';
+import { notifyAdmins, createNotification } from '@/lib/createNotification';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -148,7 +150,24 @@ export async function GET(req: NextRequest) {
             .rpc('add_credits', { user_id: user.id, amount: pack.points });
 
           if (updateError) {
-            throw new Error(`Failed to update credits: ${updateError.message}`);
+            // The card is already charged. Throwing here sent this into the
+            // Stripe catch below, which reported it as "Payment failed" — the
+            // opposite of what happened — and left the customer paying for
+            // credits they never received (#80).
+            console.error(`❌ Auto-buy charged user ${user.id} $${(finalPrice / 100).toFixed(2)} but the credit grant failed:`, updateError);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'URGENT: auto-refill charged a card but granted no credits',
+              `${user.email} was charged $${(finalPrice / 100).toFixed(2)} for the ${pack.name} pack (${pack.points} credits) by auto-refill, and the credit grant failed. The money is taken and nothing was delivered — grant ${pack.points} manually or refund the PaymentIntent.`,
+              { reason: 'autobuy_credit_grant_failed', user_id: user.id, email: user.email, pack: pack.name, points: pack.points, amount_cents: finalPrice, payment_intent: paymentIntent.id, db_error: updateError.message }
+            );
+            results.push({
+              userId: user.id,
+              email: user.email,
+              status: 'error',
+              message: `Charged $${(finalPrice / 100).toFixed(2)} but credits were NOT granted — support notified`,
+            });
+            continue;
           }
 
           // Log transaction. The column is stripe_session_id (#55) — it already
@@ -171,6 +190,12 @@ export async function GET(req: NextRequest) {
             // without this row there's no audit trail linking the charge to the
             // grant, and /api/user/plan-value under-reports.
             console.error(`❌ Auto-buy charged and credited user ${user.id} but failed to log the transaction:`, txError);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'Auto-refill charged and credited but the ledger row failed',
+              `${user.email} was charged $${(finalPrice / 100).toFixed(2)} and received ${pack.points} credits, but no points_transactions row was written — the balance and the ledger now disagree.`,
+              { reason: 'autobuy_ledger_failed', user_id: user.id, email: user.email, points: pack.points, amount_cents: finalPrice, payment_intent: paymentIntent.id, db_error: txError.message }
+            );
           }
 
           results.push({
@@ -181,6 +206,17 @@ export async function GET(req: NextRequest) {
             pointsAdded: pack.points
           });
         } else {
+          // The PaymentIntent didn't complete — typically requires_action, which
+          // an off_session charge can't satisfy. No money was taken, but the
+          // refill silently didn't happen and only the customer can fix it (#80).
+          console.log(`⚠️ Auto-refill for ${user.id} ended in status ${paymentIntent.status} — no charge, no credits`);
+          await createNotification(
+            user.id,
+            'low_credits',
+            "Auto-refill didn't go through",
+            `We couldn't complete the automatic purchase of your ${pack.name} pack — your card may need confirming. You have not been charged. Update your payment method in Settings, or buy a point pack directly.`,
+            { reason: 'autobuy_payment_incomplete', payment_status: paymentIntent.status, pack: pack.name, amount_cents: finalPrice }
+          );
           results.push({
             userId: user.id,
             email: user.email,
@@ -191,12 +227,36 @@ export async function GET(req: NextRequest) {
       } catch (stripeError: any) {
         console.error(`Auto-buy failed for ${user.email}:`, stripeError);
 
-        // If payment fails, disable auto-buy to prevent repeated failures
+        // If payment fails, disable auto-buy to prevent repeated failures.
         if (stripeError.code === 'card_declined' || stripeError.code === 'expired_card') {
-          await supabase
+          const { error: disableError } = await supabase
             .from('users')
             .update({ auto_topup: false })
             .eq('id', user.id);
+
+          if (disableError) {
+            // Still enabled, so the cron will retry the declined card hourly.
+            console.error(`❌ Auto-buy could not disable auto_topup for ${user.id} after a decline — it will keep retrying:`, disableError);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'Auto-refill kept retrying a declined card',
+              `${user.email}'s card was ${stripeError.code} and auto-refill could not be switched off, so the cron will retry it every hour. Disable auto_topup manually.`,
+              { reason: 'autobuy_disable_failed', user_id: user.id, email: user.email, stripe_code: stripeError.code, db_error: disableError.message }
+            );
+          } else {
+            // #80: this used to happen silently. A customer's auto-refill
+            // switched itself off and nothing told them — they simply stopped
+            // topping up and, at zero, stopped being able to send. Only they can
+            // fix the card, so they have to be told.
+            console.log(`⚠️ Auto-refill disabled for ${user.id} after ${stripeError.code}`);
+            await createNotification(
+              user.id,
+              'low_credits',
+              'Auto-refill turned off — your card was declined',
+              `We couldn't charge your card for the ${pack.name} pack, so auto-refill has been switched off. Update your payment method in Settings and turn it back on, or buy a point pack directly. Until then your balance won't top up automatically.`,
+              { reason: 'autobuy_card_declined', stripe_code: stripeError.code, pack: pack.name, amount_cents: finalPrice }
+            );
+          }
         }
 
         results.push({
@@ -222,6 +282,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Auto-buy cron error:', error);
+    await alertAdminsThrottled({
+      key: 'cron_run_failed:auto-buy',
+      title: 'Auto-refill cron is failing',
+      body: `The auto-refill cron threw and charged nobody: ${error.message}. Customers relying on auto-refill will hit zero credits and stop being able to send.`,
+      data: { route: 'cron/auto-buy', error: error.message },
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

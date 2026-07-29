@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -86,6 +87,12 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
       console.error('Error fetching AI drips:', fetchError);
+      await alertAdminsThrottled({
+        key: 'cron_fetch_failed:process-ai-drips',
+        title: 'AI drips are not being sent',
+        body: `get_ai_drips_ready_to_send() is failing (${fetchError.message}), so no AI follow-up has gone out since this started.`,
+        data: { route: 'cron/process-ai-drips', rpc: 'get_ai_drips_ready_to_send', error: fetchError.message },
+      });
       return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
     }
 
@@ -373,6 +380,12 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in AI drip cron:', error);
+    await alertAdminsThrottled({
+      key: 'cron_run_failed:process-ai-drips',
+      title: 'AI drip cron is failing',
+      body: `The AI drip cron threw and processed nothing: ${error.message}. AI follow-ups are stalled until this is fixed.`,
+      data: { route: 'cron/process-ai-drips', error: error.message },
+    });
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 }
