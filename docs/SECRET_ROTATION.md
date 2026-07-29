@@ -47,9 +47,9 @@ may re-provision them on reconnect. They are all recoverable from source if
 needed — `POSTGRES_*` and `SUPABASE_*` from the Supabase dashboard, and
 `NEXTAUTH_SECRET` was random and unused. Deleting again is safe.
 
-Consider also removing the dead `next-auth`, `prisma` and `@prisma/client`
-dependencies and `lib/prisma.ts` — separate change, but it's what makes the
-deletions above provably safe.
+Done in #86: `next-auth`, `prisma`, `@prisma/client`, `@auth/prisma-adapter` and
+`pg` are uninstalled and `lib/prisma.ts` deleted, so nothing remains that could
+cause those variables to be re-provisioned.
 
 ---
 

@@ -384,8 +384,14 @@ and `/api/telnyx/tollfree-status` still returns 401 (so the Supabase auth client
 initialises). Env changes apply only to new builds, so the deletion was inert
 until that deploy — that gap is the safety window if this is ever repeated.
 
-`next-auth`, `prisma` and `@prisma/client` remain as unused dependencies, and
-`lib/prisma.ts` is dead code. Removing them is what would make this permanent.
+`next-auth`, `prisma`, `@prisma/client`, `@auth/prisma-adapter` and `pg` were removed in #86,
+along with `lib/prisma.ts` — the only file that imported any of them, and itself imported by
+nothing. That is what makes the env-var deletions permanent: nothing is left to re-provision
+`POSTGRES_*` or `NEXTAUTH_*`.
+
+`@auth/prisma-adapter` was the one that needed chasing — uninstalling `@prisma/client` left it
+behind because the adapter still depended on it. It is the NextAuth Prisma adapter, dead for
+the same reason NextAuth was.
 
 The full runbook is `docs/SECRET_ROTATION.md`; `scripts/verify-secrets.js
 --production` calls each provider and reports what actually happened.
