@@ -659,6 +659,66 @@ balance not updated". The second is worse to diagnose because `points_transactio
 the points were granted while the balance never moved, so its alert names the exact amount
 to add by hand.
 
+### Auto-refill: a `throw` that reported the opposite of what happened (#80, 2026-07-29)
+
+`cron/auto-buy` charges saved cards off-session, once an hour. When the charge succeeded but
+the credit grant failed, the code did `throw new Error('Failed to update credits: …')` — and
+the enclosing `catch` is the *Stripe* catch, so the operator was told **"Payment failed"**
+for a card that had just been charged successfully. The customer paid and got nothing, and
+the one record of it pointed the wrong way. It now alerts with the PaymentIntent id and
+`continue`s to the next user instead of aborting.
+
+The decline branch had the pattern this file keeps coming back to: `auto_topup: false` was
+written fire-and-forget. Unchecked, so if the update failed the cron **retried the declined
+card every hour**; unannounced, so when it succeeded the customer's auto-refill switched
+itself off and nothing told them — they discovered it by hitting zero credits and losing the
+ability to send. Both branches are handled now, and the customer is notified, because only
+they can fix a card.
+
+### Throttled alerting for anything that runs on a schedule
+
+`lib/alerting.ts` → `alertAdminsThrottled({ key, title, body, data, windowMinutes })`.
+
+`notifyAdmins()` is right for a one-off. It is **wrong for the crons**, which run every 5–10
+minutes: a per-occurrence alert on a persistent fault is ~288 notifications a day, and a
+channel that fires constantly gets muted, which costs more than having no channel. This
+alerts on the first occurrence in a window (default 60 min) and logs the rest with a 🔁
+marker.
+
+Dedupe state lives in the notification rows themselves — `data.alert_key`, queried with
+`.filter('data->>alert_key', 'eq', key)` — **not** in module scope. Each cron invocation is a
+separate serverless instance, so an in-memory cache would never see the previous run. If the
+dedupe lookup itself fails it sends anyway; a duplicate alert beats losing the only signal.
+
+Wired to whole-run and fetch-work failures in all five crons, where the outcome is "nothing
+was processed and nobody knows":
+
+> **`process-scheduled` returns `ok: true` when it processes nothing.** If
+> `get_messages_ready_to_send()` errors, `processScheduledMessages()` returns
+> `{ processed: 0, error }` and the route still responds **200 `ok: true`**. An uptime check
+> sees green while not one scheduled message goes out. This is why the alert is on the RPC
+> error and not on the HTTP status.
+
+Two sites in the **SMS webhook**, both losses rather than errors:
+- **an inbound reply that fails to save is unrecoverable** — Telnyx has already accepted the
+  webhook and will not redeliver, so the message is gone and the owner just sees a lead who
+  apparently never replied.
+- **a failed `add_to_dnc` means someone texted STOP and is still sendable.** Keyed per phone
+  number (`dnc_write_failed:{user}:{phone}`, 24h window) rather than per route: the remedy is
+  adding *that* number by hand, so each affected person needs their own alert, while webhook
+  redeliveries of the same STOP still collapse.
+
+Left as plain logs, deliberately: delivery-status update failures and the per-message
+diagnostics where the surrounding code recovers correctly. The filter that decides is *did a
+customer pay, or lose a message, and would nobody find out?*
+
+Verified 9/9 against the live database (sends once, suppresses inside the window, resends
+after it, keys independent), then end-to-end through a real route — a forced throw in
+`process-drips` run twice produced exactly one notification row.
+
+**Caveat that applies to every alert above:** these are in-app notifications only. There is
+no email or SMS escalation (#79), so they are seen by whoever opens the app, not pushed.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
