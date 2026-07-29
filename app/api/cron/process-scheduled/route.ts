@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { timingSafeEqual } from 'crypto';
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
+import { checkSmsAllowed } from "@/lib/smsGuard";
 
 // MED-7: Use service role client — user-scoped createClient() has no session in cron context
 // and RLS filters all rows to empty. Service role bypasses RLS as intended for cron jobs.
@@ -119,28 +120,13 @@ async function processScheduledMessages(supabase: any) {
   // Process each message
   for (const message of readyMessages) {
     try {
-      // Check quiet hours for this user
+      // Quiet hours are checked further down, once the lead is loaded — they
+      // now gate on the RECIPIENT's local time (#60), which needs lead.state.
       const { data: userSettings } = await supabase
         .from('users')
-        .select('credits, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone')
+        .select('credits')
         .eq('id', message.user_id)
         .single();
-
-      if (userSettings?.quiet_hours_enabled) {
-        const now = new Date();
-        const userTz = userSettings.timezone || 'America/New_York';
-        const userTime = new Date(now.toLocaleString('en-US', { timeZone: userTz }));
-        const currentHour = userTime.getHours();
-        const currentMinute = userTime.getMinutes();
-        const currentTimeStr = `${String(currentHour).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}`;
-        const start = (userSettings.quiet_hours_start || '08:00').substring(0, 5);
-        const end = (userSettings.quiet_hours_end || '20:00').substring(0, 5);
-
-        if (currentTimeStr < start || currentTimeStr >= end) {
-          console.log(`Skipping scheduled message ${message.id} - outside quiet hours for user ${message.user_id}`);
-          continue;
-        }
-      }
 
       if (!userSettings || userSettings.credits < message.credits_cost) {
         // Not enough credits - mark as failed
@@ -178,27 +164,39 @@ async function processScheduledMessages(supabase: any) {
         continue;
       }
 
-      // HIGH-4: DNC check before sending — skip if lead has opted out
+      // Single gate for opt-out and quiet hours (#60). This path used to run its
+      // own inline DNC check plus a sender-local quiet-hours check — the only
+      // send path still gating on the SENDER's timezone after #50. A lead in
+      // California with a message scheduled by an Eastern user was evaluated
+      // against Eastern time, so an 08:00 release arrived at 05:00 their time.
+      //
+      // Placed after the lead load (it needs lead.state) and BEFORE the
+      // pending->sending claim below, so a quiet-hours deferral leaves the row
+      // pending for a later run rather than stranding it in 'sending' (#44).
       if (lead.phone) {
-        const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
-          p_user_id: message.user_id,
-          p_phone_number: lead.phone
+        const guard = await checkSmsAllowed(supabase, message.user_id, lead.phone, {
+          enforceQuietHours: true,
+          recipientState: lead.state,
+          context: { source: 'scheduled', scheduled_message_id: message.id },
         });
-        if (!dncError && dncCheck) {
-          const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
-          if (dncResult.on_dnc_list) {
-            console.log(`🚫 Scheduled msg ${message.id} blocked — ${lead.phone} is on DNC list`);
-            await supabase
-              .from('scheduled_messages')
-              .update({
-                status: 'failed',
-                error_message: `Blocked: on DNC list (${dncResult.reason || 'opted out'})`,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', message.id);
-            failed++;
+
+        if (!guard.allowed) {
+          if (guard.retryable) {
+            // Quiet hours — leave pending, the next run will pick it up.
+            console.log(`Scheduled msg ${message.id} deferred — ${guard.detail}`);
             continue;
           }
+          console.log(`🚫 Scheduled msg ${message.id} blocked — ${guard.reason} (${guard.detail})`);
+          await supabase
+            .from('scheduled_messages')
+            .update({
+              status: 'failed',
+              error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', message.id);
+          failed++;
+          continue;
         }
       }
 
