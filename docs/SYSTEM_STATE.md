@@ -773,6 +773,47 @@ precise for split states and would remove the both-zones conservatism above;
 
 ---
 
+## Account deletion (#87)
+
+`app/api/user/delete-account/route.ts`. Purges **47 tables** explicitly; 13 more cascade from
+`public.users`. It used to delete six, leaving threads, clients, notes, AI flows, templates,
+receptionist settings and ~30 other tables of personal data behind.
+
+Every delete is error-checked and failures are collected. **A failed auth deletion now returns
+an error** — it previously returned `success: true` unconditionally, with a comment saying so,
+which told users their account was gone while their login still worked. Partial failures raise
+an admin alert.
+
+Ordering that matters: purge tables → delete `public.users` → delete the auth record **last**.
+`public.users` references `auth.users`, so removing the profile first is what lets the auth
+delete succeed. Stripe subscriptions are cancelled first, and phone numbers are released from
+Telnyx and un-assigned from `number_pool` before any of it.
+
+### The retention list does not currently work
+
+`dnc_list`, `dnc_history`, `payments` and `transactions` are deliberately excluded from the
+purge — opt-outs must outlive an account by law, financial records have retention
+requirements. **That is not enough.** All four have `ON DELETE CASCADE` to **`auth.users`**, so
+the database destroys them when the auth record goes, whatever the route does. Fixing it needs
+a migration on those constraints.
+
+**Trap worth remembering:** `information_schema.constraint_column_usage` does **not** reliably
+report cross-schema foreign keys — it showed zero non-cascading FKs on these tables and missed
+all four CASCADEs to `auth`. `pg_constraint` is authoritative:
+
+```sql
+SELECT cl.relname AS child, ns.nspname||'.'||pf.relname AS parent, c.confdeltype
+FROM pg_constraint c
+JOIN pg_class cl ON cl.oid=c.conrelid
+JOIN pg_class pf ON pf.oid=c.confrelid
+JOIN pg_namespace ns ON ns.oid=pf.relnamespace
+WHERE c.contype='f';
+```
+
+`confdeltype`: `c`=CASCADE, `n`=SET NULL, `a`=NO ACTION, `r`=RESTRICT.
+
+---
+
 ## Audit 2026-07-29 (overnight) — what it found
 
 **`deduct_credits` did not exist — created 2026-07-29 (#90).** Ten code paths called it while
