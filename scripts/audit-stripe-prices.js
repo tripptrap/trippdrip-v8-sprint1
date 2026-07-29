@@ -108,6 +108,58 @@ async function checkPrice(label, id, expected) {
   return ok && flags.length === 0;
 }
 
+/**
+ * Every price id the app can charge. Anything active in Stripe but absent from
+ * this set is chargeable without appearing anywhere in the code.
+ */
+function configuredPriceIds() {
+  return new Set([
+    ...Object.values(PACK_PRICE_IDS.growth),
+    ...Object.values(PACK_PRICE_IDS.scale),
+    ...PLAN_PRICES.map(([, id]) => id),
+    process.env.STRIPE_PHONE_NUMBER_PRICE_ID || 'price_1StXaTFyk0lZUopFFJDEClnd',
+  ]);
+}
+
+/**
+ * Report active prices the app never references.
+ *
+ * The per-price check above only proves the ids the app *uses* carry the right
+ * amount. It says nothing about extras — and because Stripe prices are
+ * immutable, every price change leaves the previous one behind, still active
+ * and still chargeable, unless it is explicitly archived. This account had two
+ * such leftovers ($187.50 on Business Premium, $420 on Enterprise Premium) plus
+ * a stray $15 "myproduct", none referenced by any code path.
+ *
+ * Warning rather than failure: a legitimately unused price isn't wrong, and a
+ * check that fails on it would get muted. Archive them in Stripe to silence it.
+ */
+async function reportUnreferencedPrices(configured) {
+  const products = await stripe.products.list({ limit: 100, active: true });
+  const strays = [];
+  for (const product of products.data) {
+    const prices = await stripe.prices.list({ product: product.id, limit: 100 });
+    for (const price of prices.data) {
+      if (!price.active || configured.has(price.id)) continue;
+      strays.push({
+        product: product.name,
+        amount: (price.unit_amount ?? 0) / 100,
+        recurring: price.recurring ? `/${price.recurring.interval}` : ' one-time',
+        id: price.id,
+      });
+    }
+  }
+  if (strays.length === 0) {
+    console.log('no unreferenced active prices');
+    return;
+  }
+  console.log(`⚠️  ${strays.length} active price(s) chargeable but referenced by no code path:`);
+  for (const s of strays) {
+    console.log(`  ${s.product.padEnd(24)} $${s.amount.toFixed(2).padStart(8)}${s.recurring}   ${s.id}`);
+  }
+  console.log('  Archive these in Stripe unless something outside this repo needs them.');
+}
+
 (async () => {
   const mode = key.startsWith('sk_live') ? 'LIVE' : 'TEST';
   console.log(`Stripe price audit — key mode: ${mode}\n`);
@@ -133,6 +185,9 @@ async function checkPrice(label, id, expected) {
   for (const [label, id, expected] of PLAN_PRICES) {
     if (!(await checkPrice(`${label} /mo`, id, expected))) failures++;
   }
+
+  console.log('');
+  await reportUnreferencedPrices(configuredPriceIds());
 
   console.log('');
   if (failures) {
