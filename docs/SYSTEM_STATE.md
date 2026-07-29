@@ -415,9 +415,31 @@ Unresolved: whether Vercel preserves trailing newlines into `process.env` at run
 provable from outside; the circumstantial evidence is the 8 deliberate
 `process.env.STRIPE_SECRET_KEY?.trim()` calls someone added.
 
-Also note **22 vars read by code are unset in Production** (#84) — all 11 `STRIPE_PRICE_*`
-among them, which resolve today only because the hardcoded fallbacks belong to the same
-sandbox the production key points at.
+### The 22 unset production vars, audited (#84)
+
+43 variables are read across `app/`, `lib/` and `components/`; 21 are set in Production. **None
+of the 22 unset ones is currently causing a bug** — but the reasons differ and were not
+obvious, so they are recorded rather than left to be re-derived:
+
+| variable(s) | verdict |
+|---|---|
+| the 11 `STRIPE_PRICE_*` | fall back to hardcoded ids that resolve **only** because the production key is the sandbox's. **Become required the moment a live key is set** — see `STRIPE_LIVE_MIGRATION.md` |
+| `RESEND_API_KEY` | dead — the only reference is commented out |
+| `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY` | were read only by `lib/googleCalendar.ts`, which nothing imported. Deleted. The live Calendar path is OAuth with per-user refresh tokens and `GOOGLE_CLIENT_ID` |
+| `NEXT_PUBLIC_SITE_URL` | falls back to `https://hyvewyre.com`; the apex domain serves 200 without redirecting, so opt-in links are valid |
+| `SERVICE_EMAIL_FROM_NAME`, `TIMEZONE` | sane literal fallbacks |
+| the 5 `SMTP_*` | unused while `SERVICE_EMAIL_PROVIDER=sendgrid` — **safe only because of another variable's value** |
+
+That last row was the fragile one. The SMTP branch built a transport pointing at
+`smtp.gmail.com` with no credentials, so a wrong provider value produced per-send failures
+rather than saying the app was misconfigured. All three email paths now throw with the fix
+in the message.
+
+**`scripts/check-required-env.js`** encodes the table above — required / conditional /
+optional-with-a-checked-fallback — and exits non-zero on a real gap. It also re-flags the #85
+whitespace values. Run it with `--production` before a deploy that touches configuration.
+Local `.env.local` currently fails it: `SERVICE_EMAIL_PROVIDER` is not `sendgrid` there and no
+SMTP credentials are set, so local email is broken while production's works.
 
 ### The Stripe account is a sandbox (#81) — migration runbook exists
 

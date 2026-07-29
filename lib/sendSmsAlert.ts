@@ -28,6 +28,20 @@ function createEmailTransporter() {
       auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
     });
   }
+
+  // Reached whenever the provider isn't sendgrid. Without credentials this
+  // builds a transport pointing at smtp.gmail.com with no auth, which fails
+  // per-send with an opaque error rather than saying the app is misconfigured.
+  // In production SMTP_* are all unset (#84), so this branch is only correct if
+  // someone has deliberately configured SMTP.
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    throw new Error(
+      `Email is not configured: SERVICE_EMAIL_PROVIDER is "${provider}", which needs ` +
+      `SMTP_USER and SMTP_PASSWORD. Set those, or set SERVICE_EMAIL_PROVIDER=sendgrid ` +
+      `with SENDGRID_API_KEY.`
+    );
+  }
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
