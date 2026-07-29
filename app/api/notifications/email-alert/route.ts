@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     // Also allow system calls (cron/webhooks) with API key
     const apiKey = req.headers.get('x-api-key');
-    const isSystemCall = apiKey && apiKey === process.env.SYSTEM_API_KEY;
+    const isSystemCall = apiKey && apiKey === process.env.SYSTEM_API_KEY?.trim();
 
     if (!user && !isSystemCall) {
       return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });

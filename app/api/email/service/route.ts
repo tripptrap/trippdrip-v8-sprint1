@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     // Allow system calls (for cron jobs, webhooks, etc.) with API key
     const apiKey = req.headers.get('x-api-key');
-    const systemApiKey = process.env.SYSTEM_API_KEY;
+    const systemApiKey = process.env.SYSTEM_API_KEY?.trim();
 
     if (!user && (!apiKey || apiKey !== systemApiKey)) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });

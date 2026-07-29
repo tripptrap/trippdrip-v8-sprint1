@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': process.env.SYSTEM_API_KEY || '',
+                'x-api-key': (process.env.SYSTEM_API_KEY || '').trim(),
               },
               body: JSON.stringify({
                 type: 'account_suspended',
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': process.env.SYSTEM_API_KEY || '',
+                'x-api-key': (process.env.SYSTEM_API_KEY || '').trim(),
               },
               body: JSON.stringify({
                 type: 'account_banned',
@@ -287,7 +287,7 @@ export async function POST(req: NextRequest) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': process.env.SYSTEM_API_KEY || '',
+                'x-api-key': (process.env.SYSTEM_API_KEY || '').trim(),
               },
               body: JSON.stringify({
                 type: 'credits_granted',

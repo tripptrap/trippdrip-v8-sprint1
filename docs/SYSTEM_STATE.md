@@ -404,12 +404,33 @@ tolerance: `SERVICE_EMAIL_PROVIDER === 'sendgrid'` is false for `'sendgrid\n'`, 
 three email paths fell through to an SMTP branch with no credentials set. Those reads are
 now `.trim()`ed.
 
-**`ENCRYPTION_KEY` is a landmine.** `lib/encryption.ts` reads it untrimmed, so the newline
-is part of the key material. Self-consistent today, so it works — but **adding `.trim()`
-there, or stripping the newline in Vercel, silently makes all existing ciphertext
-undecryptable.** Do it only while nothing is encrypted. `account_pin` on number ports is
-the only encrypted field and no port order exists yet, so the window is open — this is the
-same ordering constraint CLAUDE.md records for #29.
+**The newlines are now harmless — the code trims where meaning depends on it.** Tested
+individually rather than assumed: an untrimmed key works as an `Authorization` header against
+both OpenAI and SendGrid (undici normalises header values), an untrimmed URL works in `fetch`
+and `new URL()`, and an untrimmed service-role key authenticates to Supabase. The only places
+a newline changes semantics are **exact string comparison** and **key material**, and both are
+fixed:
+
+- `SERVICE_EMAIL_PROVIDER` / `SERVICE_EMAIL_FROM` — trimmed (an untrimmed `'sendgrid\n'`
+  failed `=== 'sendgrid'` and silently selected an unconfigured SMTP branch)
+- `SYSTEM_API_KEY` — trimmed on both sides of its `===`; self-consistent before, but an
+  external caller sending the real key would have failed
+- **`ENCRYPTION_KEY` — trimmed in `lib/encryption.ts`**
+
+**The `ENCRYPTION_KEY` detail is worth understanding.** `getEncryptionKey()` branches on
+`length === 64 && /^[0-9a-fA-F]+$/`. Untrimmed the value is 65 chars, fails that test, and
+falls through to the **scrypt** branch — so the key in use was derived from
+`"<64 hex chars>\n"` rather than being the 32 raw bytes the hex was meant to supply. It
+worked because it was self-consistent, and it made the newline part of the key material:
+adding the trim later would have silently invalidated every ciphertext.
+
+Adding it was safe **only** because nothing is encrypted — verified 2026-07-29 that both
+encrypted columns are empty (`porting_orders.account_pin` and
+`user_preferences.email_api_key_encrypted`, 0 rows each). Round-trip verified with the real
+production key. **If ciphertext exists, that `.trim()` cannot be removed or altered without a
+decrypt/re-encrypt migration.**
+
+Stripping the newlines in Vercel is now cosmetic; it rides along with #29's rotation.
 
 Unresolved: whether Vercel preserves trailing newlines into `process.env` at runtime. Not
 provable from outside; the circumstantial evidence is the 8 deliberate

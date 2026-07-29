@@ -11,7 +11,23 @@ const SALT_LENGTH = 32;
  * In production, ENCRYPTION_KEY should be a 32-byte hex string (64 characters)
  */
 function getEncryptionKey(): Buffer {
-  const envKey = process.env.ENCRYPTION_KEY;
+  // .trim() is load-bearing and was added deliberately (#85).
+  //
+  // The production value carries a trailing newline. Untrimmed it is 65 chars,
+  // fails the hex test below, and falls through to the scrypt branch — so the
+  // key in use was derived from "<64 hex chars>\n" via scrypt rather than being
+  // the 32 raw bytes the hex was meant to supply. Self-consistent, so it worked,
+  // but not the intended path, and it made the newline part of the key material:
+  // adding this trim later would have silently invalidated every ciphertext.
+  //
+  // Safe to add now because nothing is encrypted — verified 2026-07-29 that both
+  // encrypted columns are empty (porting_orders.account_pin and
+  // user_preferences.email_api_key_encrypted, 0 rows each). With the trim here,
+  // whether the stored value has a newline stops mattering at all.
+  //
+  // If ciphertext exists when you read this, do NOT remove or alter this line
+  // without a decrypt/re-encrypt migration.
+  const envKey = process.env.ENCRYPTION_KEY?.trim();
 
   if (!envKey) {
     throw new Error('ENCRYPTION_KEY environment variable is not set. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
