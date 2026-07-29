@@ -15,7 +15,11 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export type SmsAlertType = 'new_message' | 'low_credits' | 'opt_out' | 'appointment';
 
 function createEmailTransporter() {
-  const provider = process.env.SERVICE_EMAIL_PROVIDER || 'smtp';
+  // .trim() matters: several production env values carry a trailing
+  // newline, and this is an exact string comparison — 'sendgrid\n'
+  // silently falls through to the SMTP branch, which has no credentials
+  // configured, so email fails with no error anyone sees.
+  const provider = (process.env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
   if (provider === 'sendgrid') {
     return nodemailer.createTransport({
       host: 'smtp.sendgrid.net',
@@ -144,8 +148,8 @@ export async function sendSmsAlertToUser(
         }
 
         if (template) {
-          const FROM_EMAIL = process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com';
-          const FROM_NAME = process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre';
+          const FROM_EMAIL = (process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com').trim();
+          const FROM_NAME = (process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre').trim();
           const transporter = createEmailTransporter();
           await transporter.sendMail({
             from: `${FROM_NAME} <${FROM_EMAIL}>`,

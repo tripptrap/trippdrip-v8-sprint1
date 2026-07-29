@@ -13,7 +13,11 @@ export const dynamic = 'force-dynamic';
 type AlertType = 'new_message' | 'appointment' | 'low_credits' | 'opt_out';
 
 function createTransporter() {
-  const provider = process.env.SERVICE_EMAIL_PROVIDER || 'smtp';
+  // .trim() matters: several production env values carry a trailing
+  // newline, and this is an exact string comparison — 'sendgrid\n'
+  // silently falls through to the SMTP branch, which has no credentials
+  // configured, so email fails with no error anyone sees.
+  const provider = (process.env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
   if (provider === 'sendgrid') {
     return nodemailer.createTransport({
       host: 'smtp.sendgrid.net',
@@ -125,8 +129,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: `Unknown alert type: ${type}` }, { status: 400 });
     }
 
-    const FROM_EMAIL = process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com';
-    const FROM_NAME = process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre';
+    const FROM_EMAIL = (process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com').trim();
+    const FROM_NAME = (process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre').trim();
 
     const transporter = createTransporter();
     await transporter.sendMail({

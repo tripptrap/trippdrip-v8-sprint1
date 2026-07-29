@@ -366,6 +366,35 @@ chargeable**, unless someone archives it. Three such strays exist (`$187.50` on 
 Premium, `$420` on Enterprise Premium — both pre-#39 figures — plus a `$15` "myproduct"),
 so the audit warns on any active price no code path references.
 
+### Production env: trailing newlines in 13 values (#85)
+
+13 of 33 Production env vars have a **trailing newline in the stored value** — including
+`ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `OPENAI_API_KEY` and
+`SERVICE_EMAIL_PROVIDER`. `vercel env pull` escapes these as `\n` in the dotenv file; that
+escaping is *not* the bug and reads as one at first glance.
+
+Most are harmless — **verified rather than assumed**: a Supabase client built with the
+untrimmed service-role key authenticates and queries fine, and the Stripe key authenticates
+once unescaped. Where it bites is **exact string comparison**, which has no library
+tolerance: `SERVICE_EMAIL_PROVIDER === 'sendgrid'` is false for `'sendgrid\n'`, so all
+three email paths fell through to an SMTP branch with no credentials set. Those reads are
+now `.trim()`ed.
+
+**`ENCRYPTION_KEY` is a landmine.** `lib/encryption.ts` reads it untrimmed, so the newline
+is part of the key material. Self-consistent today, so it works — but **adding `.trim()`
+there, or stripping the newline in Vercel, silently makes all existing ciphertext
+undecryptable.** Do it only while nothing is encrypted. `account_pin` on number ports is
+the only encrypted field and no port order exists yet, so the window is open — this is the
+same ordering constraint CLAUDE.md records for #29.
+
+Unresolved: whether Vercel preserves trailing newlines into `process.env` at runtime. Not
+provable from outside; the circumstantial evidence is the 8 deliberate
+`process.env.STRIPE_SECRET_KEY?.trim()` calls someone added.
+
+Also note **22 vars read by code are unset in Production** (#84) — all 11 `STRIPE_PRICE_*`
+among them, which resolve today only because the hardcoded fallbacks belong to the same
+sandbox the production key points at.
+
 ### The Stripe account is a sandbox (#81)
 
 `STRIPE_SECRET_KEY` is a **test** key for `acct_1SPlVzFyk0lZUopF`, display name
