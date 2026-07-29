@@ -235,6 +235,32 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // #71: claim the drip BEFORE sending. This used to advance
+        // messages_sent/next_send_at afterwards, so a failed update left BOTH
+        // unchanged — next_send_at stayed in the past and the counter never
+        // moved, meaning max_messages could never engage as a backstop and the
+        // same message went out every 10 minutes indefinitely.
+        //
+        // Conditional on the counter we read, so two workers can't both take it.
+        const claimedMessagesSent = drip.messages_sent + 1;
+        const claimedNextSendAt = new Date(now.getTime() + drip.interval_hours * 60 * 60 * 1000);
+
+        const { data: claimed, error: claimError } = await supabaseAdmin
+          .from('ai_drips')
+          .update({
+            messages_sent: claimedMessagesSent,
+            next_send_at: claimedNextSendAt.toISOString(),
+          })
+          .eq('id', drip.id)
+          .eq('messages_sent', drip.messages_sent)
+          .select('id')
+          .maybeSingle();
+
+        if (claimError || !claimed) {
+          console.log(`AI Drip ${drip.id}: could not claim (already taken or update failed) — skipping to avoid a double send`);
+          continue;
+        }
+
         // Send via Telnyx
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com';
         const sendResponse = await fetch(`${baseUrl}/api/telnyx/send-sms`, {
@@ -257,10 +283,15 @@ export async function POST(req: NextRequest) {
         const sendData = await sendResponse.json();
 
         if (!sendResponse.ok || !sendData.success) {
-          console.error(`AI Drip ${drip.id}: Failed to send:`, sendData.error);
+          // The claim above already advanced messages_sent and next_send_at, so
+          // this attempt is consumed rather than retried immediately. That's the
+          // deliberate trade from #44 — a skipped message is cheaper than an
+          // unbounded resend loop. Recorded in last_error so it's visible rather
+          // than looking like a message that simply never went out.
+          console.error(`AI Drip ${drip.id}: Failed to send (attempt consumed, next try at ${claimedNextSendAt.toISOString()}):`, sendData.error);
           await supabaseAdmin
             .from('ai_drips')
-            .update({ last_error: sendData.error || 'Failed to send' })
+            .update({ last_error: `Failed to send: ${sendData.error || 'unknown error'} (attempt consumed)` })
             .eq('id', drip.id);
           errors++;
           continue;
@@ -283,16 +314,16 @@ export async function POST(req: NextRequest) {
           console.error(`❌ AI drip ${drip.id} sent but credits NOT deducted for user ${drip.user_id}:`, deductError);
         }
 
-        // Update drip record
-        const newMessagesSent = drip.messages_sent + 1;
-        const nextSendAt = new Date(now.getTime() + drip.interval_hours * 60 * 60 * 1000);
+        // Counter and next_send_at were already advanced by the claim above;
+        // this only records the outcome.
+        const newMessagesSent = claimedMessagesSent;
+        const nextSendAt = claimedNextSendAt;
 
         // Check if this completes the drip
         if (drip.max_messages && newMessagesSent >= drip.max_messages) {
           await supabaseAdmin
             .from('ai_drips')
             .update({
-              messages_sent: newMessagesSent,
               status: 'completed',
               last_error: null,
             })

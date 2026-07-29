@@ -240,6 +240,24 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // #71: claim the event BEFORE sending. reminder_sent_at was set after,
+        // so a failed update left it null and the reminder went out again on
+        // every run — every 2 hours, indefinitely. Conditional on it still
+        // being null, so concurrent runs can't both take it.
+        const { data: claimedEvent, error: claimError } = await supabaseAdmin
+          .from('calendar_events')
+          .update({ reminder_sent_at: new Date().toISOString(), reminder_status: 'sending' })
+          .eq('id', event.id)
+          .is('reminder_sent_at', null)
+          .select('id')
+          .maybeSingle();
+
+        if (claimError || !claimedEvent) {
+          console.log(`Appointment reminder: could not claim event ${event.id} — skipping to avoid a duplicate`);
+          skipped++;
+          continue;
+        }
+
         // Send via Telnyx
         const sendResult = await sendTelnyxSMS({
           to: leadPhone,
@@ -248,7 +266,12 @@ export async function POST(req: NextRequest) {
         });
 
         if (!sendResult.success) {
-          console.error(`Appointment reminder: Failed to send to ${leadPhone}:`, sendResult.error);
+          // reminder_sent_at was set by the claim above, so this won't retry.
+          // Deliberate (#71/#44): a missed reminder is cheaper than texting the
+          // lead every 2 hours forever. Clearing reminder_sent_at here would
+          // restore retries and reintroduce the loop, so it's left set and the
+          // failure is recorded in reminder_status for visibility.
+          console.error(`Appointment reminder: Failed to send to ${leadPhone} (will not retry):`, sendResult.error);
           await supabaseAdmin
             .from('calendar_events')
             .update({ reminder_status: 'error' })
