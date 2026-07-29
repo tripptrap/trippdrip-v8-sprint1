@@ -709,7 +709,8 @@ the live 08:00–20:00 window: at 20:45 Eastern a Florida lead computed as 19:45
 If you touch `STATE_TIMEZONES`, keep it a list per state and keep the any-zone-blocks rule
 — a window has two edges and a one-zone guess can only be safe at one of them.
 
-**Credits: always use the `deduct_credits` RPC, never read-then-write.** Two paths had
+**Credits: always use the `deduct_credits` RPC, never read-then-write** — but note that RPC
+**does not currently exist** (#90), so this is the target state, not today's. Two paths had
 read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
 read *before* its send loop began and discarding any concurrent spend.
 
@@ -738,6 +739,47 @@ mark the row `failed` with the reason; retryable ones leave it `pending`.
 Known limitation: timezone resolution is state-level. `leads.zip_code` would be more
 precise for split states and would remove the both-zones conservatism above;
 `lib/geo/selectClosestNumber.ts` already does zip-based work if that's ever wanted.
+
+---
+
+## Audit 2026-07-29 (overnight) — what it found
+
+**`deduct_credits` does not exist (#90).** Ten code paths call it; `pg_proc` has no function
+matching `%credit%` in any schema, and no migration defines one. Verified live:
+`PGRST202 — Could not find the function public.deduct_credits(amount, user_id)`.
+
+This file previously instructed *"always use the `deduct_credits` RPC, never read-then-write"*
+and CLAUDE.md lists it under Key RPC Functions. **Both were describing a function that was
+never created.** Corrected here; that instruction is only valid once #90 lands.
+
+Consequences split by caller: `telnyx/send-sms` and `cron/process-drips` **fail closed** (the
+send is blocked — UI sending returns HTTP 500), everything else **fails open** (message goes
+out, never charged). Nothing has actually broken for a user because the newest row in
+`messages` is 2026-02-16, predating every call site. It is total but latent.
+
+Of 24 distinct RPCs the code calls, `deduct_credits` is the **only** missing one — checked
+exhaustively. All 47 table references resolve. The rest of CLAUDE.md's RPC list is accurate,
+and `is_within_quiet_hours` is called with the right parameter names (a mismatch fails
+identically, so it is worth checking when adding RPC calls). `schedule_message` and
+`stop_ai_drip_on_reply` exist but no code calls them.
+
+**Clean areas, verified rather than assumed:** RLS is enabled with policies on all 59 public
+tables; there are no referential orphans across the nine relationships checked; all five
+`vercel.json` crons have route files and verify `CRON_SECRET`, with no unscheduled cron
+routes; all 50 page routes resolve in production with no 404s or 500s.
+
+**`dnc_global` is dead-but-load-bearing (#88).** `check_dnc()` reads it, nothing anywhere
+writes it, and it is readable by `anon` via a `USING (true)` policy. The global half of the
+DNC model CLAUDE.md describes has never existed.
+
+**Four pages ship with zero inbound links (#89)** — `/messages` (1177 lines), `/dnc`,
+`/sms-analytics`, `/analytics-automation`. CLAUDE.md documents `/messages` as the live
+conversation inbox; the real one is `/texts`, a 63-line wrapper around `TextsLayout`.
+
+**153 fire-and-forget writes across 52 files** — writes whose result is never captured, so a
+failure is indistinguishable from success. Most are harmless; the money-adjacent one is
+`number-pool/purchase-with-credits` (#91), which does read-then-write credit maths and tells
+the user "Credits refunded" without checking whether the refund succeeded.
 
 ---
 
