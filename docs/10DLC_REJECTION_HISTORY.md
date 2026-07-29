@@ -19,7 +19,7 @@ Brand: **HyveWyre LLC** — `4b20019b-eba4-6bfd-8723-dca9058142e8` — status **
 | 4 | `4b30019f-a1d4-686f-b131-a9fa2c7ff808` | 2026-07-27 04:28 | LOW_VOLUME | TCR_FAILED | missing `subUsecases` |
 | 5 | `4b30019f-a211-5044-960e-8212c4af0d4e` | 2026-07-27 05:34 | MIXED | TELNYX_FAILED | opt-in form had no consent checkbox |
 | 6 | `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` | 2026-07-28 01:00 | MIXED | TELNYX_FAILED | consent text didn't cover MARKETING |
-| 7 | `4b30019f-a9aa-5d53-15ff-8fab24597ea8` | 2026-07-28 16:59 | MIXED | ✅ **PASSED — ACTIVE, TCR `CAAP953`** | none |
+| 7 | `4b30019f-a9aa-5d53-15ff-8fab24597ea8` | 2026-07-28 16:59 | MIXED | passed Telnyx review; **`campaignStatus: MNO_PENDING`** | none |
 
 ### #1 — verbatim reasons
 > Who is the perceived sender of the messages? If it's a business using your platform, then each business will need a brand and campaign created specifically for them.
@@ -139,14 +139,16 @@ separate from ToS agreement · submittable without opting in.
   frequency + rates + consent-not-condition + STOP; opt-out needs brand +
   no-further-messages; help needs brand + real contact. All three comply.
 
-## ✅ Approved on attempt 7 (2026-07-29)
+## Attempt 7 — cleared Telnyx review, MNO stage still pending (2026-07-29)
 
 Campaign `4b30019f-a9aa-5d53-15ff-8fab24597ea8` cleared Telnyx review roughly 11 hours
-after submission: `status: ACTIVE`, **`failureReasons: null`**, and a real TCR campaign id
-**`CAAP953`** (earlier attempts echoed the campaign UUID back in that field, which is the
-tell for "not registered at TCR").
+after submission: **`failureReasons: null`** and a real TCR campaign id **`CAAP953`**
+(earlier attempts echoed the campaign UUID back in that field, which is the tell for
+"not registered at TCR").
 
-Read those three together — `status` alone is meaningless, as the section below explains.
+**It is not fully approved.** `campaignStatus` is **`MNO_PENDING`** — the carriers'
+own stage, which follows Telnyx's review. See the status-field section below; reading
+`status: ACTIVE` as approval is a mistake that has now been made twice.
 
 **What finally fixed it** (attempt 6 → 7): the opt-in consent language and the START
 auto-response were both broadened to name every declared sub-usecase, after Telnyx flagged
@@ -159,7 +161,34 @@ diff in `docs/10dlc-submissions/`.
 ("Assign my number") before it can send at 10DLC throughput. The three toll-free pool
 numbers are unaffected — they run on TFV, not 10DLC.
 
-## Reading campaign status correctly — this misled a session
+## Reading campaign status correctly — FOUR fields, and the obvious one is wrong
+
+`GET /10dlc/campaign/{id}` returns several status-ish fields. They mean different things and
+**`status` is the least useful of them.** Reading it as "approved" has now caused two wrong
+calls in this project.
+
+| field | example | what it actually means |
+|---|---|---|
+| `status` | `ACTIVE` | the TCR **record** exists. Says nothing about approval — campaigns the portal shows as "Failed Telnyx Review" also report `ACTIVE`. |
+| `failureReasons` | `null` | **Telnyx's own review.** Non-empty = the portal's "Failed Telnyx Review". |
+| `tcrCampaignId` | `CAAP953` | a real TCR id means registration succeeded. If it equals the campaign UUID, it didn't. |
+| `campaignStatus` | `MNO_PENDING` | **the carrier stage — the one that gates sending.** |
+
+Two extra endpoints give the carrier detail:
+
+- `GET /10dlc/campaign/{id}/operationStatus` → per-MNO approval, keyed by carrier id
+- `GET /10dlc/campaign/{id}/mnoMetadata` → per-MNO throughput, message class, review flags
+
+As of 2026-07-29 all seven carriers report `APPROVED` via `operationStatus` (AT&T,
+T-Mobile, Verizon, US Cellular, Liberty, ClearSky, Interop) while `campaignStatus` still
+reads `MNO_PENDING` and `isTMobileRegistered` is `false`. Those disagree, so **treat
+`campaignStatus` as authoritative and wait for it to move** rather than assuming the
+per-carrier view means it's done. AT&T is the only carrier publishing throughput so far
+(240 TPM, message class F).
+
+**Before declaring a campaign approved, check all four fields plus `operationStatus`.**
+
+
 
 `GET /10dlc/campaign/{id}` returns a `status` field that is **not** the review
 outcome. It reflects the TCR record's lifecycle, so a campaign the portal shows as
