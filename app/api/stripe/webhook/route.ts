@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+import { notifyAdmins } from '@/lib/createNotification';
 
 // Must match the fallbacks in app/api/stripe/create-checkout/route.ts —
 // these env vars aren't set in every environment, so both places need
@@ -110,6 +111,12 @@ export async function POST(req: NextRequest) {
               console.log(`⚠️ Number ${phoneNumberPurchase} already recorded for user ${userId} — skipping duplicate webhook for session ${sessionId}`);
             } else {
               console.error(`❌ User ${userId} paid for number ${phoneNumberPurchase} (session ${sessionId}) but it is already owned by a different user (${existingNumber.user_id}). Needs manual review/refund.`);
+              await notifyAdmins(
+                'fulfillment_failed',
+                'Paid number is already owned by another user',
+                `${phoneNumberPurchase} was paid for but belongs to a different account. Refund or assign a replacement.`,
+                { reason: 'already_owned', phone_number: phoneNumberPurchase, user_id: userId, owned_by: existingNumber.user_id, session_id: sessionId }
+              );
             }
             break;
           }
@@ -118,6 +125,12 @@ export async function POST(req: NextRequest) {
             const verifiedNumbers = await getVerifiedTollFreeNumbers();
             if (!verifiedNumbers.has(phoneNumberPurchase)) {
               console.error(`❌ User ${userId} paid for unverified toll-free number ${phoneNumberPurchase} (session ${sessionId}) — order blocked. Needs manual refund or a verified replacement number.`);
+              await notifyAdmins(
+                'fulfillment_failed',
+                'Paid toll-free number is not verified — order blocked',
+                `${phoneNumberPurchase} was paid for but is not TFV-verified, so it was not ordered. Refund or supply a verified replacement.`,
+                { reason: 'tollfree_unverified', phone_number: phoneNumberPurchase, user_id: userId, session_id: sessionId }
+              );
               break;
             }
           }
@@ -127,6 +140,12 @@ export async function POST(req: NextRequest) {
 
           if (!apiKey) {
             console.error(`❌ TELNYX_API_KEY not configured — cannot fulfill paid number ${phoneNumberPurchase} for user ${userId} (session ${sessionId})`);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'Paid number could not be ordered — TELNYX_API_KEY missing',
+              `${phoneNumberPurchase} was paid for but TELNYX_API_KEY is not configured, so nothing was ordered.`,
+              { reason: 'telnyx_key_missing', phone_number: phoneNumberPurchase, user_id: userId, session_id: sessionId }
+            );
             break;
           }
 
@@ -147,6 +166,18 @@ export async function POST(req: NextRequest) {
 
           if (!orderResponse.ok) {
             console.error(`❌ Telnyx order failed for paid number ${phoneNumberPurchase} (user ${userId}, session ${sessionId}):`, JSON.stringify(orderData, null, 2));
+            await notifyAdmins(
+              'fulfillment_failed',
+              'Paid number was rejected by Telnyx',
+              `${phoneNumberPurchase} was paid for but Telnyx rejected the order. Refund or order a replacement manually.`,
+              {
+                reason: 'telnyx_order_rejected',
+                phone_number: phoneNumberPurchase,
+                user_id: userId,
+                session_id: sessionId,
+                telnyx_error: orderData?.errors?.[0]?.detail || orderData?.errors?.[0]?.title || null,
+              }
+            );
             break;
           }
 
@@ -166,6 +197,23 @@ export async function POST(req: NextRequest) {
 
           if (numberInsertError) {
             console.error(`❌ Telnyx order ${orderData.data?.id} succeeded but saving ${phoneNumberPurchase} to user_telnyx_numbers failed for user ${userId}:`, numberInsertError);
+            // The worst of the five: the number is ordered and billing on
+            // Telnyx, the customer paid, and nothing links the two. Unlike the
+            // others this leaves a real orphaned number, so it needs a manual
+            // row rather than just a refund.
+            await notifyAdmins(
+              'fulfillment_failed',
+              'URGENT: number ordered and charged but not saved',
+              `${phoneNumberPurchase} was ordered from Telnyx (order ${orderData.data?.id}) and the customer was charged, but the user_telnyx_numbers write failed. The number is live and billing with no owner recorded — add the row manually.`,
+              {
+                reason: 'ordered_but_not_saved',
+                phone_number: phoneNumberPurchase,
+                user_id: userId,
+                session_id: sessionId,
+                telnyx_order_id: orderData.data?.id ?? null,
+                db_error: numberInsertError.message,
+              }
+            );
           } else {
             console.log(`✅ Ordered and saved number ${phoneNumberPurchase} for user ${userId} (order ${orderData.data?.id}, session ${sessionId})`);
           }

@@ -465,6 +465,29 @@ NOT NULL one, and most code writes `body`. Always set both.
 
 ---
 
+**`createNotification` was itself an instance of this** (#78, 2026-07-29). It wrapped its
+insert in `try/catch` — which, per the rule above, caught nothing, because supabase-js
+resolves with `{ error }` rather than throwing. Every failed notification was reported as
+success and vanished. It now checks `error` and returns a boolean.
+
+**Operator alerts: `notifyAdmins(type, title, body, data)`** in the same file. Resolves
+`ADMIN_EMAILS` to user rows and writes a notification to each. Use it for anything a
+customer experiences but only an operator can fix. All five failure branches of the paid
+number-purchase path in `app/api/stripe/webhook/route.ts` call it — previously each was
+`console.error` + `break`, so on Vercel a customer could pay, receive nothing, and leave no
+trace but a log line nobody reads.
+
+The alert of last resort must not fail quietly, so when it cannot deliver — `ADMIN_EMAILS`
+unset, no matching user row, every insert failing — it logs `🚨 ADMIN ALERT UNDELIVERABLE`
+**with the full alert text inline**, so the log line still carries the whole message. An
+alert that silently fails to send is worse than none: it creates the impression something
+is watching when nothing is. Verified for all three undeliverable cases.
+
+The worst of the five branches is `route.ts` "ordered but not saved" — Telnyx accepted the
+order and the customer was charged, but the `user_telnyx_numbers` write failed, leaving a
+real number live and billing with no owner recorded. That one needs a manual row, not a
+refund, and its alert says so.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
