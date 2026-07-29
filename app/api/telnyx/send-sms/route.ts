@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 import { selectClosestNumber } from '@/lib/geo/selectClosestNumber';
 import { detectSpam } from '@/lib/spam/detector';
 
@@ -375,6 +376,68 @@ export async function POST(req: NextRequest) {
     // Add media for MMS
     if (mediaUrls && mediaUrls.length > 0) {
       requestBody.media_urls = mediaUrls;
+    }
+
+    // Session callers pay, internal ones don't (#72).
+    //
+    // This route is the shared send primitive: the crons and receptionist call
+    // it with x-internal-secret and have already charged credits and checked
+    // quiet hours themselves. But it ALSO accepts a plain session, which
+    // BulkComposeDrawer and SendSMSModal use — and that path charged nothing
+    // and skipped quiet hours, so a user replaying their own app's request
+    // could send unlimited free SMS at any hour.
+    //
+    // Removing the session path isn't an option: those two components are real
+    // callers. So the session path gets the same treatment every other
+    // user-facing send has.
+    if (!isInternalCaller) {
+      let recipientState: string | null = null;
+      if (leadId && supabaseAdmin) {
+        const { data: stateLead } = await supabaseAdmin
+          .from('leads')
+          .select('state')
+          .eq('id', leadId)
+          .eq('user_id', userId)      // scoped — see #64
+          .maybeSingle();
+        recipientState = stateLead?.state ?? null;
+      }
+
+      const guard = await checkSmsAllowed(supabaseAdmin!, userId, to, {
+        enforceQuietHours: true,
+        recipientState,
+        context: { source: 'send-sms', lead_id: leadId ?? null },
+      });
+
+      if (!guard.allowed) {
+        return NextResponse.json(
+          { error: guard.detail || 'Message blocked', reason: guard.reason, retryable: !!guard.retryable },
+          { status: guard.reason === 'quiet_hours' ? 429 : 403 }
+        );
+      }
+
+      const { data: creditRow } = await supabaseAdmin!
+        .from('users')
+        .select('credits')
+        .eq('id', userId)
+        .single();
+
+      if (!creditRow || (creditRow.credits ?? 0) < 1) {
+        return NextResponse.json(
+          { error: 'Insufficient credits. Please purchase a credit pack to keep sending.' },
+          { status: 402 }
+        );
+      }
+
+      const { error: deductError } = await supabaseAdmin!.rpc('deduct_credits', {
+        user_id: userId,
+        amount: 1,
+      });
+
+      if (deductError) {
+        // Fail closed: don't send if we couldn't charge for it.
+        console.error(`send-sms: could not deduct credits for user ${userId} — refusing to send:`, deductError);
+        return NextResponse.json({ error: 'Could not process credits' }, { status: 500 });
+      }
     }
 
     // Send via Telnyx API
