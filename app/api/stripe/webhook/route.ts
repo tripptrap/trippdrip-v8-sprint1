@@ -315,13 +315,15 @@ export async function POST(req: NextRequest) {
             // CRIT-4: Additive credits — subscription renewal tops up balance, does not overwrite.
             // Overwriting would destroy any un-used credits or purchased packs the user has.
             const currentCredits = existingUser.credits || 0;
+            // Credits are granted separately via add_credits (#92) — including
+            // them here would be a read-then-add, silently restoring anything
+            // spent between the read above and this write.
             const { error: updateError } = await supabaseAdmin
               .from('users')
               .update({
                 subscription_tier: planType,
                 plan_type: planType,
                 monthly_credits: monthlyCredits,
-                credits: currentCredits + monthlyCredits,
                 account_status: 'active',
                 stripe_customer_id: session.customer,
                 stripe_subscription_id: session.subscription,
@@ -339,7 +341,20 @@ export async function POST(req: NextRequest) {
                 { reason: 'subscription_update_failed', user_id: userId, plan: planType, monthly_credits: monthlyCredits, session_id: sessionId, db_error: updateError.message }
               );
             } else {
-              console.log(`Updated user ${userId} to ${planType}, added ${monthlyCredits} credits (new balance: ${currentCredits + monthlyCredits})`);
+              const { data: newBalance, error: grantError } = await supabaseAdmin
+                .rpc('add_credits', { user_id: userId, amount: monthlyCredits });
+
+              if (grantError) {
+                console.error(`❌ Plan applied for ${userId} but ${monthlyCredits} credits NOT granted:`, grantError);
+                await notifyAdmins(
+                  'fulfillment_failed',
+                  'URGENT: plan activated but monthly credits not granted',
+                  `${userId} paid for ${planType} (session ${sessionId}) and the tier was applied, but the ${monthlyCredits}-credit grant failed. Add them manually.`,
+                  { reason: 'plan_credit_grant_failed', user_id: userId, plan: planType, monthly_credits: monthlyCredits, session_id: sessionId, db_error: grantError.message }
+                );
+              } else {
+                console.log(`Updated user ${userId} to ${planType}, added ${monthlyCredits} credits (new balance: ${newBalance})`);
+              }
             }
           }
 
@@ -391,16 +406,12 @@ export async function POST(req: NextRequest) {
             .single();
 
           const currentCredits = userData?.credits || 0;
-          const newCredits = currentCredits + points;
 
-          // Update user credits
-          const { error: updateError } = await supabaseAdmin
-            .from('users')
-            .update({
-              credits: newCredits,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', userId);
+          // add_credits rather than writing currentCredits + points (#92): the
+          // balance may have moved since the read above, and a pack purchase is
+          // exactly when someone is likely to be sending.
+          const { data: newCredits, error: updateError } = await supabaseAdmin
+            .rpc('add_credits', { user_id: userId, amount: points });
 
           if (updateError) {
             console.error('Error updating user credits:', updateError);
@@ -491,15 +502,19 @@ export async function POST(req: NextRequest) {
         }
 
         const periodEnd = invoice.lines.data[0]?.period?.end;
-        const { error: renewalUpdateError } = await supabaseAdmin
+        await supabaseAdmin
           .from('users')
           .update({
-            credits: (renewingUser.credits || 0) + monthlyCredits,
             last_renewal_date: new Date().toISOString(),
             next_renewal_date: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', renewingUser.id);
+
+        // Credits via add_credits (#92). A renewal lands on active accounts, so
+        // read-then-add here was the most likely of the three to lose a spend.
+        const { error: renewalUpdateError } = await supabaseAdmin
+          .rpc('add_credits', { user_id: renewingUser.id, amount: monthlyCredits });
 
         if (renewalUpdateError) {
           console.error('Error applying renewal credits:', renewalUpdateError);

@@ -234,9 +234,11 @@ export async function POST(req: NextRequest) {
         }
 
         // MED-12: Fetch current credits — surface error if user not found (don't grant to 0+amount)
+        // `id` as well as `credits`: add_credits keys on the user id, and the
+        // lookup here is by email (#92).
         const { data: userData, error: lookupError } = await adminClient
           .from('users')
-          .select('credits')
+          .select('id, credits')
           .eq('email', (userEmail || '').toLowerCase())
           .single();
 
@@ -246,17 +248,12 @@ export async function POST(req: NextRequest) {
           }, { status: 404 });
         }
 
-        const currentCredits = userData.credits ?? 0;
-        const newCredits = currentCredits + creditAmount;
-
-        // Update credits in users table
-        const { error: updateError } = await adminClient
-          .from('users')
-          .update({
-            credits: newCredits,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('email', (userEmail || '').toLowerCase());
+        // add_credits rather than writing currentCredits + creditAmount (#92) —
+        // an admin grant can easily coincide with the user spending, and a
+        // read-then-add would hand back whatever they'd just used.
+        // creditAmount is validated > 0 above, which add_credits also requires.
+        const { data: newCredits, error: updateError } = await adminClient
+          .rpc('add_credits', { user_id: userData.id, amount: creditAmount });
 
         if (updateError) {
           console.error('Error granting credits:', updateError);
@@ -268,7 +265,10 @@ export async function POST(req: NextRequest) {
         // reject the insert and admin grants went unrecorded. The resulting
         // balance is recoverable from users.credits plus this row's amount.
         const { error: txError } = await adminClient.from('points_transactions').insert({
-          user_id: userId,
+          // userData.id, not the body-supplied userId: the grant above keys on
+          // the email lookup, and if the two ever disagreed the credits and the
+          // ledger row would land on different accounts (#92).
+          user_id: userData.id,
           points_amount: creditAmount,
           action_type: 'admin_grant',
           description: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits (balance after: ${newCredits.toLocaleString()})`,

@@ -141,13 +141,11 @@ export async function GET(req: NextRequest) {
         });
 
         if (paymentIntent.status === 'succeeded') {
-          // Add credits to user (additive, not overwrite — use read-then-add since auto-buy
-          // is a sequential cron, not a concurrent endpoint, so race risk is low here)
-          const { data: freshCredits } = await supabase.from('users').select('credits').eq('id', user.id).single();
+          // add_credits (#92). Re-reading immediately before the write narrowed
+          // the race but didn't close it — and this runs right after charging a
+          // card, so losing the grant means the customer paid for nothing.
           const { error: updateError } = await supabase
-            .from('users')
-            .update({ credits: (freshCredits?.credits ?? currentCredits) + pack.points })
-            .eq('id', user.id);
+            .rpc('add_credits', { user_id: user.id, amount: pack.points });
 
           if (updateError) {
             throw new Error(`Failed to update credits: ${updateError.message}`);

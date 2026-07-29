@@ -720,6 +720,23 @@ purchase — which silently discarded anything that changed in between. Demonstr
 DB: charge 500, spend 1 on an SMS, then refund. Delta refund gives **999**; the old snapshot
 restore wrote **1000**, refunding the unrelated SMS as well.
 
+**Every credit-granting path now uses `add_credits` too** (#92, 2026-07-29): Stripe plan
+purchase, point-pack purchase and monthly renewal, plus `cron/auto-buy` and admin grants. All
+five previously read the balance and wrote back `current + n`, which silently restored anything
+spent in between. The renewal was the most exposed — it lands on active accounts, and Stripe
+can deliver while the user is sending. Verified end to end with signed events: buying a 4,000
+pack immediately after spending 100 leaves the spend intact, and a redelivered renewal invoice
+does not double-grant.
+
+Where a credit write shared an UPDATE with other fields (plan tier, renewal dates), the fields
+and the credits are now written separately — the credit half through the RPC. The plan path
+alerts if the tier applies but the grant fails, since that leaves a paid-up account with no
+credits.
+
+`admin/users/action` grant_credits also now keys the ledger row on the id from its own email
+lookup rather than the body-supplied `userId`; if those ever disagreed the credits and the
+ledger row landed on different accounts.
+
 That route also told the customer "Credits refunded" without checking whether the refund
 succeeded. It now reports `refunded: false` and raises an admin alert when it fails — and when
 a number was ordered but the row failed to save, the alert says so explicitly, because that
