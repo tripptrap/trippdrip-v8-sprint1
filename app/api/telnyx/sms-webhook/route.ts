@@ -279,16 +279,19 @@ async function handleInboundSMS(payload: any) {
   // Recording who contacted you is not the AI's job — whether the receptionist
   // replies is a separate decision from whether the person exists. So the
   // create happens here, before any of that.
+  //
+  // The lookup goes through find_lead_by_phone rather than `.eq('phone', from)`
+  // because leads.phone holds whatever was imported, while Telnyx always sends
+  // E.164. Two of 207 rows were stored as `4079513717` / `18708824134`; those
+  // leads existed and were invisible to an exact match. Harmless while this was
+  // lookup-only — it just left the thread unlinked — but with a create attached
+  // it would mint a duplicate lead on every inbound from those contacts.
   let leadId: string | null = null;
-  const { data: leadData } = await supabaseAdmin
-    .from('leads')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('phone', from)
-    .maybeSingle();
+  const { data: foundLeadId } = await supabaseAdmin
+    .rpc('find_lead_by_phone', { p_user_id: userId, p_phone: from });
 
-  if (leadData) {
-    leadId = leadData.id;
+  if (foundLeadId) {
+    leadId = foundLeadId as string;
   } else {
     // Honour an explicit opt-out, but default to creating: the column default is
     // true, and a user with no settings row has expressed no preference.

@@ -851,8 +851,30 @@ is still honoured; a user with no settings row gets the default.
 **Recording who contacted you is not the AI's job.** Whether the receptionist replies is a
 separate decision from whether the person exists, and coupling them is what caused this.
 
-Two production threads predate the fix and still have `lead_id NULL` — one with 62 messages,
-one a wrong number. They stay stranded until backfilled; the fix only covers new inbound.
+### Phone format is why those threads were orphaned (#95)
+
+Both orphaned threads turned out to have a lead already — the lookup just could not see it.
+`leads.phone` holds whatever was imported, while Telnyx always sends E.164, and 2 of 207 rows
+were stored as `4079513717` and `18708824134`. An exact `phone = from` comparison misses those.
+
+Harmless while the lookup was read-only — the thread simply stayed unlinked. **But once the
+webhook started creating a lead when none was found, it would have minted a duplicate on every
+inbound from those contacts.** The lookup now goes through `find_lead_by_phone(user_id, phone)`,
+which tries an exact match first (common case, uses the index) then falls back to comparing
+`normalize_phone()` on both sides — the same helper `check_dnc()` uses, so a number matches
+here exactly when it matches there.
+
+All 207 leads are E.164 as of 2026-07-29; the migration normalised the two stragglers.
+
+**Backfilled:** the 62-message thread now links to its existing lead (Tripp Browning), with all
+62 messages attached. No duplicate was created — leads stayed at 207. The remaining orphan is a
+2-message wrong number ("my bad meant to send that to my other number lol") deliberately left
+alone.
+
+Other `.eq('phone', from)` sites remain in the webhook (lines ~255, 461, 512, 599, 792). All are
+selects or updates — **none creates** — so they carry no duplicate risk, and they work today
+because the data is now uniformly E.164. Worth routing through the RPC if imports ever
+reintroduce mixed formats.
 
 ---
 
