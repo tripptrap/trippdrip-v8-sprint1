@@ -832,6 +832,30 @@ precise for split states and would remove the both-zones conservatism above;
 
 ---
 
+## Inbound SMS creates the lead (#95)
+
+An inbound message now **finds or creates** the lead in `handleInboundSMS`, before anything
+AI-related runs.
+
+It used to be lookup-only. Lead creation existed, but **only inside the Receptionist handler**,
+which returns early when a user has no `receptionist_settings` row or has it disabled — true
+for **6 of 7 accounts**. So a first-time texter produced a thread and a message with
+`lead_id NULL` and nothing else: absent from `/leads`, and `ContactInfoPanel` and
+`SessionsPanel` are both gated on `lead_id`, so even "convert to client" was unreachable. The
+contact could be read and replied to, and nothing more.
+
+Note the intent was already auto-create — `receptionist_settings.auto_create_leads` defaults to
+**true**. It was simply unreachable behind `enabled` (default **false**). An explicit `false`
+is still honoured; a user with no settings row gets the default.
+
+**Recording who contacted you is not the AI's job.** Whether the receptionist replies is a
+separate decision from whether the person exists, and coupling them is what caused this.
+
+Two production threads predate the fix and still have `lead_id NULL` — one with 62 messages,
+one a wrong number. They stay stranded until backfilled; the fix only covers new inbound.
+
+---
+
 ## The global DNC list (#88, #93)
 
 `dnc_global` blocks a number for **every tenant**. `check_dnc()` has always read it. For a

@@ -266,17 +266,66 @@ async function handleInboundSMS(payload: any) {
     return;
   }
 
-  // Look up lead for this phone number (needed for message insert)
+  // Find — or create — the lead for this phone number (#95).
+  //
+  // This used to be lookup-only. Lead creation lived exclusively inside the
+  // Receptionist handler, which returns early when a user has no
+  // receptionist_settings row or has it disabled — true for 6 of 7 accounts. So
+  // a first-time texter produced a thread and a message with lead_id null and
+  // nothing else: absent from /leads, and ContactInfoPanel/SessionsPanel are
+  // both gated on lead_id, so even "convert to client" was unreachable. The
+  // contact could be read and replied to, and nothing more.
+  //
+  // Recording who contacted you is not the AI's job — whether the receptionist
+  // replies is a separate decision from whether the person exists. So the
+  // create happens here, before any of that.
   let leadId: string | null = null;
   const { data: leadData } = await supabaseAdmin
     .from('leads')
     .select('id')
     .eq('user_id', userId)
     .eq('phone', from)
-    .single();
+    .maybeSingle();
 
   if (leadData) {
     leadId = leadData.id;
+  } else {
+    // Honour an explicit opt-out, but default to creating: the column default is
+    // true, and a user with no settings row has expressed no preference.
+    const { data: recSettings } = await supabaseAdmin
+      .from('receptionist_settings')
+      .select('auto_create_leads')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (recSettings?.auto_create_leads !== false) {
+      // Columns verified against the live schema: leads has no `name`, and
+      // leads_status_check permits only active/inactive/archived/deleted — the
+      // Receptionist's copy of this insert used `name`/'new' and failed silently.
+      const { data: newLead, error: newLeadError } = await supabaseAdmin
+        .from('leads')
+        .insert({
+          user_id: userId,
+          phone: from,
+          first_name: 'New',
+          last_name: 'Contact',
+          source: 'inbound_sms',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (newLeadError) {
+        // Not fatal — the message must still be stored — but loud, because a
+        // silent failure here is exactly what produced the original bug.
+        console.error(`❌ Inbound: could not create a lead for ${from} (user ${userId}):`, newLeadError);
+      } else if (newLead) {
+        leadId = newLead.id;
+        console.log(`📇 Inbound: created lead ${leadId} for ${from}`);
+      }
+    }
   }
 
   // Find or create thread for this conversation
