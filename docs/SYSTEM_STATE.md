@@ -789,13 +789,35 @@ Ordering that matters: purge tables → delete `public.users` → delete the aut
 delete succeed. Stripe subscriptions are cancelled first, and phone numbers are released from
 Telnyx and un-assigned from `number_pool` before any of it.
 
-### The retention list does not currently work
+### Retention, and why opt-outs are promoted to global (#93)
 
-`dnc_list`, `dnc_history`, `payments` and `transactions` are deliberately excluded from the
-purge — opt-outs must outlive an account by law, financial records have retention
-requirements. **That is not enough.** All four have `ON DELETE CASCADE` to **`auth.users`**, so
-the database destroys them when the auth record goes, whatever the route does. Fixing it needs
-a migration on those constraints.
+`dnc_list`, `dnc_history`, `payments` and `transactions` are excluded from the purge — opt-outs
+must outlive an account by law, financial records have their own retention requirements.
+
+Excluding them was **not enough on its own**: all four had `ON DELETE CASCADE` to `auth.users`,
+so the database destroyed them when the auth record went. Now `ON DELETE SET NULL`, and
+delete-account stamps `deleted_user_id` before the auth delete so the rows stay attributable
+(`payments`/`transactions` had `user_id NOT NULL`, relaxed for this).
+
+**Retention alone would have been worse than the bug.** `check_dnc()` matches
+`dnc_list WHERE user_id = p_user_id` or the global list, so once `user_id` is nulled a retained
+row matches neither — the record survives while enforcement silently stops, and the row *looks*
+like protection. So a deleting account's opt-outs are **promoted into `dnc_global`** by
+`promote_user_dnc_to_global()`, called before the auth record is removed.
+
+Why global: this platform shares a number pool and reassigns numbers between tenants (#38). A
+consumer who texted STOP to a pool number opted out of a number that will be reused.
+Over-blocking is the safe direction. **The trade-off, stated plainly:** a deleted tenant's
+opt-outs then suppress those numbers for every tenant. If numbers ever become strictly
+per-tenant, revisit — the promotion is one function call and can simply be dropped.
+
+This also gives `dnc_global` its first writer. `check_dnc()` has always read it and nothing had
+ever written to it (#88).
+
+Verified end to end: two accounts, one records an opt-out via `add_to_dnc` and is then deleted.
+Before deletion the number is blocked for its owner and **not** for the other tenant (correct
+scoping); after deletion the `dnc_list` row survives with `user_id` null and `deleted_user_id`
+preserved, one entry is promoted, and `check_dnc` still reports the number blocked.
 
 **Trap worth remembering:** `information_schema.constraint_column_usage` does **not** reliably
 report cross-schema foreign keys — it showed zero non-cascading FKs on these tables and missed
