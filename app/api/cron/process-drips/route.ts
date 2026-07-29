@@ -95,7 +95,7 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
  * Process Drip Campaign Enrollments
  * Finds enrollments where next_send_at has passed and sends the next step message.
  */
-export async function POST(req: NextRequest) {
+async function handleCron(req: NextRequest) {
   try {
     if (!supabaseAdmin) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
@@ -522,12 +522,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET for health check / manual trigger
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    endpoint: '/api/cron/process-drips',
-    description: 'Processes drip campaign enrollments and sends scheduled messages',
-    method: 'POST to trigger processing',
-  });
-}
+// Vercel Cron invokes the scheduled path with an HTTP **GET** — confirmed
+// against the docs. This route previously exported the real handler as POST
+// and a metadata-only stub as GET, so every scheduled run hit the stub, got
+// 200 back, and did nothing. Both methods now run the same handler (#97).
+export const GET = handleCron;
+export const POST = handleCron;

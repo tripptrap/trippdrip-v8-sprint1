@@ -54,7 +54,7 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
  * Process AI Drip messages
  * Generates and sends AI follow-up messages for active drips
  */
-export async function POST(req: NextRequest) {
+async function handleCron(req: NextRequest) {
   try {
     if (!supabaseAdmin) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
@@ -390,12 +390,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET for health check
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    endpoint: '/api/cron/process-ai-drips',
-    description: 'Processes AI drip campaigns and sends AI-generated follow-up messages',
-    method: 'POST to trigger processing',
-  });
-}
+// Vercel Cron invokes the scheduled path with an HTTP **GET** — confirmed
+// against the docs. This route previously exported the real handler as POST
+// and a metadata-only stub as GET, so every scheduled run hit the stub, got
+// 200 back, and did nothing. Both methods now run the same handler (#97).
+export const GET = handleCron;
+export const POST = handleCron;
