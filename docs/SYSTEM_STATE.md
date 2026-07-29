@@ -403,6 +403,42 @@ NOT NULL one, and most code writes `body`. Always set both.
 
 ---
 
+## AI flow completion — confirm, then book
+
+Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
+nothing acted on it — no appointment, no tag, no record.
+
+**The cycle:** every flow field collected → `markAwaitingConfirmation()` sets
+`leads.conversation_state.awaitingAppointmentConfirmation` → the AI asks the lead to
+confirm → an affirmative reply runs `confirmAndBookAppointment()`, which creates the
+`calendar_events` row, sets `appointment_scheduled`/`appointment_at`, adds **"appointment
+set"** as `primary_tag`, writes `flow_completion_log`, and fires the appointment SMS alert.
+
+Both halves live in `lib/flows/completeFlow.ts`; the webhook calls them from the flow block.
+
+**`isAffirmative()` is deliberately narrow and whole-message only.** A false positive books
+an appointment the lead never agreed to, which is worse than asking again — so "yes but can
+we do Tuesday" and "maybe" fall through to the AI as reschedule/clarification. Widen it only
+with that trade in mind.
+
+**Two schema constraints shaped this and are worth remembering:**
+
+- `calendar_events.google_event_id` **was** NOT NULL, meaning an appointment could only
+  exist after a successful Google insert — impossible for the 6 of 7 users without Google
+  connected. Now nullable: **NULL means booked in HyveWyre but not synced to Google.**
+- `flow_completion_log.campaign_id` is NOT NULL, so a completion is logged **only when the
+  lead has a campaign.** Flow completions outside a campaign are currently not recorded.
+
+**`YES` is both an opt-in keyword and a confirmation.** Already handled — the webhook only
+treats it as a re-subscribe when the number is actually on the DNC list, so it reaches the
+flow normally. Don't "fix" this by reordering the keyword checks.
+
+**Not wired:** Google Calendar sync for connected users (the local appointment is created
+either way; `/api/calendar/create-event` does the sync), and parsing a specific proposed
+time out of the conversation — an unspecified booking defaults to the next weekday at 10:00.
+
+---
+
 ## Drips — materialised, not a cursor
 
 **Changed 2026-07-28.** A drip used to store only a cursor
