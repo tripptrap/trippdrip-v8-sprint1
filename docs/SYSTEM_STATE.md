@@ -366,6 +366,30 @@ chargeable**, unless someone archives it. Three such strays exist (`$187.50` on 
 Premium, `$420` on Enterprise Premium — both pre-#39 figures — plus a `$15` "myproduct"),
 so the audit warns on any active price no code path references.
 
+### Production env was cut from 33 vars to 21 (#29)
+
+On 2026-07-29 twelve Production variables were **deleted**, not rotated, because
+no code path reads any of them: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, the seven
+`POSTGRES_*` vars, `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY` and `SUPABASE_URL`.
+
+Why they were dead: **`next-auth` is in `package.json` but never imported** (auth
+is Supabase), and **`lib/prisma.ts` is never imported with no `schema.prisma`
+anywhere**, so Prisma cannot initialise — which made every `POSTGRES_*` var,
+including a live `POSTGRES_PASSWORD`, pure unused attack surface. The three
+unprefixed `SUPABASE_*` vars are duplicates; code reads only `NEXT_PUBLIC_*`.
+
+Proven rather than assumed: deploy `403a1a7` built and ran without them, the
+public `/opt-in/<slug>` page still renders its business name from the database,
+and `/api/telnyx/tollfree-status` still returns 401 (so the Supabase auth client
+initialises). Env changes apply only to new builds, so the deletion was inert
+until that deploy — that gap is the safety window if this is ever repeated.
+
+`next-auth`, `prisma` and `@prisma/client` remain as unused dependencies, and
+`lib/prisma.ts` is dead code. Removing them is what would make this permanent.
+
+The full runbook is `docs/SECRET_ROTATION.md`; `scripts/verify-secrets.js
+--production` calls each provider and reports what actually happened.
+
 ### Production env: trailing newlines in 13 values (#85)
 
 13 of 33 Production env vars have a **trailing newline in the stored value** — including

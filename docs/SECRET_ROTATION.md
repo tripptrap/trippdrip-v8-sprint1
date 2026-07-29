@@ -16,7 +16,18 @@ is something the rotation broke.
 
 ---
 
-## 1. Delete these — do not rotate them
+## 1. Delete these — do not rotate them  ✅ DONE 2026-07-29
+
+**All 12 were deleted from Vercel Production on 2026-07-29** and a deploy
+(`403a1a7`) built and ran without them. Production dropped from 33 variables to
+21. Verified afterwards: landing page 200, `/auth/login` 200, the public
+`/opt-in/hyvewyre-llc` page still renders `HyveWyre LLC` from the database
+(a server-side Supabase query), and `/api/telnyx/tollfree-status` returns its
+correct 401 — which proves the Supabase auth client still initialises.
+`verify-secrets.js --production` still passes on every remaining credential.
+
+The integration did **not** re-add them. Kept below as the record of what went
+and why.
 
 **12 production variables are read by no code at all.** Deleting is strictly
 better than rotating: it removes the credential from the exposure surface
@@ -31,10 +42,10 @@ entirely and there is nothing to keep in sync.
 `POSTGRES_PASSWORD` is a live database credential sitting unused — it is the
 best argument for doing this step first.
 
-**Before deleting:** these were added by the Supabase integration, which may
-re-add them. Delete, trigger a preview deploy, confirm it builds and runs, then
-delete from Production. If the integration re-adds them, leave them and rotate
-the database password in Supabase instead.
+**If they ever come back:** the Supabase integration owns several of these and
+may re-provision them on reconnect. They are all recoverable from source if
+needed — `POSTGRES_*` and `SUPABASE_*` from the Supabase dashboard, and
+`NEXTAUTH_SECRET` was random and unused. Deleting again is safe.
 
 Consider also removing the dead `next-auth`, `prisma` and `@prisma/client`
 dependencies and `lib/prisma.ts` — separate change, but it's what makes the
