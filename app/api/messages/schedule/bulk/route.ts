@@ -274,7 +274,7 @@ export async function PUT(req: NextRequest) {
               .insert({
                 user_id: user.id,
                 lead_id: message.lead_id,
-                direction: 'out',
+                direction: 'outbound',
                 content: message.body,
                 body: message.body,
                 channel: 'sms',

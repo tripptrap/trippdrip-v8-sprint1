@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     // Count received messages by hour and day (only count lead responses)
     messagesData
-      .filter(msg => msg.direction === 'in' && msg.created_at)
+      .filter(msg => msg.direction === 'inbound' && msg.created_at)
       .forEach(msg => {
         const date = new Date(msg.created_at!);
         const hour = date.getHours().toString();

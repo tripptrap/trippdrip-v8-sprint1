@@ -272,7 +272,7 @@ async function processScheduledMessages(supabase: any) {
               user_id: message.user_id,
               lead_id: message.lead_id,
               thread_id: threadId,
-              direction: 'out',
+              direction: 'outbound',
               content: message.body,
               body: message.body,
               channel: 'sms',
@@ -332,7 +332,7 @@ async function processScheduledMessages(supabase: any) {
             .insert({
               user_id: message.user_id,
               lead_id: message.lead_id,
-              direction: 'out',
+              direction: 'outbound',
               sender: 'agent',
               body: message.body,
               channel: 'email',
@@ -494,7 +494,7 @@ async function processScheduledCampaigns(supabase: any) {
               .insert({
                 user_id: campaign.user_id,
                 lead_id: leadId,
-                direction: 'out',
+                direction: 'outbound',
                 sender: 'agent',
                 body: campaign.message,
                 channel: 'sms',

@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('campaign_id', campaign.id)
-            .eq('direction', 'in');
+            .eq('direction', 'inbound');
 
           data.push({
             ...campaign,
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 
         data = (messages || []).map((m: any) => ({
           id: m.id,
-          direction: m.direction === 'in' ? 'Inbound' : 'Outbound',
+          direction: m.direction === 'inbound' ? 'Inbound' : 'Outbound',
           message: m.body,
           channel: m.channel || 'sms',
           status: m.status || 'sent',
@@ -138,13 +138,13 @@ export async function GET(req: NextRequest) {
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .eq('direction', 'in');
+          .eq('direction', 'inbound');
 
         const { count: outboundMessages } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .eq('direction', 'out');
+          .eq('direction', 'outbound');
 
         data = [{
           metric: 'Total Leads',
