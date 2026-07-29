@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import QABacktestTracker from '@/components/QABacktestTracker';
 import GlobalDncManager from '@/components/admin/GlobalDncManager';
@@ -533,7 +533,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {filteredUsers.map((user) => (<>
+              {filteredUsers.map((user) => (<Fragment key={user.id}>
                 <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => toggleUserMessages(user.id)}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -835,7 +835,7 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 )}
-              </>))}
+              </Fragment>))}
             </tbody>
           </table>
 
