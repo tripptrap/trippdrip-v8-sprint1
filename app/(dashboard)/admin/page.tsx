@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import QABacktestTracker from '@/components/QABacktestTracker';
+import GlobalDncManager from '@/components/admin/GlobalDncManager';
 import { format } from 'date-fns';
 import {
   Users,
@@ -849,6 +850,9 @@ export default function AdminPage() {
           Showing {filteredUsers.length} of {users.length} users
         </div>
       </div>
+
+      {/* Global DNC list — operator-managed, blocks every tenant (#94) */}
+      <GlobalDncManager />
 
       {/* Click-away listener for action menus */}
       {actionMenuOpen && (
