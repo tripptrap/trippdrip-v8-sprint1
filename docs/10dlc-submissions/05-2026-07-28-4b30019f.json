@@ -11,9 +11,9 @@
     "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
     "usecase": "MIXED",
     "subUsecases": [
+      "CUSTOMER_CARE",
       "MARKETING",
-      "ACCOUNT_NOTIFICATION",
-      "CUSTOMER_CARE"
+      "ACCOUNT_NOTIFICATION"
     ],
     "description": "HyveWyre LLC operates hyvewyre.com, a SaaS platform for SMS lead management. This campaign covers only HyveWyre LLC's own first-party messages to consumers who opted in on HyveWyre's own web form — account notifications, onboarding help, follow-ups, and product updates. Businesses that use the HyveWyre platform to message their own customers are not covered by this campaign; each such business registers its own separate 10DLC brand and campaign.",
     "messageFlow": "Consumers opt in through the lead form at https://hyvewyre.com/opt-in/hyvewyre-llc. The form includes a phone number field and a separate, unchecked SMS consent checkbox reading verbatim: \"I agree to receive SMS text messages from HyveWyre LLC at the phone number provided, including follow-up messages and appointment reminders. Message and data rates may apply. Message frequency varies. Consent is not a condition of purchase. Your mobile opt-in information will not be shared with third parties for marketing or promotional purposes. Reply STOP to opt out at any time, HELP for help.\" The checkbox links to the Privacy Policy and Terms of Service, is separate from any terms-of-service agreement, and the form can be submitted without opting in to SMS. HyveWyre LLC then follows up by SMS only with consumers who checked that box.",

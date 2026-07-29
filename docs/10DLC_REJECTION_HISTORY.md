@@ -19,7 +19,7 @@ Brand: **HyveWyre LLC** — `4b20019b-eba4-6bfd-8723-dca9058142e8` — status **
 | 4 | `4b30019f-a1d4-686f-b131-a9fa2c7ff808` | 2026-07-27 04:28 | LOW_VOLUME | TCR_FAILED | missing `subUsecases` |
 | 5 | `4b30019f-a211-5044-960e-8212c4af0d4e` | 2026-07-27 05:34 | MIXED | TELNYX_FAILED | opt-in form had no consent checkbox |
 | 6 | `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` | 2026-07-28 01:00 | MIXED | TELNYX_FAILED | consent text didn't cover MARKETING |
-| 7 | `4b30019f-a9aa-5d53-15ff-8fab24597ea8` | 2026-07-28 16:59 | MIXED | **submitted, awaiting review** | — (`failureReasons: null` at submit) |
+| 7 | `4b30019f-a9aa-5d53-15ff-8fab24597ea8` | 2026-07-28 16:59 | MIXED | ✅ **PASSED — ACTIVE, TCR `CAAP953`** | none |
 
 ### #1 — verbatim reasons
 > Who is the perceived sender of the messages? If it's a business using your platform, then each business will need a brand and campaign created specifically for them.
@@ -138,6 +138,26 @@ separate from ToS agreement · submittable without opting in.
   article (previously only inferred): opt-in msg needs brand + use case + HELP +
   frequency + rates + consent-not-condition + STOP; opt-out needs brand +
   no-further-messages; help needs brand + real contact. All three comply.
+
+## ✅ Approved on attempt 7 (2026-07-29)
+
+Campaign `4b30019f-a9aa-5d53-15ff-8fab24597ea8` cleared Telnyx review roughly 11 hours
+after submission: `status: ACTIVE`, **`failureReasons: null`**, and a real TCR campaign id
+**`CAAP953`** (earlier attempts echoed the campaign UUID back in that field, which is the
+tell for "not registered at TCR").
+
+Read those three together — `status` alone is meaningless, as the section below explains.
+
+**What finally fixed it** (attempt 6 → 7): the opt-in consent language and the START
+auto-response were both broadened to name every declared sub-usecase, after Telnyx flagged
+that the live form authorised only "follow-up messages and appointment reminders" while the
+campaign declared MARKETING. Everything else was carried over unchanged — see the payload
+diff in `docs/10dlc-submissions/`.
+
+**Still to do:** the number is not automatically linked. `+18134972176` currently has
+`messaging_campaign_id: null` and must be attached via Settings → Messaging Registration
+("Assign my number") before it can send at 10DLC throughput. The three toll-free pool
+numbers are unaffected — they run on TFV, not 10DLC.
 
 ## Reading campaign status correctly — this misled a session
 

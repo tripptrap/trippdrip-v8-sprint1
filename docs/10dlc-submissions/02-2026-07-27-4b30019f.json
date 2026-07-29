@@ -11,8 +11,8 @@
     "brandId": "4b20019b-eba4-6bfd-8723-dca9058142e8",
     "usecase": "MIXED",
     "subUsecases": [
-      "ACCOUNT_NOTIFICATION",
       "CUSTOMER_CARE",
+      "ACCOUNT_NOTIFICATION",
       "MARKETING"
     ],
     "description": "HyveWyre LLC is a software platform used to text leads who have submitted inquiries via our website contact form, to qualify them and schedule calls, and to send appointment reminders, account notifications, and follow-up/support messages to existing contacts. All contacts have opted in to receive SMS via our website opt-in form.",
