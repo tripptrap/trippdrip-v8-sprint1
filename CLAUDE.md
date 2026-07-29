@@ -118,7 +118,7 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - `/dashboard` — scrollable sections: upcoming appointments, unread messages, pipeline overview (lead counts by stage)
 - `/leads` — lead contact list with campaign assignment, tagging, scoring, filtering, bulk actions
 - `/clients` — sold/active customer list, managed by Receptionist AI
-- `/messages` — conversation inbox with tabs for Lead conversations and Client conversations
+- `/texts` — conversation inbox with tabs for Lead conversations and Client conversations (a thin wrapper around `components/texts/TextsLayout.tsx`; a superseded 1177-line `/messages` page was deleted in #89 — this is the live one)
 - `/campaigns` — categorize what kind of lead a person is (health, life, auto, home, solar, etc.)
 - `/flows` — AI conversation templates (industry presets + custom builder) for qualifying leads and booking appointments
 - `/phone-numbers` — search/purchase local numbers via Telnyx (porting planned pre-launch)

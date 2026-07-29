@@ -832,6 +832,32 @@ precise for split states and would remove the both-zones conservatism above;
 
 ---
 
+## Two of the four "orphaned" pages were not orphaned (#89)
+
+`/messages` (1177 lines) and `/analytics-automation` (317) were deleted — no navigation links
+and no module imports. `/messages` was a superseded standalone implementation of the
+conversation inbox; the live one is `/texts`, a 63-line wrapper around
+`components/texts/TextsLayout.tsx`. CLAUDE.md's Key Pages listed the dead one and is corrected.
+
+**`/dnc` and `/sms-analytics` were kept, and deleting them would have broken two pages.**
+Neither is linked from navigation, which is how they were mistaken for dead — but both are
+**imported as components**:
+
+```ts
+app/(dashboard)/settings/page.tsx:21   import DNCPage from '../dnc/page';        // Settings -> DNC List tab
+app/(dashboard)/analytics/page.tsx:22  import SMSAnalyticsPage from '../sms-analytics/page';  // a section of Analytics
+```
+
+They are shared components that happen to live at a route path. Worth moving into
+`components/` so the duplicate route surface goes away, but that is a refactor, not a deletion.
+
+**Checking for inbound *links* is not enough to call a page dead — check for module imports
+too.** A first pass here also nearly deleted `app/api/messages` and `app/api/dnc`, both live
+API route trees, because a `find` pattern matched on the bare directory name rather than the
+`app/(dashboard)/` path. Verify what a glob actually matched before removing anything.
+
+---
+
 ## Inbound SMS creates the lead (#95)
 
 An inbound message now **finds or creates** the lead in `handleInboundSMS`, before anything
