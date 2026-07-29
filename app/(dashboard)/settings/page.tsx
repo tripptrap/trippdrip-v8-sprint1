@@ -22,6 +22,7 @@ import DNCPage from '../dnc/page';
 import CustomModal from '@/components/CustomModal';
 import NotificationSettings from '@/components/NotificationSettings';
 import TenDLCRegistration from '@/components/settings/TenDLCRegistration';
+import TollFreeStatus from '@/components/settings/TollFreeStatus';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -1081,7 +1082,12 @@ export default function Page() {
         </div>
       )}
 
-      {activeTab === 'messaging' && <TenDLCRegistration />}
+      {activeTab === 'messaging' && (
+        <>
+          <TenDLCRegistration />
+          <TollFreeStatus />
+        </>
+      )}
 
       {/* Spam Protection Tab */}
       {activeTab === 'spam' && (

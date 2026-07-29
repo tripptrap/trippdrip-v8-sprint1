@@ -89,26 +89,78 @@ export function isTollFreeNumber(phoneNumber: string): boolean {
   return TOLL_FREE_PREFIXES.some(p => phoneNumber.startsWith(p));
 }
 
+/** One toll-free verification request, as Telnyx reports it. */
+export interface TollFreeVerificationRequest {
+  id: string;
+  /** 'Verified' | 'Rejected' | 'In Progress' | 'Waiting For Vendor' | ... */
+  verificationStatus: string;
+  /** Populated on rejection — the carrier's stated reason. */
+  reason: string | null;
+  businessName: string | null;
+  phoneNumbers: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/**
+ * A point-in-time read of toll-free verification.
+ *
+ * `ok` is the part that matters. A failed fetch produces zero verified numbers,
+ * which is indistinguishable from "nothing is verified" if you only look at the
+ * set — and that is exactly the mistake that happened on 2026-07-28, when a
+ * script read the wrong response field, reported no verification requests, and
+ * the false result stood long enough to produce a wrongly-filed issue and three
+ * incorrect documents. The numbers had been verified since January.
+ *
+ * So anything that *displays* this must branch on `ok` before it renders
+ * "not verified". Callers that *gate* on it use getVerifiedTollFreeNumbers(),
+ * which stays fail-closed.
+ */
+export interface TollFreeVerificationSnapshot {
+  ok: boolean;
+  error?: string;
+  requests: TollFreeVerificationRequest[];
+  verified: Set<string>;
+  fetchedAt: number;
+}
+
 // Cache verified numbers for 5 minutes
-let verifiedNumbersCache: { numbers: Set<string>; fetchedAt: number } | null = null;
+let verifiedNumbersCache: { snapshot: TollFreeVerificationSnapshot; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
- * Fetches verified toll-free numbers from the Telnyx verification API.
- * Results are cached for 5 minutes.
+ * Verified toll-free numbers, for gating.
+ *
+ * Deliberately unchanged in behaviour: an API failure yields an empty set, so
+ * send/order paths fail closed. Six routes depend on that. Use
+ * getTollFreeVerification() when you need to tell failure from emptiness.
  */
 export async function getVerifiedTollFreeNumbers(): Promise<Set<string>> {
+  return (await getTollFreeVerification()).verified;
+}
+
+/**
+ * Full verification state, including rejected and in-progress requests and
+ * whether the fetch itself succeeded. Cached for 5 minutes alongside the
+ * verified set, so this costs nothing extra.
+ */
+export async function getTollFreeVerification(): Promise<TollFreeVerificationSnapshot> {
   if (verifiedNumbersCache && Date.now() - verifiedNumbersCache.fetchedAt < CACHE_TTL_MS) {
-    return verifiedNumbersCache.numbers;
+    return verifiedNumbersCache.snapshot;
   }
 
   const apiKey = process.env.TELNYX_API_KEY;
   if (!apiKey) {
     console.error('TELNYX_API_KEY not configured');
-    return new Set();
+    // Not cached — a missing key is a config problem that may be fixed without
+    // a restart, and caching it would mask the fix for 5 minutes.
+    return { ok: false, error: 'TELNYX_API_KEY is not configured', requests: [], verified: new Set(), fetchedAt: Date.now() };
   }
 
   const verified = new Set<string>();
+  const requests: TollFreeVerificationRequest[] = [];
+  let ok = true;
+  let error: string | undefined;
 
   try {
     let page = 1;
@@ -127,10 +179,16 @@ export async function getVerifiedTollFreeNumbers(): Promise<Set<string>> {
 
       if (!response.ok) {
         console.error('Telnyx verification API error:', response.status);
+        ok = false;
+        error = `Telnyx returned HTTP ${response.status}`;
         break;
       }
 
       const data = await response.json();
+      // This endpoint returns `records`, NOT `data` — reading `data` here is
+      // the exact bug that produced the 2026-07-28 false alarm. The fallback
+      // stays only so a future response-shape change degrades rather than
+      // silently reporting nothing.
       const records = data.records || data.data || [];
 
       if (records.length === 0) {
@@ -139,14 +197,22 @@ export async function getVerifiedTollFreeNumbers(): Promise<Set<string>> {
       }
 
       for (const record of records) {
+        const phoneNumbers = (record.phoneNumbers || [])
+          .map((pn: any) => pn.phoneNumber || pn.phone_number)
+          .filter((n: any): n is string => typeof n === 'string');
+
+        requests.push({
+          id: record.id,
+          verificationStatus: record.verificationStatus ?? 'Unknown',
+          reason: record.reason ?? null,
+          businessName: record.businessName ?? null,
+          phoneNumbers,
+          createdAt: record.createdAt ?? null,
+          updatedAt: record.updatedAt ?? null,
+        });
+
         if (record.verificationStatus === 'Verified') {
-          const phoneNumbers = record.phoneNumbers || [];
-          for (const pn of phoneNumbers) {
-            const num = pn.phoneNumber || pn.phone_number;
-            if (typeof num === 'string') {
-              verified.add(num);
-            }
-          }
+          for (const num of phoneNumbers) verified.add(num);
         }
       }
 
@@ -157,13 +223,25 @@ export async function getVerifiedTollFreeNumbers(): Promise<Set<string>> {
         hasMore = false;
       }
     }
-  } catch (error) {
-    console.error('Error fetching toll-free verification status:', error);
+  } catch (err: any) {
+    console.error('Error fetching toll-free verification status:', err);
+    ok = false;
+    error = err?.message || 'Could not reach the Telnyx verification API';
   }
 
-  console.log(`[TF Verification] Found ${verified.size} verified toll-free numbers`);
-  verifiedNumbersCache = { numbers: verified, fetchedAt: Date.now() };
-  return verified;
+  const snapshot: TollFreeVerificationSnapshot = { ok, error, requests, verified, fetchedAt: Date.now() };
+
+  // Only cache a good read. Caching a failure would pin "0 verified" for five
+  // minutes and make a transient outage look like a compliance problem — and
+  // the refresh button wouldn't clear it.
+  if (ok) {
+    console.log(`[TF Verification] ${requests.length} request(s), ${verified.size} verified number(s)`);
+    verifiedNumbersCache = { snapshot, fetchedAt: Date.now() };
+  } else {
+    console.error(`[TF Verification] read failed: ${error}`);
+  }
+
+  return snapshot;
 }
 
 // Get phone numbers from Telnyx

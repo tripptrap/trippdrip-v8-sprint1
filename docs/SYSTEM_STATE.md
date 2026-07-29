@@ -139,11 +139,26 @@ to claim later. Sequential reassignment doesn't break the declared 1:1 model, bu
 that picked up spam reports or carrier flags under one tenant's traffic carries that
 reputation into the next tenant.
 
-**Worth fixing regardless:** `number_pool.is_verified` is set by hand and never reconciled
-against Telnyx. It happened to be *correct* here, but it's an independent flag that can
-drift from reality in either direction — and the whole scare above came from nobody being
-able to check it easily. Deriving it from `getVerifiedTollFreeNumbers()`, or surfacing real
-TFV status somewhere in the admin UI, would make this verifiable instead of assumed.
+**TFV status is now visible in-app** (#43, 2026-07-29): **Settings → Messaging**, below the
+10DLC panel. Any user sees their own toll-free numbers and whether each is verified; an
+admin (`ADMIN_EMAILS`) also sees the shared pool with **stored vs. live** verification side
+by side — drift between `number_pool.is_verified` and Telnyx is highlighted — plus the full
+request history including the two rejections and their reasons. Backed by
+`GET /api/telnyx/tollfree-status`.
+
+**The rule that panel encodes:** `lib/telnyx.ts` now exposes `getTollFreeVerification()`,
+which returns `{ ok, error, requests, verified }`. **A failed Telnyx read produces zero
+verified numbers, which is indistinguishable from "nothing is verified" if you only look at
+the set** — that conflation *is* the 2026-07-28 scare. So anything that displays this must
+branch on `ok` first; the UI renders "Unknown" plus an explicit unreachable banner, never
+"Not verified". Failed reads are deliberately **not cached**, or a transient outage would
+pin a false negative for five minutes and the Refresh button couldn't clear it.
+`getVerifiedTollFreeNumbers()` is unchanged and still fails closed (empty set on error) —
+six routes *gate* on it, and for gating, empty is the safe answer. Verified against a valid
+key (3 requests, 5 verified), an invalid key (`ok:false`, HTTP 401), and a missing key.
+
+`number_pool.is_verified` is still an independently-set flag (#36 reconciles it); the admin
+table above is what makes drift in either direction visible rather than assumed.
 
 **10DLC campaign status:** see `docs/10DLC_REJECTION_HISTORY.md` for the full
 submission history, every verbatim rejection reason, and the fix for each. As of
@@ -504,10 +519,19 @@ America/New_York).
 `leads.state`, falling back to the sender's timezone only when unknown. TCPA keys on the
 called party's local time. Every pre-2026-07-28 implementation was sender-relative, so a
 California lead texted at 9am Eastern received at 6am Pacific from a path that believed
-it was compliant. States spanning zones map to their **westernmost** zone deliberately —
-guessing east risks sending before the morning cutoff; guessing west only errs
-conservative. `leads.state` is free text and contains junk (`"NOW"`), so unrecognised
+it was compliant. `leads.state` is free text and contains junk (`"NOW"`), so unrecognised
 values fall back rather than guess.
+
+**States spanning multiple zones are evaluated against *all* of them, and blocked if it is
+quiet hours in any one** (#74). The first version of this mapped each split state to its
+westernmost zone, on the reasoning that west "only errs conservative". That is true at the
+morning edge and **false at the evening one** — west makes the computed local time
+earlier, so at the end of the day it thinks there is still room to send. Measured against
+the live 08:00–20:00 window: at 20:45 Eastern a Florida lead computed as 19:45 Central and
+**sent**, while most of Florida is Eastern and actually at 20:45. Texas had the same shape
+(mapped to Mountain, overwhelmingly Central). FL+TX are 86 of the leads on this account.
+If you touch `STATE_TIMEZONES`, keep it a list per state and keep the any-zone-blocks rule
+— a window has two edges and a one-zone guess can only be safe at one of them.
 
 **Credits: always use the `deduct_credits` RPC, never read-then-write.** Two paths had
 read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
@@ -525,9 +549,19 @@ Current coverage — every automated path has all three gates:
 | `sms/send` | ✓ | exempt (human-initiated) | ✓ |
 | `messages/schedule/bulk` | ✓ | ✓ | ✓ |
 
+All seven paths route through `checkSmsAllowed`. `cron/process-scheduled` was the last
+holdout — it kept an inline sender-local quiet-hours block plus its own `check_dnc` call
+until #60 (2026-07-29). Both accounts here are `America/New_York` 08:00–20:00 while 99 of
+their leads are Central or Mountain, so its 08:00 release was landing at 07:00 or 06:00.
+
+**Ordering constraint in `process-scheduled`:** the guard runs *after* the lead loads (it
+needs `lead.state`) and *before* the `pending → sending` claim from #44. Moving it after
+the claim would strand a quiet-hours deferral in `sending` forever. Non-retryable blocks
+mark the row `failed` with the reason; retryable ones leave it `pending`.
+
 Known limitation: timezone resolution is state-level. `leads.zip_code` would be more
-precise for split states; `lib/geo/selectClosestNumber.ts` already does zip-based work if
-that's ever wanted.
+precise for split states and would remove the both-zones conservatism above;
+`lib/geo/selectClosestNumber.ts` already does zip-based work if that's ever wanted.
 
 ---
 
@@ -599,6 +633,8 @@ Everything else from the audit is closed — see #57 for the index and what each
   that hardcodes `true`, never checked against Telnyx, but gates claim/availability and an
   RLS policy. It happened to be correct, but nothing makes it *checkable* — which is what
   let a bad script masquerade as a discovery for half a day. TFV can also be revoked, and
-  this account has already lost numbers to a deactivation once. Fix: gate on
-  `getVerifiedTollFreeNumbers()` at claim time, reconcile on a schedule, and surface real
-  TFV status somewhere in the UI (there is currently no page showing it at all).
+  this account has already lost numbers to a deactivation once. Claim time already gates on
+  `getVerifiedTollFreeNumbers()`, and **the UI half is done** — Settings → Messaging shows
+  stored vs. live side by side for admins and highlights disagreement (#43). What remains is
+  the scheduled reconciliation that writes the live value back to `number_pool.is_verified`;
+  until then the flag is merely *visible*, not self-correcting.
