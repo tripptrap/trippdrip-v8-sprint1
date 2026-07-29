@@ -324,6 +324,34 @@ left in that file.
 
 ---
 
+**Auto-refill charges the same prices as `/points`, and only for real packs** (#76,
+2026-07-29). `/api/cron/auto-buy` used to carry a *third* private pack table —
+500/1K/2.5K/5K/10K at $5/$10/$23.75/$45/$85 — plus a hardcoded flat 30% Scale discount.
+Only the 10K size resembled a real product and it was $10 under; a Scale user refilling
+10,000 points would have been charged **$59.50 against a catalog price of $80**. Nothing
+was ever mischarged (0 users with `auto_topup = true`, 0 auto-refill transactions, 0
+payments at the time of the fix), but it was fully wired: Settings writes
+`users.auto_topup*` and the cron reads them hourly via `vercel.json`.
+
+Now: pack choice and price both come from `lib/pointPacks.ts`. `packForPointsAmount()` is
+shared by the Settings picker and the cron **on purpose** — if the UI and the charge
+disagree about which pack an amount means, the user is surprised by their bill. It rounds
+*up* to the smallest covering pack, since under-delivering defeats the point of auto-refill.
+
+The Settings control is now a **pack picker**, not a free-form number. The old number input
+(100–10000, step 100) displayed an "estimated cost" of `amount × $0.01` — a fourth price
+that existed nowhere else. For 10,000 points there were four disagreeing figures: that
+estimate said $100, the cron charged $85 (or $59.50 on Scale), and `/points` sells it for
+$95/$80. Auto-buy can only charge for a purchasable pack, so the choice has to be a pack.
+
+**Legacy data:** every existing row still holds `auto_topup_amount = 500`, which is not a
+pack size. It resolves to Starter (4,000 pts, $40/$36). The Settings page snaps the loaded
+value through the same resolver so the UI shows the pack that would actually be charged.
+
+**Never reintroduce a discount percentage constant.** The discount *is* the difference
+between `basePrice` and `premiumPrice` in the catalog. A standalone percentage is what
+#39 removed and what made this route undercharge.
+
 ## Tenant isolation — how it actually works, and where it doesn't
 
 Mapped during the 2026-07-28 deep audit. **Two separate mechanisms protect tenant data, and

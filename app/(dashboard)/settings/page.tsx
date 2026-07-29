@@ -23,6 +23,7 @@ import CustomModal from '@/components/CustomModal';
 import NotificationSettings from '@/components/NotificationSettings';
 import TenDLCRegistration from '@/components/settings/TenDLCRegistration';
 import TollFreeStatus from '@/components/settings/TollFreeStatus';
+import { POINT_PACKS, priceFor, scaleSavingsVsGrowthPct, packForPointsAmount } from '@/lib/pointPacks';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -47,7 +48,8 @@ export default function Page() {
   // Auto refill form
   const [autoRefillEnabled, setAutoRefillEnabled] = useState(false);
   const [autoRefillThreshold, setAutoRefillThreshold] = useState(100);
-  const [autoRefillAmount, setAutoRefillAmount] = useState(500);
+  // Smallest real pack — 500 was not a purchasable size (#76).
+  const [autoRefillAmount, setAutoRefillAmount] = useState(4000);
 
   // Email configuration form
   const [emailProvider, setEmailProvider] = useState<'smtp' | 'sendgrid' | 'none'>('none');
@@ -167,7 +169,10 @@ export default function Page() {
 
       setAutoRefillEnabled(data.autoRefill.enabled);
       setAutoRefillThreshold(data.autoRefill.threshold);
-      setAutoRefillAmount(data.autoRefill.amount);
+      // Snap to a real pack — stored values predate the pack picker (every
+      // existing row holds 500, which buys nothing). Showing the pack the cron
+      // would actually charge for beats showing an amount nobody can buy (#76).
+      setAutoRefillAmount(packForPointsAmount(data.autoRefill.amount).points);
 
       // Load email settings
       if (data.email) {
@@ -1409,21 +1414,48 @@ export default function Page() {
               />
             </div>
 
+            {/* Pick a real pack, not a free-form number (#76). This used to be a
+                100-10000 number input with an "estimated cost" of amount x $0.01
+                — a price that existed nowhere else. Meanwhile the cron charged
+                from its own private table. Four different prices for the same
+                10,000 points: this estimate said $100, the cron charged $85
+                (or $59.50 on Scale), and /points sells it for $95/$80. Auto-buy
+                can only ever charge for a purchasable pack, so the choice has to
+                be a pack. */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Refill Amount: {autoRefillAmount} points
-              </label>
-              <input
-                type="number"
-                value={autoRefillAmount}
-                onChange={(e) => setAutoRefillAmount(Number(e.target.value))}
-                min="100"
-                max="10000"
-                step="100"
-                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-              />
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                Estimated cost: ${(autoRefillAmount * 0.01).toFixed(2)}
+              <label className="block text-sm font-medium mb-2">Refill With</label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {POINT_PACKS.map((pack) => {
+                  const price = priceFor(pack, userPlan === 'scale' ? 'scale' : 'growth');
+                  const selected = autoRefillAmount === pack.points;
+                  return (
+                    <button
+                      key={pack.name}
+                      type="button"
+                      onClick={() => setAutoRefillAmount(pack.points)}
+                      className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                        selected
+                          ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                          : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {pack.name} — {pack.points.toLocaleString()} points
+                      </span>
+                      <span className="block text-sm text-slate-600 dark:text-slate-400">
+                        ${price.toFixed(2)}
+                        {userPlan === 'scale' && pack.premiumPrice < pack.basePrice && (
+                          <span className="ml-1 text-emerald-600 dark:text-emerald-400">
+                            (Scale price, save {Math.round(scaleSavingsVsGrowthPct(pack))}%)
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                Charged to your card on file each time your balance drops below the threshold.
               </p>
             </div>
 

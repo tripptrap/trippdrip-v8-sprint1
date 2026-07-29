@@ -63,3 +63,21 @@ export function scaleSavingsRangeLabel(): string {
   const max = maxScaleSavingsPct();
   return min === max ? `${max}%` : `${min}–${max}%`;
 }
+
+/**
+ * The pack a stored `users.auto_topup_amount` actually buys.
+ *
+ * Auto-refill can only charge for a purchasable pack, but the setting was a
+ * free-form number for a long time (all existing rows hold `500`, which is not
+ * a pack size). Rounds **up** to the smallest pack that covers the request —
+ * under-delivering is the worse failure for someone who turned auto-refill on
+ * specifically to avoid running dry.
+ *
+ * Shared by the Settings picker and `/api/cron/auto-buy` on purpose: if the UI
+ * and the charge disagree about which pack an amount means, the user is
+ * surprised by their bill. That was #76.
+ */
+export function packForPointsAmount(amount: number): PointPack {
+  const bySize = [...POINT_PACKS].sort((a, b) => a.points - b.points);
+  return bySize.find((p) => p.points >= amount) ?? bySize[bySize.length - 1];
+}

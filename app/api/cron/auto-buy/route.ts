@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import crypto from 'crypto';
+import { packForPointsAmount, priceFor } from '@/lib/pointPacks';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,31 +31,16 @@ function secureCompare(a: string, b: string): boolean {
   }
 }
 
-// Point pack definitions with prices
-const POINT_PACKS = {
-  500: { price: 5, name: 'Auto-Refill 500' },
-  1000: { price: 10, name: 'Auto-Refill 1K' },
-  2500: { price: 23.75, name: 'Auto-Refill 2.5K' },
-  5000: { price: 45, name: 'Auto-Refill 5K' },
-  10000: { price: 85, name: 'Auto-Refill 10K' }
-};
-
-// Find the closest pack to the requested amount
-function findClosestPack(amount: number): { points: number; price: number; name: string } {
-  const packSizes = Object.keys(POINT_PACKS).map(Number).sort((a, b) => a - b);
-
-  // Find the smallest pack that's >= the requested amount, or the largest if none match
-  let selectedSize = packSizes[packSizes.length - 1];
-  for (const size of packSizes) {
-    if (size >= amount) {
-      selectedSize = size;
-      break;
-    }
-  }
-
-  const pack = POINT_PACKS[selectedSize as keyof typeof POINT_PACKS];
-  return { points: selectedSize, ...pack };
-}
+// Pack resolution and pricing both live in lib/pointPacks.ts (#76, #39).
+//
+// This route used to carry its own pack table — 500/1K/2.5K/5K/10K at
+// $5/$10/$23.75/$45/$85 — where only the 10K size resembled a real product, and
+// even that was $10 under. Combined with a hardcoded flat 30% Scale discount
+// (real discounts are per-pack, 10-25%), a Scale user auto-refilling 10,000
+// points would have been charged $59.50 against a catalog price of $80.
+//
+// Do not reintroduce either constant here. The discount IS the difference
+// between the two prices in the catalog.
 
 export async function GET(req: NextRequest) {
   try {
@@ -110,7 +96,9 @@ export async function GET(req: NextRequest) {
     for (const user of users || []) {
       const currentCredits = user.credits || 0;
       const threshold = user.auto_topup_threshold || 100;
-      const amount = user.auto_topup_amount || 500;
+      // 500 is the legacy default still stored on every row; it isn't a pack
+      // size, so packForPointsAmount rounds it up to the smallest real pack.
+      const amount = user.auto_topup_amount || 4000;
 
       // Skip if above threshold
       if (currentCredits >= threshold) {
@@ -123,13 +111,16 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      // Find appropriate pack
-      const pack = findClosestPack(amount);
+      const pack = packForPointsAmount(amount);
 
-      // HIGH-5: Scale tier ONLY gets 30% discount on point packs — Growth gets no discount
+      // Scale pays the Scale price, Growth pays the Growth price — both come
+      // from lib/pointPacks.ts, the same figures /points charges. Do NOT
+      // reintroduce a discount percentage here; the discount is the difference
+      // between the two prices, and a separate constant is what made this route
+      // charge $59.50 for an $80 pack (#76, #39).
       const isScale = user.subscription_tier === 'scale';
-      const discount = isScale ? 0.30 : 0; // 30% for scale only; Growth pays full price
-      const finalPrice = Math.round(pack.price * (1 - discount) * 100); // Convert to cents
+      const tier = isScale ? 'scale' : 'growth';
+      const finalPrice = Math.round(priceFor(pack, tier) * 100); // cents
 
       try {
         // Charge the customer's default payment method
@@ -139,12 +130,13 @@ export async function GET(req: NextRequest) {
           customer: user.stripe_customer_id,
           off_session: true,
           confirm: true,
-          description: `${pack.name} - Auto-refill${isScale ? ' (Scale 30% discount)' : ''}`,
+          description: `${pack.name} pack - Auto-refill (${tier})`,
           metadata: {
             user_id: user.id,
             points: pack.points.toString(),
             auto_buy: 'true',
-            discount_applied: discount.toString()
+            pack: pack.name,
+            tier,
           }
         });
 
@@ -170,7 +162,7 @@ export async function GET(req: NextRequest) {
             user_id: user.id,
             action_type: 'purchase',
             points_amount: pack.points,
-            description: `Auto-buy: ${pack.name} (${isScale ? 'Scale' : 'Growth'} discount)`,
+            description: `Auto-buy: ${pack.name} pack (${tier} pricing)`,
             stripe_session_id: paymentIntent.id,
             amount_paid: finalPrice,
           });

@@ -142,7 +142,8 @@ export async function POST(req: NextRequest) {
         .update({
           auto_topup: autoRefill?.enabled ?? false,
           auto_topup_threshold: autoRefill?.threshold ?? 50,
-          auto_topup_amount: autoRefill?.amount ?? 1000,
+          // Smallest real pack; 1000 was not a purchasable size (#76).
+          auto_topup_amount: autoRefill?.amount ?? 4000,
         })
         .eq('id', user.id);
     }
