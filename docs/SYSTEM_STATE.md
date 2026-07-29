@@ -361,6 +361,33 @@ it parses the catalog out of the source rather than duplicating the numbers. As 
 2026-07-29 all ten match in TEST mode. Run it after changing pack pricing, and on both
 sides of the switch to live keys (#63).
 
+Immutability also means **every price change leaves the old price behind, active and still
+chargeable**, unless someone archives it. Three such strays exist (`$187.50` on Business
+Premium, `$420` on Enterprise Premium — both pre-#39 figures — plus a `$15` "myproduct"),
+so the audit warns on any active price no code path references.
+
+### The Stripe account is a sandbox (#81)
+
+`STRIPE_SECRET_KEY` is a **test** key for `acct_1SPlVzFyk0lZUopF`, display name
+**"TriDrip sandbox"**, owner email `trippebrowning@gmail.com` — nested under a HyveWyre
+organisation in the dashboard. **A Stripe Sandbox has no live mode**, so live prices cannot
+be created in it; #63 requires the real account first.
+
+Consequences when that switch happens: all ten hardcoded price-id fallbacks in
+`create-checkout/route.ts` plus `STRIPE_PHONE_NUMBER_PRICE_ID` are sandbox-only and need
+replacing; `STRIPE_WEBHOOK_SECRET` is per-account-per-endpoint; and every stored
+`users.stripe_customer_id` / `stripe_subscription_id` is a sandbox id that won't resolve —
+which would send each renewal down the "no matching account" path from #80.
+
+**Product names in Stripe are still `Basic`/`Premium`** (#82) even though code standardised
+on Growth/Scale. Those names appear on checkout, receipts and invoices, so a customer
+buying Growth sees "HyveWyre Basic Plan". Names *are* mutable, but fix it during the
+real-account rebuild rather than twice.
+
+Note the Stripe account email is a third distinct address from `ADMIN_EMAILS`
+(`tripped620@gmail.com`) and the Feb-era customer records (`trippbrowning620@gmail.com`).
+It is recorded nowhere in the repo — it came from `stripe.accounts.retrieve()`.
+
 **Settings showed prices customers would not be charged** (#77, 2026-07-29). The Credit
 Packs table on Settings → Plan hardcoded a *fifth* set of figures built around the
 unpublished list price behind the old "30% off" framing — Pro $100/$70, Enterprise
