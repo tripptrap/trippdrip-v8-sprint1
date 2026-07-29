@@ -419,7 +419,23 @@ Also note **22 vars read by code are unset in Production** (#84) — all 11 `STR
 among them, which resolve today only because the hardcoded fallbacks belong to the same
 sandbox the production key points at.
 
-### The Stripe account is a sandbox (#81)
+### The Stripe account is a sandbox (#81) — migration runbook exists
+
+`docs/STRIPE_LIVE_MIGRATION.md` is the ordered runbook, and
+`scripts/provision-stripe-catalog.js` rebuilds the catalog in a target account from
+`lib/pointPacks.ts` (dry run by default; `--apply --yes` to create). It is idempotent, only
+ever creates, and names products Growth/Scale rather than the sandbox's Basic/Premium (#82).
+Exercised against the sandbox — created 11, re-ran and reused 11 with identical ids, then
+archived them, leaving the sandbox at its original 12 products.
+
+**The switch cannot be done from here**: it needs a Stripe dashboard login and handling a live
+key. Two ordering constraints that will bite otherwise — all eleven `STRIPE_PRICE_*` vars must
+be set in the *same change* as the live key (they are unset today and fall back to sandbox ids
+that resolve only because the key is the sandbox's), and every
+`users.stripe_customer_id`/`stripe_subscription_id` is a sandbox id that must be cleared or
+every renewal hits the "no matching account" path from #80.
+
+
 
 `STRIPE_SECRET_KEY` is a **test** key for `acct_1SPlVzFyk0lZUopF`, display name
 **"TriDrip sandbox"**, owner email `trippebrowning@gmail.com` — nested under a HyveWyre
