@@ -468,7 +468,31 @@ export async function POST(req: NextRequest) {
 
     // Save to database if we have user context
     if (supabaseAdmin && userId) {
-      let finalThreadId = threadId;
+      // #64: a client-supplied threadId must belong to this user. It used to be
+      // trusted outright, so a message could be written into another tenant's
+      // thread — and process-ai-drips reads thread messages as AI context, which
+      // put attacker-controlled text into a victim's prompt. The userId above is
+      // already guarded this way; threadId was missed.
+      //
+      // An unowned or unknown id falls through to find-or-create below rather
+      // than erroring: the SMS has already been sent by this point, so the worst
+      // outcome should be a new thread, not a lost record.
+      let finalThreadId: string | null = null;
+
+      if (threadId) {
+        const { data: ownedThread } = await supabaseAdmin
+          .from('threads')
+          .select('id')
+          .eq('id', threadId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (ownedThread) {
+          finalThreadId = ownedThread.id;
+        } else {
+          console.error(`⚠️ send-sms: threadId ${threadId} is not owned by user ${userId} — ignoring it and resolving the thread normally`);
+        }
+      }
 
       // Create or get thread - check by phone number OR lead_id
       if (!finalThreadId) {

@@ -124,10 +124,16 @@ export async function POST(req: NextRequest) {
         }
 
         // Get conversation context for AI generation
+        // #64: scope to the drip's owner. This read feeds conversationSummary,
+        // which is interpolated straight into the AI prompt — so an unscoped
+        // read let a message written into this thread by another tenant steer
+        // what this user's AI says to their lead. ai/generate-follow-up already
+        // filters this way; this query was the one that didn't.
         const { data: recentMessages } = await supabaseAdmin
           .from('messages')
           .select('body, direction, created_at')
           .eq('thread_id', drip.thread_id)
+          .eq('user_id', drip.user_id)
           .order('created_at', { ascending: false })
           .limit(10);
 

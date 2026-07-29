@@ -93,10 +93,15 @@ export async function POST(req: NextRequest) {
     // Get conversation history from thread
     let conversationHistory: Array<{ direction: string; body: string }> = [];
     if (threadId) {
+      // Scoped to the owner (#64). This history is fed to the receptionist AI,
+      // so an unscoped read would let a message written into this thread by
+      // another tenant steer the reply. The caller is internal-only, but the
+      // filter is free and this is the same class the AI drip cron had.
       const { data: messages } = await supabase
         .from('messages')
         .select('direction, body')
         .eq('thread_id', threadId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: true })
         .limit(20);
 
