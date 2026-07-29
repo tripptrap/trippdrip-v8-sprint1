@@ -5,33 +5,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
-import crypto from 'crypto';
 import { packForPointsAmount, priceFor } from '@/lib/pointPacks';
 import { notifyAdmins, createNotification } from '@/lib/createNotification';
 import { alertAdminsThrottled } from '@/lib/alerting';
+import { requireCronAuth } from '@/lib/cronAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Timing-safe comparison to prevent timing attacks
-function secureCompare(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    // HIGH-1: Pad to equal length before comparison — prevents secret-length leakage via timing.
-    // Both evaluations always run; length mismatch is caught by a separate boolean check.
-    const maxLen = Math.max(bufA.length, bufB.length);
-    const paddedA = Buffer.alloc(maxLen);
-    const paddedB = Buffer.alloc(maxLen);
-    bufA.copy(paddedA);
-    bufB.copy(paddedB);
-    const lengthsMatch = bufA.length === bufB.length;
-    const bytesMatch = crypto.timingSafeEqual(paddedA, paddedB);
-    return lengthsMatch && bytesMatch;
-  } catch {
-    return false;
-  }
-}
 
 // Pack resolution and pricing both live in lib/pointPacks.ts (#76, #39).
 //
@@ -46,19 +28,8 @@ function secureCompare(a: string, b: string): boolean {
 
 export async function GET(req: NextRequest) {
   try {
-    // Verify cron secret for security (MANDATORY)
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) {
-      console.error('❌ CRON_SECRET not configured');
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-    }
-
-    const authHeader = req.headers.get('authorization') || '';
-    const providedSecret = authHeader.replace('Bearer ', '');
-    if (!secureCompare(providedSecret, cronSecret)) {
-      console.error('❌ Invalid or missing cron secret');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireCronAuth(req);
+    if (denied) return denied;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -1,31 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { alertAdminsThrottled } from '@/lib/alerting';
+import { requireCronAuth } from '@/lib/cronAuth';
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Timing-safe comparison to prevent timing attacks
-function secureCompare(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    // HIGH-1: Pad to equal length before comparison — prevents secret-length leakage via timing.
-    // Both evaluations always run; length mismatch is caught by a separate boolean check.
-    const maxLen = Math.max(bufA.length, bufB.length);
-    const paddedA = Buffer.alloc(maxLen);
-    const paddedB = Buffer.alloc(maxLen);
-    bufA.copy(paddedA);
-    bufB.copy(paddedB);
-    const lengthsMatch = bufA.length === bufB.length;
-    const bytesMatch = crypto.timingSafeEqual(paddedA, paddedB);
-    return lengthsMatch && bytesMatch;
-  } catch {
-    return false;
-  }
-}
 
 // Get current hour in US Eastern time (handles EST/EDT automatically)
 function getEasternHour(date: Date = new Date()): number {
@@ -101,19 +83,8 @@ async function handleCron(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
     }
 
-    // Authenticate cron requests (MANDATORY)
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) {
-      console.error('❌ CRON_SECRET not configured');
-      return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
-    }
-
-    const authHeader = req.headers.get('authorization') || '';
-    const providedSecret = authHeader.replace('Bearer ', '');
-    if (!secureCompare(providedSecret, cronSecret)) {
-      console.error('❌ Invalid or missing cron secret');
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireCronAuth(req);
+    if (denied) return denied;
 
     // Enforce quiet hours — reschedule instead of sending
     if (isInQuietHours()) {

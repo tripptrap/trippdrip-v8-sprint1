@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateReceptionistResponse } from '@/lib/receptionist/generateResponse';
 import { ReceptionistSettings, ContactType, ReceptionistResponseParams } from '@/lib/receptionist/types';
+import { isInternalCaller } from '@/lib/cronAuth';
 
 // Use service role client for internal operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -13,10 +14,9 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 export async function POST(req: NextRequest) {
   try {
     // MED-5: Internal-only endpoint — require x-internal-secret to prevent
-    // unauthenticated callers from burning any user's AI credits
-    const internalSecret = req.headers.get('x-internal-secret');
-    const cronSecret = process.env.CRON_SECRET;
-    if (!internalSecret || !cronSecret || internalSecret !== cronSecret) {
+    // unauthenticated callers from burning any user's AI credits. Constant-time
+    // for the same reason the cron routes are (#96) — it is the same secret.
+    if (!isInternalCaller(req)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

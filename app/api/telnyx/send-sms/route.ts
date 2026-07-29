@@ -7,6 +7,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { selectClosestNumber } from '@/lib/geo/selectClosestNumber';
 import { detectSpam } from '@/lib/spam/detector';
+import { isInternalCaller } from '@/lib/cronAuth';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -32,17 +33,17 @@ export async function POST(req: NextRequest) {
     }
 
     // CRIT-2: Auth gate — require valid session OR x-internal-secret header for internal callers
-    // Internal callers (cron, webhook, receptionist) must pass x-internal-secret: CRON_SECRET
-    const internalSecret = req.headers.get('x-internal-secret');
-    const cronSecret = process.env.CRON_SECRET;
-    const isInternalCaller = !!(internalSecret && cronSecret && internalSecret === cronSecret);
+    // Internal callers (cron, webhook, receptionist) must pass x-internal-secret: CRON_SECRET.
+    // Constant-time: this is the same CRON_SECRET the cron routes compare, and
+    // comparing it with === here would undo their care (#96).
+    const internalCaller = isInternalCaller(req);
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // If userId was supplied in the request body, the caller must be an authenticated internal service
-    if (passedUserId && !isInternalCaller) {
+    if (passedUserId && !internalCaller) {
       console.error('❌ Rejected: body-supplied userId without valid x-internal-secret');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -390,7 +391,7 @@ export async function POST(req: NextRequest) {
     // Removing the session path isn't an option: those two components are real
     // callers. So the session path gets the same treatment every other
     // user-facing send has.
-    if (!isInternalCaller) {
+    if (!internalCaller) {
       let recipientState: string | null = null;
       if (leadId && supabaseAdmin) {
         const { data: stateLead } = await supabaseAdmin
