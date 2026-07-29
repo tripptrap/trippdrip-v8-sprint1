@@ -709,8 +709,23 @@ the live 08:00–20:00 window: at 20:45 Eastern a Florida lead computed as 19:45
 If you touch `STATE_TIMEZONES`, keep it a list per state and keep the any-zone-blocks rule
 — a window has two edges and a one-zone guess can only be safe at one of them.
 
-**Credits: always use the `deduct_credits` RPC, never read-then-write.** Two paths had
-read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
+**Credits: `deduct_credits` to spend, `add_credits` to refund or grant. Never read-then-write,
+and never restore a previously-read balance.** Both RPCs are atomic single UPDATEs, refuse
+negative amounts, and enforce ownership internally (service_role for any user, authenticated
+only its own, `anon` no EXECUTE at all) because SECURITY DEFINER bypasses RLS.
+
+**A refund must be a delta, not a snapshot restore** (#91). `number-pool/purchase-with-credits`
+used to roll back with `update({ credits: currentCredits })` — the balance read before the
+purchase — which silently discarded anything that changed in between. Demonstrated on the live
+DB: charge 500, spend 1 on an SMS, then refund. Delta refund gives **999**; the old snapshot
+restore wrote **1000**, refunding the unrelated SMS as well.
+
+That route also told the customer "Credits refunded" without checking whether the refund
+succeeded. It now reports `refunded: false` and raises an admin alert when it fails — and when
+a number was ordered but the row failed to save, the alert says so explicitly, because that
+leaves a live billing number with no owner.
+
+Two paths had read-modify-write races; `schedule/bulk` was the worst, writing back a `credits` value
 read *before* its send loop began and discarding any concurrent spend.
 
 Current coverage — every automated path has all three gates:

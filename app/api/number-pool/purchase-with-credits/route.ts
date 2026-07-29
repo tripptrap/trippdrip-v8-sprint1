@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { notifyAdmins } from '@/lib/createNotification';
 
 const CREDITS_PER_NUMBER = 100; // 100 credits/month for a phone number
 
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
 
     const currentCredits = userData.credits || 0;
 
+    // Read only to produce a helpful message. The RPC below is the authority —
+    // it re-checks the balance inside a single atomic UPDATE, so a concurrent
+    // spend between this read and the deduction cannot overdraw the account.
     if (currentCredits < requiredCredits) {
       return NextResponse.json(
         {
@@ -48,17 +52,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Deduct credits
-    const newCredits = currentCredits - requiredCredits;
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ credits: newCredits })
-      .eq('id', user.id);
+    // #91: was read-then-write (`credits: currentCredits - requiredCredits`),
+    // which loses any concurrent change. deduct_credits does it in one
+    // statement and refuses rather than going negative.
+    const { data: balanceAfterCharge, error: deductError } = await supabase.rpc('deduct_credits', {
+      user_id: user.id,
+      amount: requiredCredits,
+    });
 
-    if (updateError) {
-      console.error('Error deducting credits:', updateError);
+    if (deductError) {
+      console.error('Error deducting credits:', deductError);
       return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 });
     }
+
+    /**
+     * Give the credits back after a failed purchase.
+     *
+     * Refunds with a DELTA, never by restoring the balance read earlier —
+     * a snapshot restore silently discards anything else that changed in the
+     * meantime (#91). And the result is checked: a refund that fails must not
+     * be reported to the customer as "credits refunded", which is what this
+     * route used to do unconditionally.
+     */
+    const refundCredits = async (reason: string): Promise<boolean> => {
+      const { error: refundError } = await supabase.rpc('add_credits', {
+        user_id: user.id,
+        amount: requiredCredits,
+      });
+      if (refundError) {
+        console.error(`❌ ${reason} — and the ${requiredCredits}-credit refund ALSO failed for user ${user.id}:`, refundError);
+        await notifyAdmins(
+          'fulfillment_failed',
+          'URGENT: number purchase failed and the credit refund failed too',
+          `${user.id} was charged ${requiredCredits} credits for ${phoneNumber}, the purchase failed (${reason}), and the refund did not go through. The balance must be corrected by hand.`,
+          { reason: 'credit_refund_failed', user_id: user.id, phone_number: phoneNumber, credits: requiredCredits, cause: reason, db_error: refundError.message }
+        );
+        return false;
+      }
+      return true;
+    };
 
     // Order the number from Telnyx
     const apiKey = process.env.TELNYX_API_KEY;
@@ -82,25 +114,28 @@ export async function POST(req: NextRequest) {
         if (!orderResponse.ok) {
           const orderError = await orderResponse.json().catch(() => ({}));
           console.error('Telnyx order error:', orderError);
-          // Rollback credits
-          await supabase
-            .from('users')
-            .update({ credits: currentCredits })
-            .eq('id', user.id);
+          const refunded = await refundCredits('Telnyx rejected the number order');
+          const detail = orderError.errors?.[0]?.detail || 'Failed to order number from Telnyx.';
           return NextResponse.json(
-            { error: orderError.errors?.[0]?.detail || 'Failed to order number from Telnyx. Credits refunded.' },
+            {
+              error: refunded
+                ? `${detail} Your credits have been refunded.`
+                : `${detail} We could not automatically refund your ${requiredCredits} credits — support has been notified.`,
+              refunded,
+            },
             { status: 500 }
           );
         }
       } catch (telnyxError) {
         console.error('Telnyx API call failed:', telnyxError);
-        // Rollback credits
-        await supabase
-          .from('users')
-          .update({ credits: currentCredits })
-          .eq('id', user.id);
+        const refunded = await refundCredits('could not reach Telnyx');
         return NextResponse.json(
-          { error: 'Failed to reach Telnyx. Credits refunded.' },
+          {
+            error: refunded
+              ? 'Failed to reach Telnyx. Your credits have been refunded.'
+              : `Failed to reach Telnyx, and we could not automatically refund your ${requiredCredits} credits — support has been notified.`,
+            refunded,
+          },
           { status: 500 }
         );
       }
@@ -123,21 +158,30 @@ export async function POST(req: NextRequest) {
       });
 
     if (numberError) {
-      // Rollback credits
-      await supabase
-        .from('users')
-        .update({ credits: currentCredits })
-        .eq('id', user.id);
-
       console.error('Error adding number:', numberError);
+      const refunded = await refundCredits('the number was ordered but could not be saved');
+      // Worse than the other two: if the Telnyx order above succeeded, the
+      // number is live and billing on the account with no owner recorded.
+      await notifyAdmins(
+        'fulfillment_failed',
+        'URGENT: number ordered but not saved to the account',
+        `${phoneNumber} may be live on Telnyx with no owner row for user ${user.id}. Credits ${refunded ? 'were refunded' : 'were NOT refunded'}. Check Telnyx and add the row or release the number.`,
+        { reason: 'number_ordered_not_saved', user_id: user.id, phone_number: phoneNumber, credits: requiredCredits, refunded, db_error: numberError.message }
+      );
       return NextResponse.json(
-        { error: 'Failed to add number. Credits have been refunded.' },
+        {
+          error: refunded
+            ? 'Failed to add number. Your credits have been refunded.'
+            : `Failed to add number, and we could not automatically refund your ${requiredCredits} credits — support has been notified.`,
+          refunded,
+        },
         { status: 500 }
       );
     }
 
-    // Log the transaction
-    await supabase
+    // Log the transaction. Was fire-and-forget, so a purchase could succeed with
+    // no ledger row and nothing to reconcile against.
+    const { error: ledgerError } = await supabase
       .from('credit_transactions')
       .insert({
         user_id: user.id,
@@ -147,12 +191,18 @@ export async function POST(req: NextRequest) {
         metadata: { phone_number: phoneNumber }
       });
 
+    if (ledgerError) {
+      // The charge and the number both went through, so this can't be undone —
+      // but the balance and the ledger now disagree.
+      console.error(`❌ Number ${phoneNumber} purchased for user ${user.id} but the credit_transactions row failed:`, ledgerError);
+    }
+
     console.log(`✅ User ${user.id} purchased number ${phoneNumber} with ${requiredCredits} credits`);
 
     return NextResponse.json({
       success: true,
       message: `Successfully purchased ${phoneNumber} with ${requiredCredits} credits`,
-      newBalance: newCredits,
+      newBalance: balanceAfterCharge,
       phone_number: phoneNumber
     });
 
