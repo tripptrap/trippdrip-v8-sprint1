@@ -719,6 +719,41 @@ after it, keys independent), then end-to-end through a real route — a forced t
 **Caveat that applies to every alert above:** these are in-app notifications only. There is
 no email or SMS escalation (#79), so they are seen by whoever opens the app, not pushed.
 
+## Crons: three of five had never run (#97, 2026-07-29)
+
+**Vercel Cron invokes the scheduled path with an HTTP `GET`.** Per the docs: *"To trigger a
+cron job, Vercel makes an HTTP GET request to your project's production deployment URL."*
+Requests also carry the user agent `vercel-cron/1.0` and an `x-vercel-cron-schedule` header.
+
+`process-drips`, `process-ai-drips` and `send-appointment-reminders` exported the real work
+as `POST` and a **metadata-only stub** as `GET`. So every scheduled run hit the stub, got
+`200 {ok: true}` back, and did nothing — Vercel records a successful invocation and nothing
+reports a problem. Drip campaigns, AI drips and appointment reminders had **never fired on a
+schedule**.
+
+The tell, against production: an unauthenticated `GET` returned **401** on `process-scheduled`
+and `auto-buy`, and **200** on the other three. The two that worked are auth-gated on GET
+*because GET is where their work lives*.
+
+No damage had occurred only because nothing was enrolled — `drip_campaign_enrollments` and
+`calendar_events` were both empty. The corroborating trace was `ai_drips`: 4 rows created
+2026-01-20 with `next_send_at` of 01-21/22, all `stopped`, all with `messages_sent = 0`.
+
+Now `export const GET = handleCron; export const POST = handleCron;` on all three.
+
+**Rules this leaves behind:**
+- A cron route must do its work on **GET**. A POST-only cron is dead on arrival, and it fails
+  in the direction that looks healthy.
+- `vercel.json` is the only scheduler — there is no external cron service. Check there before
+  assuming a route is triggered.
+- All five routes are `ƒ` (dynamic) in the build output and declare
+  `export const dynamic = "force-dynamic"` — with **double quotes**, which a single-quote grep
+  misses. A cron route that became static would serve Vercel a cached response and
+  reintroduce this bug in a subtler form.
+- The five disagree on which auth header they accept (#96): only `process-scheduled` reads
+  `x-cron-secret`; the rest are `Authorization: Bearer` only. Fine for Vercel Cron, a trap the
+  moment the trigger changes.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
