@@ -352,6 +352,25 @@ value through the same resolver so the UI shows the pack that would actually be 
 between `basePrice` and `premiumPrice` in the catalog. A standalone percentage is what
 #39 removed and what made this route undercharge.
 
+**Settings showed prices customers would not be charged** (#77, 2026-07-29). The Credit
+Packs table on Settings → Plan hardcoded a *fifth* set of figures built around the
+unpublished list price behind the old "30% off" framing — Pro $100/$70, Enterprise
+$600/$420. A Scale user read "Pro $70" there and would have been charged $80 at checkout.
+That table now renders from `lib/pointPacks.ts`, as does the auto-refill picker, so
+Settings, `/points` and the actual charge agree. Five copy sites claiming a flat "30% off"
+were replaced with `scaleSavingsRangeLabel()` ("10–25%").
+
+**Savings percentages are floored, never rounded** — a savings claim must not be
+overstated. Pro is 15.789% and displays as 15%. `/points` and `scaleSavingsRangeLabel()`
+already floored; a `Math.round` in the first pass of the Settings fix made the same pack
+read 16% on one page and 15% on another.
+
+**Counting the pricing tables that existed before this pass:** the `/points` page constant,
+`subscriptionFeatures.pointPackDiscount`, the auto-buy cron's private table, the Settings
+Credit Packs table, and the auto-refill "estimated cost" of `amount × $0.01`. Five sources,
+four different prices for 10,000 points ($100 / $95 / $85 / $59.50 depending on where you
+looked). All now derive from `lib/pointPacks.ts`. **If you need a price, import it.**
+
 ## Tenant isolation — how it actually works, and where it doesn't
 
 Mapped during the 2026-07-28 deep audit. **Two separate mechanisms protect tenant data, and

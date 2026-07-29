@@ -23,7 +23,7 @@ import CustomModal from '@/components/CustomModal';
 import NotificationSettings from '@/components/NotificationSettings';
 import TenDLCRegistration from '@/components/settings/TenDLCRegistration';
 import TollFreeStatus from '@/components/settings/TollFreeStatus';
-import { POINT_PACKS, priceFor, scaleSavingsVsGrowthPct, packForPointsAmount } from '@/lib/pointPacks';
+import { POINT_PACKS, priceFor, scaleSavingsVsGrowthPct, scaleSavingsRangeLabel, packForPointsAmount } from '@/lib/pointPacks';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -719,19 +719,27 @@ export default function Page() {
             <div className="space-y-4 mb-6">
               <h3 className="font-medium text-slate-900 dark:text-slate-100">Plan Features</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* The pack-discount line is the tier differentiator, so it's
+                    emphasised — via an explicit flag, not by string-matching the
+                    label for "30%" as this did before (#77). */}
                 {[
-                  `${userPlan === 'scale' ? '10,000' : '3,000'} credits/month`,
-                  'Unlimited contacts',
-                  'Unlimited campaigns',
-                  'AI-powered responses',
-                  'AI Receptionist mode',
-                  'Advanced analytics',
-                  'Priority support',
-                  userPlan === 'scale' ? '30% off all credit packs' : 'Standard credit pack pricing',
-                ].map((feature) => (
-                  <div key={feature} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                    <span className={userPlan === 'scale' && feature.includes('30%') ? 'text-emerald-500 font-bold' : 'text-emerald-500'}>✓</span>
-                    <span className={userPlan === 'scale' && feature.includes('30%') ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>{feature}</span>
+                  { label: `${userPlan === 'scale' ? '10,000' : '3,000'} credits/month`, emphasise: false },
+                  { label: 'Unlimited contacts', emphasise: false },
+                  { label: 'Unlimited campaigns', emphasise: false },
+                  { label: 'AI-powered responses', emphasise: false },
+                  { label: 'AI Receptionist mode', emphasise: false },
+                  { label: 'Advanced analytics', emphasise: false },
+                  { label: 'Priority support', emphasise: false },
+                  {
+                    label: userPlan === 'scale'
+                      ? `Save ${scaleSavingsRangeLabel()} on every credit pack`
+                      : 'Standard credit pack pricing',
+                    emphasise: userPlan === 'scale',
+                  },
+                ].map(({ label, emphasise }) => (
+                  <div key={label} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <span className={emphasise ? 'text-emerald-500 font-bold' : 'text-emerald-500'}>✓</span>
+                    <span className={emphasise ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : ''}>{label}</span>
                   </div>
                 ))}
               </div>
@@ -761,11 +769,11 @@ export default function Page() {
                 <div>
                   <h2 className="text-xl font-semibold text-emerald-900 dark:text-emerald-100 mb-1">Upgrade to Scale</h2>
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-3">
-                    Get 10,000 credits/month and <strong>30% off every credit pack</strong> — the only plan with discounted top-ups.
+                    Get 10,000 credits/month and <strong>{scaleSavingsRangeLabel()} off every credit pack</strong> — the only plan with discounted top-ups.
                   </p>
                   <ul className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
                     <li>✓ 10,000 credits/month (vs 3,000 on Growth)</li>
-                    <li>✓ 30% off all credit pack purchases</li>
+                    <li>✓ Save {scaleSavingsRangeLabel()} on credit packs — up to ${(POINT_PACKS[POINT_PACKS.length - 1].basePrice - POINT_PACKS[POINT_PACKS.length - 1].premiumPrice).toFixed(2)} per pack</li>
                     <li>✓ Everything in Growth</li>
                   </ul>
                 </div>
@@ -788,8 +796,8 @@ export default function Page() {
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Credit Packs</h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
               {userPlan === 'scale'
-                ? 'As a Scale member, you get 30% off every credit pack.'
-                : 'Upgrade to Scale to unlock 30% off every credit pack.'}
+                ? `As a Scale member you save ${scaleSavingsRangeLabel()} on every credit pack, depending on size.`
+                : `Upgrade to Scale to save ${scaleSavingsRangeLabel()} on every credit pack.`}
             </p>
             <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
               <table className="w-full text-sm">
@@ -798,34 +806,46 @@ export default function Page() {
                     <th className="text-left px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Pack</th>
                     <th className="text-center px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">Base Price</th>
                     <th className={`text-center px-4 py-3 font-semibold ${userPlan === 'scale' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                      {userPlan === 'scale' ? 'Your Price (30% off)' : 'Your Price'}
+                      {userPlan === 'scale' ? 'Your Price (Scale)' : 'Your Price'}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {[
-                    { name: 'Starter', credits: '4,000', base: 40, scale: 28 },
-                    { name: 'Pro', credits: '10,000', base: 100, scale: 70 },
-                    { name: 'Business', credits: '25,000', base: 250, scale: 175 },
-                    { name: 'Enterprise', credits: '60,000', base: 600, scale: 420 },
-                  ].map((pack) => (
-                    <tr key={pack.name} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">{pack.name}</div>
-                        <div className="text-xs text-slate-500">{pack.credits} credits</div>
-                      </td>
-                      <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400">${pack.base}</td>
-                      <td className="px-4 py-3 text-center">
-                        {userPlan === 'scale' ? (
-                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                            ${pack.scale} <span className="text-xs font-normal">(-${pack.base - pack.scale})</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-700 dark:text-slate-300">${pack.base}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {/* Rendered from lib/pointPacks.ts — the prices /points actually
+                      charges. This table used to hardcode its own fifth set of
+                      figures (Pro $100/$70, Enterprise $600/$420) built around the
+                      unpublished list price behind the old "30% off" claim. A Scale
+                      user read "Pro $70" here and was charged $80 at checkout (#77). */}
+                  {POINT_PACKS.map((pack) => {
+                    const yourPrice = priceFor(pack, userPlan === 'scale' ? 'scale' : 'growth');
+                    const saving = pack.basePrice - pack.premiumPrice;
+                    return (
+                      <tr key={pack.name} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{pack.name}</div>
+                          <div className="text-xs text-slate-500">{pack.points.toLocaleString()} credits</div>
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-500 dark:text-slate-400">
+                          ${pack.basePrice.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {/* floor, never round: a savings claim must not be
+                              overstated. Pro is 15.789% — shown as 15%, matching
+                              /points and scaleSavingsRangeLabel(). */}
+                          {userPlan === 'scale' ? (
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                              ${yourPrice.toFixed(2)}{' '}
+                              <span className="text-xs font-normal">
+                                (save ${saving.toFixed(2)} · {Math.floor(scaleSavingsVsGrowthPct(pack))}%)
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-700 dark:text-slate-300">${yourPrice.toFixed(2)}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1446,7 +1466,7 @@ export default function Page() {
                         ${price.toFixed(2)}
                         {userPlan === 'scale' && pack.premiumPrice < pack.basePrice && (
                           <span className="ml-1 text-emerald-600 dark:text-emerald-400">
-                            (Scale price, save {Math.round(scaleSavingsVsGrowthPct(pack))}%)
+                            (Scale price, save {Math.floor(scaleSavingsVsGrowthPct(pack))}%)
                           </span>
                         )}
                       </span>
