@@ -12,6 +12,16 @@ import { notifyAdmins } from '@/lib/createNotification';
 const STRIPE_PRICE_GROWTH = process.env.STRIPE_PRICE_GROWTH || 'price_1SQtYHFyk0lZUopFNa0lT81K';
 const STRIPE_PRICE_SCALE = process.env.STRIPE_PRICE_SCALE || 'price_1SQtaUFyk0lZUopFRJnuLftL';
 
+/**
+ * Postgres unique-violation. Both purchase paths below use a duplicate
+ * points_transactions insert as their idempotency check, so this code means
+ * "Stripe redelivered an event we already handled" — routine, not a failure.
+ * Any OTHER error on those inserts means the row genuinely didn't write, and
+ * both paths then skip granting credits, so the customer paid and got nothing.
+ * That distinction decides whether we alert (#80).
+ */
+const PG_UNIQUE_VIOLATION = '23505';
+
 // Create Supabase admin client for webhook (bypasses RLS)
 // Only create if keys are available
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -292,6 +302,12 @@ export async function POST(req: NextRequest) {
 
             if (insertError) {
               console.error('Error creating user:', insertError);
+              await notifyAdmins(
+                'fulfillment_failed',
+                'URGENT: plan paid for but the user row was not created',
+                `A ${planType} subscription was paid for (session ${sessionId}) but creating the user record failed, so the customer has no account and no credits.`,
+                { reason: 'user_create_failed', user_id: userId, plan: planType, session_id: sessionId, db_error: insertError.message }
+              );
             } else {
               console.log(`Created user ${userId} with ${planType} subscription and ${monthlyCredits} credits`);
             }
@@ -316,6 +332,12 @@ export async function POST(req: NextRequest) {
 
             if (updateError) {
               console.error('Error updating user subscription:', updateError);
+              await notifyAdmins(
+                'fulfillment_failed',
+                'URGENT: plan paid for but the tier and credits were not applied',
+                `${userId} paid for ${planType} (session ${sessionId}) but the user update failed — they are on the old tier with no monthly credits added.`,
+                { reason: 'subscription_update_failed', user_id: userId, plan: planType, monthly_credits: monthlyCredits, session_id: sessionId, db_error: updateError.message }
+              );
             } else {
               console.log(`Updated user ${userId} to ${planType}, added ${monthlyCredits} credits (new balance: ${currentCredits + monthlyCredits})`);
             }
@@ -340,9 +362,22 @@ export async function POST(req: NextRequest) {
           });
 
           if (insertError) {
-            // Duplicate key error means another webhook already processed this
-            console.error(`⚠️ Transaction insert failed for session ${sessionId}:`, insertError);
-            return NextResponse.json({ received: true, duplicate: true });
+            if (insertError.code === PG_UNIQUE_VIOLATION) {
+              // Routine: Stripe redelivered an event we already granted.
+              console.log(`⚠️ Session ${sessionId} already processed — skipping duplicate point-pack grant`);
+              return NextResponse.json({ received: true, duplicate: true });
+            }
+            // Not a duplicate: the row genuinely failed to write, and the credit
+            // grant below is skipped as a result. The customer paid for points
+            // they will never receive, and nothing else records it (#80).
+            console.error(`❌ Transaction insert failed for session ${sessionId}:`, insertError);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'URGENT: point pack paid for but no credits granted',
+              `${userId} paid for ${packName} (${points} points, session ${sessionId}) but the transaction insert failed, so the credit grant was skipped entirely.`,
+              { reason: 'pack_transaction_insert_failed', user_id: userId, pack: packName, points, session_id: sessionId, db_error: insertError.message, db_code: insertError.code }
+            );
+            return NextResponse.json({ received: true, error: 'transaction insert failed' });
           }
 
           console.log(`✅ Transaction record created successfully for session ${sessionId}`);
@@ -369,6 +404,15 @@ export async function POST(req: NextRequest) {
 
           if (updateError) {
             console.error('Error updating user credits:', updateError);
+            // Worse than the case above: the transaction row DID write, so the
+            // audit trail claims these points were granted when the balance
+            // never moved.
+            await notifyAdmins(
+              'fulfillment_failed',
+              'URGENT: point pack charged and logged but credits not added',
+              `${userId} paid for ${packName} (${points} points, session ${sessionId}). The transaction row was written but the balance update failed, so the ledger and the balance disagree — add ${points} manually.`,
+              { reason: 'pack_credit_update_failed', user_id: userId, pack: packName, points, expected_balance: newCredits, session_id: sessionId, db_error: updateError.message }
+            );
           } else {
             console.log(`✅ Updated user ${userId} credits from ${currentCredits} to ${newCredits}`);
           }
@@ -406,6 +450,12 @@ export async function POST(req: NextRequest) {
 
         if (renewingUserError || !renewingUser) {
           console.error(`invoice.paid: no user found for subscription ${subId}`);
+          await notifyAdmins(
+            'fulfillment_failed',
+            'Renewal charged but no matching account',
+            `Stripe charged a renewal for subscription ${subId} (invoice ${invoice.id}) but no user has that stripe_subscription_id, so no credits were applied to anyone.`,
+            { reason: 'renewal_user_not_found', stripe_subscription_id: subId, invoice_id: invoice.id, amount_paid: invoice.amount_paid }
+          );
           break;
         }
 
@@ -424,7 +474,19 @@ export async function POST(req: NextRequest) {
         });
 
         if (renewalTxError) {
-          console.log(`⚠️ Invoice ${invoice.id} already processed — skipping duplicate renewal`);
+          if (renewalTxError.code === PG_UNIQUE_VIOLATION) {
+            console.log(`⚠️ Invoice ${invoice.id} already processed — skipping duplicate renewal`);
+            break;
+          }
+          // Not a duplicate. This `break` skips the credit top-up below, so the
+          // customer was charged for the month and receives nothing (#80).
+          console.error(`❌ Renewal transaction insert failed for invoice ${invoice.id}:`, renewalTxError);
+          await notifyAdmins(
+            'fulfillment_failed',
+            'URGENT: renewal charged but no monthly credits granted',
+            `${renewingUser.id} was charged their monthly renewal (invoice ${invoice.id}) but the transaction insert failed, so the ${monthlyCredits} credit top-up was skipped.`,
+            { reason: 'renewal_transaction_insert_failed', user_id: renewingUser.id, monthly_credits: monthlyCredits, invoice_id: invoice.id, db_error: renewalTxError.message, db_code: renewalTxError.code }
+          );
           break;
         }
 
@@ -441,6 +503,12 @@ export async function POST(req: NextRequest) {
 
         if (renewalUpdateError) {
           console.error('Error applying renewal credits:', renewalUpdateError);
+          await notifyAdmins(
+            'fulfillment_failed',
+            'URGENT: renewal charged and logged but credits not added',
+            `${renewingUser.id} was charged their monthly renewal (invoice ${invoice.id}). The transaction row was written but the balance update failed, so the ledger and the balance disagree — add ${monthlyCredits} manually.`,
+            { reason: 'renewal_credit_update_failed', user_id: renewingUser.id, monthly_credits: monthlyCredits, invoice_id: invoice.id, db_error: renewalUpdateError.message }
+          );
         } else {
           console.log(`Renewed user ${renewingUser.id}: +${monthlyCredits} credits`);
         }

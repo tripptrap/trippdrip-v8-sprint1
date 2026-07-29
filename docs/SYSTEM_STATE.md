@@ -352,6 +352,15 @@ value through the same resolver so the UI shows the pack that would actually be 
 between `basePrice` and `premiumPrice` in the catalog. A standalone percentage is what
 #39 removed and what made this route undercharge.
 
+**Stripe is the one price source that cannot derive from the catalog**, because the amount
+lives in Stripe and its prices are **immutable** — you cannot edit an amount, only create a
+new price and repoint the env var. So it's the remaining place the catalog can silently
+drift from what customers are actually charged. `scripts/audit-stripe-prices.js` checks all
+ten (8 packs + 2 plans) against `lib/pointPacks.ts` and exits non-zero on any mismatch;
+it parses the catalog out of the source rather than duplicating the numbers. As of
+2026-07-29 all ten match in TEST mode. Run it after changing pack pricing, and on both
+sides of the switch to live keys (#63).
+
 **Settings showed prices customers would not be charged** (#77, 2026-07-29). The Credit
 Packs table on Settings → Plan hardcoded a *fifth* set of figures built around the
 unpublished list price behind the old "30% off" framing — Pro $100/$70, Enterprise
@@ -487,6 +496,23 @@ The worst of the five branches is `route.ts` "ordered but not saved" — Telnyx 
 order and the customer was charged, but the `user_telnyx_numbers` write failed, leaving a
 real number live and billing with no owner recorded. That one needs a manual row, not a
 refund, and its alert says so.
+
+**The plan and point-pack paths alert too** (#80, 2026-07-29) — plan purchase, pack
+purchase and monthly renewal, i.e. the main revenue flow, not just the number path.
+
+**The subtle one:** both purchase paths use a duplicate `points_transactions` insert as
+their idempotency check, and both previously treated *any* insert error as "Stripe
+redelivered this" and skipped granting credits. Only `23505` (unique violation) actually
+means redelivery. Any other error — an FK violation, a constraint change, a column type
+mismatch — meant the customer was charged and the credit grant was silently skipped, while
+the log said "already processed". These now branch on `insertError.code === '23505'`:
+redelivery stays quiet, anything else alerts. Verified against the live DB that a repeat
+insert returns `23505` and an FK violation returns `23503`.
+
+Two of the alerts distinguish "charged, nothing recorded" from "charged, ledger written but
+balance not updated". The second is worse to diagnose because `points_transactions` claims
+the points were granted while the balance never moved, so its alert names the exact amount
+to add by hand.
 
 ## AI flow completion — confirm, then book
 
