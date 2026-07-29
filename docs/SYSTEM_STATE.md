@@ -773,6 +773,35 @@ precise for split states and would remove the both-zones conservatism above;
 
 ---
 
+## The global DNC list (#88, #93)
+
+`dnc_global` blocks a number for **every tenant**. `check_dnc()` has always read it. For a
+long time nothing wrote to it, so that branch could never evaluate true — the "global" half of
+the DNC model CLAUDE.md describes was scaffolding.
+
+**It has two writers now:**
+- account deletion promotes a departing account's opt-outs into it (#93)
+- `POST /api/admin/dnc-global` — operator-only, for numbers that must never be contacted by
+  anyone (litigators, repeat complainants, imported registries)
+
+**Always write through `add_to_global_dnc()` / `remove_from_global_dnc()`, never the table.**
+`check_dnc()` matches on `normalized_phone = normalize_phone(input)`; an entry normalised any
+other way silently fails to block, which is the worst outcome this table can produce. The RPCs
+own normalisation and are `service_role` only — `anon` and `authenticated` have no EXECUTE
+(verified: both return 42501).
+
+**RLS: nobody can read it from a client.** The old `"Users can view global DNC list"` policy
+was `FOR SELECT` to `{public}` with `USING (true)` — anon-readable, verified with the public
+key. That was tolerable while the table was permanently empty and is not now that deletions
+populate it with real numbers and free-text reasons. Dropped; the remaining `USING (false)`
+policy denies everyone, and `check_dnc()` reaches it as `SECURITY DEFINER`. Confirmed with a
+row present: service_role sees 1, anon sees 0.
+
+Removing an entry un-blocks someone who opted out, so `/api/admin/dnc-global` logs the
+operator's email on both add and remove.
+
+---
+
 ## Account deletion (#87)
 
 `app/api/user/delete-account/route.ts`. Purges **47 tables** explicitly; 13 more cascade from
