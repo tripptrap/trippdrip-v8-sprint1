@@ -48,7 +48,11 @@ export function secureCompare(a: string, b: string): boolean {
  * Vercel only ever sends GET. One implementation, one place to check.
  */
 export function requireCronAuth(req: NextRequest): NextResponse | null {
-  const expected = process.env.CRON_SECRET;
+  // Trimmed for the same reason the SendGrid key is (#101): 11 production env
+  // values carry a trailing newline, and if CRON_SECRET ever picks one up an
+  // untrimmed comparison 401s all five crons at once. CRON_SECRET happens to be
+  // clean today; that is not a thing to depend on.
+  const expected = process.env.CRON_SECRET?.trim();
 
   if (!expected) {
     console.error('❌ CRON_SECRET not configured — rejecting request');
@@ -77,8 +81,8 @@ export function requireCronAuth(req: NextRequest): NextResponse | null {
  * protection.
  */
 export function isInternalCaller(req: NextRequest): boolean {
-  const expected = process.env.CRON_SECRET;
-  const provided = req.headers.get('x-internal-secret');
+  const expected = process.env.CRON_SECRET?.trim();
+  const provided = req.headers.get('x-internal-secret')?.trim();
   if (!expected || !provided) return false;
   return secureCompare(provided, expected);
 }
