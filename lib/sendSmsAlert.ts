@@ -1,7 +1,7 @@
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createNotification, NotificationType } from '@/lib/createNotification';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/sendEmail';
 import {
   newMessageAlertEmail,
   lowCreditsAlertEmail,
@@ -14,41 +14,6 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export type SmsAlertType = 'new_message' | 'low_credits' | 'opt_out' | 'appointment';
 
-function createEmailTransporter() {
-  // .trim() matters: several production env values carry a trailing
-  // newline, and this is an exact string comparison — 'sendgrid\n'
-  // silently falls through to the SMTP branch, which has no credentials
-  // configured, so email fails with no error anyone sees.
-  const provider = (process.env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
-  if (provider === 'sendgrid') {
-    return nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
-    });
-  }
-
-  // Reached whenever the provider isn't sendgrid. Without credentials this
-  // builds a transport pointing at smtp.gmail.com with no auth, which fails
-  // per-send with an opaque error rather than saying the app is misconfigured.
-  // In production SMTP_* are all unset (#84), so this branch is only correct if
-  // someone has deliberately configured SMTP.
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    throw new Error(
-      `Email is not configured: SERVICE_EMAIL_PROVIDER is "${provider}", which needs ` +
-      `SMTP_USER and SMTP_PASSWORD. Set those, or set SERVICE_EMAIL_PROVIDER=sendgrid ` +
-      `with SENDGRID_API_KEY.`
-    );
-  }
-
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-  });
-}
 
 export async function sendSmsAlertToUser(
   userId: string,
@@ -162,16 +127,18 @@ export async function sendSmsAlertToUser(
         }
 
         if (template) {
-          const FROM_EMAIL = (process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com').trim();
-          const FROM_NAME = (process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre').trim();
-          const transporter = createEmailTransporter();
-          await transporter.sendMail({
-            from: `${FROM_NAME} <${FROM_EMAIL}>`,
+          // lib/sendEmail.ts rather than a fifth copy of the transporter. The
+          // copy this replaced passed SENDGRID_API_KEY and the SMTP credentials
+          // through untrimmed, which is what made a perfectly valid key look
+          // revoked (#101) — SMTP AUTH sends the password verbatim, and unlike
+          // an HTTP header nothing strips the trailing newline.
+          const sent = await sendEmail({
             to: userData.email,
             subject: template.subject,
             text: template.text,
             html: template.html,
-          }).catch(err => console.error('Email alert send failed:', err));
+          });
+          if (!sent.ok) console.error('Email alert send failed:', sent.error);
         }
       }
     }

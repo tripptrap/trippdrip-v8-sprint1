@@ -1158,7 +1158,7 @@ function InternalDevNotes() {
     { cat: 'Stripe Dashboard', item: 'Create real phone number subscription price → set STRIPE_PHONE_NUMBER_PRICE_ID', done: false },
     { cat: 'Google Cloud Console', item: 'OAuth redirect URI includes production domain: https://YOUR_DOMAIN/api/calendar/oauth/callback', done: false },
     { cat: 'Vercel Env Vars', item: 'All .env.local vars copied to Vercel (Production)', done: false },
-    { cat: 'Vercel Env Vars', item: 'SENDGRID_API_KEY or SMTP_USER + SMTP_PASSWORD + SMTP_HOST (for email alerts)', done: false },
+    { cat: 'Vercel Env Vars', item: 'SMTP_HOST + SMTP_PORT + SMTP_SECURE + SMTP_USER + SMTP_PASSWORD (PrivateEmail; SendGrid was dropped in #101)', done: true },
     { cat: 'Vercel Env Vars', item: 'SYSTEM_API_KEY — generate with: openssl rand -hex 32', done: false },
     { cat: 'Vercel Env Vars', item: 'CRON_SECRET — verify matches what Vercel uses for cron auth', done: false },
     { cat: 'Vercel Cron', item: 'process-scheduled running every 5 min ✓ (in vercel.json)', done: true },
