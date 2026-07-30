@@ -895,6 +895,73 @@ number: no duplicate.
 **Rule this leaves behind:** never compare `leads.phone` with `=` when the input came from
 outside. Use `find_lead_by_phone`, and normalise with `normalizePhone()` before storing.
 
+## Shared number pool: reuse, quarantine, history (#38, 2026-07-29)
+
+**Carrier reputation attaches to the number, not the tenant.** A released pool number used to
+have `is_assigned` cleared and go straight back out, carrying the previous business's spam
+complaints, blocks and filtering to the next one — who experiences it as "HyveWyre's SMS
+doesn't work". With three numbers in the pool, recycling is the normal case.
+
+`lib/numberPool.ts` holds the policy; `release_pool_number` and `record_pool_assignment` are
+the RPCs.
+
+### There are three release paths, not two
+
+| path | reason recorded |
+|---|---|
+| `telnyx/release-number` | `user_released` |
+| `user/delete-account` | `account_deleted` |
+| `telnyx/numbers` | `unverified_auto_release` — auto-releases a toll-free number that lost TFV |
+
+That third one is easy to miss and is the one you least want recycled silently. All three call
+`releasePoolNumber()`. **The only remaining direct `is_assigned: false` write is the claim
+rollback in `number-pool/claim`, and that is correct** — a claim that failed never happened, so
+it must not start a cooldown or write history.
+
+### The cooldown yields; spam history does not
+
+`QUARANTINE_DAYS = 30`, but it is **not a hard block**. Three numbers and a strict cooldown
+could leave nothing to give a new customer, and refusing to onboard is worse than reusing a
+clean number early. `evaluateClaim()` prefers rested numbers, falls back to a quarantined one
+only when there is genuinely nothing else, and alerts (`pool_exhausted`). `number-pool/available`
+mirrors this — resting numbers are offered only when no rested one exists — so the UI never
+advertises a number the claim path would then refuse.
+
+`SPAM_RATIO_LIMIT = 0.05` **is** absolute and is checked first: over it, the number is withheld
+regardless of cooldown and admins are told to retire rather than recycle it. Reputation does
+not age out in thirty days.
+
+**Telnyx unreachable is "unknown", not "bad"** — `getNumberHealth()` returns `ok: false` and
+the claim is allowed. Blocking onboarding on an API hiccup would be a self-inflicted outage.
+
+### getNumberHealth — checked against the live API
+
+`GET /v2/phone_numbers/{id}/messaging` returns the metrics **nested under `data.health`**, not
+at the top level: `message_count`, `spam_ratio`, `success_ratio`, `inbound_outbound_ratio`. It
+is keyed by Telnyx's internal id, so reading it for a phone number is two calls. An unknown
+number yields `ok: false`, not zeros — zeros are a real reading and mean a clean, unused number.
+
+### number_pool_assignments
+
+One row per tenancy; `released_at IS NULL` means currently held. `health_at_release` is captured
+at the moment of release because the metrics move on with the number afterwards.
+
+**`user_id` has no foreign key on purpose.** Account deletion is one of the release paths, so a
+CASCADE would delete exactly the rows worth keeping — the same retention reasoning as #87/#93.
+
+### Two gotchas from doing this work
+
+- **Moving a write into an RPC can silently drop an ownership check.** The route filtered on
+  `.eq('assigned_to_user_id', user.id)` because `phoneNumber` arrives in the request body; the
+  first version of the RPC matched on phone number alone, which would have let a caller release
+  someone else's number. The RPC filters on `p_user_id` now. Test that as an actual attack, not
+  by reading it.
+- **`supabase db query` returns `{"_tag":"Error", ...}` with no `rows` key when a statement
+  fails.** A helper that prints only `.rows` shows an empty result and looks like "the update
+  matched nothing", sending you hunting for RLS or shell quoting. The real cause was a `23503`
+  FK violation from a made-up UUID: `number_pool.assigned_to_user_id` references `users`. Always
+  surface the error branch.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
