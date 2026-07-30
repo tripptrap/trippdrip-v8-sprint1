@@ -161,6 +161,39 @@ diff in `docs/10dlc-submissions/`.
 ("Assign my number") before it can send at 10DLC throughput. The three toll-free pool
 numbers are unaffected — they run on TFV, not 10DLC.
 
+## APPROVED — CAAP953, confirmed 2026-07-30
+
+`4b30019f-a9aa-5d53-15ff-8fab24597ea8` / TCR `CAAP953`, registered 2026-07-28.
+
+```
+campaignStatus:      MNO_PROVISIONED
+isTMobileRegistered: true
+isTMobileSuspended:  false
+failureReasons:      null
+operationStatus:     all 7 MNOs APPROVED
+```
+
+**Only remaining step: assign a number.** `phone_number_campaigns` shows 0 assigned.
+
+### The trap that cost a session
+
+**Eight campaigns exist under this brand; six are dead.** CLAUDE.md named
+`4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` (CJFUY00) as "the" campaign — a *superseded* attempt that
+reads `TELNYX_FAILED` with real-looking failure reasons about MARKETING consent. On 2026-07-30 a
+session queried that id, found it failed, and worked up an appeal and a resubmission plan for a
+campaign that had already been approved a day earlier under a different id.
+
+The failure reasons on a dead campaign stay attached forever and read exactly like current ones.
+Nothing in the response says "superseded".
+
+**Never query a campaign by an id copied from documentation.** List them and pick by status:
+
+```
+GET /10dlc/campaign?brandId=<brandId>&page=1&recordsPerPage=50
+```
+
+Take the record whose `campaignStatus` is `MNO_PROVISIONED`. That is the only one that can send.
+
 ## Reading campaign status correctly — FOUR fields, and the obvious one is wrong
 
 `GET /10dlc/campaign/{id}` returns several status-ish fields. They mean different things and

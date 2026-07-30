@@ -647,7 +647,18 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - [ ] **Verify the live Telnyx number-order leg of the checkout fix** — everything around it is tested, but the actual `POST /v2/number_orders` call in the `phoneNumberPurchase` branch of `app/api/stripe/webhook/route.ts` has **never been executed against real Telnyx**, because doing so places a real, billable number order. To verify: buy a **local** number (not toll-free — toll-free is correctly blocked while TFV is missing, see `docs/SYSTEM_STATE.md`) through the checkout path as a user with no active subscription, then confirm the number appears in `user_telnyx_numbers` with `status: 'pending'` and on the Telnyx account. **Requires the user's explicit go-ahead — this spends money and orders a real number.**
 - [x] ~~Telnyx local number orders being denied~~ — **RESOLVED 2026-07-26**: root cause was the negative account balance (-$23.91), not a code or compliance issue. User added funds (balance now positive, ~$76 before test orders). Confirmed via live test: 1 local number (+18134972176, area code 813) and 3 toll-free numbers ordered successfully once balance was positive. Local orders are not gated by 10DLC campaign status at the ordering stage (only affects message throughput later).
 - [x] ~~Add funds to Telnyx account balance~~ — done by user 2026-07-26.
-- [ ] **10DLC campaign under real carrier review** — campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` submitted 2026-07-27 under the verified "HyveWyre LLC" brand (`4b20019b-eba4-6bfd-8723-dca9058142e8`, status VERIFIED). Passed validation cleanly (`TCR_PENDING`, no failureReasons) — awaiting TCR's actual review outcome. **Full submission history — every prior rejection reason verbatim, what was submitted each time, and exactly how each was fixed — is recorded in [`docs/10DLC_REJECTION_HISTORY.md`](docs/10DLC_REJECTION_HISTORY.md).** If this attempt also fails: read that file first, append the new reason and fix in the same format, and check `docs/10dlc_attempt6_payload.json` (the exact payload sent) against the new failureReasons before touching anything. Do not re-derive this from scratch. If it succeeds: next step is assigning phone number `+18134972176` to the campaign via the "Assign my number" button in Settings → Messaging Registration.
+- [ ] **10DLC campaign is APPROVED — one step left: assign the number.** The live campaign is
+  `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` (brand `4b20019b-eba4-6bfd-8723-dca9058142e8`,
+  VERIFIED). Verified 2026-07-30: `campaignStatus: MNO_PROVISIONED`, `isTMobileRegistered: true`,
+  `isTMobileSuspended: false`, `failureReasons: null`, all seven MNOs APPROVED. **0 numbers are
+  assigned**, which is the only thing left — assign `+18134972176` via Settings → Messaging
+  Registration ("Assign my number").
+  **Do not use campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` (CJFUY00) as the reference — it is
+  a superseded failed attempt.** Eight campaigns exist under this brand; six are dead. Reading the
+  old id from this file sent a session down an appeal-and-resubmit path for a campaign that was
+  already approved. Always list with
+  `GET /10dlc/campaign?brandId=<id>` and take the one whose `campaignStatus` is `MNO_PROVISIONED`.
+  History of every rejection and fix: [`docs/10DLC_REJECTION_HISTORY.md`](docs/10DLC_REJECTION_HISTORY.md).
 - [x] Per-user branded opt-in pages (#21) — built as a hard prerequisite for per-agent 10DLC (see above), not post-launch roadmap. Live at `/opt-in/<slug>`. See `docs/10DLC_REJECTION_HISTORY.md` and `lib/optInConsent.ts`.
 
 ### Open Work — tracked in GitHub Issues
