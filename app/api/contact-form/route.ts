@@ -1,13 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { limitByIp, observeRate } from '@/lib/rateLimit';
 
 /**
  * POST /api/contact-form
  * Handles public contact form submissions
  * Creates a new lead with SMS consent information
  */
+
+/** Per-IP, blocking. One submission per person; see /api/opt-in/submit (#99). */
+const IP_LIMIT = 5;
+const IP_WINDOW_SECONDS = 60;
+
+/**
+ * Whole-endpoint ceiling, alert-only. This is one shared form rather than a
+ * per-business page, so a blocking global cap would let one caller take the
+ * contact form down for everybody — the limit would become the outage.
+ */
+const TOTAL_CEILING = 100;
+const TOTAL_WINDOW_SECONDS = 3600;
+
 export async function POST(req: NextRequest) {
   try {
+    // Public and unauthenticated, writing consent records with the service-role
+    // key — the same exposure as /api/opt-in/submit, into the same table (#99).
+    const limited = await limitByIp(req, 'contact-form', IP_LIMIT, IP_WINDOW_SECONDS);
+    if (limited) return limited;
+
+    await observeRate({
+      key: 'contact-form:all',
+      limit: TOTAL_CEILING,
+      windowSeconds: TOTAL_WINDOW_SECONDS,
+      title: 'Unusual volume on the public contact form',
+      body: (count) =>
+        `/api/contact-form has taken ${count} submissions in the last hour, past the ${TOTAL_CEILING} expected. Submissions are still being accepted — this ceiling does not block, because a global cap would let one caller take the form down for everyone. Worth checking whether the recent rows in contact_form_submissions are real.`,
+    });
+
     const body = await req.json();
     const { firstName, lastName, email, phone, smsConsent, emailOptIn } = body;
 

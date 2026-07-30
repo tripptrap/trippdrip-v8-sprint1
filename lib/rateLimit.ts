@@ -106,3 +106,41 @@ export async function limitByIp(
     { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
   );
 }
+
+/**
+ * Count a request against a key and *alert* when it goes over — never block.
+ *
+ * For ceilings where blocking would be the bigger harm (#99). A per-business
+ * opt-in page is the case that motivated this: capping it would let anyone deny
+ * a business its signups by burning the quota from a botnet, and a lost real
+ * opt-in is worse than a junk one — the junk can be filtered afterwards by
+ * pattern, the missed customer and their consent record cannot be recovered.
+ *
+ * So the per-IP limit does the blocking, where a false positive costs one
+ * person one minute, and this makes a distributed flood *visible* instead of
+ * silently absorbed. Alerts are throttled, so a sustained flood is one message
+ * an hour rather than one per request.
+ */
+export async function observeRate(opts: {
+  key: string;
+  limit: number;
+  windowSeconds: number;
+  title: string;
+  body: (count: number) => string;
+  data?: Record<string, any>;
+}): Promise<void> {
+  const { allowed, count } = await checkRateLimit(opts.key, opts.limit, opts.windowSeconds);
+  if (allowed) return;
+
+  console.warn(`⚠️ ${opts.key} is over its expected ceiling: ${count} in ${opts.windowSeconds}s (expected <= ${opts.limit})`);
+
+  // Imported lazily: this is the rare path, and it keeps the alerting module out
+  // of the request path for every normal submission.
+  const { alertAdminsThrottled } = await import('@/lib/alerting');
+  await alertAdminsThrottled({
+    key: `rate_ceiling:${opts.key}`,
+    title: opts.title,
+    body: opts.body(count),
+    data: { ...opts.data, key: opts.key, count, ceiling: opts.limit, window_seconds: opts.windowSeconds },
+  });
+}

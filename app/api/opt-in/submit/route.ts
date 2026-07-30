@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { limitByIp, observeRate, clientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+/**
+ * Per-IP, and it blocks. The form validates client-side before posting, so a
+ * real person sends one request — even a retry after a network error stays far
+ * under this, and a household or small office opting in together fits (#99).
+ */
+const IP_LIMIT = 5;
+const IP_WINDOW_SECONDS = 60;
+
+/**
+ * Per-slug, and it deliberately does **not** block.
+ *
+ * Capping one business's opt-in page would hand anyone a way to deny it their
+ * signups: burn the quota from a botnet and real customers get turned away. A
+ * lost opt-in is worse than a junk one — junk can be filtered by pattern
+ * afterwards, a missed customer and their consent record cannot be recovered.
+ * So this only makes a distributed flood visible; the per-IP limit above is
+ * what actually blocks.
+ */
+const SLUG_CEILING = 100;
+const SLUG_WINDOW_SECONDS = 3600;
 
 /**
  * POST /api/opt-in/submit — public endpoint backing /opt-in/<slug>.
@@ -27,6 +49,11 @@ export async function POST(req: NextRequest) {
     if (!supabaseAdmin) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
     }
+
+    // Before the body is read: every accepted call writes a consent audit row
+    // and creates a lead, and this endpoint is public by design (#99).
+    const limited = await limitByIp(req, 'opt-in-submit', IP_LIMIT, IP_WINDOW_SECONDS);
+    if (limited) return limited;
 
     const body = await req.json();
     const { slug, firstName, lastName, email, phone, smsConsent, consentText } = body;
@@ -59,11 +86,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Opt-in page not found' }, { status: 404 });
     }
 
+    // Counted only after the slug resolves to a real business. Counting an
+    // unvalidated slug would let a caller grow the counter table without bound
+    // by rotating slugs that don't exist.
+    await observeRate({
+      key: `opt-in-slug:${slug}`,
+      limit: SLUG_CEILING,
+      windowSeconds: SLUG_WINDOW_SECONDS,
+      title: 'Unusual volume on a branded opt-in page',
+      body: (count) =>
+        `The opt-in page /opt-in/${slug} (${business.business_name || business.id}) has taken ${count} submissions in the last hour, past the ${SLUG_CEILING} expected. Submissions are still being accepted — this ceiling deliberately does not block, because turning away real opt-ins is worse than absorbing junk. Check whether this is a campaign or a flood, and review the recent consent records for that business before relying on them as evidence.`,
+      data: { slug, user_id: business.id },
+    });
+
     const now = new Date().toISOString();
-    const consentIp =
-      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      req.headers.get('x-real-ip') ||
-      null;
+    // Shared clientIp(): prefers req.ip and x-vercel-forwarded-for over the raw
+    // x-forwarded-for this used to read. The consent IP is the evidence a
+    // carrier may ask for, so it is worth resolving from the most reliable
+    // source available rather than the first header that happens to be set.
+    const consentIp = clientIp(req);
     const consentUserAgent = req.headers.get('user-agent') || null;
 
     // Consent audit record — upsert so a repeat opt-in refreshes the evidence
