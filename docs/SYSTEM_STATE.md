@@ -767,6 +767,19 @@ allowance had lapsed months earlier, so it was not a quota to top up. Reputation
 the API key was valid; nothing was wrong with the credential. Kept below because the way that
 presented cost real time.
 
+**SendGrid is fully removed** — `SENDGRID_API_KEY` deleted from Vercel 2026-07-30, and a real
+send verified afterwards. Five copies of the mail transporter existed; all five now go through
+`lib/sendEmail.ts` (`email-alert`, `email/service`, `sendSmsAlert`, plus the two named in #79).
+**`app/api/email/send` is deliberately separate** — it builds a transport from per-user
+encrypted config in the database, not from environment variables.
+
+**Account-creation email does not use any of this.** `supabase.auth.signUp()` and
+`resetPasswordForEmail()` are sent by **Supabase Auth**, with whatever sender is configured in
+the Supabase dashboard — not `lib/sendEmail.ts` and not the `SMTP_*` variables. Changing the
+app's sender does nothing to signup mail; that needs Supabase → Authentication → SMTP Settings.
+See #103, which also covers `donotreply@` and the fact that `welcomeEmail` exists but has no
+caller, so a new user receives only Supabase's confirmation and nothing else.
+
 #### The two faults that made a working key look revoked
 
 Found by actually sending one.
