@@ -16,6 +16,22 @@ const nextConfig = {
         destination: '/auth/login',
         permanent: false,
       },
+      {
+        // /messages was a real, shipped page until #89 deleted it as superseded
+        // by /texts. Deleting a live URL without a redirect turns every existing
+        // bookmark and link into a 404, which is a worse outcome than the dead
+        // code it replaced.
+        source: '/messages',
+        destination: '/texts',
+        permanent: false,
+      },
+      {
+        // Same for the analytics page removed in #89 when the nav was
+        // consolidated onto /analytics (#9).
+        source: '/analytics-automation',
+        destination: '/analytics',
+        permanent: false,
+      },
     ];
   },
 
