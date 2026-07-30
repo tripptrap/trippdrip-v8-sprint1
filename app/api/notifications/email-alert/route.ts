@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/sendEmail';
 import {
   newMessageAlertEmail,
@@ -33,14 +33,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Missing userId' }, { status: 400 });
     }
 
+    // A system call carries no session, so the request-scoped client reads as
+    // anon and RLS returns nothing — which surfaced as "No email address on
+    // file" for a user who plainly has one. The x-api-key gate above is what
+    // authorises this path, so the lookups must run with service-role rights
+    // or the system path can never work at all.
+    const db = isSystemCall ? createServiceRoleClient() : supabase;
+
     // Get user's email and preferences
-    const { data: userData } = await supabase
+    const { data: userData } = await db
       .from('users')
       .select('email, full_name')
       .eq('id', targetUserId)
       .single();
 
-    const { data: prefs } = await supabase
+    const { data: prefs } = await db
       .from('user_preferences')
       .select('email_alerts_enabled, email_alert_new_message, email_alert_low_credits, email_alert_opt_out, email_alert_appointment')
       .eq('user_id', targetUserId)
