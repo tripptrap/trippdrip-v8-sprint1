@@ -36,6 +36,8 @@ export async function alertAdminsThrottled(opts: {
   data?: Record<string, any>;
   type?: NotificationType;
   windowMinutes?: number;
+  /** Also email ADMIN_EMAILS, for alerts where delay compounds the harm (#79). */
+  escalate?: boolean;
 }): Promise<ThrottledAlertResult> {
   const {
     key,
@@ -44,6 +46,7 @@ export async function alertAdminsThrottled(opts: {
     data = {},
     type = 'fulfillment_failed',
     windowMinutes = DEFAULT_WINDOW_MINUTES,
+    escalate = false,
   } = opts;
 
   if (!supabaseAdmin) {
@@ -71,6 +74,6 @@ export async function alertAdminsThrottled(opts: {
     return 'throttled';
   }
 
-  const sent = await notifyAdmins(type, title, body, { ...data, alert_key: key });
+  const sent = await notifyAdmins(type, title, body, { ...data, alert_key: key }, { escalate });
   return sent > 0 ? 'sent' : 'undeliverable';
 }

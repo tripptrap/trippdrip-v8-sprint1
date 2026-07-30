@@ -131,6 +131,9 @@ export async function GET(req: NextRequest) {
               'URGENT: auto-refill charged a card but granted no credits',
               `${user.email} was charged $${(finalPrice / 100).toFixed(2)} for the ${pack.name} pack (${pack.points} credits) by auto-refill, and the credit grant failed. The money is taken and nothing was delivered — grant ${pack.points} manually or refund the PaymentIntent.`,
               { reason: 'autobuy_credit_grant_failed', user_id: user.id, email: user.email, pack: pack.name, points: pack.points, amount_cents: finalPrice, payment_intent: paymentIntent.id, db_error: updateError.message }
+            ,
+              // Delay compounds this one: escalate by email, don't wait for a login (#79).
+              { escalate: true }
             );
             results.push({
               userId: user.id,

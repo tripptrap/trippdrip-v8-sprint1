@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/sendEmail';
 import {
   newMessageAlertEmail,
   appointmentAlertEmail,
@@ -11,42 +11,6 @@ import {
 export const dynamic = 'force-dynamic';
 
 type AlertType = 'new_message' | 'appointment' | 'low_credits' | 'opt_out';
-
-function createTransporter() {
-  // .trim() matters: several production env values carry a trailing
-  // newline, and this is an exact string comparison — 'sendgrid\n'
-  // silently falls through to the SMTP branch, which has no credentials
-  // configured, so email fails with no error anyone sees.
-  const provider = (process.env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
-  if (provider === 'sendgrid') {
-    return nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
-      secure: false,
-      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
-    });
-  }
-
-  // Reached whenever the provider isn't sendgrid. Without credentials this
-  // builds a transport pointing at smtp.gmail.com with no auth, which fails
-  // per-send with an opaque error rather than saying the app is misconfigured.
-  // In production SMTP_* are all unset (#84), so this branch is only correct if
-  // someone has deliberately configured SMTP.
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    throw new Error(
-      `Email is not configured: SERVICE_EMAIL_PROVIDER is "${provider}", which needs ` +
-      `SMTP_USER and SMTP_PASSWORD. Set those, or set SERVICE_EMAIL_PROVIDER=sendgrid ` +
-      `with SENDGRID_API_KEY.`
-    );
-  }
-
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-  });
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -143,17 +107,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: `Unknown alert type: ${type}` }, { status: 400 });
     }
 
-    const FROM_EMAIL = (process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com').trim();
-    const FROM_NAME = (process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre').trim();
-
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+    // Transport, from-address and the SMTP-misconfiguration guard now live in
+    // lib/sendEmail.ts so notifyAdmins() can reach them too (#79).
+    const sent = await sendEmail({
       to: userData.email,
       subject: template.subject,
       text: template.text,
       html: template.html,
     });
+
+    if (!sent.ok) {
+      console.error('Email alert send failed:', sent.error);
+      return NextResponse.json({ ok: false, error: sent.error }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

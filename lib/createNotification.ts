@@ -63,7 +63,22 @@ export async function notifyAdmins(
   type: NotificationType,
   title: string,
   body?: string,
-  data?: Record<string, any>
+  data?: Record<string, any>,
+  opts?: {
+    /**
+     * Also send email, not just the in-app notification (#79).
+     *
+     * Reserve this for alerts where **delay itself compounds the harm**: a card
+     * charged with nothing delivered, a number live and billing with no owner
+     * recorded, an opt-out that failed so every further send is a fresh
+     * violation. An in-app alert waits for someone to log in, which for those is
+     * the whole problem.
+     *
+     * Everything else stays in-app on purpose. A channel that fires for
+     * everything gets muted, and then it is worse than not having it.
+     */
+    escalate?: boolean;
+  }
 ): Promise<number> {
   const emails = getAdminEmails();
   if (emails.length === 0) {
@@ -74,6 +89,13 @@ export async function notifyAdmins(
   if (!supabaseAdmin) {
     console.error(`🚨 ADMIN ALERT UNDELIVERABLE — no service-role client. ${title}: ${body ?? ''}`);
     return 0;
+  }
+
+  // Sent before the in-app write and awaited independently, so an escalation
+  // still goes out if the notifications insert fails — and vice versa. These are
+  // two channels for the same alert, not one with a fallback.
+  if (opts?.escalate) {
+    await escalateByEmail(emails, title, body, data);
   }
 
   const { data: admins, error } = await supabaseAdmin
@@ -101,4 +123,55 @@ export async function notifyAdmins(
     console.error(`🚨 ADMIN ALERT UNDELIVERABLE — every insert failed. ${title}: ${body ?? ''}`);
   }
   return sent;
+}
+
+/**
+ * Email an operational alert to every ADMIN_EMAILS address (#79).
+ *
+ * **Deliberately ignores `user_preferences`.** The email-alert route honours
+ * per-user toggles, which is right for "you have a new message" — but these are
+ * operational alerts about real charges, and an operator turning off new-message
+ * emails must not silently disable the one that says a customer paid and got
+ * nothing. It also sends to the configured addresses directly rather than to
+ * matched `users` rows, so it still works when an admin address has no account.
+ *
+ * Never throws: the caller is already handling a failure of its own.
+ */
+async function escalateByEmail(
+  emails: string[],
+  title: string,
+  body?: string,
+  data?: Record<string, any>
+): Promise<void> {
+  try {
+    const { sendEmail, isEmailConfigured } = await import('@/lib/sendEmail');
+    const { fulfillmentFailedEmail } = await import('@/lib/emailTemplates');
+
+    if (!isEmailConfigured()) {
+      // Loud, because the alert that was meant to escalate has nowhere to go and
+      // the operator would otherwise believe email escalation is working.
+      console.error(
+        `🚨 ADMIN EMAIL ESCALATION UNAVAILABLE — email is not configured, so this stayed in-app only. ${title}: ${body ?? ''}`
+      );
+      return;
+    }
+
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://hyvewyre.com').trim();
+    const template = fulfillmentFailedEmail(title, body ?? '', data ?? {}, `${baseUrl}/admin`);
+
+    const sent = await sendEmail({
+      to: emails,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+
+    if (!sent.ok) {
+      console.error(`🚨 ADMIN EMAIL ESCALATION FAILED (${sent.error}) — ${title}: ${body ?? ''}`);
+    } else {
+      console.log(`📧 Escalated to ${emails.length} admin address(es): ${title}`);
+    }
+  } catch (err: any) {
+    console.error(`🚨 ADMIN EMAIL ESCALATION THREW — ${title}:`, err?.message || err);
+  }
 }

@@ -223,6 +223,9 @@ export async function POST(req: NextRequest) {
                 telnyx_order_id: orderData.data?.id ?? null,
                 db_error: numberInsertError.message,
               }
+            ,
+              // Delay compounds this one: escalate by email, don't wait for a login (#79).
+              { escalate: true }
             );
           } else {
             console.log(`✅ Ordered and saved number ${phoneNumberPurchase} for user ${userId} (order ${orderData.data?.id}, session ${sessionId})`);
@@ -307,6 +310,9 @@ export async function POST(req: NextRequest) {
                 'URGENT: plan paid for but the user row was not created',
                 `A ${planType} subscription was paid for (session ${sessionId}) but creating the user record failed, so the customer has no account and no credits.`,
                 { reason: 'user_create_failed', user_id: userId, plan: planType, session_id: sessionId, db_error: insertError.message }
+              ,
+                // Delay compounds this one: escalate by email, don't wait for a login (#79).
+                { escalate: true }
               );
             } else {
               console.log(`Created user ${userId} with ${planType} subscription and ${monthlyCredits} credits`);
@@ -339,6 +345,9 @@ export async function POST(req: NextRequest) {
                 'URGENT: plan paid for but the tier and credits were not applied',
                 `${userId} paid for ${planType} (session ${sessionId}) but the user update failed — they are on the old tier with no monthly credits added.`,
                 { reason: 'subscription_update_failed', user_id: userId, plan: planType, monthly_credits: monthlyCredits, session_id: sessionId, db_error: updateError.message }
+              ,
+                // Delay compounds this one: escalate by email, don't wait for a login (#79).
+                { escalate: true }
               );
             } else {
               const { data: newBalance, error: grantError } = await supabaseAdmin
@@ -351,6 +360,9 @@ export async function POST(req: NextRequest) {
                   'URGENT: plan activated but monthly credits not granted',
                   `${userId} paid for ${planType} (session ${sessionId}) and the tier was applied, but the ${monthlyCredits}-credit grant failed. Add them manually.`,
                   { reason: 'plan_credit_grant_failed', user_id: userId, plan: planType, monthly_credits: monthlyCredits, session_id: sessionId, db_error: grantError.message }
+                ,
+                  // Delay compounds this one: escalate by email, don't wait for a login (#79).
+                  { escalate: true }
                 );
               } else {
                 console.log(`Updated user ${userId} to ${planType}, added ${monthlyCredits} credits (new balance: ${newBalance})`);
@@ -391,6 +403,9 @@ export async function POST(req: NextRequest) {
               'URGENT: point pack paid for but no credits granted',
               `${userId} paid for ${packName} (${points} points, session ${sessionId}) but the transaction insert failed, so the credit grant was skipped entirely.`,
               { reason: 'pack_transaction_insert_failed', user_id: userId, pack: packName, points, session_id: sessionId, db_error: insertError.message, db_code: insertError.code }
+            ,
+              // Delay compounds this one: escalate by email, don't wait for a login (#79).
+              { escalate: true }
             );
             return NextResponse.json({ received: true, error: 'transaction insert failed' });
           }
@@ -423,6 +438,9 @@ export async function POST(req: NextRequest) {
               'URGENT: point pack charged and logged but credits not added',
               `${userId} paid for ${packName} (${points} points, session ${sessionId}). The transaction row was written but the balance update failed, so the ledger and the balance disagree — add ${points} manually.`,
               { reason: 'pack_credit_update_failed', user_id: userId, pack: packName, points, expected_balance: newCredits, session_id: sessionId, db_error: updateError.message }
+            ,
+              // Delay compounds this one: escalate by email, don't wait for a login (#79).
+              { escalate: true }
             );
           } else {
             console.log(`✅ Updated user ${userId} credits from ${currentCredits} to ${newCredits}`);
@@ -466,6 +484,9 @@ export async function POST(req: NextRequest) {
             'Renewal charged but no matching account',
             `Stripe charged a renewal for subscription ${subId} (invoice ${invoice.id}) but no user has that stripe_subscription_id, so no credits were applied to anyone.`,
             { reason: 'renewal_user_not_found', stripe_subscription_id: subId, invoice_id: invoice.id, amount_paid: invoice.amount_paid }
+          ,
+            // Delay compounds this one: escalate by email, don't wait for a login (#79).
+            { escalate: true }
           );
           break;
         }
@@ -497,6 +518,9 @@ export async function POST(req: NextRequest) {
             'URGENT: renewal charged but no monthly credits granted',
             `${renewingUser.id} was charged their monthly renewal (invoice ${invoice.id}) but the transaction insert failed, so the ${monthlyCredits} credit top-up was skipped.`,
             { reason: 'renewal_transaction_insert_failed', user_id: renewingUser.id, monthly_credits: monthlyCredits, invoice_id: invoice.id, db_error: renewalTxError.message, db_code: renewalTxError.code }
+          ,
+            // Delay compounds this one: escalate by email, don't wait for a login (#79).
+            { escalate: true }
           );
           break;
         }
@@ -523,6 +547,9 @@ export async function POST(req: NextRequest) {
             'URGENT: renewal charged and logged but credits not added',
             `${renewingUser.id} was charged their monthly renewal (invoice ${invoice.id}). The transaction row was written but the balance update failed, so the ledger and the balance disagree — add ${monthlyCredits} manually.`,
             { reason: 'renewal_credit_update_failed', user_id: renewingUser.id, monthly_credits: monthlyCredits, invoice_id: invoice.id, db_error: renewalUpdateError.message }
+          ,
+            // Delay compounds this one: escalate by email, don't wait for a login (#79).
+            { escalate: true }
           );
         } else {
           console.log(`Renewed user ${renewingUser.id}: +${monthlyCredits} credits`);

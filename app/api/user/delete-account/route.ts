@@ -224,6 +224,9 @@ export async function DELETE(req: NextRequest) {
         'URGENT: deleted account\'s opt-outs may no longer be enforced',
         `${userId} (${user.email}) was deleted but their DNC entries could not be promoted to the global list. Numbers they had opted out could now be messaged again. Promote them by hand.`,
         { reason: 'dnc_promotion_failed', user_id: userId, email: user.email, db_error: promoteError.message }
+      ,
+        // Delay compounds this one: escalate by email, don't wait for a login (#79).
+        { escalate: true }
       );
       failures.push({ table: 'dnc_global (promotion)', error: promoteError.message });
     } else if (promotedCount) {
@@ -244,6 +247,9 @@ export async function DELETE(req: NextRequest) {
         'URGENT: account deletion failed — the login still works',
         `${userId} (${user.email}) requested account deletion. Their data was purged but the auth record could not be deleted, so they can still sign in. Remove it manually.`,
         { reason: 'account_deletion_auth_failed', user_id: userId, email: user.email, purge_failures: failures, db_error: deleteAuthError.message }
+      ,
+        // Delay compounds this one: escalate by email, don't wait for a login (#79).
+        { escalate: true }
       );
       return NextResponse.json(
         {

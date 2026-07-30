@@ -512,6 +512,9 @@ async function handleInboundSMS(payload: any) {
             body: `${from} texted STOP to user ${userId} and the add_to_dnc write failed (${dncAddError.message}). Enforcement reads the DNC list, so this number is still sendable. Add it manually before the next send.`,
             data: { route: 'telnyx/sms-webhook', user_id: userId, phone: from, error: dncAddError.message },
             windowMinutes: 1440,
+            // Every message sent to this number from now on is a fresh
+            // violation, so this cannot wait for someone to log in (#79).
+            escalate: true,
           });
         } else {
           console.log(`✅ Added ${from} to DNC list for user ${userId} (${(dncResult as any)?.action ?? 'added'})`);

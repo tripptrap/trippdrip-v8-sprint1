@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
           'URGENT: number purchase failed and the credit refund failed too',
           `${user.id} was charged ${requiredCredits} credits for ${phoneNumber}, the purchase failed (${reason}), and the refund did not go through. The balance must be corrected by hand.`,
           { reason: 'credit_refund_failed', user_id: user.id, phone_number: phoneNumber, credits: requiredCredits, cause: reason, db_error: refundError.message }
+        ,
+          // Delay compounds this one: escalate by email, don't wait for a login (#79).
+          { escalate: true }
         );
         return false;
       }
@@ -167,6 +170,9 @@ export async function POST(req: NextRequest) {
         'URGENT: number ordered but not saved to the account',
         `${phoneNumber} may be live on Telnyx with no owner row for user ${user.id}. Credits ${refunded ? 'were refunded' : 'were NOT refunded'}. Check Telnyx and add the row or release the number.`,
         { reason: 'number_ordered_not_saved', user_id: user.id, phone_number: phoneNumber, credits: requiredCredits, refunded, db_error: numberError.message }
+      ,
+        // Delay compounds this one: escalate by email, don't wait for a login (#79).
+        { escalate: true }
       );
       return NextResponse.json(
         {

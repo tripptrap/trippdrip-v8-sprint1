@@ -428,3 +428,50 @@ export const optOutAlertEmail = (
   `),
   text: `Opt-Out Received\n\nHi ${userName},\n\n${leadName || leadPhone} sent STOP and has been added to your DNC list.\n\nNo further messages will be sent to this contact.\n\nView DNC list: ${appUrl}`,
 });
+
+/**
+ * Operator alert for a customer who paid and did not get what they paid for
+ * (#79). Deliberately plain and detail-heavy rather than marketing-styled — the
+ * reader is whoever has to go fix it, usually on a phone, and the details are
+ * what saves them a hunt through logs.
+ */
+export const fulfillmentFailedEmail = (
+  title: string,
+  body: string,
+  details: Record<string, any>,
+  dashboardUrl: string
+): EmailTemplate => {
+  const rows = Object.entries(details)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(
+      ([k, v]) => `
+        <tr>
+          <td style="padding: 6px 12px 6px 0; color: #6b7280; font-size: 13px; vertical-align: top; white-space: nowrap;">${k}</td>
+          <td style="padding: 6px 0; color: #111827; font-size: 13px; font-family: monospace; word-break: break-all;">${String(v)}</td>
+        </tr>`
+    )
+    .join('');
+
+  const textDetails = Object.entries(details)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `  ${k}: ${v}`)
+    .join('\n');
+
+  return {
+    subject: `[HyveWyre] ${title}`,
+    html: htmlWrapper(`
+      <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin-bottom: 24px;">
+        <h2 style="margin: 0 0 8px 0; color: #991b1b; font-size: 18px;">${title}</h2>
+        <p style="margin: 0; color: #7f1d1d; font-size: 14px; line-height: 1.6;">${body}</p>
+      </div>
+      <p style="margin: 0 0 8px 0; color: #374151; font-size: 14px; font-weight: bold;">Details</p>
+      <table role="presentation" style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">${rows}</table>
+      ${button('Open the admin dashboard', dashboardUrl)}
+      <p style="margin: 0; color: #6b7280; font-size: 12px;">
+        You are receiving this because your address is in ADMIN_EMAILS. It is an operational
+        alert about a real charge, so it ignores notification preferences.
+      </p>
+    `),
+    text: `${title}\n\n${body}\n\nDetails:\n${textDetails}\n\nAdmin dashboard: ${dashboardUrl}\n\nSent because your address is in ADMIN_EMAILS. Operational alert about a real charge — ignores notification preferences.`,
+  };
+};
