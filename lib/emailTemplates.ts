@@ -23,8 +23,12 @@ const htmlWrapper = (content: string) => `
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+      <!-- Side padding so the card never touches the screen edge on a phone. -->
+      <td align="center" style="padding: 24px 12px;">
+        <!-- width:100% + max-width, not a fixed 600px. A fixed width clips or
+             forces horizontal scrolling on any viewport narrower than 600px,
+             which is most phones — and most email is read on a phone. -->
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
             <!-- bgcolor + background-color before the gradient: many clients strip
