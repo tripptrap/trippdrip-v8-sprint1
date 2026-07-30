@@ -197,6 +197,30 @@ so don't treat it as a compliance backstop unless you also wire it into the send
 
 ## Phone Numbers
 
+### A user's first number must be primary — it was not (#104, 2026-07-30)
+
+`user_telnyx_numbers.is_primary` defaults to `false`, and **none of the four insert paths set
+it** (`telnyx/purchase-number`, `number-pool/claim`, `number-pool/purchase-with-credits`,
+`telnyx/number-order-webhook`). **Eight read paths require it** — bulk scheduling, AI drip
+start, SMS alerts, draft replies, the 10DLC status and assign-number routes among them, all
+using `.eq('is_primary', true)`.
+
+So every user who finished onboarding received a number they **could not send from**. The one
+real account showed it: `+18134972176`, `is_primary: false`.
+
+**Why nobody noticed:** the inbound SMS webhook uses `.order('is_primary', …)` rather than
+`.eq`, so receiving worked fine. Only outbound was dead, and it failed by finding no number
+rather than by erroring.
+
+Fixed with a `BEFORE INSERT` trigger (`ensure_primary_telnyx_number`) rather than by patching
+the four routes — a fifth would forget the same way. It only promotes, never demotes an
+explicit `true`. A partial unique index enforces at most one primary per user, because several
+read paths `.single()` on that filter and would error on two rows.
+
+**Rule:** when a column is required by read paths but optional at insert, put the invariant in
+the database. Four routes agreeing today is not four routes agreeing next month.
+
+
 `user_telnyx_numbers.capabilities` — as of 2026-07-28 morning, this column **did not
 exist in the database at all**, despite `app/(dashboard)/phone-numbers/page.tsx`
 unconditionally reading `number.capabilities.sms/.voice/.mms` on every row. This
