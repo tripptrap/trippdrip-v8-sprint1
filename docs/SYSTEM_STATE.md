@@ -777,6 +777,53 @@ Deliberately lenient and unchanged: `authHeader.replace('Bearer ', '')` is a no-
 value, so `Authorization: <secret>` without the prefix is also accepted. Knowing the secret is
 the boundary, so this costs nothing and tolerates odd clients.
 
+## Rate limiting (#58, 2026-07-29)
+
+`lib/rateLimit.ts` → `limitByIp(req, scope, limit, windowSeconds)`; returns `null` when
+allowed or the 429 to return as-is. Backed by the `check_rate_limit(key, limit, window)` RPC
+and the `rate_limits` table (service-role only, RLS on with no policies).
+
+**Do not use an in-memory Map for this.** `app/api/ai/compose` has one, and it is per
+serverless instance: on Vercel a caller spread across N warm instances gets N times the limit,
+and every cold start resets the count. A counter is only a limit if every instance shares it.
+
+The RPC does the count and the decision in one `INSERT ... ON CONFLICT DO UPDATE`, which takes
+a row lock — a SELECT-then-UPDATE in application code would let two concurrent requests read
+the same stale count and slip past together. Rows are reused per key and pruned
+opportunistically, so the table grows with distinct keys, not request volume.
+
+**`clock_timestamp()`, not `now()`.** `now()` is the *transaction* timestamp and is frozen for
+the whole transaction, so multiple calls inside one transaction share a window that can never
+expire — a `pg_sleep` between them changes nothing. Each PostgREST call is its own transaction
+so `now()` would usually behave, which is what makes it a trap: it also cannot be tested in a
+single statement. This was caught by a test that failed, not by reading the code.
+
+**Client IP on Vercel is not spoofable.** Per Vercel's request-headers docs, it *overwrites*
+`X-Forwarded-For` and does not forward external IPs, explicitly "to prevent IP spoofing" — so
+a caller sending its own header does not get a fresh bucket. `clientIp()` prefers `req.ip`,
+then `x-vercel-forwarded-for` (same value, but survives a proxy running on top of Vercel,
+which can overwrite `x-forwarded-for`), then `x-forwarded-for`, then `x-real-ip`. A request
+with no determinable IP shares one bucket rather than getting a free pass.
+
+**Fails open, loudly.** If the limiter breaks, locking real users out of a login-support
+endpoint over an infrastructure fault is worse than briefly losing the throttle.
+
+### Where it is applied
+
+| endpoint | limit | why |
+|---|---|---|
+| `POST /api/auth/account-status` | 10 / 60s per IP | unauthenticated, service-role read of `users` by arbitrary email; a suspended/banned account is distinguishable from an active one, so a list can be probed for restricted addresses (#58) |
+
+The check runs **before** `req.json()` and before the `users` lookup, so a throttled caller
+costs one counter upsert rather than a query — the free unauthenticated read was half of what
+#58 was about.
+
+Degradation is graceful: on 429 the login page reads `statusData.status`, finds nothing, and
+falls through to its normal "Invalid login credentials" toast. Verified in the browser.
+
+**Still unthrottled:** `POST /api/opt-in/submit` — the other public service-role endpoint, and
+each call creates a lead plus a consent audit row (#99).
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
