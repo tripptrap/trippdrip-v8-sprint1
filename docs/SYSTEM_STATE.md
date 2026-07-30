@@ -748,9 +748,32 @@ so the `.trim()` in `createTransporter()` is load-bearing: without it `'sendgrid
 through to the SMTP branch, which has no credentials in production, and email dies silently
 (#85).
 
-**Still unverified:** an actual delivery through SendGrid. Everything up to the send is tested
-(13/13 on the library and template, 7/7 on the integration), but proving mail arrives needs
-production credentials and sends real mail.
+### Production email is dead — the SendGrid key is revoked (#101, 2026-07-29)
+
+Verified by sending one. Production returns:
+
+```
+535 Authentication failed: The provided authorization grant is invalid, expired, or revoked
+```
+
+Confirmed against SendGrid's own REST API (`GET /v3/scopes` → **401**), so it is the key, not
+nodemailer, SMTP or the provider switch. The key is **well-formed** — `SG.` prefix, 71
+characters — so nothing looks wrong at a glance. Likely revoked as leaked (#29).
+
+**Broken:** admin escalation, per-user email alerts, `/api/email/send`, `/api/email/service`,
+`lib/serviceEmail.ts`.
+
+**Not broken:** password reset and signup confirmation — those go through **Supabase Auth**,
+not SendGrid. That is why this went unnoticed: the email path anyone would miss fastest is the
+one that does not use this key.
+
+The degradation is the intended one — the escalation logs
+`🚨 ADMIN EMAIL ESCALATION FAILED (Invalid login: 535 ...)` and the in-app notification is
+still written. Before #79 there was no admin email at all, so nothing would have surfaced it.
+
+**There are four copies of the transporter logic**: `lib/sendEmail.ts`, `app/api/email/send`,
+`app/api/email/service`, plus the provider switch duplicated across them. #79 consolidated only
+the one it named.
 
 ## Crons: three of five had never run (#97, 2026-07-29)
 
