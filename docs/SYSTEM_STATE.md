@@ -748,7 +748,26 @@ so the `.trim()` in `createTransporter()` is load-bearing: without it `'sendgrid
 through to the SMTP branch, which has no credentials in production, and email dies silently
 (#85).
 
-### Production email is down — two stacked faults, neither is a revoked key (#101, 2026-07-30)
+### Email runs on PrivateEmail SMTP, not SendGrid (#101, 2026-07-30)
+
+**Current state:** `SERVICE_EMAIL_PROVIDER=smtp` against `mail.privateemail.com:465` (implicit
+SSL, so `SMTP_SECURE=true`), authenticating as `support@hyvewyre.com`, which is also
+`SERVICE_EMAIL_FROM` — PrivateEmail only sends from the mailbox you authenticate as, so those
+two must match. Verified in production by an actual send: `/api/email/service` returned
+`{ok:true, messageId:<…@hyvewyre.com>}`.
+
+`SMTP_PASSWORD` is stored **sensitive** in Vercel, so `vercel env pull` returns the literal
+string `[SENSITIVE]` and it cannot be verified from a developer machine. `verify-secrets.js`
+detects that placeholder and says so rather than trying to authenticate with it and reporting
+a credential that is probably fine as broken.
+
+**Why SendGrid was dropped:** the account (`hyvewyre@gmail.com`) was on the **free** plan with
+`total: 0, remain: 0, is_hard_limit: true` and reset dates frozen at 2026-05-01/02 — the
+allowance had lapsed months earlier, so it was not a quota to top up. Reputation was 100 and
+the API key was valid; nothing was wrong with the credential. Kept below because the way that
+presented cost real time.
+
+#### The two faults that made a working key look revoked
 
 Found by actually sending one.
 
@@ -760,7 +779,7 @@ That reads as a dead key and is not one. `createTransporter()` now trims every c
 
 **2. With the key trimmed, AUTH succeeds and the account refuses:** `451 Authentication failed:
 Maximum credits exceeded`. The SendGrid account is out of sending credits. **Not fixable in
-code** — this is what still blocks email.
+code** — this is why the provider was changed rather than repaired.
 
 **Not broken:** password reset and signup confirmation go through **Supabase Auth**, not
 SendGrid. That is why this went unnoticed — the email path anyone would miss fastest is the one
