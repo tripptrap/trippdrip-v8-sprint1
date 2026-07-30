@@ -27,7 +27,11 @@ const htmlWrapper = (content: string) => `
         <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, ${BRAND_COLOR} 0%, #8b5cf6 100%); padding: 30px; text-align: center;">
+            <!-- bgcolor + background-color before the gradient: many clients strip
+                 linear-gradient, and the heading is white, so without a solid
+                 fallback the brand header renders as an invisible white-on-white
+                 block. Confirmed rendering that way in PrivateEmail webmail. -->
+            <td bgcolor="${BRAND_COLOR}" style="background-color: ${BRAND_COLOR}; background: linear-gradient(135deg, ${BRAND_COLOR} 0%, #8b5cf6 100%); padding: 30px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">${BRAND_NAME}</h1>
             </td>
           </tr>
