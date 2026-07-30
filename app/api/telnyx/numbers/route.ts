@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getVerifiedTollFreeNumbers, isTollFreeNumber } from '@/lib/telnyx';
+import { releasePoolNumber } from '@/lib/numberPool';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -85,11 +86,12 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          // Mark as unassigned in number_pool if it was from there
-          await supabaseAdmin
-            .from('number_pool')
-            .update({ is_assigned: false, assigned_to_user_id: null, assigned_at: null })
-            .eq('phone_number', num.phone_number);
+          // Return it to the pool through the shared helper so it is quarantined
+          // and its tenancy recorded (#38). A number auto-released for losing
+          // toll-free verification is the last one that should go straight to a
+          // different business, and the history is how anyone later works out
+          // that it lost TFV under a previous holder.
+          await releasePoolNumber(supabaseAdmin, num.phone_number, user.id, 'unverified_auto_release');
         }
 
         releasedNumbers.push(num.phone_number);

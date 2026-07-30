@@ -286,3 +286,69 @@ export async function getTelnyxNumbers(): Promise<{
     return { success: false, error: error.message || 'Network error' };
   }
 }
+
+/**
+ * Carrier-facing health metrics for a number (#38).
+ *
+ * Reputation attaches to the number, not the tenant, so before a released pool
+ * number is handed to a different business it is worth asking Telnyx what shape
+ * it is actually in. Verified against the live API rather than assumed: the
+ * metrics come back nested under `data.health`, not at the top level.
+ *
+ * `ok: false` means the question could not be answered — a missing key, a
+ * network failure, an unknown number. Callers should treat that as "unknown",
+ * not as "healthy" and not as "bad".
+ */
+export interface NumberHealth {
+  ok: boolean;
+  messageCount: number;
+  spamRatio: number;
+  successRatio: number;
+  inboundOutboundRatio: number;
+  error?: string;
+}
+
+export async function getNumberHealth(phoneNumber: string): Promise<NumberHealth> {
+  const empty = { messageCount: 0, spamRatio: 0, successRatio: 0, inboundOutboundRatio: 0 };
+  const apiKey = process.env.TELNYX_API_KEY;
+  if (!apiKey) {
+    return { ok: false, ...empty, error: 'TELNYX_API_KEY is not configured' };
+  }
+
+  const headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+
+  try {
+    // The messaging sub-resource is keyed by Telnyx's internal id, not by the
+    // number itself, so this is two calls.
+    const lookup = await fetch(
+      `${TELNYX_API_URL}/phone_numbers?filter[phone_number]=${encodeURIComponent(phoneNumber)}`,
+      { headers }
+    );
+    const lookupBody = await lookup.json();
+    const id = lookupBody?.data?.[0]?.id;
+    if (!lookup.ok || !id) {
+      return { ok: false, ...empty, error: `No Telnyx record for ${phoneNumber}` };
+    }
+
+    const res = await fetch(`${TELNYX_API_URL}/phone_numbers/${id}/messaging`, { headers });
+    const body = await res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        ...empty,
+        error: body?.errors?.[0]?.detail || `Telnyx returned ${res.status}`,
+      };
+    }
+
+    const health = body?.data?.health ?? {};
+    return {
+      ok: true,
+      messageCount: Number(health.message_count ?? 0),
+      spamRatio: Number(health.spam_ratio ?? 0),
+      successRatio: Number(health.success_ratio ?? 0),
+      inboundOutboundRatio: Number(health.inbound_outbound_ratio ?? 0),
+    };
+  } catch (err: any) {
+    return { ok: false, ...empty, error: err?.message || 'Failed to reach Telnyx' };
+  }
+}

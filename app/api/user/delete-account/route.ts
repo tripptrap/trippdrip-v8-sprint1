@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import Stripe from 'stripe';
 import { notifyAdmins } from '@/lib/createNotification';
+import { releasePoolNumber } from '@/lib/numberPool';
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -80,11 +81,12 @@ export async function DELETE(req: NextRequest) {
           }
         }
 
-        // Mark pool numbers as available again
-        await adminClient
-          .from('number_pool')
-          .update({ is_assigned: false, assigned_to_user_id: null, assigned_at: null })
-          .eq('phone_number', num.phone_number);
+        // Return pool numbers via releasePoolNumber(), which also snapshots the
+        // number's carrier health and closes its assignment-history row. That
+        // history has to outlive the account: once this user is gone, it is the
+        // only way to answer "who had this number, and was it already in
+        // trouble" for whoever inherits it (#38).
+        await releasePoolNumber(adminClient, num.phone_number, userId, 'account_deleted');
       }
 
       // Delete from user_telnyx_numbers

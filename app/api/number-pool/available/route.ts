@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+import { isQuarantined, QUARANTINE_DAYS } from '@/lib/numberPool';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createAdminClient(
@@ -73,10 +74,27 @@ export async function GET(req: NextRequest) {
       console.error('Could not reconcile pool verification against Telnyx:', verifyErr);
     }
 
+    // Offer rested numbers first (#38). A number inside its cooldown is only
+    // surfaced when there is nothing else — the claim path allows it in exactly
+    // that case, so showing it any earlier would advertise a number the user
+    // would then be refused.
+    const rested = numbers.filter((n: any) => !isQuarantined(n));
+    const resting = numbers.filter((n: any) => isQuarantined(n));
+    const offered = rested.length > 0 ? rested : resting;
+
+    if (rested.length === 0 && resting.length > 0) {
+      console.warn(
+        `⚠️ Every available pool number is inside its ${QUARANTINE_DAYS}-day cooldown; offering ${resting.length} recycled number(s).`
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      numbers,
-      total: numbers.length
+      numbers: offered,
+      total: offered.length,
+      // True when everything on offer is a number another business recently
+      // used, so the UI can say so rather than implying a fresh number.
+      recycled: rested.length === 0 && resting.length > 0,
     });
 
   } catch (error: any) {

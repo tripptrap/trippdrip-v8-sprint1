@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+import { evaluateClaim } from '@/lib/numberPool';
 
 // Admin client to bypass RLS for database operations
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -101,6 +102,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Reputation follows the number, not the tenant, so a number that has just
+    // come back from another business does not go straight out again (#38).
+    // This also refuses outright any number with real carrier spam history, and
+    // yields the cooldown when the pool has nothing else rather than blocking
+    // someone's signup.
+    const decision = await evaluateClaim(supabaseAdmin, poolNumber);
+    if (!decision.allow) {
+      return NextResponse.json({ error: decision.message }, { status: decision.status });
+    }
+
     // Assign the number to the user
     const { data: updatedNumber, error: updateError } = await supabaseAdmin
       .from('number_pool')
@@ -151,7 +162,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`✅ Number ${poolNumber.phone_number} claimed by user ${user.id}`);
+    // Open the assignment-history row. Deliberately after the ownership writes
+    // succeed, so history records tenancies that actually happened.
+    const { error: historyError } = await supabaseAdmin
+      .rpc('record_pool_assignment', { p_phone_number: poolNumber.phone_number, p_user_id: user.id });
+    if (historyError) {
+      // Non-fatal: the user has their number. But the gap matters later, so say so.
+      console.error(`Failed to record pool assignment history for ${poolNumber.phone_number}:`, historyError);
+    }
+
+    console.log(
+      `✅ Number ${poolNumber.phone_number} claimed by user ${user.id}` +
+        (decision.recycled ? ' (recycled from an exhausted pool — see #38)' : '')
+    );
 
     return NextResponse.json({
       success: true,

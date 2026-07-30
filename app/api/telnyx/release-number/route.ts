@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { releasePoolNumber } from '@/lib/numberPool';
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,26 +90,13 @@ export async function POST(req: NextRequest) {
       // Continue - number was released from Telnyx
     }
 
-    // Also check if it was from the pool and mark it available again.
-    // Service-role client: RLS on number_pool (#56) gives end users read-only
-    // access to unassigned rows, so releasing has to run with elevated rights.
-    // Safe because the caller is already authenticated above and the row is
-    // matched on a number they were verified to own. Scoped by
-    // assigned_to_user_id as well, so a stale or spoofed phoneNumber can't
-    // release someone else's number.
-    const { error: poolError } = await createServiceRoleClient()
-      .from('number_pool')
-      .update({
-        is_assigned: false,
-        assigned_to_user_id: null,
-        assigned_at: null,
-      })
-      .eq('phone_number', phoneNumber)
-      .eq('assigned_to_user_id', user.id);
-
-    if (poolError) {
-      console.error('Failed to return number to pool:', phoneNumber, poolError);
-    }
+    // Return it to the pool through releasePoolNumber(), not by clearing
+    // is_assigned here. That helper snapshots the number's carrier health,
+    // closes its assignment-history row and starts the reuse cooldown — a
+    // released number carries its sender reputation to whoever claims it next
+    // (#38). Service-role: RLS on number_pool (#56) gives end users read-only
+    // access to unassigned rows.
+    await releasePoolNumber(createServiceRoleClient(), phoneNumber, user.id, 'user_released');
 
     console.log('Released phone number:', phoneNumber, 'for user:', user.id);
 
