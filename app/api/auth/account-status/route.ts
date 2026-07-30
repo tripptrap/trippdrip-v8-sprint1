@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { limitByIp } from '@/lib/rateLimit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+/**
+ * The login page calls this once per failed sign-in, so a real person hits it a
+ * handful of times at worst — even fumbling a password repeatedly stays well
+ * under this. Shared office IPs have room too (#58).
+ */
+const RATE_LIMIT = 10;
+const RATE_WINDOW_SECONDS = 60;
+
 export async function POST(req: NextRequest) {
   try {
+    // Before anything else, including reading the body. This endpoint answers an
+    // unauthenticated caller about an arbitrary email using the service-role key,
+    // so an unthrottled caller could probe a list of addresses to find which are
+    // restricted — and get a free unauthenticated read against `users` each time.
+    // Checking first means a throttled caller costs one cheap counter upsert
+    // instead of a lookup (#58).
+    const limited = await limitByIp(req, 'account-status', RATE_LIMIT, RATE_WINDOW_SECONDS);
+    if (limited) return limited;
+
     const { email } = await req.json();
 
     if (!email) {
@@ -16,9 +34,12 @@ export async function POST(req: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    // `suspension_reason` is deliberately not selected: it is never returned
+    // (#48), and fetching a field this endpoint must not disclose only invites
+    // someone to add it back to the response later.
     const { data: userData, error } = await adminClient
       .from('users')
-      .select('account_status, suspension_reason, suspended_until')
+      .select('account_status, suspended_until')
       .eq('email', email.toLowerCase())
       .single();
 
