@@ -821,8 +821,30 @@ costs one counter upsert rather than a query — the free unauthenticated read w
 Degradation is graceful: on 429 the login page reads `statusData.status`, finds nothing, and
 falls through to its normal "Invalid login credentials" toast. Verified in the browser.
 
-**Still unthrottled:** `POST /api/opt-in/submit` — the other public service-role endpoint, and
-each call creates a lead plus a consent audit row (#99).
+| `POST /api/opt-in/submit` | 5 / 60s per IP (blocks) + 100/hr per slug (**alerts only**) | public consent page; each call writes a consent audit row and creates a lead on the targeted business (#99) |
+| `POST /api/contact-form` | 5 / 60s per IP (blocks) + 100/hr total (**alerts only**) | same exposure, same table (#99) |
+
+### Why the per-page ceilings alert instead of blocking
+
+Capping one business's opt-in page would hand anyone a way to deny it their signups — burn the
+quota from a botnet and real customers are turned away. **A lost opt-in is worse than a junk
+one:** junk can be filtered by pattern afterwards, a missed customer and their consent record
+cannot be recovered. Same for the contact form, where a global cap would let one caller take
+the form down for everyone and the limit would become the outage.
+
+So the per-IP limit does the blocking, where a false positive costs one person one minute, and
+`observeRate()` makes a distributed flood *visible* without absorbing it silently.
+
+The per-slug counter runs **after** the slug resolves to a real business. Counting an
+unvalidated slug would let a caller grow `rate_limits` without bound by rotating slugs that
+don't exist.
+
+### The survey that missed one
+
+The #58 pass grepped for `SUPABASE_SERVICE_ROLE_KEY` and concluded there were two public
+service-role endpoints. `/api/contact-form` reaches the same privileges via
+`createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
+three, all now limited.
 
 ## AI flow completion — confirm, then book
 
