@@ -748,275 +748,47 @@ so the `.trim()` in `createTransporter()` is load-bearing: without it `'sendgrid
 through to the SMTP branch, which has no credentials in production, and email dies silently
 (#85).
 
-### Production email is dead — the SendGrid key is revoked (#101, 2026-07-29)
+### Production email is down — two stacked faults, neither is a revoked key (#101, 2026-07-29)
 
-Verified by sending one. Production returns:
+**1. The key was passed to SMTP AUTH untrimmed.** Production's `SENDGRID_API_KEY` carries a
+trailing newline (#85). **HTTP strips trailing whitespace from a header; SMTP AUTH does not** —
+it base64-encodes the password verbatim, so the newline goes over the wire and SendGrid answers:
 
 ```
 535 Authentication failed: The provided authorization grant is invalid, expired, or revoked
 ```
 
-Confirmed against SendGrid's own REST API (`GET /v3/scopes` → **401**), so it is the key, not
-nodemailer, SMTP or the provider switch. The key is **well-formed** — `SG.` prefix, 71
-characters — so nothing looks wrong at a glance. Likely revoked as leaked (#29).
-
-**Broken:** admin escalation, per-user email alerts, `/api/email/send`, `/api/email/service`,
-`lib/serviceEmail.ts`.
-
-**Not broken:** password reset and signup confirmation — those go through **Supabase Auth**,
-not SendGrid. That is why this went unnoticed: the email path anyone would miss fastest is the
-one that does not use this key.
-
-The degradation is the intended one — the escalation logs
-`🚨 ADMIN EMAIL ESCALATION FAILED (Invalid login: 535 ...)` and the in-app notification is
-still written. Before #79 there was no admin email at all, so nothing would have surfaced it.
-
-**There are four copies of the transporter logic**: `lib/sendEmail.ts`, `app/api/email/send`,
-`app/api/email/service`, plus the provider switch duplicated across them. #79 consolidated only
-the one it named.
-
-## Crons: three of five had never run (#97, 2026-07-29)
-
-**Vercel Cron invokes the scheduled path with an HTTP `GET`.** Per the docs: *"To trigger a
-cron job, Vercel makes an HTTP GET request to your project's production deployment URL."*
-Requests also carry the user agent `vercel-cron/1.0` and an `x-vercel-cron-schedule` header.
-
-`process-drips`, `process-ai-drips` and `send-appointment-reminders` exported the real work
-as `POST` and a **metadata-only stub** as `GET`. So every scheduled run hit the stub, got
-`200 {ok: true}` back, and did nothing — Vercel records a successful invocation and nothing
-reports a problem. Drip campaigns, AI drips and appointment reminders had **never fired on a
-schedule**.
-
-The tell, against production: an unauthenticated `GET` returned **401** on `process-scheduled`
-and `auto-buy`, and **200** on the other three. The two that worked are auth-gated on GET
-*because GET is where their work lives*.
-
-No damage had occurred only because nothing was enrolled — `drip_campaign_enrollments` and
-`calendar_events` were both empty. The corroborating trace was `ai_drips`: 4 rows created
-2026-01-20 with `next_send_at` of 01-21/22, all `stopped`, all with `messages_sent = 0`.
-
-Now `export const GET = handleCron; export const POST = handleCron;` on all three.
-
-**Rules this leaves behind:**
-- A cron route must do its work on **GET**. A POST-only cron is dead on arrival, and it fails
-  in the direction that looks healthy.
-- `vercel.json` is the only scheduler — there is no external cron service. Check there before
-  assuming a route is triggered.
-- All five routes are `ƒ` (dynamic) in the build output and declare
-  `export const dynamic = "force-dynamic"` — with **double quotes**, which a single-quote grep
-  misses. A cron route that became static would serve Vercel a cached response and
-  reintroduce this bug in a subtler form.
-- The five disagree on which auth header they accept (#96): only `process-scheduled` reads
-  `x-cron-secret`; the rest are `Authorization: Bearer` only. Fine for Vercel Cron, a trap the
-  moment the trigger changes.
-
-### Cron auth is one helper now (#96, 2026-07-29)
-
-`lib/cronAuth.ts` — `requireCronAuth(req)` for the five cron routes, `isInternalCaller(req)`
-for service-to-service calls, `secureCompare(a, b)` under both.
-
-There were five hand-rolled copies and they had drifted: only `process-scheduled` read
-`x-cron-secret`; the rest were `Authorization: Bearer` only. Both forms now work everywhere.
-`requireCronAuth` returns `null` when authorised or the response to return as-is.
-
-**`CRON_SECRET` is also the internal service-to-service secret**, sent as `x-internal-secret`
-(cron → `telnyx/send-sms`, sms-webhook → `receptionist/respond`). Those two receivers compared
-it with `===` while the crons went to lengths to compare the identical value in constant time.
-Both use `secureCompare` now. The `send-sms` one matters most: passing that gate is what lets
-a caller supply an arbitrary `userId` in the body and send as that user.
-
-**The fail-open to remember:** `secureCompare('', '')` returns **true**. An unset `CRON_SECRET`
-must be caught *before* the comparison, not by it — `requireCronAuth` returns 500 in that case
-and never authorises. Verified 19/19, including that path.
-
-Deliberately lenient and unchanged: `authHeader.replace('Bearer ', '')` is a no-op on a bare
-value, so `Authorization: <secret>` without the prefix is also accepted. Knowing the secret is
-the boundary, so this costs nothing and tolerates odd clients.
-
-## Rate limiting (#58, 2026-07-29)
-
-`lib/rateLimit.ts` → `limitByIp(req, scope, limit, windowSeconds)`; returns `null` when
-allowed or the 429 to return as-is. Backed by the `check_rate_limit(key, limit, window)` RPC
-and the `rate_limits` table (service-role only, RLS on with no policies).
-
-**Do not use an in-memory Map for this.** `app/api/ai/compose` has one, and it is per
-serverless instance: on Vercel a caller spread across N warm instances gets N times the limit,
-and every cold start resets the count. A counter is only a limit if every instance shares it.
-
-The RPC does the count and the decision in one `INSERT ... ON CONFLICT DO UPDATE`, which takes
-a row lock — a SELECT-then-UPDATE in application code would let two concurrent requests read
-the same stale count and slip past together. Rows are reused per key and pruned
-opportunistically, so the table grows with distinct keys, not request volume.
-
-**`clock_timestamp()`, not `now()`.** `now()` is the *transaction* timestamp and is frozen for
-the whole transaction, so multiple calls inside one transaction share a window that can never
-expire — a `pg_sleep` between them changes nothing. Each PostgREST call is its own transaction
-so `now()` would usually behave, which is what makes it a trap: it also cannot be tested in a
-single statement. This was caught by a test that failed, not by reading the code.
-
-**Client IP on Vercel is not spoofable.** Per Vercel's request-headers docs, it *overwrites*
-`X-Forwarded-For` and does not forward external IPs, explicitly "to prevent IP spoofing" — so
-a caller sending its own header does not get a fresh bucket. `clientIp()` prefers `req.ip`,
-then `x-vercel-forwarded-for` (same value, but survives a proxy running on top of Vercel,
-which can overwrite `x-forwarded-for`), then `x-forwarded-for`, then `x-real-ip`. A request
-with no determinable IP shares one bucket rather than getting a free pass.
-
-**Fails open, loudly.** If the limiter breaks, locking real users out of a login-support
-endpoint over an infrastructure fault is worse than briefly losing the throttle.
-
-### Where it is applied
-
-| endpoint | limit | why |
-|---|---|---|
-| `POST /api/auth/account-status` | 10 / 60s per IP | unauthenticated, service-role read of `users` by arbitrary email; a suspended/banned account is distinguishable from an active one, so a list can be probed for restricted addresses (#58) |
-
-The check runs **before** `req.json()` and before the `users` lookup, so a throttled caller
-costs one counter upsert rather than a query — the free unauthenticated read was half of what
-#58 was about.
-
-Degradation is graceful: on 429 the login page reads `statusData.status`, finds nothing, and
-falls through to its normal "Invalid login credentials" toast. Verified in the browser.
-
-| `POST /api/opt-in/submit` | 5 / 60s per IP (blocks) + 100/hr per slug (**alerts only**) | public consent page; each call writes a consent audit row and creates a lead on the targeted business (#99) |
-| `POST /api/contact-form` | 5 / 60s per IP (blocks) + 100/hr total (**alerts only**) | same exposure, same table (#99) |
-
-### Why the per-page ceilings alert instead of blocking
-
-Capping one business's opt-in page would hand anyone a way to deny it their signups — burn the
-quota from a botnet and real customers are turned away. **A lost opt-in is worse than a junk
-one:** junk can be filtered by pattern afterwards, a missed customer and their consent record
-cannot be recovered. Same for the contact form, where a global cap would let one caller take
-the form down for everyone and the limit would become the outage.
-
-So the per-IP limit does the blocking, where a false positive costs one person one minute, and
-`observeRate()` makes a distributed flood *visible* without absorbing it silently.
-
-The per-slug counter runs **after** the slug resolves to a real business. Counting an
-unvalidated slug would let a caller grow `rate_limits` without bound by rotating slugs that
-don't exist.
-
-### The survey that missed one
-
-The #58 pass grepped for `SUPABASE_SERVICE_ROLE_KEY` and concluded there were two public
-service-role endpoints. `/api/contact-form` reaches the same privileges via
-`createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
-three, all now limited.
-
-## Phone normalisation — one rule, in two languages (#100, 2026-07-29)
-
-`lib/phone.ts` → `normalizePhone(input): string | null`. **It must agree with the SQL
-`normalize_phone()`**, because that function is what `check_dnc()` and `find_lead_by_phone()`
-compare against: a number normalised differently in TS is a number that silently escapes
-opt-out enforcement or fails to match its own lead. The TS version is transcribed from the SQL
-one, not reinvented.
-
-The rule, in both:
-
-```
-strip non-digits
-11 digits starting with 1  ->  +<digits>
-exactly 10 digits          ->  +1<digits>    (assume US)
-10 or more digits          ->  +<digits>
-shorter                    ->  SQL returns the input unchanged; TS returns null
-```
-
-That last line is the one deliberate divergence — SQL hands back something non-E.164 that
-looks normalised, TS makes the caller decide. Every caller validates length first, so it does
-not arise. **Verified by differential test against the live database over 19 inputs** (bare
-10-digit, punctuated, `+1`-prefixed, 11-digit, UK, CN, 15-digit, leading-zero, junk): every
-normalisable input agrees exactly.
-
-### What was broken
-
-`/api/opt-in/submit` did `phone.startsWith('+') ? phone : '+' + digits`, so a 10-digit US
-number — **what the branded form's own placeholder asks for** — became `+5550001234`, no
-country code. `normalize_phone()` rescued DNC and lead matching, which is why nothing looked
-wrong. It did not rescue sending: `lib/telnyx.ts` passes `to` straight to the API and
-`send-sms` doesn't normalise either, so the send fails. Consent collected through the
-compliant path, then no way to message the person.
-
-`/api/contact-form` normalised nothing at all — one person could occupy two rows as
-`5551234567` and `+15551234567`.
-
-`ingest` and `upload-document` each had their own correct copy; both now use the shared one.
-
-### The read side matters too
-
-The opt-in duplicate check was `.eq('phone', e164)`. An exact comparison misses a lead whose
-number was imported in another format and creates a second record for the same person — the
-same bug #95 fixed on the inbound path. It now uses the `find_lead_by_phone` RPC. Verified by
-planting a lead as `5550009999` (as a bad CSV import leaves it) and then opting in from that
-number: no duplicate.
-
-**Rule this leaves behind:** never compare `leads.phone` with `=` when the input came from
-outside. Use `find_lead_by_phone`, and normalise with `normalizePhone()` before storing.
-
-## Shared number pool: reuse, quarantine, history (#38, 2026-07-29)
-
-**Carrier reputation attaches to the number, not the tenant.** A released pool number used to
-have `is_assigned` cleared and go straight back out, carrying the previous business's spam
-complaints, blocks and filtering to the next one — who experiences it as "HyveWyre's SMS
-doesn't work". With three numbers in the pool, recycling is the normal case.
-
-`lib/numberPool.ts` holds the policy; `release_pool_number` and `record_pool_assignment` are
-the RPCs.
-
-### There are three release paths, not two
-
-| path | reason recorded |
-|---|---|
-| `telnyx/release-number` | `user_released` |
-| `user/delete-account` | `account_deleted` |
-| `telnyx/numbers` | `unverified_auto_release` — auto-releases a toll-free number that lost TFV |
-
-That third one is easy to miss and is the one you least want recycled silently. All three call
-`releasePoolNumber()`. **The only remaining direct `is_assigned: false` write is the claim
-rollback in `number-pool/claim`, and that is correct** — a claim that failed never happened, so
-it must not start a cooldown or write history.
-
-### The cooldown yields; spam history does not
-
-`QUARANTINE_DAYS = 30`, but it is **not a hard block**. Three numbers and a strict cooldown
-could leave nothing to give a new customer, and refusing to onboard is worse than reusing a
-clean number early. `evaluateClaim()` prefers rested numbers, falls back to a quarantined one
-only when there is genuinely nothing else, and alerts (`pool_exhausted`). `number-pool/available`
-mirrors this — resting numbers are offered only when no rested one exists — so the UI never
-advertises a number the claim path would then refuse.
-
-`SPAM_RATIO_LIMIT = 0.05` **is** absolute and is checked first: over it, the number is withheld
-regardless of cooldown and admins are told to retire rather than recycle it. Reputation does
-not age out in thirty days.
-
-**Telnyx unreachable is "unknown", not "bad"** — `getNumberHealth()` returns `ok: false` and
-the claim is allowed. Blocking onboarding on an API hiccup would be a self-inflicted outage.
-
-### getNumberHealth — checked against the live API
-
-`GET /v2/phone_numbers/{id}/messaging` returns the metrics **nested under `data.health`**, not
-at the top level: `message_count`, `spam_ratio`, `success_ratio`, `inbound_outbound_ratio`. It
-is keyed by Telnyx's internal id, so reading it for a phone number is two calls. An unknown
-number yields `ok: false`, not zeros — zeros are a real reading and mean a clean, unused number.
-
-### number_pool_assignments
-
-One row per tenancy; `released_at IS NULL` means currently held. `health_at_release` is captured
-at the moment of release because the metrics move on with the number afterwards.
-
-**`user_id` has no foreign key on purpose.** Account deletion is one of the release paths, so a
-CASCADE would delete exactly the rows worth keeping — the same retention reasoning as #87/#93.
-
-### Two gotchas from doing this work
-
-- **Moving a write into an RPC can silently drop an ownership check.** The route filtered on
-  `.eq('assigned_to_user_id', user.id)` because `phoneNumber` arrives in the request body; the
-  first version of the RPC matched on phone number alone, which would have let a caller release
-  someone else's number. The RPC filters on `p_user_id` now. Test that as an actual attack, not
-  by reading it.
-- **`supabase db query` returns `{"_tag":"Error", ...}` with no `rows` key when a statement
-  fails.** A helper that prints only `.rows` shows an empty result and looks like "the update
-  matched nothing", sending you hunting for RLS or shell quoting. The real cause was a `23503`
-  FK violation from a made-up UUID: `number_pool.assigned_to_user_id` references `users`. Always
-  surface the error branch.
+That message reads as a dead key and is not one. `createTransporter()` now trims every
+credential, not just the provider.
+
+**2. With the key trimmed, AUTH succeeds and the account refuses:** `451 Authentication failed:
+Maximum credits exceeded`. The SendGrid account is out of sending credits. **Not fixable in
+code** — this is what still blocks email.
+
+**Not broken:** password reset and signup confirmation go through **Supabase Auth**, not
+SendGrid. That is why this went unnoticed — the email path anyone would miss fastest is the one
+that does not use this key.
+
+#### Two ways this hid, both worth remembering
+
+- **`vercel env pull` writes a trailing newline as the literal two-character escape `\n`
+  inside quotes.** `tr -d '\n'` deletes real newlines, not that escape, so a shell pipeline
+  that looks like it sanitises the value actually *appends two junk characters*. That produced
+  a 401 and a wrongly-filed "the key is revoked" issue. Decode with the same rules the runtime
+  uses, or check the length: 69 became 71.
+- **`scripts/verify-secrets.js` reported green throughout**, for two independent reasons: it
+  trimmed the key before testing (validating a value the app never uses — the whole fault was
+  in the untrimmed form), and it called `GET /v3/scopes`, which strips the whitespace anyway
+  and says nothing about whether the account can send. It now does a real SMTP handshake with
+  `transporter.verify()` on the **raw** value, and reports the trimmed failure separately when
+  it differs.
+
+**Rule:** validate a credential the way the code consuming it will, not the way that is
+convenient. An HTTP probe does not prove an SMTP credential.
+
+**Four copies of the transporter existed.** `lib/sendEmail.ts` and `app/api/email/service` are
+now one; `app/api/email/send` is deliberately separate because it builds a transport from
+per-user encrypted config in the database rather than from env.
 
 ## AI flow completion — confirm, then book
 
