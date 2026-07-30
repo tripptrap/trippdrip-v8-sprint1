@@ -174,6 +174,15 @@ async function main() {
 
       const report = async (label, rawPass, build) => {
         if (!rawPass.trim()) { record(label, false, 'not set'); return; }
+        // A variable marked "sensitive" in Vercel cannot be read back — `env
+        // pull` returns the literal placeholder. Testing that string would fail
+        // AUTH and report a broken credential that is probably fine, which is
+        // the same false-negative trap in reverse (#101). Say so instead.
+        if (rawPass.trim() === '[SENSITIVE]') {
+          record(label, true,
+            'stored sensitive — cannot be read back, so not verifiable from here', false);
+          return;
+        }
         const raw = await authAs(build(rawPass));
         if (raw.ok) { record(label, true, 'ok — SMTP AUTH accepted, account can send'); return; }
         const trimmed = rawPass === rawPass.trim() ? null : await authAs(build(rawPass.trim()));
