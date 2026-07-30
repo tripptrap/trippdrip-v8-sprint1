@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { limitByIp, observeRate } from '@/lib/rateLimit';
+import { normalizePhone } from '@/lib/phone';
 
 /**
  * POST /api/contact-form
@@ -65,6 +66,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // This route stored whatever string it was handed, so the same person could
+    // land as `5551234567` and `+15551234567` in two rows, and neither would
+    // match a lead or a DNC entry on an exact comparison (#100). Normalised on
+    // the same rule as the SQL normalize_phone().
+    const e164 = normalizePhone(phone);
+    if (!e164) {
+      return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 });
+    }
+
     // Require SMS consent
     if (!smsConsent) {
       return NextResponse.json(
@@ -84,7 +94,7 @@ export async function POST(req: NextRequest) {
     const { data: existingLead } = await supabase
       .from('contact_form_submissions')
       .select('id')
-      .eq('phone', phone)
+      .eq('phone', e164)
       .single();
 
     if (existingLead) {
@@ -113,7 +123,7 @@ export async function POST(req: NextRequest) {
           first_name: firstName,
           last_name: lastName,
           email,
-          phone,
+          phone: e164,
           sms_consent: smsConsent,
           email_opt_in: emailOptIn,
           source: 'website_contact_form',

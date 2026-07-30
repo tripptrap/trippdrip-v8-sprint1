@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { limitByIp, observeRate, clientIp } from '@/lib/rateLimit';
+import { normalizePhone } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -69,7 +70,14 @@ export async function POST(req: NextRequest) {
     if (digits.length < 10 || digits.length > 15) {
       return NextResponse.json({ ok: false, error: 'Invalid phone number' }, { status: 400 });
     }
-    const e164 = phone.startsWith('+') ? phone : `+${digits}`;
+    // This used to be `phone.startsWith('+') ? phone : '+' + digits`, which for
+    // a 10-digit US number — what this form's placeholder asks for — produced
+    // `+5550001234` with no country code (#100). normalizePhone() applies the
+    // same rule as the SQL normalize_phone() that DNC and lead matching use.
+    const e164 = normalizePhone(phone);
+    if (!e164) {
+      return NextResponse.json({ ok: false, error: 'Invalid phone number' }, { status: 400 });
+    }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ ok: false, error: 'Invalid email address' }, { status: 400 });
@@ -136,14 +144,14 @@ export async function POST(req: NextRequest) {
     // Create the lead for this business if they don't already have one.
     // A failure here must NOT lose the consent record above, so it's non-fatal.
     try {
-      const { data: existingLead } = await supabaseAdmin
-        .from('leads')
-        .select('id')
-        .eq('user_id', business.id)
-        .eq('phone', e164)
-        .maybeSingle();
+      // find_lead_by_phone rather than .eq('phone', e164): an exact comparison
+      // misses a lead whose number was imported in another format, and creates a
+      // duplicate for the same person. That is the bug #95 fixed on the inbound
+      // path; the RPC compares normalised forms, the same way check_dnc does.
+      const { data: existingLeadId } = await supabaseAdmin
+        .rpc('find_lead_by_phone', { p_user_id: business.id, p_phone: e164 });
 
-      if (!existingLead) {
+      if (!existingLeadId) {
         const { error: leadError } = await supabaseAdmin.from('leads').insert({
           user_id: business.id,
           first_name: firstName.trim(),

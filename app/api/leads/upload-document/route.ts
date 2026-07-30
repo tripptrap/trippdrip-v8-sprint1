@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { spendPointsForAction } from "@/lib/pointsSupabase";
+import { normalizePhone } from '@/lib/phone';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,14 +70,6 @@ async function parseDOCX(buf: Buffer) {
 
 /* ---------- Helpers ---------- */
 
-function normalizePhone(p?: string) {
-  const d = (p || "").replace(/\D/g, "");
-  if (!d) return "";
-  if (d.length === 10) return `+1${d}`;
-  if (d.length === 11 && d.startsWith("1")) return `+${d}`;
-  return `+${d}`;
-}
-
 function mapRow(row: Record<string, any>): Lead {
   const obj: Lead = {};
   let rawName = "", rawFirst = "", rawLast = "";
@@ -87,7 +80,7 @@ function mapRow(row: Record<string, any>): Lead {
     else if (/^first|first\s*name|fname|given/.test(k)) rawFirst = rawFirst || val;
     else if (/^last|last\s*name|lname|surname/.test(k)) rawLast = rawLast || val;
     else if (/mail/.test(k)) obj.email = val;
-    else if (/phone|cell|mobile|tel/.test(k)) obj.phone = normalizePhone(val);
+    else if (/phone|cell|mobile|tel/.test(k)) obj.phone = (normalizePhone(val) ?? "");
     else if (/^st$|state|region/.test(k)) obj.state = val.trim().toUpperCase().slice(0, 2);
     else if (/tag|label|segment|category/.test(k)) obj.tags = String(val).split(/[,|]/).map(s => s.trim()).filter(Boolean);
     else if (k === "status") obj.status = val;
@@ -180,7 +173,7 @@ export async function POST(req: NextRequest) {
       tags: [...(lead.tags || []), ...addTags],
       campaign: campaignName || lead.campaign,
       status: lead.status || "new",
-      phone: normalizePhone(lead.phone),
+      phone: (normalizePhone(lead.phone) ?? ""),
     }));
 
     return NextResponse.json({

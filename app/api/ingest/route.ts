@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from '@/lib/supabase/server';
+import { normalizePhone } from '@/lib/phone';
 
 export const runtime = "nodejs";
 
@@ -61,13 +62,6 @@ async function parseDOCX(buf: Buffer) {
 /* ---------- Helpers ---------- */
 type Lead = { first_name?:string; last_name?:string; phone?:string; email?:string; state?:string; tags?:string[]; status?:string; };
 
-function normalizePhone(p?:string){
-  const d=(p||"").replace(/\D/g,"");
-  if(!d) return "";
-  if(d.length===10) return `+1${d}`;
-  if(d.length===11 && d.startsWith("1")) return `+${d}`;
-  return `+${d}`;
-}
 const stateMap: Record<string,string> = { alabama:"AL",alaska:"AK",arizona:"AZ",arkansas:"AR",california:"CA",colorado:"CO",connecticut:"CT",delaware:"DE","district of columbia":"DC",florida:"FL",georgia:"GA",hawaii:"HI",idaho:"ID",illinois:"IL",indiana:"IN",iowa:"IA",kansas:"KS",kentucky:"KY",louisiana:"LA",maine:"ME",maryland:"MD",massachusetts:"MA",michigan:"MI",minnesota:"MN",mississippi:"MS",missouri:"MO",montana:"MT",nebraska:"NE",nevada:"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND",ohio:"OH",oklahoma:"OK",oregon:"OR",pennsylvania:"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD",tennessee:"TN",texas:"TX",utah:"UT",vermont:"VT",virginia:"VA",washington:"WA","west virginia":"WV",wisconsin:"WI",wyoming:"WY" };
 function normState(s?:string){ if(!s) return ""; const up=s.trim().toUpperCase(); if(up.length===2) return up; const m=stateMap[s.trim().toLowerCase()]; return m||up; }
 
@@ -114,7 +108,7 @@ function mapRow(row:Record<string,any>):Lead{
     else if (/^first|first\s*name|fname|given/.test(k)) rawFirst = rawFirst || val;
     else if (/^last|last\s*name|lname|surname/.test(k)) rawLast = rawLast || val;
     else if(/mail/.test(k)) obj.email=val;
-    else if(/phone|cell|mobile|tel/.test(k)) obj.phone=normalizePhone(val);
+    else if(/phone|cell|mobile|tel/.test(k)) obj.phone=(normalizePhone(val) ?? "");
     else if(/^st$|state|region/.test(k)) obj.state=normState(val);
     else if(/tag|label|segment|category/.test(k)) obj.tags=String(val).split(/[,|]/).map(s=>s.trim()).filter(Boolean);
     else if(k==="status") obj.status=val;
@@ -226,7 +220,7 @@ export async function POST(req: NextRequest) {
     leads=dedupe(leads).map(l=>({
       first_name:(l.first_name||"").trim(),
       last_name:(l.last_name||"").trim(),
-      phone:normalizePhone(l.phone),
+      phone:(normalizePhone(l.phone) ?? ""),
       email:(l.email||"").trim(),
       state: normState(l.state),
       tags:Array.isArray(l.tags)?l.tags.filter(Boolean):[],
