@@ -1,34 +1,59 @@
-name: Process Scheduled Messages
+name: Process Scheduled Messages (backup)
 
-  on:
-    schedule:
-      # Runs every 5 minutes
-      - cron: '*/5 * * * *'
+# Deliberate second scheduler — do not delete this as a duplicate.
+#
+# Vercel Cron is the primary trigger for /api/cron/process-scheduled (see
+# vercel.json). This is a backstop that does not depend on Vercel's scheduler,
+# because that scheduler has already failed silently once: in #97, three of the
+# five cron routes had their handler on POST while Vercel only ever sends GET,
+# so they answered 200 and did nothing for months.
+#
+# This file was broken from the day it was written — everything below `name:`
+# was indented two spaces, which is invalid at the root of a workflow, and the
+# curl line continuation was mangled. Every run failed in 0s and it never fired
+# on schedule at all, so the backup has never once run. Fixed 2026-07-30 (#102).
+#
+# The schedule is offset from Vercel's */5 by two minutes on purpose. Both
+# firing on the same boundary means two workers racing for the same message,
+# and the claim guarding that could not detect a lost race until #44's
+# follow-on. It can now — but not colliding is cheaper than relying on the lock.
 
-    # Allows manual triggering from GitHub Actions tab
-    workflow_dispatch:
+on:
+  schedule:
+    # :02, :07, :12 … — Vercel Cron covers :00, :05, :10 …
+    - cron: '2-59/5 * * * *'
 
-  jobs:
-    process-scheduled-messages:
-      runs-on: ubuntu-latest
+  # Allows manual triggering from the GitHub Actions tab
+  workflow_dispatch:
 
-      steps:
-        - name: Trigger Cron Endpoint
-          run: |
-            response=$(curl -s -w "\n%{http_code}" -X GET \
-              
-  "https://trippdrip-v8-sprint1.vercel.app/api/cron/process-scheduled" \
-              -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+# One run at a time. If a run is slow, the next waits rather than stacking up
+# another concurrent caller against the same endpoint.
+concurrency:
+  group: scheduled-messages-cron
+  cancel-in-progress: false
 
-            http_code=$(echo "$response" | tail -n1)
-            body=$(echo "$response" | head -n-1)
+jobs:
+  process-scheduled-messages:
+    runs-on: ubuntu-latest
 
-            echo "HTTP Status: $http_code"
-            echo "Response: $body"
+    steps:
+      - name: Trigger Cron Endpoint
+        run: |
+          # x-cron-secret rather than Authorization: Bearer. Every cron route
+          # accepts both since #96; before that, only this one did.
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://trippdrip-v8-sprint1.vercel.app/api/cron/process-scheduled" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
 
-            if [ "$http_code" -ne 200 ]; then
-              echo "Error: Cron job failed with status $http_code"
-              exit 1
-            fi
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
 
-            echo "✅ Scheduled messages processed successfully"
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "Error: Cron job failed with status $http_code"
+            exit 1
+          fi
+
+          echo "✅ Scheduled messages processed successfully"
