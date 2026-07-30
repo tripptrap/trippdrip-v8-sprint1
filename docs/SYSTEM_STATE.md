@@ -716,8 +716,41 @@ Verified 9/9 against the live database (sends once, suppresses inside the window
 after it, keys independent), then end-to-end through a real route — a forced throw in
 `process-drips` run twice produced exactly one notification row.
 
-**Caveat that applies to every alert above:** these are in-app notifications only. There is
-no email or SMS escalation (#79), so they are seen by whoever opens the app, not pushed.
+### Email escalation — 15 of 41 alerts (#79, 2026-07-29)
+
+`notifyAdmins(type, title, body, data, { escalate: true })`, and the same flag on
+`alertAdminsThrottled`. Sending lives in **`lib/sendEmail.ts`** — moved out of
+`app/api/notifications/email-alert/route.ts`, which is what made escalation possible at all:
+the logic was only reachable from an authenticated HTTP request, so a webhook could not use it
+without fetching the app from itself. The route now calls the same function.
+
+**The rule for escalating: delay itself compounds the harm.** A card charged with nothing
+delivered, a number live and billing with no owner recorded, a STOP that failed to record so
+every further send is a fresh violation, a deletion that left the login working. Everything
+else — cron failures, a ledger row that didn't write, an exhausted number pool, a rate ceiling
+— stays in-app on purpose. A channel that fires for everything gets muted, and then it is
+worse than not having it.
+
+Escalation email **ignores `user_preferences`**. The email-alert route honours per-type
+toggles, right for "you have a new message" and wrong here: an operator switching off
+new-message emails must not silently disable the one that says a customer paid and got nothing.
+It sends to the `ADMIN_EMAILS` addresses directly, not to matched `users` rows, so it still
+arrives when an admin address has no account.
+
+**The two channels are independent, not a fallback chain.** The email is sent and awaited
+before the notification insert, so each still happens if the other fails. With email
+unconfigured the in-app notification is still written and the log carries
+`ADMIN EMAIL ESCALATION UNAVAILABLE` plus the full alert text — silence there would leave the
+impression that escalation is working.
+
+`SERVICE_EMAIL_PROVIDER` is compared exactly and **production's value has a trailing newline**,
+so the `.trim()` in `createTransporter()` is load-bearing: without it `'sendgrid\n'` falls
+through to the SMTP branch, which has no credentials in production, and email dies silently
+(#85).
+
+**Still unverified:** an actual delivery through SendGrid. Everything up to the send is tested
+(13/13 on the library and template, 7/7 on the integration), but proving mail arrives needs
+production credentials and sends real mail.
 
 ## Crons: three of five had never run (#97, 2026-07-29)
 
