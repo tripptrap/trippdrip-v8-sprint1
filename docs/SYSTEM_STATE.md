@@ -846,6 +846,55 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Phone normalisation — one rule, in two languages (#100, 2026-07-29)
+
+`lib/phone.ts` → `normalizePhone(input): string | null`. **It must agree with the SQL
+`normalize_phone()`**, because that function is what `check_dnc()` and `find_lead_by_phone()`
+compare against: a number normalised differently in TS is a number that silently escapes
+opt-out enforcement or fails to match its own lead. The TS version is transcribed from the SQL
+one, not reinvented.
+
+The rule, in both:
+
+```
+strip non-digits
+11 digits starting with 1  ->  +<digits>
+exactly 10 digits          ->  +1<digits>    (assume US)
+10 or more digits          ->  +<digits>
+shorter                    ->  SQL returns the input unchanged; TS returns null
+```
+
+That last line is the one deliberate divergence — SQL hands back something non-E.164 that
+looks normalised, TS makes the caller decide. Every caller validates length first, so it does
+not arise. **Verified by differential test against the live database over 19 inputs** (bare
+10-digit, punctuated, `+1`-prefixed, 11-digit, UK, CN, 15-digit, leading-zero, junk): every
+normalisable input agrees exactly.
+
+### What was broken
+
+`/api/opt-in/submit` did `phone.startsWith('+') ? phone : '+' + digits`, so a 10-digit US
+number — **what the branded form's own placeholder asks for** — became `+5550001234`, no
+country code. `normalize_phone()` rescued DNC and lead matching, which is why nothing looked
+wrong. It did not rescue sending: `lib/telnyx.ts` passes `to` straight to the API and
+`send-sms` doesn't normalise either, so the send fails. Consent collected through the
+compliant path, then no way to message the person.
+
+`/api/contact-form` normalised nothing at all — one person could occupy two rows as
+`5551234567` and `+15551234567`.
+
+`ingest` and `upload-document` each had their own correct copy; both now use the shared one.
+
+### The read side matters too
+
+The opt-in duplicate check was `.eq('phone', e164)`. An exact comparison misses a lead whose
+number was imported in another format and creates a second record for the same person — the
+same bug #95 fixed on the inbound path. It now uses the `find_lead_by_phone` RPC. Verified by
+planting a lead as `5550009999` (as a bad CSV import leaves it) and then opting in from that
+number: no duplicate.
+
+**Rule this leaves behind:** never compare `leads.phone` with `=` when the input came from
+outside. Use `find_lead_by_phone`, and normalise with `normalizePhone()` before storing.
+
 ## AI flow completion — confirm, then book
 
 Built 2026-07-29 (#70). Before this, completion was detected and passed to the AI, and
