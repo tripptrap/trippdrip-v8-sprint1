@@ -54,7 +54,21 @@
 // any directory.
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+// .env.local parsed inline rather than via dotenv. dotenv was removed as an
+// unused dependency in #86, which broke this script — and it only surfaced when
+// someone tried to submit. The other scripts here (verify-secrets,
+// check-required-env, provision-stripe-catalog) already parse it this way, so
+// this has one less thing that can rot between submissions.
+for (const file of ['.env.local', '.env']) {
+  const envPath = path.join(__dirname, '..', file);
+  if (!fs.existsSync(envPath)) continue;
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) {
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, '').replace(/\\n/g, '\n').trim();
+    }
+  }
+}
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const key = process.env.TELNYX_API_KEY;
