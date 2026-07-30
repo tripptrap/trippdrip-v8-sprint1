@@ -202,15 +202,32 @@ async function processScheduledMessages(supabase: any) {
         // that unbounded resend into a single missed message, which is the far
         // cheaper failure. A row stuck in 'sending' is visible and recoverable;
         // a lead texted every 5 minutes is not.
-        const { error: claimError } = await supabase
+        //
+        // .select() is what makes the guard work. supabase-js returns
+        // { error: null, status: 204 } for an UPDATE that matched *zero* rows,
+        // so a worker that lost the race looks exactly like one that won it and
+        // would send anyway — the double send this claim exists to prevent.
+        // Asking for the row back is the only way to tell. process-ai-drips and
+        // send-appointment-reminders already do this; this one did not.
+        //
+        // It matters here most: .github/workflows/scheduled-messages-cron.yml
+        // hits this route every 5 minutes *as well as* Vercel Cron, both on the
+        // same */5 boundary, so concurrent runs are normal rather than rare.
+        const { data: claimed, error: claimError } = await supabase
           .from('scheduled_messages')
           .update({ status: 'sending', updated_at: new Date().toISOString() })
           .eq('id', message.id)
-          .eq('status', 'pending');   // lost update = another worker has it
+          .eq('status', 'pending')   // lost update = another worker has it
+          .select('id');
 
         if (claimError) {
           console.error(`Could not claim scheduled message ${message.id} — skipping to avoid a double send:`, claimError);
           failed++;
+          continue;
+        }
+
+        if (!claimed || claimed.length === 0) {
+          console.log(`Scheduled message ${message.id} was already claimed by another run — skipping.`);
           continue;
         }
 
