@@ -653,6 +653,12 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
   `isTMobileSuspended: false`, `failureReasons: null`, all seven MNOs APPROVED. **0 numbers are
   assigned**, which is the only thing left — assign `+18134972176` via Settings → Messaging
   Registration ("Assign my number").
+  **Blocked as of 2026-07-30 (#105):** the assignment fails — AT&T and T-Mobile report
+  *"Longcode cannot be added/deleted as it is already associated with another campaign"* while
+  non-T-Mobile carriers accept it. One of the five dead campaigns still holds the number at
+  carrier level, invisible through the API. Needs Telnyx support to clear it; the exact request
+  to send is in #105. **Do not keep retrying** — tried twice with a full delete between, same
+  result.
   **Do not use campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` (CJFUY00) as the reference — it is
   a superseded failed attempt.** Eight campaigns exist under this brand; six are dead. Reading the
   old id from this file sent a session down an appeal-and-resubmit path for a campaign that was

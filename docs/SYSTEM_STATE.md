@@ -197,6 +197,27 @@ so don't treat it as a compliance backstop unless you also wire it into the send
 
 ## Phone Numbers
 
+### The 10DLC campaign is approved; the number cannot attach to it (#105, 2026-07-30)
+
+Campaign `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` is `MNO_PROVISIONED`, T-Mobile
+registered, no failure reasons, all seven MNOs APPROVED. Assigning `+18134972176` fails:
+
+```
+attNumberMappingStatus:        FAILED
+tmobileNumberMappingStatus:    FAILED
+nonTmobileNumberMappingStatus: ADDED
+errors: "Longcode cannot be added/deleted as it is already associated with another campaign."
+```
+
+**The reason lives in `errors`, not `failureReasons`** — that field stayed `null` throughout, so
+a check that only reads `failureReasons` sees a failure with no explanation. Read both.
+
+Five dead campaigns exist under the brand and one still holds the number at AT&T/T-Mobile. The
+Telnyx API shows only our assignment, and `filter[campaign_id]` on
+`GET /10dlc/phone_number_campaigns` is ignored — every campaign returns the same single global
+record — so the holder cannot be found programmatically. Needs Telnyx support; the request is
+written out in #105. Retried once with a full delete between attempts, same result.
+
 ### A user's first number must be primary — it was not (#104, 2026-07-30)
 
 `user_telnyx_numbers.is_primary` defaults to `false`, and **none of the four insert paths set
