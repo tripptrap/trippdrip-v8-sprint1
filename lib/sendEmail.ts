@@ -27,14 +27,23 @@ export function createTransporter() {
   const provider = (process.env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
 
   if (provider === 'sendgrid') {
-    if (!process.env.SENDGRID_API_KEY) {
+    // .trim() on the key as well as the provider. Production's SENDGRID_API_KEY
+    // carries a trailing newline (#85), and unlike an HTTP header — where curl
+    // and fetch strip it — SMTP AUTH base64-encodes the password verbatim, so
+    // the newline goes over the wire and SendGrid answers:
+    //   535 Authentication failed: the provided authorization grant is invalid,
+    //   expired, or revoked
+    // which reads as a dead key and is not one. Trimming every credential here
+    // rather than relying on the value being clean (#101).
+    const apiKey = (process.env.SENDGRID_API_KEY || '').trim();
+    if (!apiKey) {
       throw new Error('Email is not configured: SERVICE_EMAIL_PROVIDER is "sendgrid" but SENDGRID_API_KEY is unset.');
     }
     return nodemailer.createTransport({
       host: 'smtp.sendgrid.net',
       port: 587,
       secure: false,
-      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+      auth: { user: 'apikey', pass: apiKey },
     });
   }
 
@@ -43,7 +52,9 @@ export function createTransporter() {
   // fails per-send with an opaque error rather than saying the app is
   // misconfigured. In production SMTP_* are all unset (#84), so this branch is
   // only correct if someone has deliberately configured SMTP.
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpPass = (process.env.SMTP_PASSWORD || '').trim();
+  if (!smtpUser || !smtpPass) {
     throw new Error(
       `Email is not configured: SERVICE_EMAIL_PROVIDER is "${provider}", which needs ` +
       `SMTP_USER and SMTP_PASSWORD. Set those, or set SERVICE_EMAIL_PROVIDER=sendgrid ` +
@@ -52,10 +63,10 @@ export function createTransporter() {
   }
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+    host: (process.env.SMTP_HOST || 'smtp.gmail.com').trim(),
+    port: parseInt((process.env.SMTP_PORT || '587').trim()),
+    secure: (process.env.SMTP_SECURE || '').trim() === 'true',
+    auth: { user: smtpUser, pass: smtpPass },
   });
 }
 
@@ -85,20 +96,22 @@ export async function sendEmail(opts: {
   subject: string;
   text: string;
   html: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
   if (recipients.length === 0) return { ok: false, error: 'No recipients' };
 
   try {
     const transporter = createTransporter();
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `${FROM_NAME()} <${FROM_EMAIL()}>`,
       to: recipients.join(', '),
       subject: opts.subject,
       text: opts.text,
       html: opts.html,
     });
-    return { ok: true };
+    // Returned so callers that log deliveries keep their provider reference —
+    // service_emails.message_id would otherwise go null.
+    return { ok: true, messageId: info?.messageId };
   } catch (error: any) {
     return { ok: false, error: error?.message || 'Failed to send email' };
   }

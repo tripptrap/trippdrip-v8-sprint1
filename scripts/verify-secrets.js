@@ -147,16 +147,56 @@ async function main() {
     }
 
     // ── SendGrid ────────────────────────────────────────────────────────────
-    const sg = (env.SENDGRID_API_KEY || '').trim();
+    //
+    // Two things this used to get wrong, both of which produced a green tick
+    // while production email was dead (#101):
+    //
+    //  1. It trimmed the key before testing, so it validated a value the app
+    //     never uses. Production's key carries a trailing newline and the app
+    //     passed it through verbatim — checking the trimmed one proves nothing
+    //     about what actually happens. The raw value is tested first now.
+    //  2. GET /v3/scopes is an HTTP call, and HTTP strips trailing whitespace
+    //     from a header — so it returns 200 for a key that SMTP AUTH rejects.
+    //     It also says nothing about whether the account can actually send.
+    //
+    // So the real check is an SMTP handshake with AUTH, which is what sending
+    // does. transporter.verify() does exactly that and delivers no mail.
+    const sgRaw = env.SENDGRID_API_KEY || '';
     const provider = (env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
     if (provider !== 'sendgrid') {
       record('SENDGRID_API_KEY', false,
         `SERVICE_EMAIL_PROVIDER is "${provider}" — SMTP branch would be used`, false);
-    } else if (!sg) {
+    } else if (!sgRaw.trim()) {
       record('SENDGRID_API_KEY', false, 'not set but provider is sendgrid');
     } else {
-      const r = await fetch('https://api.sendgrid.com/v3/scopes', { headers: { Authorization: `Bearer ${sg}` } });
-      record('SENDGRID_API_KEY', r.ok, r.ok ? 'ok — scopes endpoint reachable' : `HTTP ${r.status}`);
+      const nodemailer = require('nodemailer');
+      const authAs = async (pass) => {
+        const t = nodemailer.createTransport({
+          host: 'smtp.sendgrid.net', port: 587, secure: false,
+          auth: { user: 'apikey', pass },
+        });
+        try { await t.verify(); return { ok: true }; }
+        catch (e) { return { ok: false, error: e.message }; }
+      };
+
+      const raw = await authAs(sgRaw);
+      if (raw.ok) {
+        record('SENDGRID_API_KEY', true, 'ok — SMTP AUTH accepted, account can send');
+      } else {
+        const trimmed = sgRaw === sgRaw.trim() ? null : await authAs(sgRaw.trim());
+        if (trimmed && trimmed.ok) {
+          record('SENDGRID_API_KEY', false,
+            'FAILS as stored, works trimmed — the value has trailing whitespace (#85/#101)');
+        } else if (trimmed && trimmed.error !== raw.error) {
+          // Two distinct faults stacked. Reporting only the first sends you
+          // hunting a dead key when the key is fine and the account is not.
+          record('SENDGRID_API_KEY', false, `SMTP AUTH rejected: ${raw.error}`);
+          record('  └ with whitespace trimmed', false,
+            `different failure — ${trimmed.error}`, false);
+        } else {
+          record('SENDGRID_API_KEY', false, `SMTP AUTH rejected: ${raw.error}`);
+        }
+      }
     }
 
     // ── Self-generated secrets: shape only, nothing to call ─────────────────
