@@ -146,56 +146,71 @@ async function main() {
       record('OPENAI_API_KEY', r.ok, r.ok ? 'ok — models endpoint reachable' : `HTTP ${r.status}`);
     }
 
-    // ── SendGrid ────────────────────────────────────────────────────────────
+    // ── Email: whichever provider is configured ─────────────────────────
     //
     // Two things this used to get wrong, both of which produced a green tick
     // while production email was dead (#101):
     //
     //  1. It trimmed the key before testing, so it validated a value the app
-    //     never uses. Production's key carries a trailing newline and the app
+    //     never uses. Production's key carried a trailing newline and the app
     //     passed it through verbatim — checking the trimmed one proves nothing
     //     about what actually happens. The raw value is tested first now.
     //  2. GET /v3/scopes is an HTTP call, and HTTP strips trailing whitespace
-    //     from a header — so it returns 200 for a key that SMTP AUTH rejects.
-    //     It also says nothing about whether the account can actually send.
+    //     from a header — so it returned 200 for a key SMTP AUTH rejects. It
+    //     also said nothing about whether the account could actually send.
     //
     // So the real check is an SMTP handshake with AUTH, which is what sending
-    // does. transporter.verify() does exactly that and delivers no mail.
-    const sgRaw = env.SENDGRID_API_KEY || '';
-    const provider = (env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
-    if (provider !== 'sendgrid') {
-      record('SENDGRID_API_KEY', false,
-        `SERVICE_EMAIL_PROVIDER is "${provider}" — SMTP branch would be used`, false);
-    } else if (!sgRaw.trim()) {
-      record('SENDGRID_API_KEY', false, 'not set but provider is sendgrid');
-    } else {
+    // does. transporter.verify() does exactly that and delivers no mail. It
+    // runs for whichever provider is selected — SendGrid is just one SMTP host.
+    {
       const nodemailer = require('nodemailer');
-      const authAs = async (pass) => {
-        const t = nodemailer.createTransport({
-          host: 'smtp.sendgrid.net', port: 587, secure: false,
-          auth: { user: 'apikey', pass },
-        });
+      const provider = (env.SERVICE_EMAIL_PROVIDER || 'smtp').trim();
+
+      const authAs = async (opts) => {
+        const t = nodemailer.createTransport(opts);
         try { await t.verify(); return { ok: true }; }
         catch (e) { return { ok: false, error: e.message }; }
       };
 
-      const raw = await authAs(sgRaw);
-      if (raw.ok) {
-        record('SENDGRID_API_KEY', true, 'ok — SMTP AUTH accepted, account can send');
-      } else {
-        const trimmed = sgRaw === sgRaw.trim() ? null : await authAs(sgRaw.trim());
+      const report = async (label, rawPass, build) => {
+        if (!rawPass.trim()) { record(label, false, 'not set'); return; }
+        const raw = await authAs(build(rawPass));
+        if (raw.ok) { record(label, true, 'ok — SMTP AUTH accepted, account can send'); return; }
+        const trimmed = rawPass === rawPass.trim() ? null : await authAs(build(rawPass.trim()));
         if (trimmed && trimmed.ok) {
-          record('SENDGRID_API_KEY', false,
-            'FAILS as stored, works trimmed — the value has trailing whitespace (#85/#101)');
+          record(label, false, 'FAILS as stored, works trimmed — trailing whitespace (#85/#101)');
         } else if (trimmed && trimmed.error !== raw.error) {
           // Two distinct faults stacked. Reporting only the first sends you
-          // hunting a dead key when the key is fine and the account is not.
-          record('SENDGRID_API_KEY', false, `SMTP AUTH rejected: ${raw.error}`);
-          record('  └ with whitespace trimmed', false,
-            `different failure — ${trimmed.error}`, false);
+          // hunting a dead credential when the credential is fine and the
+          // account is not.
+          record(label, false, `SMTP AUTH rejected: ${raw.error}`);
+          record('  └ with whitespace trimmed', false, `different failure — ${trimmed.error}`, false);
         } else {
-          record('SENDGRID_API_KEY', false, `SMTP AUTH rejected: ${raw.error}`);
+          record(label, false, `SMTP AUTH rejected: ${raw.error}`);
         }
+      };
+
+      if (provider === 'sendgrid') {
+        await report('SENDGRID_API_KEY', env.SENDGRID_API_KEY || '', (pass) => ({
+          host: 'smtp.sendgrid.net', port: 587, secure: false,
+          auth: { user: 'apikey', pass },
+        }));
+      } else {
+        const host = (env.SMTP_HOST || '').trim();
+        const port = parseInt((env.SMTP_PORT || '587').trim());
+        const user = (env.SMTP_USER || '').trim();
+        if (!host) {
+          record('SMTP_HOST', false,
+            'not set — the app would fall back to smtp.gmail.com, which is not your mail host');
+        } else {
+          record('SMTP_HOST', true, `${host}:${port} (user ${user || 'UNSET'})`, false);
+        }
+        await report('SMTP_PASSWORD', env.SMTP_PASSWORD || '', (pass) => ({
+          host: host || 'smtp.gmail.com',
+          port,
+          secure: (env.SMTP_SECURE || '').trim() === 'true',
+          auth: { user, pass },
+        }));
       }
     }
 

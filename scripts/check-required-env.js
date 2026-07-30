@@ -61,8 +61,12 @@ const CONDITIONAL = [
     why: 'SERVICE_EMAIL_PROVIDER is "sendgrid"',
   },
   {
+    // SMTP_HOST is in here rather than OPTIONAL: without it the transport
+    // silently defaults to smtp.gmail.com, which is not the mail host for a
+    // PrivateEmail (or any other) account, so auth fails with an opaque error
+    // instead of saying the app is misconfigured.
     when: (env) => (env.SERVICE_EMAIL_PROVIDER || 'smtp').trim() !== 'sendgrid',
-    need: ['SMTP_USER', 'SMTP_PASSWORD'],
+    need: ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'],
     why: 'SERVICE_EMAIL_PROVIDER is not "sendgrid", so the SMTP branch is used',
   },
 ];
@@ -76,9 +80,8 @@ const OPTIONAL = {
   NEXT_PUBLIC_SITE_URL: "falls back to https://hyvewyre.com — verified to serve 200",
   SERVICE_EMAIL_FROM_NAME: "falls back to 'HyveWyre'",
   SERVICE_EMAIL_FROM: "falls back to noreply@hyvewyre.com",
-  SMTP_HOST: 'only used on the SMTP branch',
-  SMTP_PORT: 'only used on the SMTP branch',
-  SMTP_SECURE: 'only used on the SMTP branch',
+  SMTP_PORT: "defaults to 587; PrivateEmail uses 465 (SSL) or 587 (STARTTLS)",
+  SMTP_SECURE: "must be 'true' when SMTP_PORT is 465 — implicit SSL, not STARTTLS",
   GOOGLE_CLIENT_ID: 'Google Calendar OAuth — the feature is optional per user',
   GOOGLE_CLIENT_SECRET: 'Google Calendar OAuth — the feature is optional per user',
   SYSTEM_API_KEY: 'internal service-to-service calls; both sides read the same var',
