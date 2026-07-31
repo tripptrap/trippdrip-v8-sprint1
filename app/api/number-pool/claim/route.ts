@@ -1,6 +1,7 @@
 // API Route: Claim a number from the pool
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 import { evaluateClaim } from '@/lib/numberPool';
@@ -24,6 +25,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
+      );
+    }
+
+    // Carriers require a registered business behind any number that sends A2P
+    // traffic, so a number handed out before registration cannot actually send
+    // — it just looks like it can (#1). Fails closed: without the service-role
+    // client the gate cannot be evaluated, and "cannot check" must not mean
+    // "allow".
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Server not configured (missing service role key)' },
+        { status: 500 }
+      );
+    }
+    const gate = await checkNumberEligibility(supabaseAdmin, user.id);
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.reason, code: gate.code, registrationRequired: true },
+        { status: 403 }
       );
     }
 

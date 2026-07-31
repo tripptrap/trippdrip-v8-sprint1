@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { notifyAdmins } from '@/lib/createNotification';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 
@@ -15,6 +16,17 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Same gate as the other two number paths (#1) — a number bought before the
+    // business is registered cannot carry A2P traffic, and spending the user's
+    // credits on one is worse than refusing.
+    const gate = await checkNumberEligibility(createServiceRoleClient(), user.id);
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.reason, code: gate.code, registrationRequired: true },
+        { status: 403 }
+      );
     }
 
     const { phoneNumber, credits } = await req.json();

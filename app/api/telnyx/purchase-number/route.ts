@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
@@ -26,6 +27,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
+      );
+    }
+
+    // A number without a registered business behind it cannot carry A2P traffic
+    // — carriers filter it and nothing surfaces the failure (#1). Fails closed:
+    // if the gate cannot be evaluated, no number is ordered.
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Server not configured (missing service role key)' },
+        { status: 500 }
+      );
+    }
+    const gate = await checkNumberEligibility(supabaseAdmin, user.id);
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.reason, code: gate.code, registrationRequired: true },
+        { status: 403 }
       );
     }
 
