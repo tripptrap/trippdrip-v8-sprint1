@@ -966,6 +966,73 @@ Deliberately lenient and unchanged: `authHeader.replace('Bearer ', '')` is a no-
 value, so `Authorization: <secret>` without the prefix is also accepted. Knowing the secret is
 the boundary, so this costs nothing and tolerates odd clients.
 
+### `SECURITY DEFINER RETURNS SETOF <table>` returns zero rows over PostgREST (#61, 2026-07-31)
+
+**Do not write a Postgres function that returns `SETOF <table>` and call it with `.rpc()`.** It
+can return an empty array with `error: null` to the route while returning the correct rows to
+every other caller — a silent, total failure with nothing to catch.
+
+This is *not* the #97 problem (handler on the wrong verb). These crons ran, authenticated, and
+returned `ok: true`. They fetched nothing.
+
+Measured inside a single production request, with one `scheduled_messages` row 54 minutes
+overdue:
+
+```
+whoami:                    {"current_user":"service_role","pending_visible":2}
+get_messages_ready_to_send:{"count":0,"error":null}
+```
+
+and after switching that one call to a direct query, in one request:
+
+```
+messages direct vs rpc:  {"direct":1,"directErr":null,"rpc":0,"rpcErr":null}
+```
+
+The same function, at the same instant, as the same role: **1 row to the direct query, 0 to the
+RPC.** Ruled out empirically, in this order — each of these was a live theory that the evidence
+killed:
+
+- **Not auth.** `current_user` is `service_role`, from the route's own client.
+- **Not RLS.** That same client reads `scheduled_messages` fine in the same request.
+- **Not timing.** The row was overdue by 54 minutes; `scheduled_for <= now()` was true in SQL.
+- **Not the client library.** `@supabase/supabase-js` with the same key, run locally against the
+  same project, returns 1 row from the same RPC.
+- **Not a stale PostgREST schema cache.** `NOTIFY pgrst, 'reload schema'` changed nothing.
+- **Not a wrong project or key.** Prod and local `NEXT_PUBLIC_SUPABASE_URL` are the same ref
+  (`ljibsszhcvhwnoegweat`); the JWT's `ref`/`role` match.
+- **Not a chained filter.** The call site is a bare `.rpc(name)` with no `.eq()`/`.limit()`.
+
+What remains is the function itself as PostgREST serves it to that client. The root cause below
+that is still unidentified, and the fix does not depend on knowing it.
+
+**The blast radius was exactly three functions** — the entire schema contained only three
+`SETOF`-returning functions, and all three were cron "what's due" queries:
+
+| function | route | now |
+|---|---|---|
+| `get_messages_ready_to_send` | `cron/process-scheduled` | inlined |
+| `get_campaigns_ready_for_batch` | `cron/process-scheduled` | inlined |
+| `get_ai_drips_ready_to_send` | `cron/process-ai-drips` | inlined |
+
+`get_drip_enrollments_ready_to_send` is **`RETURNS TABLE(...)`, not `SETOF`** — it is the one
+that was never affected, and it is the shape to copy if a helper function is wanted again.
+
+All three predicates are now inlined as plain PostgREST queries. Two notes on the translation:
+
+- They compare against **the app's clock**, not the database's `now()`. Both track NTP and the
+  cron runs every 5 minutes, so sub-second skew cannot change which rows are due.
+- `ai_drips` needed `messages_sent < max_messages`, a **column-to-column** comparison PostgREST
+  cannot express. It is applied in JS after a `.limit(200)` read, with the original `LIMIT 50`
+  re-applied *after* filtering — so a batch of exhausted drips cannot starve live ones.
+
+**Verified in production 2026-07-31**: the cron found the due message on the first run after the
+change (`📤 1 scheduled message(s) due`) and deferred it on recipient-local quiet hours
+(`03:02 America/New_York`, window 08:00–20:00) — the first time this cron has ever reached that
+code path. `processed: 0` with a deferral is correct, not a failure.
+
+The temporary `whoami_probe()` used to isolate this has been dropped from the database.
+
 ## Rate limiting (#58, 2026-07-29)
 
 `lib/rateLimit.ts` → `limitByIp(req, scope, limit, windowSeconds)`; returns `null` when
