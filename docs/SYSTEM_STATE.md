@@ -1032,6 +1032,62 @@ iteration does several round trips plus a Telnyx send, so an uncapped backlog wo
 mid-loop and strand rows in `sending`. That risk was theoretical for as long as the fetch
 returned zero rows. Oldest first, cron every 5 minutes → a backlog drains at ~1,200/hour.
 
+### The second reason nothing sent: `sending` violated a CHECK constraint (#61, 2026-07-31)
+
+Fixing the fetch above did **not** make a single message send. It made the next failure
+reachable, and that one had also been there from the beginning:
+
+```
+scheduled_messages_status_check
+  CHECK (status = ANY (ARRAY['pending','sent','failed','cancelled']))
+```
+
+`process-scheduled` claims a row before sending it — `pending → sending → sent` — so two
+concurrent runs cannot both send the same message. **`sending` was not an allowed value**, so
+every claim failed with `23514` and every message was skipped with *"Could not claim … skipping
+to avoid a double send"*. Migration `allow_sending_status_on_scheduled_messages.sql`, applied and
+verified against the linked project.
+
+**These two faults were independent, and each fully masked the other.** Fixing only the fetch
+changes nothing observable; fixing only the constraint changes nothing observable. That is worth
+remembering the next time a pipeline "reports success and does nothing" — the first root cause
+found may not be the only one, and a fix that produces no visible change is not necessarily wrong.
+
+The failure counter is also misleading here: the claim failure increments `failed` but writes no
+status, so the run reports `failed: 2` while both rows stay `pending` with `error_message` NULL
+and are retried forever. A `failed` count with no failed rows means the claim, not the send.
+
+**Verified end to end in production, 2026-07-31 22:56Z** — the first automated messages this
+system has ever sent. Both left `+18134972176`, and Telnyx returned `message.received` **and**
+`message.finalized` for each (`04769e26…`, `f896fc50…`), so delivery is confirmed by the provider
+rather than inferred from a local status. Before this, `messages` held 64 outbound rows and
+**0** with `is_automated = true`.
+
+One gap the send exposed: the `messages` insert omitted `message_sid` and `provider`, and
+`handleDeliveryStatus` matches on `.eq('message_sid', …)`. Automated messages could therefore
+never leave `sent` — no `delivered`, no `failed` — and the analytics delivery rate silently
+excluded all of them. Both fields are now recorded (commit `7c14002`).
+
+### Vercel Cron works — but re-registers on every production deploy
+
+Worth knowing before concluding it is broken, which cost time here. After a production
+deployment, Vercel re-registers the cron definitions against the new deployment id, and they do
+not fire for several minutes. Measured: deployment at 22:59Z, cron config `updatedAt` 23:01Z,
+**first invocation 23:20Z** — a ~19-minute gap during which nothing fires at all.
+
+Sampling the logs during that gap makes a healthy scheduler look dead. Compounding it,
+`vercel logs <url>` returns only the last 100 entries, and the dashboard polls `/api/texts/threads`
+every 5s — so the visible window is about **92 seconds**. A single `vercel logs` call cannot
+observe a `*/5` cron at all; sample repeatedly at a shorter interval than the window and cover a
+boundary. Confirmed healthy afterwards: `process-scheduled` at 23:20:35 and 23:25:35, exactly
+five minutes apart, plus `process-drips` and `process-ai-drips`.
+
+The GitHub Actions backup (#102) is real but **throttled**: its `*/5` schedule actually fires
+roughly hourly (12:12, 14:33, 16:18, 17:55, 19:09, 20:35, 21:42, 22:40 on 2026-07-31), which is
+normal for GitHub's shared scheduler. It is a safety net against Vercel Cron failing, not a
+second timely scheduler — and it covers **only** `process-scheduled`. The other four crons have
+no backup.
+
 **Verified in production 2026-07-31**: the cron found the due message on the first run after the
 change (`📤 1 scheduled message(s) due`) and deferred it on recipient-local quiet hours
 (`03:02 America/New_York`, window 08:00–20:00) — the first time this cron has ever reached that
