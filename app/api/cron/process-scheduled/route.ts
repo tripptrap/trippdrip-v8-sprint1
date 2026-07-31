@@ -106,7 +106,14 @@ async function processScheduledMessages(supabase: any) {
     .select('*')
     .eq('status', 'pending')
     .lte('scheduled_for', nowIso)
-    .order('scheduled_for', { ascending: true });
+    .order('scheduled_for', { ascending: true })
+    // Batch cap. `maxDuration` is 60s and each iteration does several round
+    // trips plus a Telnyx send, so an uncapped backlog would time out mid-loop
+    // and strand rows in 'sending'. This never mattered while the fetch above
+    // returned zero rows; now that it returns real work, it does. Oldest first,
+    // cron every 5 minutes — a backlog drains at ~1,200/hour rather than
+    // killing the run.
+    .limit(100);
 
   if (error) {
     // The route still returns ok:true when this happens, so an uptime check
