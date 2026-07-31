@@ -70,6 +70,7 @@ export default function PhoneNumbersPage() {
   const [areaCode, setAreaCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null);
   const [numberType, setNumberType] = useState<NumberType>('tollfree');
 
   // Purchase modal state
@@ -97,6 +98,18 @@ export default function PhoneNumbersPage() {
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  // Reads the same gate the acquisition routes enforce, so the page cannot
+  // disagree with what actually happens on click (#1).
+  const fetchNumberGate = async () => {
+    try {
+      const res = await fetch('/api/number-eligibility');
+      const data = await res.json();
+      if (data?.ok) setNumberGate({ allowed: data.allowed, reason: data.reason ?? undefined });
+    } catch {
+      // Leave it null — no banner rather than a wrong one.
+    }
   };
 
   // Fetch user's phone numbers (handles auto-release of unverified numbers)
@@ -339,10 +352,29 @@ export default function PhoneNumbersPage() {
     loadPoolNumbers();
     fetchUserCredits();
     fetchPortingOrders();
+    fetchNumberGate();
   }, []);
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      {/* Why numbers are unavailable, stated before the user tries (#1). The
+          three acquisition routes enforce this server-side regardless — this
+          exists so the refusal is explained rather than merely delivered. */}
+      {numberGate && !numberGate.allowed && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+          <h2 className="font-semibold text-amber-900 dark:text-amber-200">
+            Business registration required before you can get a number
+          </h2>
+          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">{numberGate.reason}</p>
+          <a
+            href="/settings#messaging-registration"
+            className="mt-3 inline-block text-sm font-semibold text-amber-900 dark:text-amber-200 underline underline-offset-2"
+          >
+            Finish business registration →
+          </a>
+        </div>
+      )}
+
       {/* Message Banner */}
       {message && (
         <div
