@@ -194,7 +194,12 @@ export async function POST(req: Request) {
 
     // Check for drip campaign triggers (lead_created)
     if (lead?.id) {
-      checkAndEnrollDripTriggers(supabase, user.id, lead.id, 'lead_created', {
+      // Awaited. Un-awaited work after the response is not guaranteed to run on
+      // Vercel — the lambda can freeze the moment the response is sent. Here it
+      // froze between creating the enrollment and materialising its steps,
+      // leaving a half-enrolled lead: no scheduled messages, next_send_at still
+      // set, and the drip cron ready to send a sequence the user cannot see (#61).
+      await checkAndEnrollDripTriggers(supabase, user.id, lead.id, 'lead_created', {
         source: body.source || undefined,
       });
     }

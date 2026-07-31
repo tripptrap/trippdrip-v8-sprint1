@@ -113,13 +113,18 @@ export async function PATCH(
       const newTags: string[] = body.tags || [];
       const addedTags = newTags.filter(t => !oldTags.includes(t));
       for (const tag of addedTags) {
-        checkAndEnrollDripTriggers(supabase, user.id, params.id, 'tag_added', { tag });
+        // Awaited. Un-awaited work after the response is not guaranteed to run on
+        // Vercel — the lambda can freeze the moment the response is sent. Here it
+        // froze between creating the enrollment and materialising its steps,
+        // leaving a half-enrolled lead: no scheduled messages, next_send_at still
+        // set, and the drip cron ready to send a sequence the user cannot see (#61).
+        await checkAndEnrollDripTriggers(supabase, user.id, params.id, 'tag_added', { tag });
       }
     }
 
     // Check drip triggers for status changes
     if (body.status && oldLead && body.status !== oldLead.status) {
-      checkAndEnrollDripTriggers(supabase, user.id, params.id, 'status_change', { status: body.status });
+      await checkAndEnrollDripTriggers(supabase, user.id, params.id, 'status_change', { status: body.status });
     }
 
     return NextResponse.json({ ok: true, lead });

@@ -140,7 +140,12 @@ export async function POST(req: NextRequest) {
     // Check for drip campaign triggers (status_change)
     // Pass the actual status value (not the disposition name)
     const actualStatus = disposition === 'not_interested' ? 'archived' : disposition;
-    checkAndEnrollDripTriggers(supabase, user.id, id, 'status_change', {
+    // Awaited. Un-awaited work after the response is not guaranteed to run on
+    // Vercel — the lambda can freeze the moment the response is sent. Here it
+    // froze between creating the enrollment and materialising its steps,
+    // leaving a half-enrolled lead: no scheduled messages, next_send_at still
+    // set, and the drip cron ready to send a sequence the user cannot see (#61).
+    await checkAndEnrollDripTriggers(supabase, user.id, id, 'status_change', {
       status: actualStatus,
     });
 
