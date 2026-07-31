@@ -108,16 +108,6 @@ async function processScheduledMessages(supabase: any) {
     .lte('scheduled_for', nowIso)
     .order('scheduled_for', { ascending: true });
 
-  // Temporary (#61): confirm in production that the RPC still returns zero for
-  // the same rows this query finds. Remove once that is recorded.
-  const { data: viaRpc, error: rpcErr } = await supabase.rpc('get_messages_ready_to_send');
-  console.log('🔎 messages direct vs rpc:', JSON.stringify({
-    direct: Array.isArray(readyMessages) ? readyMessages.length : null,
-    directErr: error?.message ?? null,
-    rpc: Array.isArray(viaRpc) ? viaRpc.length : null,
-    rpcErr: rpcErr?.message ?? null,
-  }));
-
   if (error) {
     // The route still returns ok:true when this happens, so an uptime check
     // sees green while zero messages go out. Nothing else would surface it (#80).
@@ -125,18 +115,17 @@ async function processScheduledMessages(supabase: any) {
     await alertAdminsThrottled({
       key: 'cron_fetch_failed:process-scheduled:messages',
       title: 'Scheduled messages are not being sent',
-      body: `get_messages_ready_to_send() is failing (${error.message}), so no scheduled message has been sent since this started. The cron still reports success, so nothing else will surface it.`,
-      data: { route: 'cron/process-scheduled', rpc: 'get_messages_ready_to_send', error: error.message },
+      body: `The scheduled_messages query is failing (${error.message}), so no scheduled message has been sent since this started. The cron still reports success, so nothing else will surface it.`,
+      data: { route: 'cron/process-scheduled', query: 'scheduled_messages', error: error.message },
     });
     return { processed: 0, failed: 0, error: error.message };
   }
 
   if (!readyMessages || readyMessages.length === 0) {
-    console.log('🔎 no due messages — returning early');
     return { processed: 0, failed: 0 };
   }
 
-  console.log(`🔎 processing ${readyMessages.length} due message(s)`);
+  console.log(`📤 ${readyMessages.length} scheduled message(s) due`);
 
   let processed = 0;
   let failed = 0;
@@ -436,22 +425,13 @@ async function processScheduledCampaigns(supabase: any) {
     .lte('next_batch_date', nowIso)
     .order('next_batch_date', { ascending: true });
 
-  // Temporary (#61): same comparison as the message path.
-  const { data: viaRpc, error: rpcErr } = await supabase.rpc('get_campaigns_ready_for_batch');
-  console.log('🔎 campaigns direct vs rpc:', JSON.stringify({
-    direct: Array.isArray(readyCampaigns) ? readyCampaigns.length : null,
-    directErr: error?.message ?? null,
-    rpc: Array.isArray(viaRpc) ? viaRpc.length : null,
-    rpcErr: rpcErr?.message ?? null,
-  }));
-
   if (error) {
     console.error('Error fetching ready campaigns:', error);
     await alertAdminsThrottled({
       key: 'cron_fetch_failed:process-scheduled:campaigns',
       title: 'Campaign batches are not being sent',
-      body: `get_campaigns_ready_for_batch() is failing (${error.message}), so no campaign batch has gone out since this started. The cron still reports success.`,
-      data: { route: 'cron/process-scheduled', rpc: 'get_campaigns_ready_for_batch', error: error.message },
+      body: `The scheduled_campaigns query is failing (${error.message}), so no campaign batch has gone out since this started. The cron still reports success.`,
+      data: { route: 'cron/process-scheduled', query: 'scheduled_campaigns', error: error.message },
     });
     return { processed: 0, batches: 0, error: error.message };
   }

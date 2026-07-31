@@ -52,17 +52,42 @@ async function handleCron(req: NextRequest) {
 
     const now = new Date();
 
-    // Get drips ready to send using the database function
-    const { data: drips, error: fetchError } = await supabaseAdmin
-      .rpc('get_ai_drips_ready_to_send');
+    // Read due drips directly rather than through get_ai_drips_ready_to_send().
+    //
+    // That function is the third and last of the `SECURITY DEFINER RETURNS SETOF
+    // <table>` helpers, and the pattern is confirmed broken over PostgREST (#61):
+    // measured in a single production request, the sibling function returned 0
+    // rows while a direct query for the same predicate returned the due row —
+    //
+    //     messages direct vs rpc: {"direct":1,"rpc":0}
+    //
+    // — with no error either time. There is no reason to expect this one behaves
+    // differently, and the failure mode is silent, so it is inlined too.
+    const nowIso = now.toISOString();
+    const { data: dripRows, error: fetchError } = await supabaseAdmin
+      .from('ai_drips')
+      .select('*')
+      .eq('status', 'active')
+      .lte('next_send_at', nowIso)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+      .order('next_send_at', { ascending: true })
+      .limit(200);
+
+    // `messages_sent < max_messages` compares two columns, which PostgREST
+    // cannot express as a filter, so it is applied here. The 200 above is a
+    // read cap; the function's own LIMIT 50 is preserved after filtering so a
+    // batch of exhausted drips cannot starve the ones still owed a message.
+    const drips = (dripRows || [])
+      .filter((d: any) => d.max_messages == null || (d.messages_sent ?? 0) < d.max_messages)
+      .slice(0, 50);
 
     if (fetchError) {
       console.error('Error fetching AI drips:', fetchError);
       await alertAdminsThrottled({
         key: 'cron_fetch_failed:process-ai-drips',
         title: 'AI drips are not being sent',
-        body: `get_ai_drips_ready_to_send() is failing (${fetchError.message}), so no AI follow-up has gone out since this started.`,
-        data: { route: 'cron/process-ai-drips', rpc: 'get_ai_drips_ready_to_send', error: fetchError.message },
+        body: `The ai_drips query is failing (${fetchError.message}), so no AI follow-up has gone out since this started.`,
+        data: { route: 'cron/process-ai-drips', query: 'ai_drips', error: fetchError.message },
       });
       return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
     }
