@@ -165,8 +165,64 @@ export interface CampaignResult {
   success: boolean;
   campaignId?: string;
   status?: string;
+  /** Telnyx's `status` field (ACTIVE / EXPIRED / …), distinct from `campaignStatus`. */
+  lifecycleStatus?: string;
   failureReasons?: string[];
   error?: string;
+}
+
+/**
+ * Map Telnyx brand state onto the three values `user_10dlc_registrations.brand_status`
+ * holds. Fed `identityStatus` (VERIFIED / UNVERIFIED / VETTED_VERIFIED / FAILED).
+ */
+export function mapBrandStatus(raw?: string): 'pending' | 'verified' | 'failed' {
+  const s = (raw || '').toUpperCase();
+  // Exact match, not `includes('VERIFIED')` — that substring is also inside
+  // **UNVERIFIED**, so a brand that failed identity verification was being
+  // recorded as verified, and the app would go on to create a campaign and
+  // attach numbers as though the brand were good.
+  if (s === 'VERIFIED' || s === 'VETTED_VERIFIED') return 'verified';
+  if (s.includes('FAILED')) return 'failed';
+  return 'pending';
+}
+
+/**
+ * Map Telnyx campaign state onto `user_10dlc_registrations.campaign_status`.
+ *
+ * ── Why this is not a one-liner (#1) ────────────────────────────────────────
+ *
+ * There are **two** status fields on a Telnyx campaign and they use different
+ * vocabularies:
+ *
+ *   status         ACTIVE | EXPIRED | …
+ *   campaignStatus TCR_PENDING | TCR_EXPIRED | MNO_PENDING | MNO_PROVISIONED | …
+ *
+ * `getCampaignStatus` returns `campaignStatus`, but both callers mapped it with
+ * `if (s === 'ACTIVE')` — a value that field never takes. So an **approved,
+ * MNO-provisioned campaign fell through to 'pending'**, and stayed there
+ * forever. That is not cosmetic: `autoAssignNumberToCampaign` refuses to attach
+ * a number unless the stored status is active/approved/mno_provisioned, and the
+ * refresh route only auto-assigns on the pending→active transition. Neither
+ * could ever fire, which is why the approved campaign had **0 numbers assigned**
+ * while every other diagnostic said it was healthy.
+ *
+ * `EXPIRED` is deliberately terminal rather than 'pending'. Treating it as
+ * pending is what left the app polling a dead campaign indefinitely — the
+ * stored id pointed at a TCR_EXPIRED campaign and every refresh happily
+ * rewrote 'pending' over 'pending'.
+ *
+ * Accepts either field, so a caller passing `status` still behaves.
+ */
+export function mapCampaignStatus(raw?: string): 'pending' | 'active' | 'failed' {
+  const s = (raw || '').toUpperCase();
+  if (!s) return 'pending';
+  // Usable: carriers have provisioned it, or the lifecycle field says ACTIVE.
+  if (s === 'ACTIVE' || s.includes('PROVISIONED')) return 'active';
+  // Terminal. EXPIRED and SUSPENDED are not recoverable by waiting.
+  if (s.includes('FAILED') || s.includes('REJECTED') || s.includes('EXPIRED') || s.includes('SUSPENDED')) {
+    return 'failed';
+  }
+  return 'pending';
 }
 
 export async function createCampaign(params: CreateCampaignParams): Promise<CampaignResult> {
@@ -253,12 +309,79 @@ export async function getCampaignStatus(campaignId: string): Promise<CampaignRes
       success: true,
       campaignId,
       status: data.campaignStatus,
+      // Returned alongside so callers can tell a campaign that is merely
+      // awaiting review from one that is EXPIRED — `campaignStatus` alone does
+      // not always make that obvious (#1).
+      lifecycleStatus: data.status,
       failureReasons: data.failureReasons?.map((f: any) => f.description).filter(Boolean),
     };
   } catch (error: any) {
     console.error('Telnyx getCampaignStatus error:', error);
     return { success: false, error: error.message || 'Network error' };
   }
+}
+
+export interface BrandCampaign {
+  campaignId: string;
+  campaignStatus?: string;
+  status?: string;
+  usecase?: string;
+}
+
+/**
+ * List every campaign under a brand.
+ *
+ * Exists so the app can recover when the campaign id it stored is no longer the
+ * one that matters (#1). A campaign can expire, be rejected, or be replaced by a
+ * resubmission — and when that happens Telnyx does not update the old id, it
+ * issues a new one. The stored pointer keeps resolving (HTTP 200, TCR_EXPIRED),
+ * so nothing looks broken from the app's side while every number assignment
+ * silently targets a dead campaign.
+ *
+ * This account reached exactly that state: eight campaigns had been created
+ * under one brand over successive rejections, the DB held the id of a superseded
+ * one, and the approved campaign had zero numbers attached.
+ */
+export async function listCampaignsForBrand(
+  brandId: string
+): Promise<{ success: boolean; campaigns?: BrandCampaign[]; error?: string }> {
+  const key = apiKey();
+  if (!key) return { success: false, error: 'Telnyx API key not configured' };
+
+  try {
+    const response = await fetch(
+      `${TELNYX_API_URL}/10dlc/campaign?brandId=${encodeURIComponent(brandId)}&page=1&recordsPerPage=100`,
+      { headers: { 'Authorization': `Bearer ${key}` } }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: errorFromResponse(data, 'Failed to list campaigns') };
+    }
+
+    const records = data.records ?? data.data ?? [];
+    return {
+      success: true,
+      campaigns: records.map((r: any) => ({
+        campaignId: r.campaignId,
+        campaignStatus: r.campaignStatus,
+        status: r.status,
+        usecase: r.usecase,
+      })),
+    };
+  } catch (error: any) {
+    console.error('Telnyx listCampaignsForBrand error:', error);
+    return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+/**
+ * The campaign under this brand that can actually carry traffic, if any.
+ * Returns null rather than guessing when none is provisioned.
+ */
+export function pickUsableCampaign(campaigns?: BrandCampaign[]): BrandCampaign | null {
+  if (!campaigns?.length) return null;
+  return campaigns.find(c => mapCampaignStatus(c.campaignStatus ?? c.status) === 'active') ?? null;
 }
 
 // ── Phone number assignment ─────────────────────────────────────────────
