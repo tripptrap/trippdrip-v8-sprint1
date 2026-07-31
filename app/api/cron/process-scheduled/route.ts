@@ -315,6 +315,12 @@ async function processScheduledMessages(supabase: any) {
               points_cost: message.credits_cost,
               is_automated: true,
               automation_source: 'scheduled',
+              // Without these the message can never leave 'sent'. The delivery
+              // webhook matches on `.eq('message_sid', ...)`, so a null sid means
+              // 'delivered' and 'failed' never land and the analytics delivery
+              // rate silently excludes every automated message (#61).
+              message_sid: smsResult.messageSid,
+              provider: 'telnyx',
             });
 
           if (msgInsertError) {
@@ -559,6 +565,10 @@ async function processScheduledCampaigns(supabase: any) {
                 is_automated: true,
                 automation_source: 'bulk_campaign',
                 campaign_id: campaign.id,
+                // Same as the scheduled path above — the delivery webhook keys
+                // on message_sid, so omitting it strands the row at 'sent' (#61).
+                message_sid: smsResult.messageSid,
+                provider: 'telnyx',
               });
 
             // Update lead last_interaction_at
