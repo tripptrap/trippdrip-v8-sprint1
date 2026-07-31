@@ -67,6 +67,48 @@ export async function GET() {
   }
 }
 
+
+/**
+ * Validate a user's custom opt-out keyword (#108).
+ *
+ * A lead replying with this word goes on the DNC list, which is **permanent
+ * and irreversible** — there is no path back to messaging them. That makes a
+ * careless keyword unrecoverable for whoever trips it, so the collisions below
+ * are rejected rather than warned about.
+ *
+ * The dangerous one is YES: it is an opt-in keyword and it is what leads are
+ * asked to reply to confirm an appointment. Setting opt-out to YES would
+ * permanently block every lead who confirmed a booking.
+ *
+ * STOP keeps working whatever is set here — the webhook checks its standard
+ * list as well as this value, and STOP is what the 10DLC campaign registers
+ * with the carriers.
+ */
+function validateOptOutKeyword(raw: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (raw === null || raw === undefined || raw === '') return { ok: true, value: null };
+  if (typeof raw !== 'string') return { ok: false, error: 'Opt-out keyword must be text.' };
+
+  const value = raw.trim().toUpperCase();
+
+  if (!/^[A-Z0-9]{2,20}$/.test(value)) {
+    return { ok: false, error: 'Opt-out keyword must be a single word, 2-20 letters or numbers, no spaces or punctuation.' };
+  }
+
+  const reserved: Record<string, string> = {
+    YES: 'leads reply YES to confirm appointments',
+    START: 'START is the opt-in keyword',
+    UNSTOP: 'UNSTOP is the opt-in keyword',
+    HELP: 'HELP is reserved for help requests',
+    INFO: 'INFO is reserved for help requests',
+    CANCEL: 'CANCEL is used for appointment cancellations',
+  };
+  if (reserved[value]) {
+    return { ok: false, error: `"${value}" cannot be an opt-out keyword — ${reserved[value]}.` };
+  }
+
+  return { ok: true, value };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -104,7 +146,11 @@ export async function POST(req: NextRequest) {
 
     // Only include opt_out_keyword if explicitly provided
     if (optOutKeyword !== undefined) {
-      settingsData.opt_out_keyword = optOutKeyword || null;
+      const validation = validateOptOutKeyword(optOutKeyword);
+      if (!validation.ok) {
+        return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+      }
+      settingsData.opt_out_keyword = validation.value;
     }
 
     let data, error;
