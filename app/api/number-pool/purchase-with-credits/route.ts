@@ -1,7 +1,7 @@
 // API Route: Purchase a phone number using credits
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { notifyAdmins } from '@/lib/createNotification';
 
 const CREDITS_PER_NUMBER = 100; // 100 credits/month for a phone number
@@ -144,8 +144,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Add the number to user's account (pending until webhook confirms)
-    const { error: numberError } = await supabase
+    // Service-role for the write. `user_telnyx_numbers` has RLS on with a
+    // SELECT policy and **no INSERT policy**, so the request-scoped client
+    // cannot write to it at all — this upsert failed every time, after the
+    // Telnyx order had already succeeded. Every purchase through this route
+    // left a real number live and billing with no owner recorded (#106).
+    //
+    // Safe: the caller is authenticated above and the row is scoped to
+    // `user.id`, never to anything from the request body. The other four write
+    // paths (telnyx/purchase-number, number-pool/claim, number-order-webhook,
+    // stripe/webhook) already do exactly this; this route was the odd one out.
+    const { error: numberError } = await createServiceRoleClient()
       .from('user_telnyx_numbers')
       .upsert({
         user_id: user.id,
