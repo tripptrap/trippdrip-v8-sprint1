@@ -482,12 +482,17 @@ async function handleInboundSMS(payload: any) {
 
     // Send SMS alert to user's personal phone (new inbound message)
     if (!optOut) {
-      const { data: leadForAlert } = await supabaseAdmin
-        .from('leads')
-        .select('first_name, last_name')
-        .eq('user_id', userId)
-        .eq('phone', from)
-        .single();
+      // By id, not by exact phone — same normalisation trap as everywhere else
+      // in this handler (#95). Worst case here is only a missing name on the
+      // alert, but there is no reason to keep the unreliable lookup.
+      const { data: leadForAlert } = leadId
+        ? await supabaseAdmin
+            .from('leads')
+            .select('first_name, last_name')
+            .eq('user_id', userId)
+            .eq('id', leadId)
+            .single()
+        : { data: null as { first_name: string | null; last_name: string | null } | null };
       const leadName = leadForAlert
         ? [leadForAlert.first_name, leadForAlert.last_name].filter(Boolean).join(' ')
         : undefined;
@@ -542,16 +547,21 @@ async function handleInboundSMS(payload: any) {
           leadPhone: from,
         }).catch(err => console.error('SMS alert (opt_out) failed:', err));
 
-        // Update lead's sms_opt_in to false
-        const { data: updatedLead } = await supabaseAdmin
-          .from('leads')
-          .update({
-            sms_opt_in: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId)
-          .eq('phone', from)
-          .select('id');
+        // Update lead's sms_opt_in to false. Targeted by the lead id resolved at
+        // the top of this handler rather than by exact phone — see the
+        // stop-on-reply block below for why `.eq('phone', from)` misses leads
+        // whose number was imported in a non-E.164 format (#95).
+        const { data: updatedLead } = leadId
+          ? await supabaseAdmin
+              .from('leads')
+              .update({
+                sms_opt_in: false,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', userId)
+              .eq('id', leadId)
+              .select('id')
+          : { data: null as { id: string }[] | null };
 
         // Cancel any queued drip messages. The DNC list already blocks these at
         // send time, but leaving them pending means the scheduled view keeps
@@ -656,11 +666,15 @@ async function handleInboundSMS(payload: any) {
             created_at: new Date().toISOString(),
           });
 
-          await supabaseAdmin
-            .from('leads')
-            .update({ sms_opt_in: true, updated_at: new Date().toISOString() })
-            .eq('user_id', userId)
-            .eq('phone', from);
+          // By id, not exact phone (#95) — a missed match here would silently
+          // leave sms_opt_in false for someone who just texted START.
+          if (leadId) {
+            await supabaseAdmin
+              .from('leads')
+              .update({ sms_opt_in: true, updated_at: new Date().toISOString() })
+              .eq('user_id', userId)
+              .eq('id', leadId);
+          }
 
           const { data: bizRow } = await supabaseAdmin
             .from('users')
@@ -849,33 +863,38 @@ async function handleInboundSMS(payload: any) {
 
     // Stop-on-reply: pause any active drip campaign enrollments for this lead
     try {
-      const { data: replyLead } = await supabaseAdmin
-        .from('leads')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('phone', from)
-        .single();
-
-      if (replyLead) {
+      // Uses the lead already resolved at the top of this handler rather than
+      // looking it up again by exact phone. `leads.phone` holds whatever was
+      // imported while Telnyx always sends E.164, so `.eq('phone', from)` misses
+      // any lead whose number was stored formatted — the same trap the lookup at
+      // the top of this function documents (#95).
+      //
+      // It matters more here than anywhere else in this file, because this is
+      // the one drip-stop path with nothing behind it. The opt-out path survives
+      // a missed lookup: `purge_lead_after_opt_out` re-resolves the lead by
+      // normalised phone and cascades the enrollments away. A reply that misses
+      // here just leaves the drip running, so someone who answered keeps
+      // receiving automated messages — and nothing reports it.
+      if (leadId) {
         const { data: pausedEnrollments } = await supabaseAdmin
           .from('drip_campaign_enrollments')
           .update({ status: 'paused_reply', paused_at: new Date().toISOString() })
-          .eq('lead_id', replyLead.id)
+          .eq('lead_id', leadId)
           .eq('status', 'active')
           .select('id');
 
         if (pausedEnrollments && pausedEnrollments.length > 0) {
-          console.log(`⏸️ Paused ${pausedEnrollments.length} drip enrollment(s) for lead ${replyLead.id} due to reply`);
+          console.log(`⏸️ Paused ${pausedEnrollments.length} drip enrollment(s) for lead ${leadId} due to reply`);
 
           // Drip steps are now materialised as real scheduled_messages rows, so
           // pausing the enrollment alone no longer stops anything — the queued
           // rows would still be picked up by process-scheduled. Cancel them.
           const cancelled = await cancelPendingDripMessages(supabaseAdmin, {
-            leadId: replyLead.id,
+            leadId,
             reason: 'Lead replied — drip stopped',
           });
           if (cancelled > 0) {
-            console.log(`⏸️ Cancelled ${cancelled} queued drip message(s) for lead ${replyLead.id}`);
+            console.log(`⏸️ Cancelled ${cancelled} queued drip message(s) for lead ${leadId}`);
           }
         }
       }
