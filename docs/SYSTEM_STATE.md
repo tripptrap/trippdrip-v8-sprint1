@@ -1026,6 +1026,12 @@ All three predicates are now inlined as plain PostgREST queries. Two notes on th
   cannot express. It is applied in JS after a `.limit(200)` read, with the original `LIMIT 50`
   re-applied *after* filtering — so a batch of exhausted drips cannot starve live ones.
 
+`process-scheduled` also gained a **`.limit(100)` batch cap**, which the original function did
+not have. This is a consequence of the fix, not unrelated tidying: `maxDuration` is 60s and each
+iteration does several round trips plus a Telnyx send, so an uncapped backlog would time out
+mid-loop and strand rows in `sending`. That risk was theoretical for as long as the fetch
+returned zero rows. Oldest first, cron every 5 minutes → a backlog drains at ~1,200/hour.
+
 **Verified in production 2026-07-31**: the cron found the due message on the first run after the
 change (`📤 1 scheduled message(s) due`) and deferred it on recipient-local quiet hours
 (`03:02 America/New_York`, window 08:00–20:00) — the first time this cron has ever reached that
