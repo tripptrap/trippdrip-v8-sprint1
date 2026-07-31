@@ -554,6 +554,29 @@ async function handleInboundSMS(payload: any) {
         if (updatedLead && updatedLead.length > 0) {
           console.log(`✅ Set sms_opt_in=false for lead with phone ${from}`);
         }
+
+        // Erase the person, keep the suppression (#109). Someone who opted out
+        // wants nothing further from this business, so their name, email, notes
+        // and conversation serve no purpose once they can never be contacted.
+        //
+        // Last in this branch on purpose: deleting the lead cascades the
+        // messages, thread, follow-ups and drip enrollments that the code above
+        // still refers to.
+        //
+        // The RPC refuses unless a dnc_list row already exists, so a failed
+        // add_to_dnc above cannot result in an erased lead with nothing left to
+        // stop the next import messaging them. `dncAddError` is checked here
+        // too rather than relying on that alone — two guards, because the
+        // failure mode is unrecoverable.
+        if (!dncAddError) {
+          const { data: purgeResult, error: purgeError } = await supabaseAdmin
+            .rpc('purge_lead_after_opt_out', { p_user_id: userId, p_phone: from });
+          if (purgeError) {
+            console.error(`Opt-out purge failed for ${from} (they are still on the DNC list):`, purgeError);
+          } else {
+            console.log(`🧹 Opt-out purge for ${from}:`, purgeResult);
+          }
+        }
       } catch (dncErr) {
         console.error('Error handling opt-out DNC:', dncErr);
       }
