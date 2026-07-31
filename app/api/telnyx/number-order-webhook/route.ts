@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 
 // Create Supabase admin client (bypasses RLS)
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -123,6 +124,9 @@ export async function POST(req: NextRequest) {
               console.error('❌ Error activating number:', updateError);
             } else {
               console.log(`✅ Number ${phoneNumber} activated for user ${pendingNumber.user_id}`);
+              // The order is confirmed, so this is the first moment the number
+              // is real enough to attach to a campaign (#107).
+              await autoAssignNumberToCampaign(pendingNumber.user_id, phoneNumber);
             }
           } else if (userId) {
             // No pending record - create new one (shouldn't normally happen)

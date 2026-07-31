@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { notifyAdmins } from '@/lib/createNotification';
+import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 
 const CREDITS_PER_NUMBER = 100; // 100 credits/month for a phone number
 
@@ -168,6 +169,13 @@ export async function POST(req: NextRequest) {
       }, {
         onConflict: 'phone_number'
       });
+
+    if (!numberError) {
+      // Attach it to the user's 10DLC campaign if they have an approved one.
+      // A number that is not on the campaign has its A2P traffic filtered by
+      // carriers, and this used to require finding a button in Settings (#107).
+      await autoAssignNumberToCampaign(user.id, phoneNumber);
+    }
 
     if (numberError) {
       console.error('Error adding number:', numberError);

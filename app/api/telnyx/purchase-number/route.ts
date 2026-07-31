@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 
 // Admin client to bypass RLS for database operations
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -156,6 +157,11 @@ export async function POST(req: NextRequest) {
         messaging_profile_id: messagingProfileId,
         capabilities: { voice: true, sms: true, mms: true },
       });
+
+    if (!dbError) {
+      // Attach to the user's 10DLC campaign if they have an approved one (#107).
+      await autoAssignNumberToCampaign(user.id, phoneNumber);
+    }
 
     if (dbError) {
       console.error('Error saving pending number:', dbError);

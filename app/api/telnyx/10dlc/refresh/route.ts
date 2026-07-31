@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getBrandStatus, getCampaignStatus } from '@/lib/telnyx10dlc';
+import { assignAllUserNumbersToCampaign } from '@/lib/autoAssignCampaignNumber';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -65,6 +66,15 @@ export async function POST() {
     }
 
     await supabaseAdmin.from('user_10dlc_registrations').update(updates).eq('id', registration.id);
+
+    // The campaign just became usable, and this user may already own numbers
+    // bought before it was approved. Attach them now rather than leaving the
+    // user to find a button in Settings — an unattached number has its A2P
+    // traffic filtered by carriers, which presents as "sending is broken" (#107).
+    if (updates.campaign_status === 'active' && registration.campaign_status !== 'active') {
+      const n = await assignAllUserNumbersToCampaign(user.id);
+      if (n > 0) console.log(`📇 Campaign ${registration.campaign_id} approved — submitted ${n} number(s) for assignment`);
+    }
 
     const { data: fresh } = await supabaseAdmin
       .from('user_10dlc_registrations')
