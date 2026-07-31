@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { INDUSTRY_PRESETS, getTagColor } from '@/lib/industryPresets'
+import { INDUSTRY_PRESETS, getTagColor, mapIndustryToVertical } from '@/lib/industryPresets'
 import toast from 'react-hot-toast'
 import { Phone, Loader2, CheckCircle, MapPin, ArrowRight, ArrowLeft, Calendar, Building2, Clock, Tag, PartyPopper, CreditCard, Zap, Bot, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { getFlowTemplate, type FlowTemplate } from '@/lib/flowTemplates'
@@ -82,6 +82,24 @@ function OnboardingContent() {
   // Step 2: Business setup
   const [businessName, setBusinessName] = useState('')
   const [timezone, setTimezone] = useState('America/New_York')
+
+  // Carrier registration (#1). Collected here because carriers require a real
+  // registered business behind any number that sends marketing texts — there is
+  // no path to a working number that skips this. The EIN is the one field a
+  // user may not have to hand, so it stays optional: the rest is saved, and the
+  // submission waits. What it costs them is the number, not the account.
+  const [entityType, setEntityType] = useState('PRIVATE_PROFIT')
+  const [legalBusinessName, setLegalBusinessName] = useState('')
+  const [taxId, setTaxId] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
+  const [contactEmail, setContactEmail] = useState('')
+  const [website, setWebsite] = useState('')
+  const [street, setStreet] = useState('')
+  const [city, setCity] = useState('')
+  const [addressState, setAddressState] = useState('')
+  const [postalCode, setPostalCode] = useState('')
+  const [registrationSubmitted, setRegistrationSubmitted] = useState<boolean | null>(null)
+  const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null)
   const [businessHours, setBusinessHours] = useState<Record<string, { open: string; close: string; enabled: boolean }>>(() => {
     const hours: Record<string, { open: string; close: string; enabled: boolean }> = {}
     DAYS.forEach(day => {
@@ -242,11 +260,70 @@ function OnboardingContent() {
       }).eq('id', user.id)
 
       if (error) throw error
+
+      // Carrier registration is saved alongside the profile, but never blocks
+      // moving on. A failure here must not strand someone in onboarding — the
+      // number gate is what enforces completion, and Settings can finish it.
+      await saveCarrierRegistration()
+
       goToStep(3)
     } catch (error: any) {
       toast.error(error.message || 'Failed to save business info')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Save the 10DLC details. Submits to the carrier only when an EIN is present
+   * (or the entity is a sole proprietor, which registers on an SSN instead);
+   * otherwise the API stores a draft and reports `submitted: false`.
+   */
+  const saveCarrierRegistration = async () => {
+    const required = [legalBusinessName, contactPhone, contactEmail, street, city, addressState, postalCode]
+    if (required.some(v => !v.trim())) {
+      setRegistrationSubmitted(false)
+      return
+    }
+
+    try {
+      const res = await fetch('/api/telnyx/10dlc/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityType,
+          legalBusinessName,
+          displayName: businessName || legalBusinessName,
+          taxId,
+          contactPhone,
+          contactEmail,
+          website,
+          vertical: mapIndustryToVertical(userIndustry),
+          street,
+          city,
+          state: addressState,
+          postalCode,
+          country: 'US',
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        // Don't fail onboarding over this — say so and move on.
+        toast.error(data.error || 'Could not save business registration')
+        setRegistrationSubmitted(false)
+        return
+      }
+
+      setRegistrationSubmitted(data.submitted !== false)
+      if (data.submitted === false) {
+        toast('Business details saved. Add your EIN later to unlock phone numbers.', { icon: 'ℹ️' })
+      } else {
+        toast.success('Business submitted for carrier registration')
+      }
+    } catch {
+      toast.error('Could not save business registration')
+      setRegistrationSubmitted(false)
     }
   }
 
@@ -276,6 +353,22 @@ function OnboardingContent() {
       fetchAvailableNumbers()
     }
   }, [currentStep, hasExistingNumber, poolNumbers.length, telnyxNumbers.length, fetchAvailableNumbers])
+
+  // Ask the server whether a number can be issued, rather than inferring it from
+  // what happened earlier in this session — someone can land on step 3 directly
+  // from a link, or come back days later to finish (#1).
+  useEffect(() => {
+    if (currentStep !== 3) return
+    let cancelled = false
+    fetch('/api/number-eligibility')
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled || !d?.ok) return
+        setNumberGate({ allowed: d.allowed, reason: d.reason ?? undefined })
+      })
+      .catch(() => { /* the claim itself still enforces this — don't block the step */ })
+    return () => { cancelled = true }
+  }, [currentStep, registrationSubmitted])
 
   const handleClaimNumber = async () => {
     setClaiming(true)
@@ -692,6 +785,146 @@ function OnboardingContent() {
               </div>
             </div>
 
+            {/* Carrier registration (#1). Separate card so it reads as what it
+                is — a regulatory requirement — rather than more profile fields. */}
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm space-y-6 mt-6 onb-fade-up-d2">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Business Registration</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  US carriers require a registered business behind every number that sends
+                  business texts. These details go to the carriers, not to your contacts.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Business Type</label>
+                <select
+                  value={entityType}
+                  onChange={(e) => setEntityType(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                >
+                  <option value="PRIVATE_PROFIT">LLC / Corporation (private)</option>
+                  <option value="PUBLIC_PROFIT">Publicly traded company</option>
+                  <option value="NON_PROFIT">Non-profit</option>
+                  <option value="SOLE_PROPRIETOR">Sole proprietor</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Legal Business Name</label>
+                <input
+                  type="text"
+                  value={legalBusinessName}
+                  onChange={(e) => setLegalBusinessName(e.target.value)}
+                  placeholder="Exactly as registered with the IRS"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                />
+              </div>
+
+              {entityType !== 'SOLE_PROPRIETOR' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    EIN / Tax ID <span className="font-normal text-gray-400">— optional for now</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={taxId}
+                    onChange={(e) => setTaxId(e.target.value)}
+                    placeholder="12-3456789"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                  />
+                  <div className="mt-2 flex gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3">
+                    <span aria-hidden="true" className="text-amber-600">⚠</span>
+                    <p className="text-sm text-amber-800">
+                      You can finish setting up your account without this. <strong>You will not be able
+                      to claim or buy a phone number until your EIN is added</strong> — carriers require
+                      it before a number can send messages. You can add it later in Settings.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="+1 555 123 4567"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Contact Email</label>
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="you@yourbusiness.com"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Website <span className="font-normal text-gray-400">— optional</span>
+                </label>
+                <input
+                  type="url"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://yourbusiness.com"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Street Address</label>
+                <input
+                  type="text"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="123 Main St"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={addressState}
+                    onChange={(e) => setAddressState(e.target.value)}
+                    placeholder="FL"
+                    maxLength={2}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900 uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ZIP</label>
+                  <input
+                    type="text"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    placeholder="33601"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSaveBusiness}
@@ -720,6 +953,25 @@ function OnboardingContent() {
               <h1 className="text-3xl font-bold mb-2 text-gray-900 onb-fade-up-d1">Your Free Phone Number</h1>
               <p className="text-gray-500 onb-fade-up-d2">A number has been reserved for you — included free with your plan</p>
             </div>
+
+            {/* Say why the number is unavailable, at the moment they expect to
+                get one — rather than letting the claim fail with a bare error (#1). */}
+            {numberGate && !numberGate.allowed && !claimedNumber && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 onb-fade-up-d2">
+                <h2 className="font-semibold text-amber-900">Phone numbers aren&apos;t available yet</h2>
+                <p className="text-sm text-amber-800 mt-1">{numberGate.reason}</p>
+                <button
+                  onClick={() => goToStep(2)}
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-900 hover:text-amber-950 underline underline-offset-2"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Go back and finish business registration
+                </button>
+                <p className="text-xs text-amber-700 mt-3">
+                  You can skip this for now and finish setting up your account — everything else
+                  works. Add your EIN in Settings whenever you have it.
+                </p>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm onb-fade-up-d2">
               {hasExistingNumber && claimedNumber ? (

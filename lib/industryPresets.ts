@@ -55,3 +55,33 @@ const TAG_COLORS = [
 export function getTagColor(index: number): string {
   return TAG_COLORS[index % TAG_COLORS.length];
 }
+
+/**
+ * Map an onboarding industry onto Telnyx's 10DLC `vertical` enum (#1).
+ *
+ * The two vocabularies do not line up one-to-one — solar is ENERGY, roofing and
+ * home services are both CONSTRUCTION — and the enum is closed: a value Telnyx
+ * does not recognise fails brand creation. The enum values below were confirmed
+ * against `GET /v2/10dlc/enum/vertical` and match VERTICAL_OPTIONS in
+ * components/settings/TenDLCRegistration.tsx.
+ *
+ * Falls back to PROFESSIONAL rather than throwing. A slightly generic vertical
+ * is a far better outcome than a failed registration, and the user can correct
+ * it in Settings before the brand is reviewed.
+ */
+export const INDUSTRY_TO_VERTICAL: Record<string, string> = {
+  insurance: 'INSURANCE',
+  real_estate: 'REAL_ESTATE',
+  solar: 'ENERGY',
+  roofing: 'CONSTRUCTION',
+  home_services: 'CONSTRUCTION',
+  financial_services: 'FINANCIAL',
+  healthcare: 'HEALTHCARE',
+  automotive: 'RETAIL',
+  retail: 'RETAIL',
+  other: 'PROFESSIONAL',
+};
+
+export function mapIndustryToVertical(industry?: string): string {
+  return INDUSTRY_TO_VERTICAL[industry ?? ''] ?? 'PROFESSIONAL';
+}

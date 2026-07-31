@@ -36,18 +36,29 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: `${field} is required` }, { status: 400 });
       }
     }
-    if (body.entityType !== 'SOLE_PROPRIETOR' && !body.taxId?.trim()) {
-      return NextResponse.json({ ok: false, error: 'taxId (EIN) is required unless entityType is SOLE_PROPRIETOR' }, { status: 400 });
-    }
+    // A missing EIN is no longer an error (#1). Onboarding lets someone finish
+    // signup without one, because demanding a tax ID before the account exists
+    // loses people who are still deciding — so the details are saved and the
+    // Telnyx submission simply is not made. Nothing is lost by waiting: what
+    // the EIN actually buys is a number, and `checkNumberEligibility` is what
+    // holds that line.
+    //
+    // Sole proprietors register with an SSN and Telnyx asks for no tax ID, so
+    // they are complete without one.
+    const isSoleProprietor = body.entityType === 'SOLE_PROPRIETOR';
+    const canSubmit = isSoleProprietor || !!body.taxId?.trim();
 
-    // Block re-submission while a registration is already in flight or active
+    // Block re-submission while a registration is already in flight or active.
+    // Keyed on `brand_id`, not status: a draft has never been sent to Telnyx and
+    // must stay editable, which is the whole point of letting someone finish
+    // onboarding without an EIN and come back to it.
     const { data: existing } = await supabaseAdmin
       .from('user_10dlc_registrations')
-      .select('id, brand_status, campaign_status')
+      .select('id, brand_id, brand_status, campaign_status')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (existing && (existing.campaign_status === 'active' || existing.brand_status === 'pending' || existing.campaign_status === 'pending')) {
+    if (existing?.brand_id && (existing.campaign_status === 'active' || existing.brand_status === 'pending' || existing.campaign_status === 'pending')) {
       return NextResponse.json({
         ok: false,
         error: `Registration already ${existing.campaign_status === 'active' ? 'active' : 'in progress'} — cannot resubmit.`,
@@ -61,7 +72,7 @@ export async function POST(req: NextRequest) {
       entity_type: body.entityType,
       legal_business_name: body.legalBusinessName.trim(),
       display_name: body.displayName.trim(),
-      tax_id: body.entityType === 'SOLE_PROPRIETOR' ? null : body.taxId.trim(),
+      tax_id: isSoleProprietor ? null : (body.taxId?.trim() || null),
       contact_phone: body.contactPhone.trim(),
       contact_email: body.contactEmail.trim(),
       website: body.website?.trim() || null,
@@ -94,12 +105,26 @@ export async function POST(req: NextRequest) {
       registrationId = inserted.id;
     }
 
+    // Saved, but not sent. Returning ok:true is deliberate — from the user's
+    // side nothing failed, they simply have not supplied the one field that
+    // starts the carrier clock. The client shows what is still needed.
+    if (!canSubmit) {
+      return NextResponse.json({
+        ok: true,
+        submitted: false,
+        registrationId,
+        reason: 'ein_required',
+        message:
+          'Business details saved. Add your EIN to submit for carrier registration — phone numbers stay unavailable until that is done.',
+      });
+    }
+
     // ── 1. Create the brand under THIS business's own identity ─────────────
     const brandResult = await createBrand({
       entityType: body.entityType as EntityType,
       displayName: body.displayName.trim(),
       companyName: body.legalBusinessName.trim(),
-      ein: body.entityType === 'SOLE_PROPRIETOR' ? undefined : body.taxId.trim(),
+      ein: isSoleProprietor ? undefined : body.taxId?.trim(),
       phone: body.contactPhone.trim(),
       street: body.street.trim(),
       city: body.city.trim(),
