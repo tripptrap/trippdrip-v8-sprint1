@@ -76,30 +76,46 @@ export async function GET(req: NextRequest) {
  * Process individual scheduled messages that are ready to send
  */
 async function processScheduledMessages(supabase: any) {
-  // Get messages ready to send using the helper function
+  // Read the due rows directly rather than through get_messages_ready_to_send().
+  //
+  // ── Why this does not call the RPC any more (#61) ──────────────────────────
+  //
+  // That function returns the due row to psql, to a raw PostgREST call with this
+  // same service-role key, and to this same client library run locally — but it
+  // returned `data: [], error: null` to this route on every single production
+  // run. Measured in one request, at a moment when exactly one row was 54
+  // minutes overdue:
+  //
+  //     whoami_probe()              -> current_user: service_role, 2 rows visible
+  //     get_messages_ready_to_send()-> count: 0, error: null
+  //
+  // So it is not authentication (the role is right), not RLS (the same client
+  // reads the table fine in the same request), and not timing (the row was long
+  // due). The function simply yields nothing to this caller, silently — no error
+  // to catch, and `length === 0` returns early without logging, which is why
+  // this reported `processed: 0` and looked healthy for months.
+  //
+  // The predicate is two comparisons. Inlining it removes the dependency on a
+  // component that has demonstrably lied to the only caller that matters. Note
+  // this compares against the app clock instead of the database's `now()`; both
+  // track NTP and the cron runs every 5 minutes, so sub-second skew cannot
+  // change which rows are due.
+  const nowIso = new Date().toISOString();
   const { data: readyMessages, error } = await supabase
-    .rpc('get_messages_ready_to_send');
+    .from('scheduled_messages')
+    .select('*')
+    .eq('status', 'pending')
+    .lte('scheduled_for', nowIso)
+    .order('scheduled_for', { ascending: true });
 
-  // Diagnostic (#61): which role does PostgREST resolve for THIS client?
-  // anon sees 0 rows of scheduled_messages under RLS, service_role sees them
-  // all — which matches the empty-with-no-error symptom exactly.
-  const { data: who, error: whoErr } = await supabase.rpc('whoami_probe');
-  console.log('🔎 whoami:', JSON.stringify({ who, err: whoErr?.message ?? null }));
-
-  // Diagnostic (#61): the RPC returns a due row when called over PostgREST with
-  // the same service-role key, while this route sees nothing and returns
-  // processed:0 with no output — it takes the `length === 0` return below, which
-  // logs nothing. These two observations contradict each other, so log what the
-  // route actually receives. Remove once the cause is known.
-  console.log('🔎 get_messages_ready_to_send returned:', JSON.stringify({
-    error: error ? { message: error.message, code: (error as any).code, details: (error as any).details, hint: (error as any).hint } : null,
-    isArray: Array.isArray(readyMessages),
-    type: typeof readyMessages,
-    count: Array.isArray(readyMessages) ? readyMessages.length : null,
-    firstRow: Array.isArray(readyMessages) && readyMessages[0]
-      ? { id: readyMessages[0].id, status: readyMessages[0].status, channel: readyMessages[0].channel, scheduled_for: readyMessages[0].scheduled_for, lead_id: readyMessages[0].lead_id }
-      : null,
-    raw: Array.isArray(readyMessages) ? undefined : String(readyMessages).slice(0, 200),
+  // Temporary (#61): confirm in production that the RPC still returns zero for
+  // the same rows this query finds. Remove once that is recorded.
+  const { data: viaRpc, error: rpcErr } = await supabase.rpc('get_messages_ready_to_send');
+  console.log('🔎 messages direct vs rpc:', JSON.stringify({
+    direct: Array.isArray(readyMessages) ? readyMessages.length : null,
+    directErr: error?.message ?? null,
+    rpc: Array.isArray(viaRpc) ? viaRpc.length : null,
+    rpcErr: rpcErr?.message ?? null,
   }));
 
   if (error) {
@@ -406,9 +422,28 @@ async function processScheduledMessages(supabase: any) {
  * Process scheduled campaigns that are ready for next batch
  */
 async function processScheduledCampaigns(supabase: any) {
-  // Get campaigns ready for batch
+  // Read due campaigns directly, for the same reason the message query above
+  // does (#61): get_campaigns_ready_for_batch() has the identical shape —
+  // SECURITY DEFINER returning SETOF scheduled_campaigns — and the sibling
+  // function with that shape returned zero rows to this route while returning
+  // them to every other caller. Campaign batches have never been observed
+  // going out, which is consistent with this having the same fault.
+  const nowIso = new Date().toISOString();
   const { data: readyCampaigns, error } = await supabase
-    .rpc('get_campaigns_ready_for_batch');
+    .from('scheduled_campaigns')
+    .select('*')
+    .in('status', ['scheduled', 'running'])
+    .lte('next_batch_date', nowIso)
+    .order('next_batch_date', { ascending: true });
+
+  // Temporary (#61): same comparison as the message path.
+  const { data: viaRpc, error: rpcErr } = await supabase.rpc('get_campaigns_ready_for_batch');
+  console.log('🔎 campaigns direct vs rpc:', JSON.stringify({
+    direct: Array.isArray(readyCampaigns) ? readyCampaigns.length : null,
+    directErr: error?.message ?? null,
+    rpc: Array.isArray(viaRpc) ? viaRpc.length : null,
+    rpcErr: rpcErr?.message ?? null,
+  }));
 
   if (error) {
     console.error('Error fetching ready campaigns:', error);
