@@ -197,6 +197,77 @@ so don't treat it as a compliance backstop unless you also wire it into the send
 
 ## Phone Numbers
 
+### The approved campaign read as `pending` for weeks — a two-field status mix-up (#1, 2026-07-31)
+
+**A Telnyx campaign has two status fields, with different vocabularies:**
+
+```
+status          ACTIVE | EXPIRED | …
+campaignStatus  TCR_PENDING | TCR_EXPIRED | MNO_PENDING | MNO_PROVISIONED | …
+```
+
+`getCampaignStatus` returns **`campaignStatus`**. Both callers mapped it with
+`if (s === 'ACTIVE')` — a value that field never takes — so everything fell through to
+`'pending'`. The live campaign, MNO-provisioned and carrying traffic, was stored as pending
+indefinitely.
+
+That is the mechanism behind "**0 numbers are assigned**" in CLAUDE.md, which had been read as a
+carrier problem. `autoAssignNumberToCampaign` refuses unless the stored status is
+active/approved/mno_provisioned, and the refresh route auto-assigns only on the pending→active
+transition. Neither could ever fire. The carrier block (#105) is real and separate — but it was
+never reached.
+
+**`EXPIRED` is now terminal, not pending.** Treating it as pending is what let the app poll a
+dead campaign forever: the stored id pointed at a `TCR_EXPIRED` campaign, and every refresh
+rewrote 'pending' over 'pending'.
+
+**Telnyx does not update a campaign id on resubmission.** It issues a new one and leaves the old
+id resolving happily — HTTP 200, `TCR_EXPIRED`, not a 404 — so a stored pointer to a superseded
+campaign looks healthy from the app's side. This account held exactly that: the DB pointed at
+`4b30019f-a63a-…` while the approved campaign was `4b30019f-a9aa-…` (CAAP953). Corrected in the
+live row, and `listCampaignsForBrand` + `pickUsableCampaign` now let refresh adopt the brand's
+live campaign instead of polling a corpse.
+
+**Also fixed, and found by writing a test for the mapper rather than by reading it:**
+`mapBrandStatus` used `includes('VERIFIED')` — which is **also true for `UNVERIFIED`**. A brand
+that failed identity verification was recorded as verified, and the app would go on to create a
+campaign and attach numbers against it. Now an exact match.
+
+Both mappers moved into `lib/telnyx10dlc.ts`; they were duplicated across two routes.
+
+### Numbers are withheld until the business is registered (#1, 2026-07-31)
+
+Onboarding now collects the carrier-registration details in the existing "Set Up Your Business"
+step, and **the EIN is optional** — someone without their tax ID can still finish signup. What a
+missing EIN costs is the *number*, not the account.
+
+`lib/numberEligibility.ts` → `checkNumberEligibility()` gates all three acquisition paths:
+`number-pool/claim`, `number-pool/purchase-with-credits`, `telnyx/purchase-number`. It **fails
+closed** — a registration read that errors, or a missing service-role client, refuses. "Cannot
+check" is not "allow".
+
+The reason it withholds rather than warns: numbers carry A2P traffic, A2P needs a campaign, a
+campaign needs a verified brand, and a brand needs the EIN. Issuing a number first produces the
+worst available failure — the user has a number, the app looks finished, and every message is
+filtered by carriers with nothing surfaced anywhere.
+
+Two deliberate looser edges:
+
+- **Does not require `brand_status = verified`.** Carrier verification takes 3–7 business days;
+  blocking that long leaves a paying user with nothing. A *submitted* brand (brand_id present)
+  is enough — campaign attachment happens automatically on approval (#107).
+- **Sole proprietors are exempt from the EIN check.** They register on an SSN and Telnyx asks for
+  no tax ID. Mirrors the register route.
+
+`/api/telnyx/10dlc/register` no longer 400s on a missing taxId — it saves the details and returns
+`submitted: false`, so a client cannot accidentally submit an incomplete registration nor skip a
+complete one. Its resubmission guard is keyed on **`brand_id`**, not status: a draft has never
+reached Telnyx and must stay editable, where previously any row with status `pending` was frozen.
+
+`/api/number-eligibility` (GET) exists only so the UI can *explain* the refusal — onboarding's
+number step and the Phone Numbers page both read it. It is not the boundary; hiding a button
+never is.
+
 ### The 10DLC campaign is approved; the number cannot attach to it (#105, 2026-07-30)
 
 Campaign `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` is `MNO_PROVISIONED`, T-Mobile
