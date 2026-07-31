@@ -80,6 +80,12 @@ async function processScheduledMessages(supabase: any) {
   const { data: readyMessages, error } = await supabase
     .rpc('get_messages_ready_to_send');
 
+  // Diagnostic (#61): which role does PostgREST resolve for THIS client?
+  // anon sees 0 rows of scheduled_messages under RLS, service_role sees them
+  // all — which matches the empty-with-no-error symptom exactly.
+  const { data: who, error: whoErr } = await supabase.rpc('whoami_probe');
+  console.log('🔎 whoami:', JSON.stringify({ who, err: whoErr?.message ?? null }));
+
   // Diagnostic (#61): the RPC returns a due row when called over PostgREST with
   // the same service-role key, while this route sees nothing and returns
   // processed:0 with no output — it takes the `length === 0` return below, which
