@@ -142,11 +142,28 @@ export async function POST(req: NextRequest) {
       try {
         const ed25519Sig = Buffer.from(signature, 'base64');
         const signedPayload = `${timestamp}|${rawBody}`;
-        const publicKeyBuffer = Buffer.from(publicKey, 'base64');
+
+        // Telnyx publishes its public key as **raw** base64 Ed25519 — 32 bytes.
+        // This used to hand those 32 bytes to crypto.verify as
+        // `format: 'der', type: 'spki'`, which they are not: SPKI-wrapped
+        // Ed25519 is 44 bytes, the raw key behind a 12-byte ASN.1 header. Node
+        // could not parse it and threw "Failed to read asymmetric key" (asn1
+        // wrong tag), which the catch below turned into a 401.
+        //
+        // So **every inbound webhook was rejected** — no message stored, no
+        // lead created, no opt-out honoured — from the day this check was
+        // added. It failed closed and silently: nothing downstream ran, so even
+        // the inbound-message-lost alert never fired (#110).
+        const rawKey = Buffer.from(publicKey, 'base64');
+        const spkiKey = rawKey.length === 32
+          ? Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), rawKey])
+          : rawKey; // already SPKI-wrapped
+        const keyObject = crypto.createPublicKey({ key: spkiKey, format: 'der', type: 'spki' });
+
         const isValid = crypto.verify(
           null, // Ed25519 doesn't use a digest algorithm
           Buffer.from(signedPayload),
-          { key: publicKeyBuffer, format: 'der', type: 'spki' },
+          keyObject,
           ed25519Sig
         );
         if (!isValid) {
