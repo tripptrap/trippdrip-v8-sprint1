@@ -1530,6 +1530,35 @@ selects or updates — **none creates** — so they carry no duplicate risk, and
 because the data is now uniformly E.164. Worth routing through the RPC if imports ever
 reintroduce mixed formats.
 
+**Amended 2026-07-31 (#61), and four of those five are now fixed.** The paragraph above judged
+them by duplicate risk, which was the wrong axis. One of them changes behaviour when it misses:
+
+- **stop-on-reply** pauses the drip enrollment and cancels the queued `scheduled_messages` when
+  a lead answers. It is **the only drip-stop path with nothing behind it.** The opt-out path
+  survives a missed lookup because `purge_lead_after_opt_out` re-resolves the lead by normalised
+  phone and cascades the enrollments away. A reply that misses here leaves the drip running, so
+  someone who answered keeps receiving automated messages — and nothing reports it.
+
+Proven against live data, with the lead stored as a CSV import would store it and the inbound
+arriving as Telnyx sends it:
+
+| lookup | result |
+|---|---|
+| `.eq('phone', '+18887062631')` | **0 rows** |
+| `find_lead_by_phone(user, '+18887062631')` | found the lead |
+
+Four sites (stop-on-reply, opt-out `sms_opt_in=false`, opt-in `sms_opt_in=true`, and the alert
+name lookup) now use the `leadId` already resolved at the top of the handler — no second lookup,
+so they cannot disagree with it. Commit `7576525`.
+
+**The fallback at line 273 was deliberately left**, and is [#111](https://github.com/tripptrap/trippdrip-v8-sprint1/issues/111):
+it runs *before* the tenant is known, and `find_lead_by_phone` requires a `p_user_id`. Fixing it
+needs a cross-tenant normalised lookup, which has to return the owner without leaking lead data
+across tenants.
+
+The general rule this leaves: **in the inbound webhook, resolve the lead once and pass the id.**
+Any second lookup by `from` is a lookup that can disagree with the first.
+
 ---
 
 ## Opt-out erases the lead, keeps the suppression (#109, 2026-07-31)
