@@ -80,6 +80,22 @@ async function processScheduledMessages(supabase: any) {
   const { data: readyMessages, error } = await supabase
     .rpc('get_messages_ready_to_send');
 
+  // Diagnostic (#61): the RPC returns a due row when called over PostgREST with
+  // the same service-role key, while this route sees nothing and returns
+  // processed:0 with no output — it takes the `length === 0` return below, which
+  // logs nothing. These two observations contradict each other, so log what the
+  // route actually receives. Remove once the cause is known.
+  console.log('🔎 get_messages_ready_to_send returned:', JSON.stringify({
+    error: error ? { message: error.message, code: (error as any).code, details: (error as any).details, hint: (error as any).hint } : null,
+    isArray: Array.isArray(readyMessages),
+    type: typeof readyMessages,
+    count: Array.isArray(readyMessages) ? readyMessages.length : null,
+    firstRow: Array.isArray(readyMessages) && readyMessages[0]
+      ? { id: readyMessages[0].id, status: readyMessages[0].status, channel: readyMessages[0].channel, scheduled_for: readyMessages[0].scheduled_for, lead_id: readyMessages[0].lead_id }
+      : null,
+    raw: Array.isArray(readyMessages) ? undefined : String(readyMessages).slice(0, 200),
+  }));
+
   if (error) {
     // The route still returns ok:true when this happens, so an uptime check
     // sees green while zero messages go out. Nothing else would surface it (#80).
@@ -94,8 +110,11 @@ async function processScheduledMessages(supabase: any) {
   }
 
   if (!readyMessages || readyMessages.length === 0) {
+    console.log('🔎 no due messages — returning early');
     return { processed: 0, failed: 0 };
   }
+
+  console.log(`🔎 processing ${readyMessages.length} due message(s)`);
 
   let processed = 0;
   let failed = 0;
