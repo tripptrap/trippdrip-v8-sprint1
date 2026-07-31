@@ -1356,6 +1356,63 @@ API route trees, because a `find` pattern matched on the bare directory name rat
 
 ---
 
+## Inbound was dead for six months — Ed25519 key parsed wrong (#108, 2026-07-31)
+
+**Every inbound webhook was rejected with 401** from the day signature verification was added
+until 2026-07-31. The last inbound row before the fix is dated **2026-01-20**.
+
+Telnyx publishes its webhook public key as **raw base64 Ed25519 — 32 bytes**. The verifier
+passed those 32 bytes to `crypto.verify` as `{ format: 'der', type: 'spki' }`. They are not:
+SPKI-wrapped Ed25519 is 44 bytes, the raw key behind a 12-byte ASN.1 header
+(`302a300506032b6570032100`). Node could not parse it:
+
+```
+Failed to read asymmetric key
+error:0688010A: asn1 encoding routines::nested asn1 error
+error:068000A8: asn1 encoding routines::wrong tag
+```
+
+The surrounding `catch` turned that into `401 Signature verification failed`.
+
+**The key was never wrong.** It decodes to exactly 32 bytes, fails to parse as-is, parses as
+`ed25519` once wrapped. The fix wraps a 32-byte key and passes through anything already 44.
+
+### What it broke
+
+Everything inbound: replies never reached Messages, leads were never created from inbound texts
+(so #95's work could not run), the receptionist never replied, flows never advanced, drips never
+stopped on reply, and **opt-outs were never honoured** — STOP or custom keyword.
+
+**Outbound was completely unaffected**, so sending looked healthy the whole time.
+
+### Why nothing caught it
+
+It failed **closed and silently**. The handler returned before any database write, so the
+"inbound replies are being lost" alert added in #80 could never fire — the code that alerts
+never executed. Telnyx retried and gave up. No error surfaced anywhere in the product.
+
+### How it was found, and the rule that follows
+
+Not by reading code. The webhook URL, messaging profile, public key value and number-to-user
+lookup were all checked first and were all correct.
+
+It took **manufacturing a real inbound** — sending an SMS from one of the account's own numbers
+to another — and reading the Vercel runtime log, which showed the handler entered with valid
+signature headers and dying on the key parse.
+
+> **Outbound working tells you nothing about inbound.** They share almost no code path. Any
+> end-to-end check has to send a message *into* the system, not just out of it. Two Telnyx
+> numbers on the same account are enough to do that without involving a handset.
+
+A second rule from the same hunt: `vercel logs <url>` prints a **snapshot and exits**, it does
+not follow. To catch a webhook you must trigger the event and read within a minute or two, or
+the window has already rolled past.
+
+### Verified after the fix
+
+Probe inbound saved, lead and thread created; a real `POT` opt-out from an AT&T handset
+recognised, DNC written, lead purged (#109); `check_dnc` blocks the number afterwards.
+
 ## Inbound SMS creates the lead (#95)
 
 An inbound message now **finds or creates** the lead in `handleInboundSMS`, before anything
@@ -1401,6 +1458,55 @@ because the data is now uniformly E.164. Worth routing through the RPC if import
 reintroduce mixed formats.
 
 ---
+
+## Opt-out erases the lead, keeps the suppression (#109, 2026-07-31)
+
+`purge_lead_after_opt_out(user_id, phone)`, called from the SMS webhook's opt-out branch once
+`add_to_dnc` has succeeded. Applies to **every** opt-out — standard keyword or the user's custom
+one.
+
+**Deleted:** the lead row, which cascades messages, thread, notes, activities, follow-ups, drip
+enrollments, scheduled sends, flows and sessions. Plus `sms_messages`, `sms_responses`,
+`receptionist_logs` and `emails` — those reference leads with `ON DELETE SET NULL`, so they
+survive the cascade holding message bodies and phone numbers. They are cleared **before** the
+lead, because the cascade nulls the `lead_id` needed to find them, and are also matched on the
+normalised phone for rows written before a lead existed.
+
+**Kept:** the `dnc_list` row. It is what stops the number being messaged again *and* the evidence
+the business was told to stop. Delete it and the same number returns in the next CSV import, gets
+messaged, and nothing records that anyone ever asked not to be — the exact violation the opt-out
+prevented. This works because `dnc_list` is keyed on `(user_id, normalized_phone)` with no
+reference to the lead, and `check_dnc()` matches on the phone alone.
+
+Also kept deliberately: `dnc_history`; `points_transactions`, `transactions`, `payments`
+(financial retention, #93); `calendar_events` (a booked appointment may still happen); `clients`
+(someone converted is a customer, not a lead).
+
+**Two guards, because the failure is unrecoverable:** the RPC refuses to run unless a `dnc_list`
+row already exists, and the webhook only calls it when `add_to_dnc` reported no error. A failed
+suppression can never produce an erased lead with nothing stopping the next message.
+
+### Custom opt-out keywords
+
+`user_settings.opt_out_keyword` is appended to first messages ("Reply <word> to opt out") and
+matched by `isOptOut()`. **STOP and the standard list always work regardless** — the campaign
+registers `STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT` with `subscriberOptout: true`, carriers test
+it, and TCPA damages run $500–$1,500 per message after a valid opt-out.
+
+Validation added (#108 era): single word, 2–20 alphanumerics, uppercased, and **`YES`, `START`,
+`UNSTOP`, `HELP`, `INFO`, `CANCEL` are rejected**. `YES` is the dangerous one — it is an opt-in
+keyword *and* what leads reply to confirm an appointment, so allowing it would permanently DNC
+every lead who confirmed a booking.
+
+**Telnyx intercepts registered keywords at the platform level.** A reply of `YES` got Telnyx's
+own auto-response ("You have successfully subscribed…"), not the campaign's registered
+`optinMessage` and not anything from this app. Do not assume STOP/START/YES/HELP reach the
+webhook.
+
+### Verified in production
+
+Real `POT` from an AT&T handset: lead created by the inbound and destroyed in the same request,
+thread and message gone, one `dnc_list` row left, `check_dnc` returns `on_dnc_list: true`.
 
 ## The global DNC list (#88, #93)
 
