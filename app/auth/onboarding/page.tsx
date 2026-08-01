@@ -1046,8 +1046,13 @@ function OnboardingContent() {
                   {(selectedPoolNumber || selectedTelnyxNumber) && (
                     <button
                       onClick={handleClaimNumber}
-                      disabled={claiming}
-                      className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      // Also disabled when registration is incomplete. The claim
+                      // would be refused server-side anyway, and letting someone
+                      // press a live button to receive an error they were just
+                      // warned about is the worse of the two experiences (#1).
+                      disabled={claiming || (numberGate !== null && !numberGate.allowed)}
+                      title={numberGate && !numberGate.allowed ? numberGate.reason : undefined}
+                      className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {claiming ? <><Loader2 className="w-5 h-5 animate-spin" />Reserving your number...</> : <>Confirm This Number <ArrowRight className="w-5 h-5" /></>}
                     </button>
