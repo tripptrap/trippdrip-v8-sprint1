@@ -767,6 +767,31 @@ service_role add_to_dnc                    -> 200  (STOP path intact)
 
 and the write landed under the test user, not the account named in the attack.
 
+**And the one the sweep caught last: `add_credits` let users mint their own credits.** Both
+credit RPCs are SECURITY DEFINER and were granted to `authenticated`. Their guard —
+
+```
+IF v_role <> 'service_role' AND auth.uid() IS DISTINCT FROM user_id THEN RAISE
+```
+
+— stops you acting on *another* user's balance, and **permits acting on your own**. A fresh test
+account, its own session, one request with `amount: 999999` → HTTP 200, balance 0 → 999,999.
+Credits are what the point packs sell, so that was revenue, not data.
+
+Both are service-role only now, with three call sites moved first (the charge and refund in
+`number-pool/purchase-with-credits`, `follow-ups/send-calendar-link`, `campaigns/run`). The
+per-user guard inside the functions is kept as defence in depth, but **the grant is the control**.
+
+**The lesson that ties all three together:** each was found by a check that *looked* sufficient
+and wasn't — a grants query blind to PUBLIC, a route audit that never asked whether the RPC could
+be called without the route, and a sweep that tested "mentions `auth.uid`" rather than "is
+actually scoped". Every one was settled by running the attack. **Verify authorization by
+attacking it, never by reading it.**
+
+What remains reachable by `authenticated` is only the five thread RPCs, and that is deliberate —
+they carry `AND user_id = auth.uid()` inside. Confirmed: a logged-in user calling `archive_thread`
+on another account's thread gets HTTP 204 and the row is **unchanged**.
+
 ### The two ways a write reports success without writing (#110, 2026-08-02)
 
 Checking `error` is necessary and **not sufficient**. Both AI-toggle routes checked it and
