@@ -6,6 +6,18 @@ import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { notifyAdmins } from '@/lib/createNotification';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 
+// Credit changes run on the service-role client, never the caller's (#114).
+//
+// add_credits and deduct_credits are SECURITY DEFINER and were granted to
+// `authenticated`. Their guard only stops you acting on ANOTHER user — acting on
+// your own id was permitted, so any logged-in user could POST
+// /rest/v1/rpc/add_credits with their own id and mint credits. Verified: a test
+// account went 0 -> 999,999 in one request. Credits are what the point packs
+// sell, so that was revenue, not just data.
+//
+// EXECUTE is revoked from authenticated; these calls run as service_role. The
+// user id still comes from the verified session.
+
 const CREDITS_PER_NUMBER = 100; // 100 credits/month for a phone number
 
 export async function POST(req: NextRequest) {
@@ -68,7 +80,7 @@ export async function POST(req: NextRequest) {
     // #91: was read-then-write (`credits: currentCredits - requiredCredits`),
     // which loses any concurrent change. deduct_credits does it in one
     // statement and refuses rather than going negative.
-    const { data: balanceAfterCharge, error: deductError } = await supabase.rpc('deduct_credits', {
+    const { data: balanceAfterCharge, error: deductError } = await createServiceRoleClient().rpc('deduct_credits', {
       user_id: user.id,
       amount: requiredCredits,
     });
@@ -88,7 +100,7 @@ export async function POST(req: NextRequest) {
      * route used to do unconditionally.
      */
     const refundCredits = async (reason: string): Promise<boolean> => {
-      const { error: refundError } = await supabase.rpc('add_credits', {
+      const { error: refundError } = await createServiceRoleClient().rpc('add_credits', {
         user_id: user.id,
         amount: requiredCredits,
       });

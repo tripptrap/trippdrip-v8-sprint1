@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+
+// Credit changes run on the service-role client, never the caller's (#114).
+//
+// add_credits and deduct_credits are SECURITY DEFINER and were granted to
+// `authenticated`. Their guard only stops you acting on ANOTHER user — acting on
+// your own id was permitted, so any logged-in user could POST
+// /rest/v1/rpc/add_credits with their own id and mint credits. Verified: a test
+// account went 0 -> 999,999 in one request. Credits are what the point packs
+// sell, so that was revenue, not just data.
+//
+// EXECUTE is revoked from authenticated; these calls run as service_role. The
+// user id still comes from the verified session.
 
 export const dynamic = "force-dynamic";
 
@@ -169,7 +181,7 @@ export async function POST(req: NextRequest) {
     // arguments by NAME, so the old spelling failed even once the function
     // existed (#90). The SMS has already gone out above, so a failure here
     // can't be undone; it must be loud rather than silent.
-    const { error: deductError } = await supabase.rpc('deduct_credits', {
+    const { error: deductError } = await createServiceRoleClient().rpc('deduct_credits', {
       user_id: user.id,
       amount: creditsCost,
     });

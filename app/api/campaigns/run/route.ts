@@ -7,6 +7,18 @@ import { sendTelnyxSMS } from "@/lib/telnyx";
 import { createNotification } from "@/lib/createNotification";
 import { checkSmsAllowed } from "@/lib/smsGuard";
 
+// Credit changes run on the service-role client, never the caller's (#114).
+//
+// add_credits and deduct_credits are SECURITY DEFINER and were granted to
+// `authenticated`. Their guard only stops you acting on ANOTHER user — acting on
+// your own id was permitted, so any logged-in user could POST
+// /rest/v1/rpc/add_credits with their own id and mint credits. Verified: a test
+// account went 0 -> 999,999 in one request. Credits are what the point packs
+// sell, so that was revenue, not just data.
+//
+// EXECUTE is revoked from authenticated; these calls run as service_role. The
+// user id still comes from the verified session.
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -350,7 +362,7 @@ export async function POST(req: Request) {
             const messageCredits = personalizedCreditCalc.credits;
 
             // CRIT-5: Deduct credits server-side after each successful send
-            const { error: deductError } = await supabase.rpc('deduct_credits', { user_id: user.id, amount: messageCredits });
+            const { error: deductError } = await createServiceRoleClient().rpc('deduct_credits', { user_id: user.id, amount: messageCredits });
             if (deductError) {
               // Already sent — can't be rolled back, so make it visible (#90).
               console.error(`❌ Campaign message sent to lead ${lead.id} but ${messageCredits} credits NOT deducted for user ${user.id}:`, deductError);
