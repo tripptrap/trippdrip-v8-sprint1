@@ -738,9 +738,34 @@ Two different fixes, on purpose:
   handling an inbound STOP, where `auth.uid()` is NULL. Adding a caller-scope predicate there
   would silently break opt-out persistence — #34 all over again.
 
-Still open as [#114](https://github.com/tripptrap/trippdrip-v8-sprint1/issues/114): `authenticated`
-still has EXECUTE on those ten, and the tenant is still a parameter, so a logged-in user can pass
-someone else's `user_id`. Closing that needs per-route checks of which client each caller uses.
+**Closed 2026-08-02 (#114).** `authenticated` is revoked from all ten; they are service-role only
+now, matching the shape the already-safe functions were in (`purge_lead_after_opt_out`,
+`release_pool_number`, `check_rate_limit` …). Ten call sites moved to the service-role client
+first — the four `/api/dnc` routes, the three `/api/referrals` routes, `/api/sms/send`, and the
+two `smsGuard` callers (`messages/schedule/bulk`, `campaigns/run`). `schedule_message` and
+`stop_ai_drip_on_reply` had **no caller in the codebase at all**.
+
+The tenant still comes from the verified session in every route, never from the request body —
+that was already true, which is why the routes were never the hole. The hole was that the RPC
+could be called *without* the route.
+
+One more found on the way: **`complete_referral` takes only a referral id and verifies no
+ownership whatsoever** — it marks any pending referral complete and grants the referrer a free
+month. Service-role-only now, but the function itself is still unguarded if anything server-side
+ever passes it an id from user input.
+
+Verified by attacking with a real session, not by reading grants:
+
+```
+authenticated, another account's user_id:  remove_from_dnc -> 42501 / 403
+                                           add_to_dnc      -> 42501 / 403
+same session, through the routes:          /api/dnc/add    -> 200
+                                           /api/dnc/check  -> on_dnc_list true
+                                           /api/dnc/remove -> 200
+service_role add_to_dnc                    -> 200  (STOP path intact)
+```
+
+and the write landed under the test user, not the account named in the attack.
 
 ### The two ways a write reports success without writing (#110, 2026-08-02)
 
