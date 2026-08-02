@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
 import { detectSpam } from "@/lib/spam/detector";
@@ -291,7 +291,7 @@ export async function POST(req: Request) {
         // quiet-hours check at all before, despite being the bulk sender — a
         // campaign fired at 2am sent at 2am. Gates on the *lead's* local time
         // where their state is known, which is what TCPA keys on.
-        const guard = await checkSmsAllowed(supabase, user.id, lead.phone, {
+        const guard = await checkSmsAllowed(createServiceRoleClient(), user.id, lead.phone, {
           enforceQuietHours: true,
           recipientState: lead.state,
           context: { campaign_id: campaignId, campaign_name: campaignName, source: 'campaign' },

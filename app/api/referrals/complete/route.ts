@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+
+// The privileged RPC runs on the service-role client, not the caller's (#114).
+//
+// These functions are SECURITY DEFINER and take the tenant as a parameter, so
+// EXECUTE granted to `authenticated` meant any logged-in user could call them
+// directly over PostgREST with someone else's user_id — bypassing this route
+// entirely. The grant is revoked; the route keeps working because it now calls
+// as service_role.
+//
+// The tenant still comes from the verified session below, never from the body.
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Complete referral and grant rewards
-    const { data, error } = await supabase.rpc('complete_referral', {
+    const { data, error } = await createServiceRoleClient().rpc('complete_referral', {
       p_referral_id: referralId
     });
 

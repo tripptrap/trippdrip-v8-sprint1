@@ -1,7 +1,7 @@
 // API Route: Send SMS via Telnyx with full tracking and analytics
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       : messageBody;
 
     // Check DNC list BEFORE sending
-    const { data: dncCheck, error: dncError } = await supabase.rpc('check_dnc', {
+    const { data: dncCheck, error: dncError } = await createServiceRoleClient().rpc('check_dnc', {
       p_user_id: user.id,
       p_phone_number: toPhone
     });

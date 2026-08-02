@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
@@ -225,7 +225,7 @@ export async function PUT(req: NextRequest) {
 
           // Opt-out gate (#40) — bulk sends previously had no DNC check, so an
           // opted-out lead in the batch still received the message.
-          const guard = await checkSmsAllowed(supabase, user.id, lead.phone, {
+          const guard = await checkSmsAllowed(createServiceRoleClient(), user.id, lead.phone, {
             enforceQuietHours: true,
             recipientState: lead.state,
             context: { source: 'bulk_scheduled', scheduled_message_id: message.id },
