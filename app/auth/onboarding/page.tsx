@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { INDUSTRY_PRESETS, getTagColor, mapIndustryToVertical } from '@/lib/industryPresets'
+import { validateBusinessEmail } from '@/lib/validateBusinessEmail'
 import toast from 'react-hot-toast'
 import { Phone, Loader2, CheckCircle, MapPin, ArrowRight, ArrowLeft, Calendar, Building2, Clock, Tag, PartyPopper, CreditCard, Zap, Bot, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { getFlowTemplate, type FlowTemplate } from '@/lib/flowTemplates'
@@ -98,6 +99,7 @@ function OnboardingContent() {
   const [city, setCity] = useState('')
   const [addressState, setAddressState] = useState('')
   const [postalCode, setPostalCode] = useState('')
+  const [contactEmailError, setContactEmailError] = useState<string | null>(null)
   const [registrationSubmitted, setRegistrationSubmitted] = useState<boolean | null>(null)
   const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null)
   const [businessHours, setBusinessHours] = useState<Record<string, { open: string; close: string; enabled: boolean }>>(() => {
@@ -285,6 +287,18 @@ function OnboardingContent() {
       setRegistrationSubmitted(false)
       return
     }
+
+    // Carriers reject an unreachable contact address, and their error arrives
+    // after this step is over and does not say which field it means (#1). Catch
+    // it here while the user is still looking at the form.
+    const emailCheck = validateBusinessEmail(contactEmail)
+    if (!emailCheck.ok) {
+      setContactEmailError(emailCheck.reason)
+      toast.error(emailCheck.reason)
+      setRegistrationSubmitted(false)
+      return
+    }
+    setContactEmailError(null)
 
     try {
       const res = await fetch('/api/telnyx/10dlc/register', {
@@ -860,10 +874,34 @@ function OnboardingContent() {
                   <input
                     type="email"
                     value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
+                    onChange={(e) => {
+                      setContactEmail(e.target.value)
+                      if (contactEmailError) setContactEmailError(null)
+                    }}
+                    // Checked on blur rather than per-keystroke: validating while
+                    // someone is still typing the domain flags every address as
+                    // broken before they have finished writing it.
+                    onBlur={(e) => {
+                      const v = e.target.value.trim()
+                      if (!v) return
+                      const check = validateBusinessEmail(v)
+                      setContactEmailError(check.ok ? null : check.reason)
+                    }}
                     placeholder="you@yourbusiness.com"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                    aria-invalid={!!contactEmailError}
+                    aria-describedby={contactEmailError ? 'contact-email-error' : undefined}
+                    className={`w-full px-4 py-3 rounded-xl border outline-none transition-all text-gray-900 ${
+                      contactEmailError
+                        ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
+                        : 'border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+                    }`}
                   />
+                  {contactEmailError && (
+                    <p id="contact-email-error" className="mt-2 text-sm text-red-600">{contactEmailError}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-400">
+                    Carriers send registration correspondence here, so it must be an address you can receive mail at.
+                  </p>
                 </div>
               </div>
 

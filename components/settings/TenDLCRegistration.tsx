@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ShieldCheck, Loader2, AlertTriangle, CheckCircle2, RefreshCw, Link2, Link as LinkIcon } from 'lucide-react';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
+import { validateBusinessEmail } from '@/lib/validateBusinessEmail';
 
 type EntityType = 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NON_PROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
 
@@ -176,6 +177,14 @@ export default function TenDLCRegistration() {
     }
     if (entityType !== 'SOLE_PROPRIETOR' && !taxId.trim()) {
       toast.error('EIN is required unless you are a sole proprietor');
+      return;
+    }
+    // Same check the onboarding form and the API route make (#1) — carriers
+    // reject an unreachable contact address, and this is a real submission that
+    // creates a billable brand, so catching it here saves a charge.
+    const emailCheck = validateBusinessEmail(contactEmail);
+    if (!emailCheck.ok) {
+      toast.error(emailCheck.reason);
       return;
     }
 

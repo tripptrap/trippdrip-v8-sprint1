@@ -3,6 +3,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createBrand, createCampaign, EntityType, mapBrandStatus, mapCampaignStatus } from '@/lib/telnyx10dlc';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
+import { validateBusinessEmail, explainBrandError } from '@/lib/validateBusinessEmail';
+import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -36,6 +38,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: `${field} is required` }, { status: 400 });
       }
     }
+    // Carriers reject an unreachable contact address, and Telnyx's own error
+    // (`10019 Invalid email address`) arrives only after the registration row is
+    // written — and does not say which field it means (#1). Checked here as well
+    // as in the form, because the form is not the boundary.
+    const emailCheck = validateBusinessEmail(body.contactEmail);
+    if (!emailCheck.ok) {
+      return NextResponse.json({ ok: false, error: emailCheck.reason, field: 'contactEmail' }, { status: 400 });
+    }
+
     // A missing EIN is no longer an error (#1). Onboarding lets someone finish
     // signup without one, because demanding a tax ID before the account exists
     // loses people who are still deciding — so the details are saved and the
@@ -143,7 +154,29 @@ export async function POST(req: NextRequest) {
         brand_failure_reason: brandResult.error || 'Unknown error',
         updated_at: new Date().toISOString(),
       }).eq('id', registrationId);
-      return NextResponse.json({ ok: false, error: `Brand registration failed: ${brandResult.error}` }, { status: 502 });
+
+      // Some brand failures are the user's to fix (a bad email); others are
+      // ours and they cannot act on them at all. A negative Telnyx balance
+      // blocks every brand creation on the account with
+      // `20100 Insufficient Funds` — it blocked one outright on 2026-08-02, and
+      // is the same root cause as the July number-order denials. Nobody was
+      // told, so it presented as "registration is broken".
+      //
+      // This also makes explainBrandError's "support has been notified" true,
+      // which it was not before.
+      const err = (brandResult.error || '').toLowerCase();
+      const isOurProblem = err.includes('enough funds') || err.includes('insufficient funds');
+      if (isOurProblem) {
+        await alertAdminsThrottled({
+          key: 'brand_registration_blocked',
+          title: '10DLC brand registration is failing for everyone',
+          body: `Telnyx refused to create a brand: ${brandResult.error}. This is account-level, not user-level — no agent can register until it is resolved. Check the Telnyx balance first (GET /v2/balance).`,
+          data: { route: 'telnyx/10dlc/register', user_id: user.id, error: brandResult.error },
+          escalate: true,
+        });
+      }
+
+      return NextResponse.json({ ok: false, error: explainBrandError(brandResult.error) }, { status: 502 });
     }
 
     const brandStatus = mapBrandStatus(brandResult.status);
