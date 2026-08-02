@@ -235,6 +235,54 @@ campaign and attach numbers against it. Now an exact match.
 
 Both mappers moved into `lib/telnyx10dlc.ts`; they were duplicated across two routes.
 
+### The mock run: `createBrand` works, `createCampaign` was broken for everyone (#1, 2026-08-02)
+
+**Telnyx mock brands are free and are the right way to test this.** `mock: true` on brand
+creation costs nothing, and any campaign created under a mock brand is automatically mock with no
+registration or recurring fee. They cannot carry real traffic — that is the only thing they do
+not prove.
+
+The first ever execution of `createBrand`/`createCampaign` found a blocker:
+
+```
+10025 String length out of range
+detail: String is too long. Must be maximum 320 characters.
+source: {"pointer": "/body/optinMessage"}
+```
+
+`generateCampaignDefaults` produced **343 characters**, so *every* per-agent campaign submission
+would have failed — **after the brand was created and charged $4.50**, because the brand comes
+first. The single existing registration never hit it: CAAP953's `optinMessage` is 305, written by
+hand.
+
+**`messageFlow` is not capped, despite looking like the obvious culprit at 920 characters.**
+Submitting 920 raises no error and the approved campaign's is 944. Only `source.pointer` settled
+it — length alone pointed at the wrong field. When Telnyx returns 10025, read the pointer.
+
+`buildOptinMessage` now guarantees ≤ 320. Load-bearing and non-removable: the business name (the
+perceived sender), **every declared message type** (campaign `4b30019f` was rejected 2026-07-28
+for omitting marketing while MARKETING was a selected sub-use-case), frequency, rates,
+"Consent is not a condition of purchase", HELP, STOP. Removable and removed: the `about <offer>`
+clause, absent from the approved campaign. Length still scales with the legal business name — the
+full form fits only ~27 characters of it — so a compact form follows and past that the name is
+trimmed.
+
+`validateCampaignFields` runs before submission so a future overflow names the field rather than
+costing a brand charge to discover. `messageFlow` is deliberately excluded from it.
+
+Two more from the same run:
+
+- **Telnyx validates the email domain.** `ops@mockrun.test` → `10019 Invalid email address`.
+  Onboarding accepts any syntactically valid address, so an unroutable domain fails brand
+  registration with a message the user cannot act on.
+- **Mock brands cannot be deleted** — `DELETE /10dlc/brand/{id}` returns 500. Two now sit on the
+  account (`Mockrun Test Co`, `Test Agent Brand`), free and flagged `mock=true`.
+
+**A negative Telnyx balance blocks brand creation entirely**, mock included, with
+`20100 Insufficient Funds` — the balance was −$0.46. Same root cause as the July number-order
+denials. **Check `GET /v2/balance` first whenever a Telnyx call fails in a way that looks like
+permissions or compliance.**
+
 ### Numbers are withheld until the business is registered (#1, 2026-07-31)
 
 Onboarding now collects the carrier-registration details in the existing "Set Up Your Business"
