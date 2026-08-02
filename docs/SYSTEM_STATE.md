@@ -705,6 +705,43 @@ behind more shipped bugs here than anything else: the DNC opt-out failure (#34, 
 of "success" logs while writing nothing), `user_telnyx_numbers.capabilities`, and the
 entire 2026-07-28 audit cluster (#51–#55).
 
+### `SECURITY DEFINER` + anon grant = cross-tenant writes (#114, 2026-08-02)
+
+**Verify a revoke by re-running the attack, not by querying grants.** This one nearly shipped
+as "fixed" twice.
+
+Fifteen `SECURITY DEFINER` functions were granted `EXECUTE` to **`anon`**. SECURITY DEFINER
+bypasses RLS; the anon key is public by design. Each took the tenant as an ordinary parameter,
+so the caller chose the account. Proven, not inferred:
+
+```
+POST /rest/v1/rpc/archive_thread   anon key, no session, another account's thread
+  -> HTTP 204, is_archived true
+POST /rest/v1/rpc/add_to_dnc       anon key, no session, another account's user_id
+  -> {"success": true, "action": "added"}, row written
+```
+
+**The trap: `REVOKE EXECUTE … FROM anon` alone does nothing, and looks like it worked.**
+Postgres grants EXECUTE to `PUBLIC` by default and anon inherits it, so the named revoke removes
+a grant that was never the one in force. The obvious verification is blind to this — `aclexplode`
+renders PUBLIC as grantee **oid 0**, which never joins to `pg_roles`, so a check for
+`rolname = 'anon'` reports clean while the function stays world-callable. The first revoke passed
+that check and the attack still returned HTTP 200. **Always `REVOKE … FROM PUBLIC, anon`.**
+
+Two different fixes, on purpose:
+
+- **Thread RPCs** (`archive_thread`, `unarchive_thread`, `bulk_archive_threads`,
+  `add_thread_tag`, `remove_thread_tag`) — scoped to `auth.uid()` *and* revoked. Their only
+  caller is a logged-in user acting on their own thread.
+- **The other ten** — revoked only, **not** scoped. They take the tenant as a parameter because
+  their callers are server-side: the SMS webhook calls `add_to_dnc` as `service_role` while
+  handling an inbound STOP, where `auth.uid()` is NULL. Adding a caller-scope predicate there
+  would silently break opt-out persistence — #34 all over again.
+
+Still open as [#114](https://github.com/tripptrap/trippdrip-v8-sprint1/issues/114): `authenticated`
+still has EXECUTE on those ten, and the tenant is still a parameter, so a logged-in user can pass
+someone else's `user_id`. Closing that needs per-route checks of which client each caller uses.
+
 ### The two ways a write reports success without writing (#110, 2026-08-02)
 
 Checking `error` is necessary and **not sufficient**. Both AI-toggle routes checked it and
