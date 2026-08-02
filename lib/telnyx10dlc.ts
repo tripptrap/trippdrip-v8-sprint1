@@ -225,9 +225,52 @@ export function mapCampaignStatus(raw?: string): 'pending' | 'active' | 'failed'
   return 'pending';
 }
 
+/**
+ * Per-field length limits Telnyx enforces on campaign creation, confirmed
+ * against the live API by submitting deliberately out-of-range values and
+ * reading the `source.pointer` it returns (#1).
+ *
+ * Checked before the request because of the order things happen in: the brand
+ * is created and **charged** first, then the campaign. A field that overflows
+ * fails at the campaign step with an opaque `10025 String length out of range`,
+ * after the money is gone. Catching it here names the field and costs nothing.
+ *
+ * Deliberately not listed: `messageFlow`. It has no 320 cap — the approved
+ * campaign's is 944 characters — and guessing a limit that does not exist would
+ * reject valid submissions.
+ */
+const CAMPAIGN_FIELD_LIMITS: { field: keyof CreateCampaignParams; min?: number; max?: number }[] = [
+  { field: 'optinMessage', min: 20, max: 320 },
+  { field: 'optoutMessage', min: 20, max: 320 },
+  { field: 'helpMessage', min: 20, max: 320 },
+  { field: 'sample1', min: 20 },
+  { field: 'sample2', min: 20 },
+  { field: 'description', min: 40 },
+];
+
+export function validateCampaignFields(params: CreateCampaignParams): string | null {
+  for (const { field, min, max } of CAMPAIGN_FIELD_LIMITS) {
+    const value = params[field];
+    if (typeof value !== 'string') continue;
+    if (max !== undefined && value.length > max) {
+      return `${field} is ${value.length} characters; Telnyx allows at most ${max}`;
+    }
+    if (min !== undefined && value.length < min) {
+      return `${field} is ${value.length} characters; Telnyx requires at least ${min}`;
+    }
+  }
+  return null;
+}
+
 export async function createCampaign(params: CreateCampaignParams): Promise<CampaignResult> {
   const key = apiKey();
   if (!key) return { success: false, error: 'Telnyx API key not configured' };
+
+  const lengthError = validateCampaignFields(params);
+  if (lengthError) {
+    console.error('createCampaign: refusing to submit —', lengthError);
+    return { success: false, error: lengthError };
+  }
 
   try {
     const requestBody: Record<string, any> = {

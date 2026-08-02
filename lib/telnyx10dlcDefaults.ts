@@ -19,6 +19,49 @@
 
 import { buildConsentText } from './optInConsent';
 
+/** Telnyx caps optinMessage at 320 chars (error 10025, `/body/optinMessage`). */
+export const OPTIN_MESSAGE_MAX = 320;
+
+/**
+ * The opt-in auto-reply, guaranteed to fit Telnyx's 320-character limit.
+ *
+ * Found by a mock-brand run (#1): the generated message was 343 characters and
+ * **every** campaign submission would have failed with 10025 — after the $4.50
+ * brand charge had already gone through. The approved campaign CAAP953 is 305,
+ * which is why this was never hit by the one registration that exists.
+ *
+ * What cannot be dropped to save room:
+ *   - the business name — it is the perceived sender (rejections #1, #3)
+ *   - every message type the campaign declares. Campaign 4b30019f was rejected
+ *     on 2026-07-28 partly for omitting marketing/promotional while MARKETING
+ *     was a selected sub-use-case.
+ *   - frequency, rates, "Consent is not a condition of purchase", HELP, STOP
+ *
+ * What was dropped: the `about <offer>` clause. The approved campaign does not
+ * carry it, so its absence is known-good with the reviewers.
+ *
+ * Length still scales with the legal business name, and the full form only
+ * leaves room for about 27 characters of it — so a compact form follows, and
+ * past that the name itself is trimmed. A truncated name in one auto-reply is a
+ * better outcome than a registration that cannot be submitted at all.
+ */
+export function buildOptinMessage(business: string): string {
+  const full = (b: string) =>
+    `You are now opted in to receive SMS messages from ${b}, including follow-ups, appointment reminders, account notifications, and promotional and marketing messages. Message frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`;
+
+  const compact = (b: string) =>
+    `You are now opted in to SMS from ${b}: follow-ups, appointment reminders, account notifications, and marketing messages. Frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`;
+
+  const name = business.trim();
+  if (full(name).length <= OPTIN_MESSAGE_MAX) return full(name);
+  if (compact(name).length <= OPTIN_MESSAGE_MAX) return compact(name);
+
+  // Still over: trim the name against the compact form, leaving room for '…'.
+  const overflow = compact(name).length - OPTIN_MESSAGE_MAX;
+  const trimmed = name.slice(0, Math.max(1, name.length - overflow - 1)).trimEnd() + '…';
+  return compact(trimmed);
+}
+
 export interface CampaignDefaultsInput {
   legalBusinessName: string;
   vertical: string;
@@ -65,7 +108,11 @@ export function generateCampaignDefaults(input: CampaignDefaultsInput): Campaign
     // Must name every message type the campaign declares — Telnyx rejected
     // campaign 4b30019f on 2026-07-28 partly because this response omitted
     // marketing/promotional while MARKETING was a selected sub-use-case.
-    optinMessage: `You are now opted in to receive SMS messages from ${business} about ${offer}, including follow-ups, appointment reminders, account notifications, and promotional and marketing messages. Message frequency varies. Msg&data rates may apply. Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
+    //
+    // Hard-capped at 320 characters by the API (`/body/optinMessage`, error
+    // 10025) — the only campaign field with that limit; messageFlow is not
+    // capped, the approved campaign's is 944. See buildOptinMessage.
+    optinMessage: buildOptinMessage(business),
     optoutMessage: `You have been unsubscribed from ${business} SMS messages and will not receive any more messages. Reply START to resubscribe.`,
     optinKeywords: 'START,YES,UNSTOP',
     optoutKeywords: 'STOP,STOPALL,UNSUBSCRIBE,CANCEL,END,QUIT',
