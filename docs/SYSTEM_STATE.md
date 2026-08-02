@@ -705,6 +705,47 @@ behind more shipped bugs here than anything else: the DNC opt-out failure (#34, 
 of "success" logs while writing nothing), `user_telnyx_numbers.capabilities`, and the
 entire 2026-07-28 audit cluster (#51–#55).
 
+### The two ways a write reports success without writing (#110, 2026-08-02)
+
+Checking `error` is necessary and **not sufficient**. Both AI-toggle routes checked it and
+still lied.
+
+**1. Swallowing the error on a guess about schema.** Both routes did this:
+
+```ts
+if (error.message.includes('ai_disabled')) {
+  return NextResponse.json({ ok: true, updated: 0, message: 'ai_disabled column not found' });
+}
+```
+
+`threads.ai_disabled` exists (boolean, default false), so the branch protected against
+nothing — while converting *any* error naming the column (permission, type, policy) into a
+reported success. The user flips "AI off", the UI confirms, and the AI keeps replying on
+their behalf. **Defensive code written against a schema doubt that was never checked is not
+defensive; it is a silent failure with a comment on it.** Check the column once, at the
+source, and then trust it.
+
+**2. A guarded UPDATE that matches zero rows.** `manage`'s `toggle_ai` ran:
+
+```ts
+.update({ ai_disabled: disable }).eq('id', threadId).eq('user_id', user.id)   // no .select()
+```
+
+A zero-row match returns `error: null, status: 204` — **indistinguishable from success**.
+Wrong `threadId`, or another tenant's thread, and the route answered *"AI disabled — you
+have taken over this conversation"* having touched nothing. This is the same trap as the
+cron's pending→sending claim in #61.
+
+**The rule: any UPDATE whose `.eq()` filters can legitimately match nothing must
+`.select()` and check the row count.** The filter that scopes a write to the current user
+is exactly such a filter.
+
+Verified after the fix, against a real session rather than by reading: own thread → 200 and
+the column really changed; nonexistent thread → 404; another tenant's thread → 404 with
+that row provably unmodified; bulk `all: true` → `updated: 1`, only the caller's own thread.
+The cross-tenant refusal says "Conversation not found" rather than a permission error, so it
+does not confirm the thread exists to someone probing.
+
 **Fixed 2026-07-28 (commit `db54fa7`)** — five tables where the code wrote columns that
 didn't exist, so Postgres rejected the statement and nobody noticed:
 
