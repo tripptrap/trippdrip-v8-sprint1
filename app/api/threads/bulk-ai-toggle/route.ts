@@ -67,10 +67,19 @@ export async function POST(req: NextRequest) {
     const { data, error } = await query.select('id');
 
     if (error) {
-      // Column might not exist
-      if (error.message.includes('ai_disabled')) {
-        return NextResponse.json({ ok: true, updated: 0, message: 'ai_disabled column not found' });
-      }
+      // Previously: an error mentioning `ai_disabled` returned `ok: true,
+      // updated: 0` on the theory that the column might not exist (#110).
+      //
+      // It does exist — `threads.ai_disabled`, boolean, default false — so that
+      // branch was unreachable defensive code guarding against nothing. What it
+      // *would* have done is report success for a write that never happened:
+      // the user flips "AI off", the UI confirms, and the AI keeps replying on
+      // their behalf. Any Postgres error naming the column in its message
+      // (a permission error, a type error, a policy violation) triggered it.
+      //
+      // This is the shape that hid the STOP opt-out failure for months and the
+      // dead cron for longer: report success, do nothing, surface nothing.
+      console.error('Error toggling AI in bulk:', error);
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 

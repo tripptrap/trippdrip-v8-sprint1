@@ -181,19 +181,33 @@ export async function POST(req: NextRequest) {
 
         const disable = body.disable === true;
 
-        const { error: toggleError } = await supabase
+        // `.select('id')` is not decoration. A guarded UPDATE that matches no
+        // row — wrong threadId, or a thread belonging to someone else — returns
+        // `error: null` and is indistinguishable from success without it. This
+        // route reported "AI disabled — you have taken over this conversation"
+        // for writes that touched nothing (#110).
+        const { data: toggled, error: toggleError } = await supabase
           .from('threads')
           .update({ ai_disabled: disable })
           .eq('id', threadId)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .select('id');
 
         if (toggleError) {
-          // Column might not exist yet — try without it
-          if (toggleError.message.includes('ai_disabled')) {
-            return NextResponse.json({ ok: true, message: 'AI toggle not available (column missing)', ai_disabled: false });
-          }
+          // Previously swallowed any error mentioning `ai_disabled` and returned
+          // ok:true, on the theory the column might be missing. It exists
+          // (boolean, default false), so that guarded against nothing while
+          // turning a real failure into a reported success — the user believes
+          // they have taken over the conversation and the AI keeps replying.
           console.error('Error toggling AI:', toggleError);
           return NextResponse.json({ ok: false, error: toggleError.message }, { status: 500 });
+        }
+
+        if (!toggled || toggled.length === 0) {
+          return NextResponse.json(
+            { ok: false, error: 'Conversation not found' },
+            { status: 404 }
+          );
         }
 
         return NextResponse.json({
