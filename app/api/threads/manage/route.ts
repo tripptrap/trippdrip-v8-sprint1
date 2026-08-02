@@ -35,22 +35,26 @@ export async function POST(req: NextRequest) {
         }
 
 
-        // Try RPC first, fall back to direct update
-        let archiveError: any = null;
-        const rpcResult = await supabase.rpc('archive_thread', { thread_id_param: threadId });
-        if (rpcResult.error) {
-          // RPC doesn't exist — do direct update
-          const { error } = await supabase
-            .from('threads')
-            .update({ is_archived: true, archived_at: new Date().toISOString() })
-            .eq('id', threadId)
-            .eq('user_id', user.id);
-          archiveError = error;
-        }
+        // Scoped update rather than the archive_thread RPC. That RPC was
+        // SECURITY DEFINER with no ownership check and granted to anon, so it
+        // archived anyone's thread by id — see
+        // supabase/migrations/scope_thread_archive_rpcs_to_owner.sql. Doing it
+        // here keeps the ownership predicate next to the handler that relies on
+        // it, and `.select()` is what makes "not yours" distinguishable from
+        // "done" (#110).
+        const { data: archived, error: archiveError } = await supabase
+          .from('threads')
+          .update({ is_archived: true, archived_at: new Date().toISOString() })
+          .eq('id', threadId)
+          .eq('user_id', user.id)
+          .select('id');
 
         if (archiveError) {
           console.error('Error archiving thread:', archiveError);
           return NextResponse.json({ ok: false, error: archiveError.message }, { status: 500 });
+        }
+        if (!archived?.length) {
+          return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
         }
 
         return NextResponse.json({ ok: true, message: 'Thread archived successfully' });
@@ -62,20 +66,19 @@ export async function POST(req: NextRequest) {
         }
 
 
-        const rpcResult = await supabase.rpc('unarchive_thread', { thread_id_param: threadId });
-        let unarchiveError: any = null;
-        if (rpcResult.error) {
-          const { error } = await supabase
-            .from('threads')
-            .update({ is_archived: false, archived_at: null })
-            .eq('id', threadId)
-            .eq('user_id', user.id);
-          unarchiveError = error;
-        }
+        const { data: unarchived, error: unarchiveError } = await supabase
+          .from('threads')
+          .update({ is_archived: false, archived_at: null })
+          .eq('id', threadId)
+          .eq('user_id', user.id)
+          .select('id');
 
         if (unarchiveError) {
           console.error('Error unarchiving thread:', unarchiveError);
           return NextResponse.json({ ok: false, error: unarchiveError.message }, { status: 500 });
+        }
+        if (!unarchived?.length) {
+          return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
         }
 
         return NextResponse.json({ ok: true, message: 'Thread unarchived successfully' });
@@ -87,26 +90,27 @@ export async function POST(req: NextRequest) {
         }
 
 
-        const rpcResult = await supabase.rpc('bulk_archive_threads', { thread_ids: threadIds });
-        let bulkError: any = null;
-        if (rpcResult.error) {
-          const { error } = await supabase
-            .from('threads')
-            .update({ is_archived: true, archived_at: new Date().toISOString() })
-            .in('id', threadIds)
-            .eq('user_id', user.id);
-          bulkError = error;
-        }
+        const { data: bulkArchived, error: bulkError } = await supabase
+          .from('threads')
+          .update({ is_archived: true, archived_at: new Date().toISOString() })
+          .in('id', threadIds)
+          .eq('user_id', user.id)
+          .select('id');
 
         if (bulkError) {
           console.error('Error bulk archiving threads:', bulkError);
           return NextResponse.json({ ok: false, error: bulkError.message }, { status: 500 });
         }
 
+        // Reports what was archived, not what was asked for. This used to return
+        // `count: threadIds.length` unconditionally, so a request naming ten
+        // threads the caller does not own still answered "10 threads archived".
+        const bulkCount = bulkArchived?.length ?? 0;
         return NextResponse.json({
           ok: true,
-          message: `${threadIds.length} threads archived successfully`,
-          count: threadIds.length,
+          message: `${bulkCount} thread${bulkCount === 1 ? '' : 's'} archived successfully`,
+          count: bulkCount,
+          requested: threadIds.length,
         });
       }
 
