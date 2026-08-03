@@ -1473,6 +1473,56 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## The from-number is chosen here, never by the carrier (#125, 2026-08-03)
+
+`SendTelnyxSMSOptions.from` is **required**, and the transport refuses an empty one.
+
+It used to be optional, and omitting it did not fail the send — the request fell back to
+`messaging_profile_id` and **Telnyx picked a number from the profile pool**. Three callers
+passed `from: x || undefined` with no null check, so an unresolved number became a *successful*
+send from a number nobody selected: rest and lock ignored, the traffic and any complaint it
+earned attributed to whichever tenant held that number, and success reported to the user.
+
+**This is why the Rest button from #122 did nothing on those paths.** Compounded by a fallback
+in `telnyx/send-sms` that overrode a declined resolve by taking the user's *oldest* active
+number straight from the table — ignoring rest, lock, geo and mode alike — on the route that
+`receptionist/respond`, `process-drips` and `process-ai-drips` all fetch into. Deleted.
+
+A number is per-tenant reputation in this product. Choosing one is never something to leave to
+the provider, and "no number resolved" must fail rather than fall back.
+
+### `null` was hiding two opposite conditions
+
+`resolveFromNumber` returned `string | null`. All nine callers branched on falsiness and
+rendered some variant of *"claim a phone number first"* — so a transient database error told the
+user to buy a number they already owned, and on the cron paths could mark work permanently
+failed.
+
+It now returns a discriminated result:
+
+| reason | retryable | correct handling |
+|---|---|---|
+| `none_owned` | no | tell them to claim a number; fail the scheduled row |
+| `lookup_failed` | yes | defer; leave the row for the next run |
+
+`retryable` deliberately mirrors the field on `SmsGuardResult`, so the crons apply one rule to
+both: **retryable means leave the row alone.** Appointment reminders no longer stamp
+`reminder_status` on a transient failure — nothing re-sends a marked event, so that stamp was
+permanently dropping reminders for a condition that would have cleared on its own.
+
+### The bug class a type change introduces: `|| fallback` on a result object
+
+Changing a return type from `string | null` to an object silently breaks every
+`(await f()) || fallback`, because **an object is always truthy**. The fallback becomes dead and
+the object itself flows onward.
+
+Two sites did exactly this — `ai-drip/start` (`|| undefined`) and `process-drips` (`|| ''`) —
+and **neither failed the type-check**, because both values flowed into untyped JSON request
+bodies. They were found by deliberately reading the call sites the compiler did *not* flag.
+
+When widening a return type, the sites tsc reports are the easy half. Grep for `|| ` on the
+call, and read every site that stayed silent.
+
 ## Sends the counters could not see (#126, 2026-08-03)
 
 Everything that limits or measures sending reads `public.messages`. Three defects meant parts
