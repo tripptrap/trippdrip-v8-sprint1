@@ -131,30 +131,35 @@ export async function addPoints(
     return { success: false, error: 'Not authenticated' };
   }
 
-  // Get current balance
-  const { data: userData, error: fetchError } = await supabase
+  const { data: userData } = await supabase
     .from('users')
     .select('credits')
     .eq('id', user.id)
     .single();
 
-  if (fetchError || !userData) {
-    return { success: false, error: 'Failed to fetch user data' };
-  }
+  // ── Same two fixes as spendPoints, for the same two reasons ────────────────
+  //
+  // 1. Read-then-write. Concurrent credits overwrite each other exactly as
+  //    concurrent debits did — measured at 23 of 25 lost on the debit side.
+  // 2. The UPDATE ran on the caller's own client, and `close_anon_lead_and_
+  //    user_grants` revoked UPDATE on users from `authenticated` except for four
+  //    profile columns. `credits` is deliberately not one of them, so this
+  //    write had started failing outright.
+  //
+  // Caught by testing a refund end to end: an upload was charged 5 points, the
+  // route reported "Your points have been refunded", and the balance did not
+  // move. Exactly the failure class CLAUDE.md warns about — supabase-js returns
+  // { error } rather than throwing, and here nothing was checking it before the
+  // caller reported success.
+  const { data: rpcBalance, error: addError } = await createServiceRoleClient()
+    .rpc('add_credits', { user_id: user.id, amount });
 
-  const currentBalance = userData.credits || 0;
-  const newBalance = currentBalance + amount;
-
-  // Add points
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ credits: newBalance, updated_at: new Date().toISOString() })
-    .eq('id', user.id);
-
-  if (updateError) {
-    console.error('Error updating balance:', updateError);
+  if (addError) {
+    console.error('Error adding credits:', addError);
     return { success: false, error: 'Failed to update balance' };
   }
+
+  const newBalance = typeof rpcBalance === 'number' ? rpcBalance : (userData?.credits ?? 0) + amount;
 
   // Record transaction
   const { error: transactionError } = await supabase

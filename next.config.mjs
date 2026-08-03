@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // pdf-parse must not be bundled by webpack.
+    //
+    // It ships `dist/worker/` and `dist/node/` and resolves those paths at
+    // runtime. Bundled, the require targets no longer exist and parsing fails
+    // inside the serverless function — while working perfectly under plain
+    // `node`, which is exactly how the v2 API fix (4627780) passed locally and
+    // still returned "Could not read that PDF file" in production.
+    //
+    // Anything that loads files relative to its own package at runtime belongs
+    // here; the symptom is always "works locally, fails deployed".
+    serverComponentsExternalPackages: ['pdf-parse'],
+  },
+
   async redirects() {
     return [
       {
