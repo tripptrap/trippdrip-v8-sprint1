@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { limitByIp, observeRate, clientIp } from '@/lib/rateLimit';
 import { normalizePhone } from '@/lib/phone';
+import { consentFields } from '@/lib/leadConsent';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -159,6 +160,10 @@ export async function POST(req: NextRequest) {
           phone: e164,
           email: email?.trim() || null,
           source: 'opt_in_form',
+          // The only intake with consumer-side evidence behind it — the verbatim
+          // disclosure, IP, user agent and timestamp are in the
+          // contact_form_submissions row written just above (#130).
+          ...consentFields('opt_in_form'),
           // leads_status_check allows only active/inactive/archived/deleted
           status: 'active',
           created_at: now,

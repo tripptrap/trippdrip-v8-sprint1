@@ -8,6 +8,7 @@ import { ContactType } from '@/lib/receptionist/types';
 import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { exemptFromModeration } from '@/lib/smsModeration';
+import { consentFields } from '@/lib/leadConsent';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 import { cancelPendingDripMessages } from '@/lib/drip/materialize';
 import { isAffirmative, isAwaitingConfirmation, markAwaitingConfirmation, confirmAndBookAppointment } from '@/lib/flows/completeFlow';
@@ -332,6 +333,9 @@ async function handleInboundSMS(payload: any) {
           first_name: 'New',
           last_name: 'Contact',
           source: 'inbound_sms',
+          // They messaged the business first, which is the consent (#130). The
+          // inbound message itself is the record, and it is stored.
+          ...consentFields('inbound_message'),
           status: 'active',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

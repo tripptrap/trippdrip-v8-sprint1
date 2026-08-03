@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { consentFields, isAttested } from "@/lib/leadConsent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,6 +27,12 @@ export async function POST(req: NextRequest) {
     console.log(`[Import] body.campaignName raw:`, body?.campaignName);
     const incoming = Array.isArray(body?.items) ? body.items : (Array.isArray(body?.rows) ? body.rows : []);
     const addTags = Array.isArray(body?.addTags) ? body.addTags.map((t: any)=>String(t).trim()).filter(Boolean) : [];
+    // Consent attestation (#130). Imported contacts consented — if they did —
+    // on the business's own form, before the data reached us, so the platform
+    // cannot see it. Either the business asserts it and the assertion is
+    // recorded, or the lead's consent stays UNKNOWN. `sms_opt_in` used to
+    // default to true, which asserted it on their behalf without asking.
+    const attested = isAttested(body?.consentAttested);
     const campaignName = body?.campaignName ? String(body.campaignName).trim() : "";
     console.log(`[Import] campaignName after parsing:`, campaignName);
 
@@ -119,6 +126,7 @@ export async function POST(req: NextRequest) {
         email: l.email || null,
         state: l.state || null,
         tags: uniq([...currentTags, ...addTags]),
+        ...consentFields(attested ? 'agent_attested' : null),
       };
       // Add campaign_id if we have a campaign
       if (campaignId) {

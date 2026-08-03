@@ -1054,7 +1054,12 @@ export default function LeadsPage() {
     }
   }
 
-  const canImport = !!(raw?.ok && (raw?.total || 0) > 0);
+  // Consent attestation (#130). Imported contacts consented — if they did — on
+  // the business's own form before the file ever reached us, so the platform
+  // cannot see it. Either it is asserted here and recorded, or these leads are
+  // stored with consent UNKNOWN. It used to be assumed by a column default.
+  const [consentAttested, setConsentAttested] = useState(false);
+  const canImport = !!(raw?.ok && (raw?.total || 0) > 0 && consentAttested);
 
   async function onImport() {
     if (!canImport) return;
@@ -1062,7 +1067,8 @@ export default function LeadsPage() {
       const payload = {
         items: mappedAll.length ? mappedAll : [],
         campaignName: campaignName.trim() || undefined,
-        addTags: normalizeTags(bulkTags)
+        addTags: normalizeTags(bulkTags),
+        consentAttested,
       };
       console.log("[Import Frontend] Sending payload:", payload);
       console.log("[Import Frontend] campaignName value:", campaignName);
@@ -2423,17 +2429,35 @@ export default function LeadsPage() {
               )}
             </div>
 
-            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-end">
-              {canImport && (
+            <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3 space-y-3">
+              {!!(raw?.ok && (raw?.total || 0) > 0) && (
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={consentAttested}
+                    onChange={(e) => setConsentAttested(e.target.checked)}
+                    data-testid="consent-attestation"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 dark:border-slate-600"
+                  />
+                  <span>
+                    I confirm that every contact in this import has given prior express written
+                    consent to receive SMS messages from my business, that I can produce evidence of
+                    that consent on request, and that I am responsible for the lawful basis on which
+                    these contacts are messaged.
+                  </span>
+                </label>
+              )}
+              <div className="flex justify-end">
                 <button
                   onClick={onImport}
+                  disabled={!canImport}
                   data-testid="confirm-import"
-                  className="rounded-md border border-[#2a6cff] bg-[#2a6cff]/20 px-4 py-2 text-sm hover:bg-[#2a6cff]/30"
+                  className="rounded-md border border-[#2a6cff] bg-[#2a6cff]/20 px-4 py-2 text-sm hover:bg-[#2a6cff]/30 disabled:cursor-not-allowed disabled:opacity-40"
                   type="button"
                 >
                   Confirm Import
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { consentFields, isAttested } from "@/lib/leadConsent";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    // Consent attestation (#130). Sent as a form field alongside the file
+    // because this endpoint takes multipart, not JSON.
+    const attested = isAttested(formData.get('consentAttested') === 'true');
 
     if (!file) {
       return NextResponse.json({ ok: false, error: 'No file provided' }, { status: 400 });
@@ -94,6 +98,9 @@ export async function POST(req: NextRequest) {
 
       const leadData: any = {
         user_id: user.id,
+        // See the import route (#130): consent for an uploaded contact happened
+        // before the file reached us, so it is either attested or unknown.
+        ...consentFields(attested ? 'agent_attested' : null),
       };
 
       // Map CSV columns to lead fields
