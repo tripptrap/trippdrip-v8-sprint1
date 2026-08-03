@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { spendPointsForAction } from "@/lib/pointsSupabase";
+import { spendPointsForAction, addPoints, getActionCost } from "@/lib/pointsSupabase";
 import { normalizePhone } from '@/lib/phone';
 
 export const dynamic = "force-dynamic";
@@ -56,10 +56,29 @@ async function parseCSV(buf: Buffer, delimiter = ","): Promise<Record<string, an
 }
 
 async function parsePDF(buf: Buffer) {
-  const pdfParse = await import("pdf-parse");
-  const pdf = (pdfParse as any).default || pdfParse;
-  const data = await pdf(buf);
-  return data.text || "";
+  // pdf-parse v2 is a different API from v1, and this was written against v1.
+  //
+  // v1 was `module.exports = pdfParse`, a callable. v2 exports named classes and
+  // has no default, so `(pdfParse as any).default || pdfParse` fell through to
+  // the module namespace object and `await pdf(buf)` threw "not a function".
+  // package.json has said `^2.4.5` the whole time, so **every PDF upload failed**
+  // — and points are spent before parsing, so each one charged 5 points for a
+  // crash.
+  //
+  // The `||` fallback is what hid it: written to tolerate both module shapes, it
+  // silently produced a non-callable instead of failing where the mistake was.
+  //
+  // Verified against a real PDF: `new PDFParse({ data }).getText()` returns
+  // `{ text }`. destroy() releases the worker — without it the handle leaks on
+  // every upload.
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: buf });
+  try {
+    const { text } = await parser.getText();
+    return text || "";
+  } finally {
+    await parser.destroy();
+  }
 }
 
 async function parseDOCX(buf: Buffer) {
@@ -115,6 +134,28 @@ function detectKind(name: string, type: string) {
   return "txt";
 }
 
+/**
+ * Give back the 5 points an upload was charged before it failed.
+ *
+ * Kept as a named helper so every failure path uses the same amount and the same
+ * wording, rather than each one open-coding a number that then drifts from
+ * POINT_COSTS.document_upload.
+ *
+ * Never throws: this runs while already handling a failure, and a refund that
+ * blows up would turn a 400 into a 500 and lose the original reason.
+ */
+async function refundUpload(reason: string): Promise<void> {
+  try {
+    const cost = getActionCost('document_upload', 1);
+    const result = await addPoints(cost, `Refund — document upload failed (${reason})`, 'earn');
+    if (!result.success) {
+      console.error(`Upload refund of ${cost} points FAILED — user was charged for nothing:`, result.error);
+    }
+  } catch (e) {
+    console.error('Upload refund threw:', e);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -140,30 +181,47 @@ export async function POST(req: NextRequest) {
 
     let leads: Lead[] = [];
 
-    if (kind === "csv" || kind === "tsv") {
-      const table = await parseCSV(buf, kind === "tsv" ? "\t" : ",");
-      leads = table.map(mapRow);
-    } else if (kind === "xlsx") {
-      const table = await parseXLSX(buf);
-      leads = table.map(mapRow);
-    } else if (kind === "json") {
-      try {
-        const jsonData = JSON.parse(buf.toString("utf8"));
-        const arr = Array.isArray(jsonData) ? jsonData : (jsonData.leads || []);
-        leads = arr.map(mapRow);
-      } catch {
-        return NextResponse.json({ error: "Invalid JSON format" }, { status: 400 });
+    // Points are spent above, before the file is even looked at, so anything
+    // that throws here has already charged the user 5 points for nothing. That
+    // is how the broken PDF path stayed invisible: it failed, it billed, and the
+    // person just saw an error and tried a different file.
+    //
+    // Refunding rather than moving the deduction: the check has to come first
+    // (nobody should be able to run AI extraction with a zero balance), so the
+    // only correct shape is charge-then-refund-on-failure.
+    try {
+      if (kind === "csv" || kind === "tsv") {
+        const table = await parseCSV(buf, kind === "tsv" ? "\t" : ",");
+        leads = table.map(mapRow);
+      } else if (kind === "xlsx") {
+        const table = await parseXLSX(buf);
+        leads = table.map(mapRow);
+      } else if (kind === "json") {
+        try {
+          const jsonData = JSON.parse(buf.toString("utf8"));
+          const arr = Array.isArray(jsonData) ? jsonData : (jsonData.leads || []);
+          leads = arr.map(mapRow);
+        } catch {
+          await refundUpload('invalid JSON');
+          return NextResponse.json({ error: "Invalid JSON format" }, { status: 400 });
+        }
+      } else if (kind === "pdf") {
+        const text = await parsePDF(buf);
+        leads = await aiExtractLeads(text);
+      } else if (kind === "docx") {
+        const text = await parseDOCX(buf);
+        leads = await aiExtractLeads(text);
+      } else {
+        // Plain text — use AI extraction
+        const text = buf.toString("utf8");
+        leads = await aiExtractLeads(text);
       }
-    } else if (kind === "pdf") {
-      const text = await parsePDF(buf);
-      leads = await aiExtractLeads(text);
-    } else if (kind === "docx") {
-      const text = await parseDOCX(buf);
-      leads = await aiExtractLeads(text);
-    } else {
-      // Plain text — use AI extraction
-      const text = buf.toString("utf8");
-      leads = await aiExtractLeads(text);
+    } catch (parseError: any) {
+      await refundUpload(parseError?.message || 'parse failed');
+      return NextResponse.json(
+        { error: `Could not read that ${kind.toUpperCase()} file. Your points have been refunded.` },
+        { status: 400 }
+      );
     }
 
     // Add tags and campaign to leads
