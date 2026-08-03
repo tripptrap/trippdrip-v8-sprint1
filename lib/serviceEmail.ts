@@ -66,10 +66,21 @@ class ServiceEmailClient {
 
   constructor() {
     this.baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    this.apiKey = process.env.SYSTEM_API_KEY;
+    // Trimmed for the same reason SENDGRID_API_KEY is (#101): a value pasted
+    // into Vercel with a trailing newline is invisible and compares unequal.
+    this.apiKey = process.env.SYSTEM_API_KEY?.trim();
   }
 
   private async send(type: ServiceEmailType, data: any): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+    // The key is now the route's only gate (it used to also accept any logged-in
+    // session, which was an open phishing relay — see the route's header). That
+    // makes a missing key a total, silent outage of every transactional email,
+    // so say so rather than letting it read as "sent nothing, no problem".
+    if (!this.apiKey) {
+      console.error(`SYSTEM_API_KEY is not set — service email "${type}" cannot be sent.`);
+      return { ok: false, error: 'SYSTEM_API_KEY is not configured' };
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}/api/email/service`, {
         method: 'POST',
