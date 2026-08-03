@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -195,12 +196,10 @@ export async function PUT(req: NextRequest) {
       }
 
       // Get user's primary Telnyx number
-      const { data: primaryNumberRow } = await supabase
-        .from('user_telnyx_numbers')
-        .select('phone_number')
-        .eq('user_id', user.id)
-        .eq('is_primary', true)
-        .single();
+      // The from-number is resolved per message inside the loop instead of once
+      // here (#122). A bulk send goes to leads in different places, so choosing
+      // one number up front defeats geo-routing for every recipient but the
+      // first — which is exactly what the Scale tier sells.
 
       // Calculate total credits needed
       const totalCredits = messages.reduce((sum, m) => sum + (m.credits_cost || 0), 0);
@@ -250,10 +249,13 @@ export async function PUT(req: NextRequest) {
           }
 
           // Send SMS via Telnyx
+          const fromNumber = await resolveFromNumber(adminClient, user.id, {
+            leadZipCode: lead.zip_code ?? null,
+          });
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: message.body,
-            from: primaryNumberRow?.phone_number || undefined,
+            from: fromNumber || undefined,
           });
 
           if (result.success) {

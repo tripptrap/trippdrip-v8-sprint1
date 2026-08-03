@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
-import { selectClosestNumber } from "@/lib/geo/selectClosestNumber";
+import { resolveFromNumber } from "@/lib/resolveFromNumber";
 import { detectSpam } from "@/lib/spam/detector";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { createNotification } from "@/lib/createNotification";
@@ -329,7 +329,7 @@ export async function POST(req: Request) {
         // Send via Telnyx API
         try {
           // Geo-route: pick closest number to lead's zip code
-          const geoFrom = await selectClosestNumber(user.id, lead.zip_code || null, supabase);
+          const geoFrom = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null });
           const effectiveFrom = geoFrom || fromNumber || '';
 
           // Check if this is the first message to this lead (for opt-out footer)

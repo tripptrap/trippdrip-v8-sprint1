@@ -4,6 +4,7 @@ import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { alertAdminsThrottled } from '@/lib/alerting';
 import { requireCronAuth } from '@/lib/cronAuth';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -139,15 +140,12 @@ async function handleCron(req: NextRequest) {
           continue;
         }
 
-        // Get user's primary Telnyx number for sending
-        const { data: userNumber } = await supabaseAdmin
-          .from('user_telnyx_numbers')
-          .select('phone_number')
-          .eq('user_id', event.user_id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .single();
+        // Shared resolver (#122) — this took whichever number was created first,
+        // ignoring the primary flag, geo, locks and rests alike.
+        const resolvedFrom = await resolveFromNumber(supabaseAdmin, event.user_id, {
+          leadZipCode: null,
+        });
+        const userNumber = resolvedFrom ? { phone_number: resolvedFrom } : null;
 
         if (!userNumber?.phone_number) {
           console.error(`Appointment reminder: No Telnyx number for user ${event.user_id}`);

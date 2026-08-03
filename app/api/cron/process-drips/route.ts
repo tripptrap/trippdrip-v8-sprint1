@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { alertAdminsThrottled } from '@/lib/alerting';
 import { requireCronAuth } from '@/lib/cronAuth';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -232,7 +233,7 @@ async function handleCron(req: NextRequest) {
         // Get lead info
         const { data: lead } = await supabaseAdmin
           .from('leads')
-          .select('id, phone, first_name, last_name, user_id, state')
+          .select('id, phone, first_name, last_name, user_id, state, zip_code')
           .eq('id', enrollment.lead_id)
           .single();
 
@@ -298,15 +299,12 @@ async function handleCron(req: NextRequest) {
         }
         message = guardrailResult.message;
 
-        // Get user's Telnyx number for sending
-        const { data: primaryNumber } = await supabaseAdmin
-          .from('user_telnyx_numbers')
-          .select('phone_number')
-          .eq('user_id', enrollment.user_id)
-          .eq('is_primary', true)
-          .single();
-
-        const fromNumber = primaryNumber?.phone_number || '';
+        // Shared resolver — geo, lock and rest all apply here now (#122).
+        // This took the primary unconditionally, so a Scale agent's extra
+        // numbers were never used for drip steps.
+        const fromNumber = (await resolveFromNumber(supabaseAdmin, enrollment.user_id, {
+          leadZipCode: lead?.zip_code ?? null,
+        })) || '';
         if (!fromNumber) {
           console.error(`📧 Drip: No from number for user ${enrollment.user_id}`);
           errors++;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,16 +32,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'A drip is already active for this thread' }, { status: 409 });
     }
 
-    // Get user's Telnyx number if not provided
+    // Number is chosen ONCE, here, and pinned to the drip (#122).
+    //
+    // process-ai-drips deliberately reuses `drip.from_number` for every step
+    // rather than resolving per message: an AI drip is one continuing
+    // conversation with one lead, and switching numbers mid-thread breaks
+    // threading on the handset and reads as a different sender. So the geo
+    // decision belongs at the start — which is what this now does, instead of
+    // taking the primary and ignoring where the lead actually is.
     let senderNumber = fromNumber;
     if (!senderNumber) {
-      const { data: primaryNumber } = await supabase
-        .from('user_telnyx_numbers')
-        .select('phone_number')
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('zip_code')
         .eq('user_id', user.id)
-        .eq('is_primary', true)
-        .single();
-      senderNumber = primaryNumber?.phone_number;
+        .eq('phone', phoneNumber)
+        .maybeSingle();
+      senderNumber =
+        (await resolveFromNumber(createServiceRoleClient(), user.id, {
+          leadZipCode: lead?.zip_code ?? null,
+        })) || undefined;
     }
 
     if (!senderNumber) {

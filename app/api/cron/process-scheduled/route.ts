@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { resolveFromNumber } from "@/lib/resolveFromNumber";
 import { alertAdminsThrottled } from '@/lib/alerting';
 import { requireCronAuth } from '@/lib/cronAuth';
 
@@ -220,14 +221,14 @@ async function processScheduledMessages(supabase: any) {
         }
       }
 
-      // Get user's primary Telnyx number
-      const { data: primaryNumber } = await supabase
-        .from('user_telnyx_numbers')
-        .select('phone_number')
-        .eq('user_id', message.user_id)
-        .eq('is_primary', true)
-        .eq('status', 'active')
-        .single();
+      // Routed through the shared resolver so this path honours geo-routing,
+      // locks and rests like every other one (#122). It previously took the
+      // primary unconditionally, so extra numbers did nothing for scheduled
+      // sends — most of the automated volume.
+      const resolvedFrom = await resolveFromNumber(supabase, message.user_id, {
+        leadZipCode: lead.zip_code,
+      });
+      const primaryNumber = resolvedFrom ? { phone_number: resolvedFrom } : null;
 
       // Send the message based on channel
       if (message.channel === 'sms') {

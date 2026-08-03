@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { checkSmsAllowed } from '@/lib/smsGuard';
-import { selectClosestNumber } from '@/lib/geo/selectClosestNumber';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 import { detectSpam } from '@/lib/spam/detector';
 import { isInternalCaller } from '@/lib/cronAuth';
 
@@ -120,7 +120,9 @@ export async function POST(req: NextRequest) {
         leadZipCode = lead?.zip_code || null;
       }
 
-      resolvedFrom = await selectClosestNumber(userId, leadZipCode, supabaseAdmin);
+      // Shared resolver rather than selectClosestNumber directly, so this path
+      // also honours the user's mode, locks and rests (#122).
+      resolvedFrom = await resolveFromNumber(supabaseAdmin, userId, { leadZipCode });
       if (resolvedFrom) {
         console.log('📍 Geo-routed to number:', resolvedFrom, 'for zip:', leadZipCode);
       }

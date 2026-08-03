@@ -6,6 +6,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -130,20 +131,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Resolve 'from' number: use provided, or fall back to user's first active number
+    // Resolve the from-number: an explicit one wins, otherwise the shared
+    // resolver (#122). This used to take whichever number was created first,
+    // which ignored the primary flag as well as geo, locks and rests.
     let resolvedFrom = fromPhone;
     if (!resolvedFrom && supabaseAdmin) {
-      const { data: userNumbers } = await supabaseAdmin
-        .from('user_telnyx_numbers')
-        .select('phone_number')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-      if (userNumbers && userNumbers.length > 0) {
-        resolvedFrom = userNumbers[0].phone_number;
-      }
+      resolvedFrom = (await resolveFromNumber(supabaseAdmin, user.id, {
+        leadZipCode: null,
+      })) || undefined;
     }
 
     if (!resolvedFrom) {
