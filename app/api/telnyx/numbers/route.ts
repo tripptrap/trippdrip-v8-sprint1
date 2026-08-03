@@ -146,6 +146,11 @@ export async function GET(req: NextRequest) {
       is_primary: num.is_primary || index === 0,
       status: num.status,
       capabilities: num.capabilities || { voice: true, sms: true, mms: true },
+      // The page has always branched on this to label a number local vs
+      // toll-free, and it was never returned — so every number, including the
+      // account's toll-free, rendered as "Your local number". Precisely the
+      // failure the comment above describes, still live in the same function.
+      number_type: num.number_type ?? null,
       purchased_at: num.created_at,
       locked_until: num.locked_until ?? null,
       rested_until: num.rested_until ?? null,
