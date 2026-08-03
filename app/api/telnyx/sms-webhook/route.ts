@@ -9,6 +9,7 @@ import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { exemptFromModeration } from '@/lib/smsModeration';
 import { consentFields } from '@/lib/leadConsent';
+import { normalizePhone } from '@/lib/phone';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 import { cancelPendingDripMessages } from '@/lib/drip/materialize';
 import { isAffirmative, isAwaitingConfirmation, markAwaitingConfirmation, confirmAndBookAppointment } from '@/lib/flows/completeFlow';
@@ -240,49 +241,58 @@ async function handleInboundSMS(payload: any) {
   // phone or lead lookup can route to the wrong tenant if two tenants have the same lead.
   let userId: string | null = null;
 
-  // Step 1: Look up the receiving number in user_telnyx_numbers to identify the tenant
-  const { data: telnyxNumber } = await supabaseAdmin
-    .from('user_telnyx_numbers')
-    .select('user_id')
-    .eq('phone_number', to)
-    .eq('status', 'active')
-    .single();
+  // One resolver, in the database, so the comparisons are normalised and the
+  // ambiguous case is refused rather than guessed (#111).
+  //
+  // The three inline steps this replaces both compared phone strings exactly.
+  // `leads.phone` holds whatever was imported while Telnyx always sends E.164,
+  // so a lead stored as `(813) 465-8966` was invisible and the inbound was
+  // silently dropped.
+  //
+  // The larger problem was the two sender-based steps existing at all in that
+  // form. They also used `.single()`, which errors on multiple rows — which
+  // accidentally avoided misattribution by dropping the message. Normalising
+  // alone would have removed that accident and started delivering one business's
+  // inbound to another's inbox. The resolver now returns `ambiguous` instead,
+  // and adds the pool-number lookup, which was never consulted at all.
+  const { data: resolved, error: resolveError } = await supabaseAdmin
+    .rpc('resolve_inbound_tenant', { p_to: to, p_from: from });
 
-  if (telnyxNumber) {
-    userId = telnyxNumber.user_id;
-    console.log('Found user via Telnyx number (to):', userId);
+  if (resolveError) {
+    console.error('Tenant resolution failed for inbound message:', resolveError);
   }
 
-  // Step 2: Fallback — check existing threads scoped to this user (or any user if not found)
-  if (!userId) {
-    const { data: existingThread } = await supabaseAdmin
-      .from('threads')
-      .select('user_id')
-      .eq('phone_number', from)
-      .single();
+  const match = Array.isArray(resolved) ? resolved[0] : resolved;
+  userId = match?.user_id ?? null;
 
-    if (existingThread) {
-      userId = existingThread.user_id;
-      console.log('Found user via existing thread:', userId);
-    }
-  }
-
-  // Step 3: Last fallback — lead lookup by sender phone
-  if (!userId) {
-    const { data: lead } = await supabaseAdmin
-      .from('leads')
-      .select('user_id')
-      .eq('phone', from)
-      .single();
-
-    if (lead) {
-      userId = lead.user_id;
-      console.log('Found user via lead:', userId);
-    }
+  if (userId) {
+    console.log(`Found user via ${match.matched_by}:`, userId);
   }
 
   if (!userId) {
-    console.error('Could not find user for incoming message. From:', from, 'To:', to);
+    // An unattributable inbound is a lead's reply that nobody will ever see, and
+    // Telnyx does not redeliver. Previously this was a console line on a
+    // serverless log nobody reads (#80 is the same failure).
+    const why = match?.ambiguous
+      ? `more than one account has ${from} as a contact, so there is no way to tell whose reply this is`
+      : `${to} is not a number on any account, and ${from} matches no existing conversation or contact`;
+
+    console.error('Could not find user for incoming message. From:', from, 'To:', to, '—', why);
+
+    await alertAdminsThrottled({
+      key: `inbound_unattributable:${match?.ambiguous ? 'ambiguous' : 'unknown'}`,
+      title: 'An inbound message could not be matched to an account',
+      body:
+        `A message from ${from} to ${to} could not be attributed: ${why}. Telnyx does not ` +
+        `redeliver, so this reply is lost and the account owner has no way to know someone ` +
+        `replied.` +
+        (match?.ambiguous
+          ? ' It was NOT delivered to a guess, deliberately — that would put a consumer message in the wrong business inbox.'
+          : ' Check whether the receiving number is still assigned in user_telnyx_numbers or number_pool.'),
+      data: { from, to, matched_by: match?.matched_by ?? null, ambiguous: !!match?.ambiguous },
+      windowMinutes: 60,
+    }).catch(err => console.error('Unattributable-inbound alert failed:', err));
+
     return;
   }
 
@@ -673,11 +683,20 @@ async function handleInboundSMS(payload: any) {
     if (messageBody && isOptIn(messageBody)) {
       console.log(`✅ Opt-in (re-subscribe) from ${from}`);
       try {
+        // Matched on `normalized_phone`, not `phone_number` (#111).
+        //
+        // add_to_dnc stores the caller's string verbatim in `phone_number` and
+        // the normalised form alongside it. An entry added by hand through
+        // /api/dnc/add as `(813) 465-8966` therefore does not equal the E.164
+        // `from` Telnyx sends — so this lookup missed, the START was not
+        // recognised as a re-subscribe, and someone who explicitly asked to be
+        // resubscribed stayed opted out. `normalized_phone` is the column that
+        // exists for this comparison.
         const { data: dncRow } = await supabaseAdmin
           .from('dnc_list')
           .select('id')
           .eq('user_id', userId)
-          .eq('phone_number', from)
+          .eq('normalized_phone', normalizePhone(from) ?? from)
           .maybeSingle();
 
         // Only treat this as a re-subscribe if they had actually opted out.
