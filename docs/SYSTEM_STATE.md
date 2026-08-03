@@ -1473,6 +1473,77 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Two rate limits that had never once fired (#128, 2026-08-03)
+
+`maxMessagesPerContact` and `cooldownMinutes` were offered in Settings, saved by users, and
+**blocked nothing, ever, on any account**. Both filtered on `.ilike('to_number', …)`.
+`to_number` is not a column on `public.messages` — it is `to_phone`.
+
+```
+SELECT count(*) FROM public.messages WHERE to_number IS NOT NULL;
+ERROR: column "to_number" does not exist
+```
+
+PostgREST returns 42703, neither call checked `error`, and the undefined results made both
+conditions unreachable:
+
+```ts
+const { count } = await …ilike('to_number', …)   // undefined
+if ((count || 0) >= maxPerContact)               // 0 >= 5 — never true
+
+const { data: last } = await …                   // null
+if (last) { … }                                  // never entered
+```
+
+Both now live in `lib/smsGuard`, so they run on all eight send paths rather than the one route
+they used to sit on. Matching is on exact E.164 candidates — the old leading-wildcard
+`%<last10>%` could not use an index under any circumstances. Added
+`idx_messages_user_tophone_created`; EXPLAIN confirms an Index Only Scan.
+
+### Merge the settings object, never replace it
+
+`campaigns/run` did `userSettings?.spam_protection || { …defaults }`. Live rows hold **four of
+eleven keys** (the column default), so taking the stored object wholesale left every advanced
+limit `undefined` — and `undefined > cap` is false, so its batch and campaign caps permitted
+everything for every real account.
+
+`telnyx/send-sms` and `smsGuard` both merge (`{ ...DEFAULTS, ...(stored || {}) }`). Any new
+reader of `spam_protection` must too.
+
+### `maxCampaignMessagesPerHour` is not hourly
+
+It compares the size of the current run to the cap and runs no query. Ten runs of 200 inside one
+hour all pass. The Settings copy now says so rather than implying a rolling window.
+
+### A deferral has to be written down
+
+`scheduled_messages.last_deferred_reason` / `last_deferred_at`, written by `noteDeferred()`.
+
+Every automated path already distinguished permanent from retryable and handled both correctly
+— but the retryable branch only logged to the console, so a message pending because of a rate
+cap or quiet hours was **indistinguishable from a cron that never ran**, the exact failure #61
+took months to find. A stale `last_deferred_at` on a still-pending row is now itself the signal
+that the cron has stopped.
+
+Deliberately not `error_message`: that field accompanies `status='failed'` and means the message
+is over. A routine overnight quiet-hours wait written there would render as a failure everywhere
+the message is listed.
+
+### Validation is pointless while the save reports success either way
+
+`POST /api/settings` wrote `spam_protection` with no validation — the form's ranges are HTML
+attributes, and these numbers are the send caps.
+
+`validateSpamProtection` now bounds each key, rejects non-integers (`NaN >= cap` is false, so an
+unusable cap fails **open**), and **allows 0 even though the form's `min` is 1** — `smsGuard`
+documents zero as the deliberate way to stop an account sending.
+
+That validation would have been invisible. `saveSettings` never inspected the response and
+caught its own fetch error, while all three callers showed a success message unconditionally —
+so the product said "saved!" for values the server had rejected, and dispatched `settingsUpdated`
+so the rest of the app re-rendered with them. **When adding server-side validation, check that
+the client can see a rejection at all before assuming the validation does anything.**
+
 ## A caller-supplied from-number is another tenant's property until proven otherwise (#127, 2026-08-03)
 
 `user_telnyx_numbers.phone_number` is **globally unique** — a number belongs to exactly one
