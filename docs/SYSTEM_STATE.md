@@ -283,6 +283,38 @@ Two more from the same run:
 denials. **Check `GET /v2/balance` first whenever a Telnyx call fails in a way that looks like
 permissions or compliance.**
 
+### Tier design and the throughput numbers behind it (#11, #121, 2026-08-02)
+
+**Growth ($30): 1 local number, LOW_VOLUME. Scale ($98): multiple local numbers, MIXED.**
+Scale's extra numbers are for **geographic coverage, not throughput** — a distinction that is easy
+to get backwards and expensive to get wrong.
+
+Confirmed against Telnyx rather than assumed:
+
+| AT&T — per campaign | SMS/min |   | T-Mobile — per **brand**, daily | SMS/day |
+|---|---|---|---|---|
+| LOW_VOLUME (Class T) | 75 |   | Sole Proprietor | 1,000 |
+| Standard, vetting 50–74 | 2,400 |   | **Basic — unvetted, the default** | **2,000** |
+| Standard, vetting 75–100 | 4,500 |   | Medium / High / Top | 10k / 40k / 200k |
+
+Verizon publishes nothing and filters on content. Toll-free is 1,200/min per number.
+
+**Throughput is not the binding constraint — credits are.** Growth's 3,000 credits/mo is ~100
+messages/day and Scale's 10,000 is ~333/day; both sit far below every cap above. LOW_VOLUME is
+adequate for Growth despite the name.
+
+**More numbers does not mean more throughput.** AT&T limits per *campaign*, T-Mobile per *brand* —
+neither per number. Ten numbers under one brand share the caps of one. If throughput ever needs to
+differentiate the tiers, the lever is **brand vetting** (unvetted = Basic = 2,000/day), not number
+count.
+
+One thing this design depends on that does not work yet:
+[#122](https://github.com/tripptrap/trippdrip-v8-sprint1/issues/122) — `selectClosestNumber` is
+wired into **2 of 8** send paths (`telnyx/send-sms`, `campaigns/run`). Scheduled sends, drips, AI
+drips, bulk and appointment reminders all use `is_primary`, so a Scale agent's extra numbers buy
+nothing on the automated paths. Same shape as the rate-limit gap in #121, and the same fix: one
+shared resolver rather than six hand-rolled `is_primary` lookups.
+
 ### Numbers are withheld until the business is registered (#1, 2026-07-31)
 
 Onboarding now collects the carrier-registration details in the existing "Set Up Your Business"
