@@ -1006,16 +1006,49 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
     status = 'failed';
   }
 
-  console.log('📬 Telnyx delivery status:', { messageSid, status, eventType });
+  // Why it failed, not just that it did (audit, 2026-08-03).
+  //
+  // This handler wrote `status` and discarded `payload.errors`, so every failure
+  // collapsed into one undifferentiated "failed". These want opposite responses:
+  //
+  //   destination unreachable   the number is bad — stop retrying it
+  //   blocked by carrier        content or sender reputation
+  //   unregistered sender       10DLC registration, nothing to do with the text
+  //
+  // Telling a dead phone number from carriers rejecting the whole account is the
+  // distinction that matters most here, and it was the one thing not recorded.
+  //
+  // `errors?.[0]?.detail` matches how send-sms, purchase-number, search-numbers
+  // and port-number already read Telnyx errors — one convention, not a second.
+  const telnyxError = payload.errors?.[0];
+  const errorCode = status === 'failed' ? (telnyxError?.code ?? null) : null;
+  const errorMessage =
+    status === 'failed' ? (telnyxError?.detail || telnyxError?.title || null) : null;
 
-  // Update message status
-  const { error } = await supabaseAdmin
+  console.log('📬 Telnyx delivery status:', { messageSid, status, eventType, errorCode, errorMessage });
+
+  // Written on every event, not only on failure: a message that fails and is
+  // then redelivered must not keep a stale reason attached to a delivered row.
+  const { data: updated, error } = await supabaseAdmin
     .from('messages')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('message_sid', messageSid);
+    .update({
+      status,
+      error_code: errorCode ? String(errorCode) : null,
+      error_message: errorMessage,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('message_sid', messageSid)
+    .select('id');
 
   if (error) {
     console.error('Error updating message status:', error);
+  } else if (!updated?.length) {
+    // supabase-js reports no error when an UPDATE matches nothing, so without
+    // this a webhook for a message we never stored looks like a success. That
+    // is the same silent-zero-row failure as #110.
+    console.warn(`⚠️ Delivery status for unknown message_sid ${messageSid} — no row updated`);
+  } else if (status === 'failed') {
+    console.error(`❌ Message ${messageSid} failed: ${errorCode ?? 'no code'} — ${errorMessage ?? 'no detail'}`);
   } else {
     console.log('✅ Message status updated to:', status);
   }
