@@ -32,6 +32,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { selectClosestNumber } from './geo/selectClosestNumber';
+import { getNumberCapacity } from './numberCapacity';
 
 export type NumberSelectionMode = 'geo' | 'primary';
 
@@ -57,7 +58,18 @@ export type NumberSelectionMode = 'geo' | 'primary';
  */
 export type FromNumberResult =
   | { ok: true; number: string }
-  | { ok: false; reason: 'none_owned' | 'lookup_failed'; detail: string; retryable: boolean };
+  | {
+      ok: false;
+      /**
+       * `all_exhausted` is temporary — every number the account holds has passed
+       * a hard per-number ceiling and the window has to roll before any of them
+       * can be used again (#123 gap 2). Retryable, so the crons defer rather
+       * than failing the work.
+       */
+      reason: 'none_owned' | 'lookup_failed' | 'all_exhausted';
+      detail: string;
+      retryable: boolean;
+    };
 
 export interface ResolveOptions {
   /** Lead's ZIP, used in `geo` mode. Absent is fine — falls back to primary. */
@@ -166,12 +178,59 @@ export async function resolveFromNumber(
     return { ok: true, number: (rows.find(n => n.is_primary) ?? rows[0]).phone_number };
   }
 
-  // 2. A lock beats everything, including geo.
-  const locked = usable.find(n => inFuture(n.locked_until));
+  // 2. Per-number capacity (#123 gap 2).
+  //
+  // Two thresholds doing different jobs — see lib/numberCapacity for why a
+  // single hard cap would have given single-number accounts nothing:
+  //
+  //   exhausted     past a hard ceiling. Removed from the pool entirely. The
+  //                 ceilings sit ABOVE the per-account caps, so for a number
+  //                 used by one tenant the account cap always binds first and
+  //                 this cannot fire. It exists for a recycled pool number,
+  //                 whose traffic spans tenants and which no per-account cap
+  //                 can see.
+  //   heavilyUsed   past a soft threshold. Avoided while anything else is
+  //                 available. This is where a Scale account's extra numbers
+  //                 earn their keep: load spreads before anything is blocked.
+  //
+  // Counted across ALL tenants, deliberately. A pool number carries its history
+  // to whoever holds it next.
+  const capacity = await getNumberCapacity(supabase, usable.map(n => n.phone_number));
+
+  const withCapacity = usable.filter(n => !capacity.get(n.phone_number)?.exhausted);
+
+  if (!withCapacity.length) {
+    // Unlike rest — which the agent chose, and which therefore falls back
+    // rather than losing a send — a ceiling is a safety limit. Falling back
+    // here would defeat the only thing it does.
+    const worst = capacity.get(usable[0].phone_number);
+    console.warn(`resolveFromNumber: every number for ${userId} is at its send ceiling`);
+    return {
+      ok: false,
+      reason: 'all_exhausted',
+      detail:
+        `Every one of your numbers has hit its sending ceiling` +
+        (worst?.reason ? ` (${worst.reason})` : '') +
+        `. Sending resumes automatically as the window clears.`,
+      retryable: true,
+    };
+  }
+
+  // 3. A lock beats everything, including geo — but not the ceiling above, which
+  //    is why this runs after it. "Keep using this one" is a routing preference;
+  //    the ceiling is there to stop a number being damaged.
+  const locked = withCapacity.find(n => inFuture(n.locked_until));
   if (locked) return { ok: true, number: locked.phone_number };
 
   // One number and nothing to decide.
-  if (usable.length === 1) return { ok: true, number: usable[0].phone_number };
+  if (withCapacity.length === 1) return { ok: true, number: withCapacity[0].phone_number };
+
+  // Prefer numbers under the soft threshold, but only while some exist — if
+  // every number is heavily used they are all equally valid again and the
+  // normal rules below decide.
+  const light = withCapacity.filter(n => !capacity.get(n.phone_number)?.heavilyUsed);
+  const pool = light.length ? light : withCapacity;
+  if (pool.length === 1) return { ok: true, number: pool[0].phone_number };
 
   // 3. Mode.
   let mode = options.mode;
@@ -186,13 +245,15 @@ export async function resolveFromNumber(
 
   if (mode === 'geo' && options.leadZipCode) {
     const closest = await selectClosestNumber(userId, options.leadZipCode, supabase);
-    // Only accept it if it is not resting — selectClosestNumber knows nothing
-    // about rest state, so filtering here is what keeps that guarantee true.
-    if (closest && usable.some(n => n.phone_number === closest)) {
+    // Checked against `pool`, not `usable`. selectClosestNumber knows nothing
+    // about rest or capacity, so filtering here is the only thing keeping both
+    // guarantees true — matching against `usable` would hand back a number this
+    // function had just excluded for being at its ceiling.
+    if (closest && pool.some(n => n.phone_number === closest)) {
       return { ok: true, number: closest };
     }
   }
 
-  // 4. Primary, else anything usable.
-  return { ok: true, number: (usable.find(n => n.is_primary) ?? usable[0]).phone_number };
+  // 4. Primary, else anything left in the pool.
+  return { ok: true, number: (pool.find(n => n.is_primary) ?? pool[0]).phone_number };
 }

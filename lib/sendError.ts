@@ -31,6 +31,7 @@ export type SendBlockKind =
   | 'spam'
   | 'no_credits'
   | 'no_number'
+  | 'numbers_exhausted'
   | 'not_allowed'
   | 'temporary'
   | 'unknown';
@@ -62,6 +63,7 @@ const TITLES: Record<SendBlockKind, string> = {
   spam: 'Flagged as spam risk',
   no_credits: 'Out of credits',
   no_number: 'No sending number',
+  numbers_exhausted: 'Numbers at capacity',
   not_allowed: 'Not allowed',
   temporary: 'Temporary problem',
   unknown: 'Could not send',
@@ -113,6 +115,13 @@ export function parseSendError(status: number, body: any): SendBlock {
   }
   if (reason === 'none_owned') {
     return { kind: 'no_number', title: TITLES.no_number, detail, retryable: false };
+  }
+  // Distinct from 'temporary': the account owns numbers and they are fine, they
+  // have simply taken as much as one number should in the window (#123 gap 2).
+  // Telling someone their numbers are at capacity is actionable; "temporary
+  // problem" is not.
+  if (reason === 'all_exhausted') {
+    return { kind: 'numbers_exhausted', title: TITLES.numbers_exhausted, detail, retryable: true };
   }
   if (reason === 'lookup_failed' || reason === 'check_failed' || status === 503) {
     return { kind: 'temporary', title: TITLES.temporary, detail, retryable: true };
