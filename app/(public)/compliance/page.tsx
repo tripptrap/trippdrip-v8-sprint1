@@ -42,23 +42,29 @@ export default function CompliancePage() {
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>Transparent communication about message frequency and costs</li>
-            <li>Immediate processing of STOP requests (within 10 business days)</li>
+            <li>Immediate processing of STOP requests — applied on receipt, permanently, before any queued message can be delivered</li>
             <li>Support for HELP keyword to provide customer service information</li>
-            <li>Age-gating for age-restricted content or services</li>
+            <li>No age-restricted content — HyveWyre is not used for age-gated programs</li>
             <li>No sharing of mobile numbers without explicit consent</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-3">Do Not Call Registry</h2>
+          <h2 className="text-xl font-semibold mb-3">Do-Not-Contact Suppression</h2>
           <p className="text-slate-700 dark:text-slate-300 mb-3">
-            HyveWyre™ helps you respect the National Do Not Call Registry:
+            HyveWyre maintains its own suppression list, which is separate from the National Do Not
+            Call Registry and is enforced by the platform on every message:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Built-in DNC scrubbing capabilities (coming soon)</li>
-            <li>Existing business relationship (EBR) exemptions tracking</li>
-            <li>Documented consent overrides DNC restrictions</li>
-            <li>Regular DNC list updates and maintenance</li>
+            <li>Anyone who replies STOP — or any of a broad set of equivalent phrases — is suppressed
+            immediately and permanently</li>
+            <li>The list is checked before every outbound message, on every sending path, and the
+            check fails closed: if it cannot be read, the message is not sent</li>
+            <li>Suppression cannot be removed, overridden or worked around by a business using the
+            platform. Only the recipient can reverse it, by replying START</li>
+            <li>HyveWyre does not scrub against the National Do Not Call Registry. Checking that
+            registry, and relying on any exemption to it, remains the responsibility of the business
+            sending the messages</li>
           </ul>
         </section>
 

@@ -5,6 +5,7 @@ import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { checkSmsAllowed, noteDeferred } from "@/lib/smsGuard";
 import { moderateOutbound } from "@/lib/smsModeration";
+import { withOptOutFooterIfFirst } from "@/lib/optOutFooter";
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = "force-dynamic";
@@ -282,6 +283,15 @@ export async function PUT(req: NextRequest) {
           // had. A block is permanent (identical text scores identically), so
           // the row is cancelled with a readable reason rather than left pending
           // for a cron that would reject it on every run.
+          // First-contact opt-out footer (#131) — see process-scheduled. Moderation
+          // still scores the agent's own text, not our appended footer.
+          const bulkBody = await withOptOutFooterIfFirst(
+            adminClient,
+            user.id,
+            lead.phone,
+            message.body
+          );
+
           const moderation = await moderateOutbound(adminClient, user.id, message.body);
           if (!moderation.allowed) {
             console.log(`Bulk send: blocked ${message.id} by moderation — score ${moderation.spamScore}`);
@@ -298,7 +308,7 @@ export async function PUT(req: NextRequest) {
 
           const result = await sendTelnyxSMS({
             to: lead.phone,
-            message: message.body,
+            message: bulkBody,
             from: fromNumber,
             moderation,
           });

@@ -65,7 +65,7 @@ export default function TermsOfServicePage() {
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>Obtaining proper consent before sending messages (TCPA compliance)</li>
             <li>Including opt-out mechanisms in all marketing messages</li>
-            <li>Honoring opt-out requests within 10 business days</li>
+            <li>Honoring opt-out requests. The platform applies them immediately and permanently on receipt, and you may not override, remove or work around a suppression.</li>
             <li>Maintaining records of consent for regulatory purposes</li>
             <li>Complying with all applicable telecommunications laws and regulations</li>
           </ul>
@@ -81,7 +81,7 @@ export default function TermsOfServicePage() {
             <li>Message frequency varies by program and by your interaction with the sender.</li>
             <li>Message and data rates may apply, depending on your mobile carrier plan.</li>
             <li>Consent to receive SMS messages is not a condition of any purchase.</li>
-            <li>Reply <strong>STOP</strong> at any time to opt out of a messaging program. You will receive one final message confirming your opt-out, after which no further messages will be sent.</li>
+            <li>Reply <strong>STOP</strong> at any time to opt out of a messaging program. Your opt-out is applied immediately on receipt and no further messages will be sent. Your mobile carrier may send its own confirmation.</li>
             <li>Reply <strong>HELP</strong> at any time for assistance, or contact support@hyvewyre.com.</li>
             <li>Reply <strong>START</strong> to re-subscribe after a previous opt-out.</li>
             <li>Carriers are not liable for delayed or undelivered messages.</li>

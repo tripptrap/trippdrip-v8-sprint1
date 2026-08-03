@@ -124,7 +124,7 @@
       <div class="step-number">4</div>
       <div class="step-content">
         <h4>Consent Logged with Timestamp</h4>
-        <p>Upon form submission, consent is recorded in our database with timestamp, phone number, source URL, and IP address for compliance records.</p>
+        <p>Upon form submission, consent is recorded with the UTC timestamp, the phone number provided, the originating IP address, the browser user agent, and a verbatim copy of the disclosure text the consumer agreed to. The disclosure text is stored per record, so the exact wording shown at the time of consent can be reproduced for any individual contact.</p>
       </div>
     </div>
 
@@ -133,23 +133,25 @@
       <p><span class="label">Timestamp:</span> <span class="value">2026-02-05T15:23:47.000Z</span></p>
       <p><span class="label">Phone:</span> <span class="value">+14075551234</span></p>
       <p><span class="label">Consent Type:</span> <span class="value">SMS_OPT_IN</span></p>
-      <p><span class="label">Source URL:</span> <span class="value">https://agent.hyvewyre.com/contact</span></p>
-      <p><span class="label">Disclosure Text:</span> <span class="value">"I agree to receive SMS messages from this business..."</span></p>
+      <p><span class="label">IP Address:</span> <span class="value">203.0.113.42</span></p>
+      <p><span class="label">User Agent:</span> <span class="value">Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) ...</span></p>
+      <p><span class="label">Source:</span> <span class="value">branded_opt_in_page</span></p>
+      <p><span class="label">Disclosure Text:</span> <span class="value">"I agree to receive SMS text messages from {BusinessName} at the phone number provided, including follow-up messages, appointment reminders, account notifications, and promotional and marketing messages. Message and data rates may apply. Message frequency varies. Consent is not a condition of purchase. Your mobile opt-in information will not be shared with third parties for marketing or promotional purposes. Reply STOP to unsubscribe or HELP for help."</span></p>
       <p><span class="label">Checkbox Default:</span> <span class="value">UNCHECKED (required affirmative action)</span></p>
       <p><span class="label">User Action:</span> <span class="value">CHECKED</span></p>
     </div>
 
     <h2>5. Opt-Out Mechanism</h2>
-    <p>All messages include opt-out instructions. The platform automatically processes the following keywords:</p>
+    <p>The platform processes opt-out requests automatically and immediately, on receipt, before any further message can be queued. It recognises a deliberately broad set of phrases rather than the single required keyword:</p>
     <ul>
-      <li><strong>STOP</strong> - Immediately unsubscribes the recipient and adds to Do-Not-Call list</li>
-      <li><strong>HELP</strong> - Sends assistance information with support contact details</li>
-      <li><strong>START / YES</strong> - Re-subscribes a previously opted-out number (if requested)</li>
+      <li><strong>STOP</strong>, <strong>UNSUBSCRIBE</strong>, <strong>QUIT</strong>, <strong>END</strong>, <strong>HALT</strong>, <strong>OPT OUT</strong>, <strong>OPTOUT</strong>, <strong>REMOVE ME</strong>, <strong>TAKE ME OFF</strong>, <strong>STOP TEXTING</strong>, <strong>DON'T TEXT</strong>, <strong>NO MORE TEXTS</strong>, <strong>LEAVE ME ALONE</strong> - the sender is added to the Do-Not-Call list immediately and permanently blocked from all further messages</li>
+      <li><strong>HELP</strong>, <strong>INFO</strong> - returns the business name and a support contact. Answered for every sender, including those who have already opted out</li>
+      <li><strong>START</strong>, <strong>UNSTOP</strong>, <strong>YES</strong> - re-subscribes a number that previously opted out, at that person's request</li>
     </ul>
 
     <div class="info-box">
-      <h4>Automatic Opt-Out Response</h4>
-      <p>"You have been unsubscribed and will no longer receive messages. Reply START to resubscribe."</p>
+      <h4>Opt-out is permanent and enforced at the platform</h4>
+      <p>An opt-out is recorded on the Do-Not-Call list, which is checked before every outbound message on every sending path. The check fails closed: if the list cannot be read, the message is not sent. A business using this platform cannot remove an entry, override it, or message a suppressed number.</p>
     </div>
 
     <h2>6. First Message Compliance</h2>
@@ -160,14 +162,20 @@
     </div>
 
     <h2>7. Platform-Level Enforcement</h2>
-    <p>HyveWyre enforces consent requirements at the platform level:</p>
+    <p>The following controls are enforced by the platform on every outbound message, on every sending path, and cannot be disabled or bypassed by a business using it:</p>
     <ul>
-      <li>Contacts cannot receive messages unless SMS consent is recorded</li>
-      <li>Do-Not-Call list is maintained and checked before every message</li>
-      <li>STOP keyword processing is automatic and immediate</li>
-      <li>Consent records are retained for compliance auditing</li>
-      <li>Agents cannot bypass consent requirements</li>
+      <li><strong>Do-Not-Call suppression.</strong> The list is checked before every message and the check fails closed - if it cannot be read, the message is not sent.</li>
+      <li><strong>Immediate opt-out processing.</strong> Recognised on receipt across the phrase set in section 5, recorded permanently, and applied before any queued message can be delivered.</li>
+      <li><strong>HELP is always answered</strong>, including for numbers that have opted out.</li>
+      <li><strong>Content screening.</strong> Every outbound message is scored before sending, and high-risk content is refused.</li>
+      <li><strong>Volume limits</strong> per business, per number and across the platform, which tighten automatically when a business's opt-out rate rises and relax as it recovers.</li>
+      <li><strong>Consent records are retained</strong> with the verbatim disclosure text, timestamp and IP address, and can be produced for any contact who opted in through the form described above.</li>
     </ul>
+
+    <div class="info-box">
+      <h4>Scope of these controls</h4>
+      <p>The controls listed above apply to every message the platform sends. Consent itself is collected by each business from its own contacts, using the form described in section 3. Each business is responsible for the lawful basis on which it contacts a given person, and warrants that it holds prior express written consent, in the terms it accepts when it creates an account.</p>
+    </div>
 
     <div class="footer">
       <p>HyveWyre LLC | <a href="mailto:support@hyvewyre.com" style="color: #22d3ee;">support@hyvewyre.com</a></p>

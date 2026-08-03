@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdmin, type SupabaseClient } from '@supab
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
 import { checkSmsAllowed, noteDeferred } from "@/lib/smsGuard";
+import { withOptOutFooterIfFirst } from "@/lib/optOutFooter";
 import { moderateOutbound, type ModerationDecision } from "@/lib/smsModeration";
 import { resolveFromNumber } from "@/lib/resolveFromNumber";
 import { alertAdminsThrottled } from '@/lib/alerting';
@@ -301,7 +302,17 @@ async function processScheduledMessages(supabase: any) {
         }
 
         // Send SMS via Telnyx
-        const smsResult = await sendSMS(supabase, message.user_id, lead.phone, message.body, primaryNumber?.phone_number);
+        // First-contact opt-out footer (#131). This path had none, so a
+        // scheduled message could be an agent's first contact with a lead and
+        // carry no opt-out instruction — while the public compliance evidence
+        // stated that every first message does.
+        const scheduledBody = await withOptOutFooterIfFirst(
+          supabase,
+          message.user_id,
+          lead.phone,
+          message.body
+        );
+        const smsResult = await sendSMS(supabase, message.user_id, lead.phone, scheduledBody, primaryNumber?.phone_number);
 
         if (smsResult.success) {
           // CRIT-1: Atomic credit deduction via RPC — prevents race condition from read-then-write
