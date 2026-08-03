@@ -77,6 +77,46 @@ const inFuture = (ts: string | null | undefined): boolean =>
   !!ts && Date.parse(ts) > Date.now();
 
 /**
+ * Does this account actually hold this number? (#127)
+ *
+ * `user_telnyx_numbers.phone_number` is globally unique, so a number belongs to
+ * exactly one tenant at a time. A route that accepts a caller-supplied number
+ * without this check will happily send from **another tenant's** number,
+ * attributing the traffic — and any complaint or opt-out it earns — to them.
+ *
+ * `telnyx/send-sms` had this check inline and correct; `campaigns/run` and
+ * `ai-drip/start` accepted the number raw. Shared here so the next route that
+ * takes a number from a request body has one obvious thing to call, rather than
+ * a check to remember to reimplement.
+ *
+ * Deliberately ownership only. An agent who explicitly picks one of their own
+ * numbers has made a deliberate choice, so this does not also refuse rested or
+ * locked numbers — that would override the person on whose behalf rest exists.
+ */
+export async function ownsNumber(
+  supabase: SupabaseClient,
+  userId: string,
+  phoneNumber: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('user_telnyx_numbers')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('phone_number', phoneNumber)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (error) {
+    // Fails CLOSED. "Cannot tell whether they own this number" must not permit
+    // sending from it — unlike resolveFromNumber, where a lookup failure means
+    // falling back to a number we would have chosen anyway.
+    console.error(`ownsNumber: lookup failed for ${userId} / ${phoneNumber}:`, error);
+    return false;
+  }
+  return !!data;
+}
+
+/**
  * @param supabase service-role client — several callers are crons acting for
  *                 another user, and `user_telnyx_numbers` is under RLS.
  * @returns the chosen number, or why one could not be chosen. See

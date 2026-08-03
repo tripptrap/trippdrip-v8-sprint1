@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { resolveFromNumber } from '@/lib/resolveFromNumber';
+import { resolveFromNumber, ownsNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +40,29 @@ export async function POST(req: NextRequest) {
     // threading on the handset and reads as a different sender. So the geo
     // decision belongs at the start — which is what this now does, instead of
     // taking the primary and ignoring where the lead actually is.
+    //
+    // ── Why the caller-supplied number is checked (#127) ─────────────────────
+    //
+    // `fromNumber` came straight off the request body, and because a truthy
+    // value short-circuits the resolver below, **nothing validated it**. It was
+    // then written to `ai_drips.from_number` and reused by process-ai-drips for
+    // every message in the sequence.
+    //
+    // So a request naming another tenant's number would have sent an entire drip
+    // from it, attributing the traffic — and any opt-out it earned — to them.
+    // The same hole as campaigns/run, but persisted and replayed rather than
+    // affecting a single send.
     let senderNumber = fromNumber;
+    if (senderNumber) {
+      const owned = await ownsNumber(createServiceRoleClient(), user.id, senderNumber);
+      if (!owned) {
+        console.error('❌ AI drip start with an unowned number:', { userId: user.id, fromNumber: senderNumber });
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to send from this phone number' },
+          { status: 403 }
+        );
+      }
+    }
     if (!senderNumber) {
       const { data: lead } = await supabase
         .from('leads')

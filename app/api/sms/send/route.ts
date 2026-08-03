@@ -7,7 +7,7 @@ import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { moderateOutbound } from '@/lib/smsModeration';
-import { resolveFromNumber } from '@/lib/resolveFromNumber';
+import { resolveFromNumber, ownsNumber } from '@/lib/resolveFromNumber';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     // Support both old and new parameter formats
     const toPhone = body.toPhone || body.to;
     const messageBody = body.messageBody || body.message;
-    const fromPhone = body.from; // Telnyx will use number from messaging profile if not provided
+    const fromPhone = body.from; // Validated for ownership below before it is trusted (#127)
     const { leadId, campaignId, templateId, isAutomated = false, isBulk = false, channel = 'sms', mediaUrls } = body;
 
     // Validate inputs
@@ -154,7 +154,23 @@ export async function POST(req: NextRequest) {
     // to return 400 after a point had already been spent, with no refund — rare
     // while the only cause was owning no numbers, but a guaranteed way to burn
     // points once a temporary lookup failure became a reportable outcome.
+    //
+    // An explicit number short-circuits the resolver, so until #127 **nothing
+    // validated it**. `phone_number` is globally unique, so an unowned value is
+    // another tenant's number — sending from it attributes the traffic, and any
+    // opt-out it earns, to them. `telnyx/send-sms` has had this check all along;
+    // this route and ai-drip/start did not.
     let resolvedFrom = fromPhone;
+    if (resolvedFrom && supabaseAdmin) {
+      const owned = await ownsNumber(supabaseAdmin, user.id, resolvedFrom);
+      if (!owned) {
+        console.error('❌ sms/send with an unowned number:', { userId: user.id, from: resolvedFrom });
+        return NextResponse.json(
+          { error: 'You do not have permission to send from this phone number' },
+          { status: 403 }
+        );
+      }
+    }
     if (!resolvedFrom && supabaseAdmin) {
       const resolved = await resolveFromNumber(supabaseAdmin, user.id, { leadZipCode: null });
       if (!resolved.ok) {

@@ -61,7 +61,6 @@ export async function POST(req: Request) {
     const campaignName: string = body?.campaignName ? String(body.campaignName).trim() : "";
     const messageTemplate: string = body?.message || "";
     const sendSMS: boolean = body?.sendSMS === true;
-    const fromNumber: string = body?.fromNumber || "";
 
     const checkSpam: boolean = body?.checkSpam !== false;
 
@@ -338,11 +337,13 @@ export async function POST(req: Request) {
         try {
           // Geo-route: pick closest number to lead's zip code
           //
-          // A failure here used to fall through to `fromNumber` (unvalidated,
-          // straight from the request body — see #127) and then to '', which
+          // A failure here used to fall through to a `fromNumber` read straight
+          // from the request body with no ownership check, and then to '', which
           // sendTelnyxSMS turned into a profile-pool send from a number nobody
-          // chose (#125). Now it records the failure against this lead and moves
-          // on, so a campaign does not silently send from arbitrary numbers.
+          // chose (#125). That body field is now gone entirely (#127): this
+          // route geo-routes per lead, so letting the caller name a number was
+          // never a feature — only an unvalidated way to override the routing.
+          // Now a failure is recorded against this lead and the run continues.
           const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null });
           if (!resolved.ok) {
             console.error(`Campaign: no sending number for ${lead.phone} — ${resolved.reason}`);
