@@ -303,6 +303,13 @@ async function handleCron(req: NextRequest) {
             to_phone: leadPhone,
             is_automated: true,
             automation_source: 'appointment_reminder',
+            // The delivery webhook matches on `.eq('message_sid', ...)`, so
+            // without it this row is stuck at 'sent' for ever — 'delivered' and
+            // 'failed' never land, and every reminder is excluded from the
+            // analytics delivery rate. Same omission as #61, still present on
+            // this path (#126).
+            message_sid: sendResult.messageSid,
+            provider: 'telnyx',
             created_at: new Date().toISOString(),
           });
 

@@ -298,6 +298,12 @@ export async function PUT(req: NextRequest) {
                 user_id: user.id,
                 lead_id: message.lead_id,
                 direction: 'outbound',
+                // Previously omitted (#126). from_phone is what attributes a send
+                // to a number: without it this row is missing from the `sent`
+                // denominator in get_number_health_stats, so bulk volume inflated
+                // the opt-out rate of whichever number actually sent it.
+                from_phone: fromNumber ?? null,
+                to_phone: lead.phone,
                 content: message.body,
                 body: message.body,
                 channel: 'sms',
@@ -305,6 +311,11 @@ export async function PUT(req: NextRequest) {
                 points_cost: message.credits_cost,
                 is_automated: true,
                 automation_source: 'scheduled_bulk',
+                // The delivery webhook matches on message_sid, so without it this
+                // row can never leave 'sent' and every bulk message is excluded
+                // from the analytics delivery rate (#61).
+                message_sid: result.messageSid,
+                provider: 'telnyx',
               });
 
             if (msgInsertError) {

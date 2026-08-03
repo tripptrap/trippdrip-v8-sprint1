@@ -310,6 +310,14 @@ async function processScheduledMessages(supabase: any) {
               lead_id: message.lead_id,
               thread_id: threadId,
               direction: 'outbound',
+              // Both phone columns, previously omitted (#126). Without
+              // from_phone this send is invisible to get_number_health_stats,
+              // which computes opt_out_rate as opt_outs/sent over rows that HAVE
+              // a from_phone — so scheduled volume was missing from the
+              // denominator and inflated every number's opt-out rate, on the
+              // page that tells the agent to rest a number at 5%.
+              from_phone: primaryNumber?.phone_number ?? null,
+              to_phone: lead.phone,
               content: message.body,
               body: message.body,
               channel: 'sms',
@@ -370,20 +378,32 @@ async function processScheduledMessages(supabase: any) {
             .update({ credits: userSettings.credits - message.credits_cost })
             .eq('id', message.user_id);
 
-          await supabase
+          // `sender` and `credits_cost` are not columns on public.messages — the
+          // live table has points_cost, and `content` is NOT NULL (#126).
+          // Postgres rejects the whole INSERT for an unknown column, and this
+          // call never destructured `error`, so every scheduled email recorded
+          // nothing at all while the row was marked sent.
+          const { error: emailMsgInsertError } = await supabase
             .from('messages')
             .insert({
               user_id: message.user_id,
               lead_id: message.lead_id,
               direction: 'outbound',
-              sender: 'agent',
+              content: message.body,
               body: message.body,
               channel: 'email',
               status: 'sent',
-              credits_cost: message.credits_cost,
+              points_cost: message.credits_cost,
               is_automated: true,
               automation_source: 'scheduled',
             });
+
+          if (emailMsgInsertError) {
+            console.error(
+              `❌ Scheduled email ${message.id} sent but failed to record it:`,
+              emailMsgInsertError
+            );
+          }
 
           await supabase
             .from('scheduled_messages')
@@ -551,19 +571,32 @@ async function processScheduledCampaigns(supabase: any) {
               console.error(`❌ Campaign batch message sent for campaign ${campaign.id} but ${creditsNeeded} credits NOT deducted for user ${campaign.user_id}:`, batchDeductError);
             }
 
-            // Create message record with automation tracking
-            await supabase
+            // Three of the columns this used to write — `sender`,
+            // `credits_cost` and `segments` — do not exist on public.messages.
+            // Postgres rejects the entire INSERT when any column is unknown, and
+            // the result was never destructured, so **every campaign-batch send
+            // recorded nothing at all** (#126).
+            //
+            // Those sends were therefore invisible to `get_send_counts`, which is
+            // what enforces the per-account rate limit — a campaign batch could
+            // run at any size without moving the counter that is supposed to cap
+            // it — and invisible to number health and analytics.
+            //
+            // `segments` has nowhere to go and is dropped rather than invented;
+            // it is recomputed from the body wherever it is actually needed.
+            const { error: batchMsgInsertError } = await supabase
               .from('messages')
               .insert({
                 user_id: campaign.user_id,
                 lead_id: leadId,
                 direction: 'outbound',
-                sender: 'agent',
+                from_phone: campaignPrimaryNumber?.phone_number ?? null,
+                to_phone: lead.phone,
+                content: campaign.message,
                 body: campaign.message,
                 channel: 'sms',
                 status: 'sent',
-                credits_cost: creditsNeeded,
-                segments,
+                points_cost: creditsNeeded,
                 is_automated: true,
                 automation_source: 'bulk_campaign',
                 campaign_id: campaign.id,
@@ -572,6 +605,13 @@ async function processScheduledCampaigns(supabase: any) {
                 message_sid: smsResult.messageSid,
                 provider: 'telnyx',
               });
+
+            if (batchMsgInsertError) {
+              console.error(
+                `❌ Campaign ${campaign.id} sent to ${lead.phone} but failed to record it:`,
+                batchMsgInsertError
+              );
+            }
 
             // Update lead last_interaction_at
             await supabase

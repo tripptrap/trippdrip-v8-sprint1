@@ -273,7 +273,11 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      await supabase.from('messages').insert({
+      // Checked, not fire-and-forget. supabase-js returns { error } rather than
+      // throwing, so an unchecked insert fails in total silence — and a send that
+      // records no row is a send no rate limit and no number-health figure can
+      // see (#126).
+      const { error: msgInsertError } = await supabase.from('messages').insert({
         thread_id: threadId,
         from_phone: actualFromPhone,
         to_phone: toPhone,
@@ -297,6 +301,10 @@ export async function POST(req: NextRequest) {
         spam_score: moderation.spamScore,
         spam_flags: moderation.flags,
       });
+
+      if (msgInsertError) {
+        console.error(`❌ Sent SMS to ${toPhone} but failed to record it:`, msgInsertError);
+      }
     }
 
     // User takeover: pause any active drip enrollments for this lead

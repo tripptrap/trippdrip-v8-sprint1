@@ -453,8 +453,11 @@ export async function POST(req: Request) {
                 .update(updateData)
                 .eq('id', existingThread.id);
 
-              // Save the message to database with spam score
-              await supabase
+              // Checked, not fire-and-forget. supabase-js returns { error }
+              // rather than throwing, so an unchecked insert fails in total
+              // silence — and a campaign send that records no row is one the
+              // rate limit and number health cannot see (#126).
+              const { error: msgInsertError } = await supabase
                 .from('messages')
                 .insert({
                   user_id: user.id,
@@ -472,6 +475,10 @@ export async function POST(req: Request) {
                   spam_flags: moderation.flags,
                   created_at: new Date().toISOString()
                 });
+
+              if (msgInsertError) {
+                console.error(`❌ Campaign sent to ${lead.phone} but failed to record it:`, msgInsertError);
+              }
             } else {
               // Create new thread with campaign_id
               const { data: newThread } = await supabase
@@ -494,7 +501,10 @@ export async function POST(req: Request) {
 
               // Save message to database with spam score
               if (newThread) {
-                await supabase
+                // Checked, for the same reason as the existing-thread branch
+                // above — an unchecked insert fails silently and the send goes
+                // uncounted (#126).
+                const { error: newThreadMsgError } = await supabase
                   .from('messages')
                   .insert({
                     user_id: user.id,
@@ -512,6 +522,10 @@ export async function POST(req: Request) {
                     spam_flags: moderation.flags,
                     created_at: new Date().toISOString()
                   });
+
+                if (newThreadMsgError) {
+                  console.error(`❌ Campaign sent to ${lead.phone} but failed to record it:`, newThreadMsgError);
+                }
               }
             }
           } else {
