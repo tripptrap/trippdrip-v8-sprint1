@@ -18,6 +18,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkQuietHours } from './quietHours';
 import { getAccountRisk, applyRiskFactor } from './riskTier';
+import { getPlatformState } from './platformCeiling';
 
 export interface SmsGuardResult {
   allowed: boolean;
@@ -317,6 +318,32 @@ export async function checkSmsAllowed(
   // Retryable on purpose: hitting the cap should defer a scheduled message to
   // the next run, not mark it failed. Only the caller knows whether it has a
   // "later" — the crons do, a human pressing send does not.
+  // Platform ceiling (#123 gap 3). Checked before the per-account caps because a
+  // platform-wide stop is more fundamental than one account's allowance, and
+  // because it is cached — so it is the cheapest check on this path, not the
+  // most expensive.
+  //
+  // Only the volume ceiling blocks. The aggregate opt-out rate alerts and never
+  // blocks: stopping every well-behaved account over a total none of them can
+  // see is a decision for a person, not a threshold. See lib/platformCeiling.
+  const platform = await getPlatformState(supabase);
+  if (platform.overCeiling) {
+    console.error(
+      `🛑 Platform ceiling reached (${platform.sends}/${platform.ceiling} in 24h) — refusing send for ${userId}`
+    );
+    return {
+      allowed: false,
+      reason: 'rate_limited',
+      retryable: true,
+      // Deliberately does not quote the ceiling or the platform total. This is
+      // not a limit on the recipient's account and the numbers would only
+      // alarm; it is a temporary service condition that clears on its own.
+      detail:
+        'Sending is temporarily paused across the service. This is not a limit on your account, ' +
+        'and it will clear automatically.',
+    };
+  }
+
   const rateOut: { limits?: typeof DEFAULT_LIMITS } = {};
   const rate = await checkSendRate(supabase, userId, rateOut);
   if (rate) return rate;

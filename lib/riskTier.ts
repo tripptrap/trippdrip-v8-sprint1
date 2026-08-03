@@ -145,11 +145,33 @@ export function classifyRisk(s: RiskSignals): AccountRisk {
  *          throttling the whole product because one RPC is unavailable would be
  *          far worse than briefly not throttling one bad account.
  */
+/**
+ * Per-account cache.
+ *
+ * The tier is computed over a rolling 7-day window, so it cannot meaningfully
+ * change between two messages in a bulk loop — but without this it costs a round
+ * trip on every one of them, and this guard already makes several. Sixty seconds
+ * bounds how long a newly-deteriorated account keeps its old allowance.
+ *
+ * Per-process, so serverless gives each instance its own. That is fine: the
+ * throttle is a coarse instrument and does not need to be exact.
+ */
+const riskCache = new Map<string, { at: number; risk: AccountRisk }>();
+const RISK_CACHE_MS = 60_000;
+
+/** Testing seam — consecutive assertions are meaningless against a cache. */
+export function clearRiskCache(): void {
+  riskCache.clear();
+}
+
 export async function getAccountRisk(
   supabase: SupabaseClient,
   userId: string,
   days = 7
 ): Promise<AccountRisk> {
+  const hit = riskCache.get(userId);
+  if (hit && Date.now() - hit.at < RISK_CACHE_MS) return hit.risk;
+
   const healthy = (reason: string): AccountRisk => ({
     tier: 'healthy',
     factor: 1,
@@ -200,6 +222,7 @@ export async function getAccountRisk(
       }).catch(err => console.error('Risk alert failed:', err));
     }
 
+    riskCache.set(userId, { at: Date.now(), risk });
     return risk;
   } catch (e) {
     console.error(`Risk lookup threw for ${userId} — treating as healthy:`, e);
