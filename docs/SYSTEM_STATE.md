@@ -1487,6 +1487,75 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Consent: what the product actually knows (#130, #131, 2026-08-03)
+
+**`leads.sms_opt_in` no longer defaults to true.** It had, which meant every lead created by any
+route was marked as having consented with nothing behind it:
+
+```
+leads                                209
+contact_form_submissions (consent)     0
+leads with sms_opt_in = false          0
+```
+
+True for every lead, never false for any. A column that is always true carries no information —
+so `smsGuard` checking it enforced nothing, while the public compliance page claimed it did.
+
+### The three states, and why unknown is NULL
+
+| `sms_opt_in` | meaning |
+|---|---|
+| `true` | consent established — `consent_source` says what established it |
+| `false` | **the person opted out.** `smsGuard` blocks on this |
+| `NULL` | unknown |
+
+Unknown must be NULL, never false. They are different claims, and false is the one that blocks.
+Conflating them would have silently made 209 leads unmessageable.
+
+`consent_source` is the evidence, recorded at intake by `lib/leadConsent`:
+`opt_in_form` (branded page — verbatim disclosure, IP, user agent, timestamp) ·
+`agent_attested` (the business asserted it at import) · `inbound_message` (they texted first) ·
+`legacy_unknown` (predates this).
+
+Find leads with no basis for contact in one indexed query:
+
+```sql
+SELECT count(*) FROM public.leads WHERE consent_source = 'legacy_unknown' OR consent_source IS NULL;
+```
+
+### Attestation is a record, not proof
+
+For imported and hand-entered contacts the consent happened on the business's own form before the
+data reached us — the platform cannot see it. Asking the business to assert it, and recording who
+asserted and when, is the honest arrangement. **Inferring it from a column default was not.**
+
+`isAttested` accepts only a literal `true`. A missing field, the string `"true"`, or `1` all read
+as no — the failure to avoid is an import quietly counting as an attestation because a checkbox
+serialised oddly.
+
+The browser extension sends no attestation, so scraped contacts land as unknown. Correct, and it
+needed no change to the extension.
+
+### The public claims had to be corrected first (#131)
+
+`hyvewyre.com/opt-in-proof.png` is the `optInWorkflowImageURLs` value on the approved TFV — the
+evidence a carrier reviewer opens. It is live, serves HTML through a `next.config` rewrite, and
+claimed *"Contacts cannot receive messages unless SMS consent is recorded"*, an automatic opt-out
+reply that is never sent, a source-URL column that does not exist, and that agents cannot bypass
+consent. `/terms` promised a confirmation SMS and said opt-outs are honoured *"within 10 business
+days"* when the code applies them on receipt. `/compliance` claimed age-gating the product does
+not do and called DNC scrubbing *"coming soon"* while the shipped suppression list is fully
+enforced.
+
+**Rule: fix the live artifact first, deploy, verify, then mirror it into a filing.** Never the
+other way round — the 10DLC history in this repo is what happens when a submission and the live
+evidence disagree.
+
+The opt-out footer was appended in three routes and not in the shared sender, so *"every first
+message carries opt-out instructions"* was false for scheduled and bulk sends. `lib/optOutFooter`
+completes it rather than weakening the claim. Reminders and calendar links are excluded on
+purpose: they go to someone who already has an appointment, so they are never a first contact.
+
 ## The shared verification, and what watches it (#123 gap 3, 2026-08-03)
 
 Every agent sends toll-free under **one shared TFV** (#120). There is no published
