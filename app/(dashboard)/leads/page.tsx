@@ -161,6 +161,8 @@ export default function LeadsPage() {
 
   /* Add Lead Modal */
   const [addLeadOpen, setAddLeadOpen] = useState(false);
+  /** Consent attestation for a hand-entered contact (#130). Same reasoning as the import. */
+  const [addLeadAttested, setAddLeadAttested] = useState(false);
   const [newLead, setNewLead] = useState({
     first_name: "",
     last_name: "",
@@ -273,6 +275,7 @@ export default function LeadsPage() {
         ...newLead,
         tags: newLead.tags ? newLead.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         campaign_id: newLead.campaign_id || null,
+        consentAttested: addLeadAttested,
       };
 
       const res = await fetch('/api/leads', {
@@ -286,6 +289,7 @@ export default function LeadsPage() {
         setToast('Lead added successfully!');
         setTimeout(() => setToast(''), 2500);
         setAddLeadOpen(false);
+        setAddLeadAttested(false);
         setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" });
         setPreselectedCampaignName("");
         await fetchLeads();
@@ -1393,17 +1397,31 @@ export default function LeadsPage() {
                 </select>
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-3">
+            <label className="mt-5 flex cursor-pointer items-start gap-2.5 text-xs text-slate-600 dark:text-slate-400">
+              <input
+                type="checkbox"
+                checked={addLeadAttested}
+                onChange={(e) => setAddLeadAttested(e.target.checked)}
+                data-testid="add-lead-consent"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 dark:border-slate-600"
+              />
+              <span>
+                I confirm that this contact has given prior express written consent to receive SMS
+                messages from my business, that I can produce evidence of that consent on request,
+                and that I am responsible for the lawful basis on which they are messaged.
+              </span>
+            </label>
+            <div className="mt-4 flex justify-end gap-3">
               <button
-                onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" }); setPreselectedCampaignName(""); }}
+                onClick={() => { setAddLeadOpen(false); setAddLeadAttested(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" }); setPreselectedCampaignName(""); }}
                 className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddLead}
-                disabled={addingLead}
-                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
+                disabled={addingLead || !addLeadAttested}
+                className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {addingLead ? 'Adding...' : 'Add Lead'}
               </button>

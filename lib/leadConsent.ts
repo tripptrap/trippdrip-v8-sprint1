@@ -72,6 +72,11 @@ export function consentFields(source: ConsentSource | null): ConsentFields {
  * in the UI the account holder sees and in what gets recorded, and those two
  * drifting apart would make the record worthless as evidence of what was agreed.
  */
+export const ATTESTATION_TEXT_SINGLE =
+  'I confirm that this contact has given prior express written consent to receive SMS messages ' +
+  'from my business, that I can produce evidence of that consent on request, and that I am ' +
+  'responsible for the lawful basis on which they are messaged.';
+
 export const ATTESTATION_TEXT =
   'I confirm that every contact in this import has given prior express written consent to ' +
   'receive SMS messages from my business, that I can produce evidence of that consent on ' +

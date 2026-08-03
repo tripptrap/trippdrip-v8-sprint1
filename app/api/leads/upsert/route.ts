@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { consentFields, isAttested } from "@/lib/leadConsent";
 import { safeDecrypt } from "@/lib/encryption";
 import nodemailer from 'nodemailer';
 
@@ -17,8 +18,23 @@ type Lead = {
 
 export async function POST(req: Request) {
   try {
-    const lead = (await req.json()) as Lead;
-    if (!lead) return NextResponse.json({ ok: false, error: "No lead" }, { status: 400 });
+    const rawLead = (await req.json()) as Lead & Record<string, unknown>;
+    if (!rawLead) return NextResponse.json({ ok: false, error: "No lead" }, { status: 400 });
+
+    // Consent fields are server-determined and never accepted from the caller
+    // (#130). This route spreads the request body straight into the row, so
+    // without this a client could set `sms_opt_in: true` and manufacture a
+    // consent record it never attested to — which is the same defect as
+    // `consent_text` being taken verbatim from a request body.
+    //
+    // Stripped rather than rejected: a client sending them is far more likely to
+    // be echoing a lead it read back than attempting anything, and failing the
+    // whole upsert over an ignorable field would be worse.
+    const { sms_opt_in, consent_source, consent_recorded_at, consentAttested, ...leadFields } = rawLead;
+    const lead = {
+      ...leadFields,
+      ...consentFields(isAttested(consentAttested) ? 'agent_attested' : null),
+    } as Lead;
 
     const supabase = await createClient();
 

@@ -702,7 +702,8 @@ async function handleInboundSMS(payload: any) {
           if (leadId) {
             await supabaseAdmin
               .from('leads')
-              .update({ sms_opt_in: true, updated_at: new Date().toISOString() })
+              // They texted START, which is consent and is itself the record (#130).
+              .update({ ...consentFields('inbound_message'), updated_at: new Date().toISOString() })
               .eq('user_id', userId)
               .eq('id', leadId);
           }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { consentFields, isAttested } from '@/lib/leadConsent';
 import { checkAndEnrollDripTriggers } from "@/lib/drip/triggerEnrollment";
 
 export const dynamic = "force-dynamic";
@@ -178,6 +179,10 @@ export async function POST(req: Request) {
       state: body.state?.trim() || null,
       zip_code: body.zip_code?.trim() || null,
       tags: Array.isArray(body.tags) ? body.tags : [],
+      // Consent provenance (#130). A hand-entered contact consented — if they
+      // did — somewhere the platform cannot see, so it is either asserted here
+      // and recorded with its date, or the lead's consent stays UNKNOWN.
+      ...consentFields(isAttested(body?.consentAttested) ? 'agent_attested' : null),
     };
 
     // Insert lead
