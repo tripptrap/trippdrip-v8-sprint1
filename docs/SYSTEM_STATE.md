@@ -1473,6 +1473,54 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## The shared verification, and what watches it (#123 gap 3, 2026-08-03)
+
+Every agent sends toll-free under **one shared TFV** (#120). There is no published
+per-verification throughput number to enforce — a TFV is a verification, not a quota. What it can
+do is be **revoked**, and what revokes it is complaints.
+
+So `lib/platformCeiling` measures two things and treats them oppositely:
+
+| signal | behaviour | why |
+|---|---|---|
+| aggregate **opt-out rate** ≥ 3% | **alert only, escalated to email** | blocking would stop every well-behaved customer over a total none of them can see — a product-wide outage fired by a threshold |
+| aggregate **volume** ≥ ceiling | **blocks** | a total far above normal is a loop or a compromise, and the fastest way to lose the verification for everyone |
+
+**This is the only exposure no per-account control can see.** Fifty accounts can each sit inside
+their own thresholds while the aggregate is what a carrier acts on.
+
+### The ceiling is a runaway detector, not a business limit
+
+`PLATFORM_DAILY_SEND_CEILING`, default **25,000/day** against real traffic of a few hundred.
+Warns at 80% so it cannot be reached unannounced. Invalid or negative values fall back to the
+default — a ceiling of `NaN` or `-5` would block everything.
+
+The user-facing message quotes neither the ceiling nor the total: it is not a limit on their
+account, and the numbers would only alarm.
+
+### Caching, and why the send path needed it
+
+`checkSmsAllowed` now makes several round trips, and gaps 2–4 added three more. Both the
+platform state and the account risk tier are cached for **60 seconds**:
+
+- the platform value is *identical for every account*
+- the risk tier is computed over a **7-day** window
+
+Neither can meaningfully change between two messages of a bulk loop. Measured across five
+consecutive sends, this takes the steady state from ~1255ms to ~580ms (laptop to a remote
+database — in production both sit in one region, so the real figure is far lower). Per-process,
+so serverless gives each instance its own; both controls are coarse and do not need to be exact.
+
+`clearPlatformCache()` and `clearRiskCache()` exist as testing seams — consecutive assertions
+against a cache are meaningless.
+
+### Every one of these fails OPEN
+
+Platform ceiling, risk tier, per-number capacity, send-rate and per-contact limits all allow the
+send when their lookup fails. Only the **account-status** gate fails closed. The rule: *being
+unable to measure something is not evidence of abuse*, and refusing every send across every
+account because one RPC is unavailable causes exactly the outage these exist to prevent.
+
 ## Send limits move with an account's behaviour (#123 gap 4, 2026-08-03)
 
 A rolling 7-day opt-out rate multiplies every configured cap, in `lib/riskTier`:
