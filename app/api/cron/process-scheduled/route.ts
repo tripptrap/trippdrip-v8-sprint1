@@ -35,7 +35,7 @@ export const maxDuration = 60; // Max execution time in seconds
  */
 
 export async function GET(req: NextRequest) {
-  const denied = requireCronAuth(req);
+  const denied = await requireCronAuth(req);
   if (denied) return denied;
 
   if (!supabaseAdmin) {

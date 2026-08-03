@@ -57,3 +57,36 @@ jobs:
           fi
 
           echo "✅ Scheduled messages processed successfully"
+
+      # The external half of the cron heartbeat (#117).
+      #
+      # Each cron checks its peers when it runs, so any single surviving cron
+      # notices the others have stopped. That cannot help when they ALL stop —
+      # a paused project, a bad deploy, an expired secret — because nothing is
+      # left inside to notice.
+      #
+      # This step runs on GitHub's infrastructure, so it is the only check that
+      # survives a total outage of the primary scheduler. It calls the same
+      # endpoint the peers use.
+      #
+      # `if: always()` so a failure of the step above does not skip the very
+      # check that would report it.
+      - name: Cron heartbeat
+        if: always()
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://trippdrip-v8-sprint1.vercel.app/api/cron/heartbeat" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          # Deliberately does NOT fail the workflow on overdue jobs. The endpoint
+          # alerts admins itself; failing here as well would turn one incident
+          # into a stream of red builds and train everyone to ignore both.
+          if [ "$http_code" -ne 200 ]; then
+            echo "::warning::Heartbeat endpoint returned $http_code — the app may be down entirely"
+          fi

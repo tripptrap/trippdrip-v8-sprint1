@@ -28,7 +28,7 @@ export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   try {
-    const denied = requireCronAuth(req);
+    const denied = await requireCronAuth(req);
     if (denied) return denied;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

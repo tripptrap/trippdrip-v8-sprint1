@@ -84,7 +84,7 @@ async function handleCron(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
     }
 
-    const denied = requireCronAuth(req);
+    const denied = await requireCronAuth(req);
     if (denied) return denied;
 
     // Enforce quiet hours — reschedule instead of sending
