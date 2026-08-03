@@ -283,6 +283,36 @@ Two more from the same run:
 denials. **Check `GET /v2/balance` first whenever a Telnyx call fails in a way that looks like
 permissions or compliance.**
 
+### Agents get TOLL-FREE numbers; the tier difference is quantity (#120, 2026-08-03)
+
+**Growth: 1 toll-free number. Scale: more than 1.** The local number `+18134972176` stays
+HyveWyre's own, for acquiring agents, on the existing `MIXED` 10DLC campaign.
+
+**Supersedes the "Growth gets 1 local" reading recorded below on 2026-08-02.** That section's
+throughput analysis still stands and is still worth reading; its premise does not.
+
+**Toll-free runs on TFV, not 10DLC**, which takes three things off the launch path:
+
+- no **$19.50 per agent** against $30 of first-month revenue
+- no **3–7 day wait** before a new agent can send
+- **#119 stops blocking** — sole proprietors cannot complete 10DLC but do not need it for a
+  toll-free number, and they are plausibly a large share of the target market
+- **#1 becomes post-launch** — per-agent brands matter when agents move to local numbers
+
+**The conflict this creates.** The verified TFV (`6723e639`) says verbatim: *"Each toll-free
+number is provisioned 1:1 to a separate, independent client business… No single business uses more
+than one number."* **Scale holding more than one directly contradicts what was approved.** The new
+TFV request has to describe the real model or the verification does not cover what we do.
+
+Two more the new request must fix: the use case is `Conversational / Alerts` while agents send
+marketing (Telnyx: *"any non-marketing content and also marketing content → Mixed"*), and the
+opt-in workflow lists three methods when the approval was won by narrowing to one — including
+"verbal consent", which the product does not capture.
+
+**Inventory is now the binding constraint.** 2 numbers available; Telnyx caps at 5 per business
+without justification, which is exactly the rejection on `65ad888e`. Every batch beyond that needs
+a fresh TFV with the ISV argument (#3).
+
 ### Tier design and the throughput numbers behind it (#11, #121, 2026-08-02)
 
 **Growth ($30): 1 local number, LOW_VOLUME. Scale ($98): multiple local numbers, MIXED.**
