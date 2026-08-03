@@ -2930,6 +2930,60 @@ Do not "fix" it to match.
 
 ---
 
+## `/compliance` claimed four controls that do not exist (`576add3`, 2026-08-03)
+
+The public compliance page advertised **multi-factor authentication, role-based permissions,
+third-party penetration testing and 24/7 monitoring**. None exist: grepping for MFA returns
+nothing at all, an account is a single owner with no roles, no third party has assessed this
+system, and there is no staffed monitoring. This is the page a prospect or a regulator
+actually relies on, so it was the worst place to be wrong.
+
+It now carries a **"What we do not yet have"** panel stating all four plainly. Prefer that
+shape to silent deletion — a missing claim reads as an oversight, a stated absence reads as
+a decision, and it stops the claim being quietly re-added later.
+
+### Three of the corrections made the page *stronger*, not weaker
+
+Worth knowing, because the instinct when auditing marketing copy is to weaken everything:
+
+| claim | what was actually true |
+|---|---|
+| "8 AM – 9 PM recipient's local time" | default is **08:00–20:00**, an hour *tighter* than TCPA, configurable, and for a state spanning zones a send is held if it is quiet hours in **any** of them (#50) |
+| "Proper 10DLC registration" | registration is a **gate** — all three number-acquisition routes refuse without it |
+| "Consent Tracking: tag leads with consent status" | source *and* timestamp per contact, and no-record is marked as such rather than assumed consenting (#130) |
+
+The page had been underselling real controls while overselling absent ones.
+
+### The claim that had to be narrowed, and why it was not just fixed
+
+`withOptOutFooterIfFirst` is applied on **bulk and scheduled sends only** — not on
+`telnyx/send-sms`, `sms/send`, `campaigns/run`, or the drip crons. So whether a first
+contact carries opt-out instructions depends on which button the user pressed, which is not
+a distinction CTIA makes. The page now says bulk-and-scheduled rather than claiming
+universal coverage, and the gap is **#133** (fix: move it into `lib/smsGuard.ts`, which all
+ten send paths already share, rather than a sixth copy per call site).
+
+**Rule this leaves behind:** when a compliance claim outruns the code, narrow the claim
+*and* file the gap in the same change. Narrowing alone quietly lowers the bar; filing alone
+leaves a false public statement live in the meantime.
+
+### The email API key was stored in plaintext in a column called `_encrypted`
+
+`app/api/user/settings/route.ts` wrote `email_api_key_encrypted = preferences.emailApiKey`
+under the comment *"In production, encrypt this before storing"* — which production then
+read as a promise already kept. Now encrypted. No migration: that column had exactly one
+reference in the whole codebase (the write), no reader, and 0 rows with a value. A future
+reader must go through `safeDecrypt`, which passes through anything we did not encrypt.
+
+Checking that claim is the *only* reason it was found — the page asserted stored credentials
+were encrypted, and verifying the sentence found the bug. Auditing public claims against the
+code is a bug-finding technique, not just a copy exercise.
+
+**Public pages never enter dark mode** (#134) — `<html>` carries no `dark` class, so every
+`dark:` variant in `app/(public)` is inert. Pre-existing, whole route group, not just this page.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
