@@ -3,7 +3,7 @@ import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
-import { checkSmsAllowed } from "@/lib/smsGuard";
+import { checkSmsAllowed, noteDeferred } from "@/lib/smsGuard";
 import { moderateOutbound } from "@/lib/smsModeration";
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
@@ -244,6 +244,10 @@ export async function PUT(req: NextRequest) {
                   error_message: `Blocked: ${guard.reason} — ${guard.detail}`,
                 })
                 .eq('id', message.id);
+            } else {
+              // Still pending — record why, so it is not mistaken for a message
+              // nothing ever picked up (#128).
+              await noteDeferred(adminClient, message.id, guard.detail || `Waiting: ${guard.reason}`);
             }
             failed++;
             continue;
@@ -266,6 +270,8 @@ export async function PUT(req: NextRequest) {
                 .from('scheduled_messages')
                 .update({ status: 'cancelled', error_message: resolved.detail })
                 .eq('id', message.id);
+            } else {
+              await noteDeferred(adminClient, message.id, resolved.detail);
             }
             failed++;
             continue;

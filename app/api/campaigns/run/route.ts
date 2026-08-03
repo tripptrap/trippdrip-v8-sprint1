@@ -141,7 +141,17 @@ export async function POST(req: Request) {
       .eq('user_id', user.id)
       .single();
     const optOutKeyword = userSettings?.opt_out_keyword || null;
-    const spamProtection = userSettings?.spam_protection || {
+    // MERGED onto the defaults, not replaced by the stored object (#128).
+    //
+    // `userSettings?.spam_protection || { …defaults }` takes the stored value
+    // wholesale when one exists. Live rows hold only four of the eleven keys —
+    // the column default — so every advanced limit here evaluated to `undefined`
+    // at runtime, and `undefined > cap` is false: the batch and campaign caps
+    // silently permitted everything for every real account.
+    //
+    // `telnyx/send-sms` and `lib/smsGuard` both merge. This route was the one
+    // that did not.
+    const SPAM_DEFAULTS = {
       enabled: true,
       blockOnHighRisk: true,
       maxHourlyMessages: 100,
@@ -154,6 +164,7 @@ export async function POST(req: Request) {
       enableWeekendLimits: false,
       weekendLimitPercent: 50
     };
+    const spamProtection = { ...SPAM_DEFAULTS, ...(userSettings?.spam_protection || {}) };
 
     // SMS sending logic
     const sendResults: SendResult[] = [];

@@ -300,30 +300,40 @@ export default function Page() {
     return phone;
   };
 
-  const saveSpamSettings = () => {
-    updateSpamProtection({
-      enabled: spamEnabled,
-      blockOnHighRisk,
-      maxHourlyMessages: maxHourly,
-      maxDailyMessages: maxDaily,
-      maxMessagesPerMinute: maxPerMinute,
-      maxMessagesPerContact: maxPerContact,
-      cooldownMinutes: cooldownMinutes,
-      maxCampaignMessagesPerHour: maxCampaignHourly,
-      maxBulkRecipients: maxBulkRecipients,
-      enableWeekendLimits: enableWeekendLimits,
-      weekendLimitPercent: weekendLimitPercent
-    });
-    showSaveMessage('Spam protection settings saved!');
+  const saveSpamSettings = async () => {
+    try {
+      await updateSpamProtection({
+        enabled: spamEnabled,
+        blockOnHighRisk,
+        maxHourlyMessages: maxHourly,
+        maxDailyMessages: maxDaily,
+        maxMessagesPerMinute: maxPerMinute,
+        maxMessagesPerContact: maxPerContact,
+        cooldownMinutes: cooldownMinutes,
+        maxCampaignMessagesPerHour: maxCampaignHourly,
+        maxBulkRecipients: maxBulkRecipients,
+        enableWeekendLimits: enableWeekendLimits,
+        weekendLimitPercent: weekendLimitPercent
+      });
+      showSaveMessage('Spam protection settings saved!');
+    } catch (err: any) {
+      // Was an unconditional success message that never looked at the result,
+      // so a rejected value still read as saved (#128).
+      showSaveMessage(err?.message || 'Could not save spam protection settings');
+    }
   };
 
-  const saveAutoRefillSettings = () => {
-    updateAutoRefill({
-      enabled: autoRefillEnabled,
-      threshold: autoRefillThreshold,
-      amount: autoRefillAmount
-    });
-    showSaveMessage('Auto-refill settings saved!');
+  const saveAutoRefillSettings = async () => {
+    try {
+      await updateAutoRefill({
+        enabled: autoRefillEnabled,
+        threshold: autoRefillThreshold,
+        amount: autoRefillAmount
+      });
+      showSaveMessage('Auto-refill settings saved!');
+    } catch (err: any) {
+      showSaveMessage(err?.message || 'Could not save auto-refill settings');
+    }
   };
 
   const saveEmailSettings = async () => {
@@ -363,6 +373,8 @@ export default function Page() {
       const updated = await loadSettings();
       setSettings(updated);
       showSaveMessage('Email settings saved!');
+    } catch (err: any) {
+      showSaveMessage(err?.message || 'Could not save email settings');
     } finally {
       setSavingEmail(false);
     }

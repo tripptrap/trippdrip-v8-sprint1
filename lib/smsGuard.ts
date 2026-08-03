@@ -62,6 +62,9 @@ const DEFAULT_LIMITS = {
   maxDailyMessages: 1000,
   enableWeekendLimits: false,
   weekendLimitPercent: 50,
+  // Defaults carried over from the send-sms block these replaced (#128).
+  maxMessagesPerContact: 5,
+  cooldownMinutes: 30,
 };
 
 /**
@@ -72,7 +75,8 @@ const DEFAULT_LIMITS = {
  */
 async function checkSendRate(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  out?: { limits?: typeof DEFAULT_LIMITS }
 ): Promise<SmsGuardResult | null> {
   const { data: settingsRow } = await supabase
     .from('user_settings')
@@ -81,6 +85,9 @@ async function checkSendRate(
     .maybeSingle();
 
   const limits = { ...DEFAULT_LIMITS, ...(settingsRow?.spam_protection || {}) };
+  // Handed back so the per-contact check below reuses them rather than making a
+  // second identical settings query on every send.
+  if (out) out.limits = limits;
 
   const isWeekend = [0, 6].includes(new Date().getDay());
   const multiplier = limits.enableWeekendLimits && isWeekend
@@ -115,6 +122,102 @@ async function checkSendRate(
       }`;
       console.log(`🛑 Rate limited: user ${userId} — ${detail}`);
       return { allowed: false, reason: 'rate_limited', retryable: true, detail };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Per-contact daily cap and cooldown (#128).
+ *
+ * ── Both of these had never blocked a single message ────────────────────────
+ *
+ * They existed only in `telnyx/send-sms`, and both filtered on
+ * `.ilike('to_number', …)`. **`to_number` is not a column on public.messages** —
+ * the live column is `to_phone`. PostgREST returns 42703, and neither call
+ * checked `error`:
+ *
+ *     const { count } = await …ilike('to_number', …)   // count is undefined
+ *     if ((count || 0) >= maxPerContact)               // 0 >= 5, never true
+ *
+ *     const { data: lastMessage } = await …            // null on error
+ *     if (lastMessage) { … }                           // never entered
+ *
+ * So Settings offered two limits, the user could set them, and they did
+ * nothing — for every account, on every path. Verified against the linked
+ * database: `SELECT … WHERE to_number IS NOT NULL` → `column "to_number" does
+ * not exist`.
+ *
+ * Moved here because both are per-message and per-recipient, which is exactly
+ * what this guard already receives, and because it runs on all eight send paths
+ * rather than the one they used to live on.
+ *
+ * Matching is on the same candidate set the opt-in check below uses rather than
+ * a leading-wildcard `ilike`: `to_phone` is stored E.164, and `%1234567890%`
+ * cannot use an index no matter what is created.
+ */
+async function checkContactLimits(
+  supabase: SupabaseClient,
+  userId: string,
+  candidates: string[],
+  limits: { maxMessagesPerContact: number; cooldownMinutes: number }
+): Promise<SmsGuardResult | null> {
+  if (!candidates.length) return null;
+
+  // Daily cap for this contact.
+  if (limits.maxMessagesPerContact >= 0) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('direction', 'outbound')
+      .in('to_phone', candidates)
+      .gte('created_at', since);
+
+    if (error) {
+      // Fails OPEN and says so, matching checkSendRate: a contact-frequency
+      // check that cannot run is not evidence of abuse. Logging is the point —
+      // silence here is what hid the missing column for as long as it did.
+      console.error(`Per-contact count failed for user ${userId} — allowing send:`, error);
+    } else if ((count ?? 0) >= limits.maxMessagesPerContact) {
+      return {
+        allowed: false,
+        reason: 'rate_limited',
+        retryable: true,
+        detail:
+          `Contact limit reached: ${count} of ${limits.maxMessagesPerContact} messages ` +
+          `to this contact in the last 24 hours`,
+      };
+    }
+  }
+
+  // Minimum gap since the last message to this contact.
+  if (limits.cooldownMinutes > 0) {
+    const { data: last, error } = await supabase
+      .from('messages')
+      .select('created_at')
+      .eq('user_id', userId)
+      .eq('direction', 'outbound')
+      .in('to_phone', candidates)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`Cooldown lookup failed for user ${userId} — allowing send:`, error);
+    } else if (last?.created_at) {
+      const minutesSince = (Date.now() - Date.parse(last.created_at)) / 60000;
+      if (minutesSince < limits.cooldownMinutes) {
+        const wait = Math.ceil(limits.cooldownMinutes - minutesSince);
+        return {
+          allowed: false,
+          reason: 'rate_limited',
+          retryable: true,
+          detail: `Cooldown active: ${wait} more minute${wait === 1 ? '' : 's'} before messaging this contact again`,
+        };
+      }
     }
   }
 
@@ -196,7 +299,8 @@ export async function checkSmsAllowed(
   // Retryable on purpose: hitting the cap should defer a scheduled message to
   // the next run, not mark it failed. Only the caller knows whether it has a
   // "later" — the crons do, a human pressing send does not.
-  const rate = await checkSendRate(supabase, userId);
+  const rateOut: { limits?: typeof DEFAULT_LIMITS } = {};
+  const rate = await checkSendRate(supabase, userId, rateOut);
   if (rate) return rate;
 
   // Quiet hours first — it's the cheapest check and, unlike DNC, a block here
@@ -295,5 +399,54 @@ export async function checkSmsAllowed(
     return { allowed: false, reason: 'opted_out', detail: 'Lead has opted out of SMS' };
   }
 
+  // 3. Per-contact frequency. Last, because it is the only temporary block left
+  //    and the permanent ones above should answer first — a contact on the DNC
+  //    list should be told that, not that they are in a cooldown.
+  const contact = await checkContactLimits(
+    supabase,
+    userId,
+    candidates,
+    rateOut.limits ?? DEFAULT_LIMITS
+  );
+  if (contact) {
+    if (logBlocked) console.log(`🛑 ${phone}: ${contact.detail}`);
+    return contact;
+  }
+
   return { allowed: true };
+}
+
+/**
+ * Record why a pending scheduled row was not sent this cycle (#128).
+ *
+ * Every automated path already distinguishes a permanent block from a retryable
+ * one and handles both correctly — but the retryable branch wrote *nothing*. It
+ * logged to the console and moved on, so a message pending because of a rate cap
+ * or quiet hours was **indistinguishable from a cron that never ran**, which is
+ * precisely the failure #61 took months to notice.
+ *
+ * Deliberately NOT `error_message`: that field accompanies `status='failed'` and
+ * means the message is over. A deferral is the opposite — the row is healthy and
+ * waiting — and writing it there would make an ordinary overnight quiet-hours
+ * wait render as a failure everywhere the message is listed.
+ *
+ * Never throws and never blocks the run. Failing to write the note is not a
+ * reason to stop processing the rest of the batch; it is logged and ignored.
+ */
+export async function noteDeferred(
+  supabase: SupabaseClient,
+  scheduledMessageId: string,
+  reason: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('scheduled_messages')
+    .update({ last_deferred_reason: reason, last_deferred_at: new Date().toISOString() })
+    .eq('id', scheduledMessageId)
+    // Only a row still waiting. A row that reached 'sent' or 'failed' in a
+    // concurrent run must not be relabelled as deferred.
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error(`Could not record deferral for scheduled message ${scheduledMessageId}:`, error);
+  }
 }

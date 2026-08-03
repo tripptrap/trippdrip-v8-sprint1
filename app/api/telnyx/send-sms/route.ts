@@ -279,58 +279,17 @@ export async function POST(req: NextRequest) {
         }, { status: 429 });
       }
 
-      // Contact-level rate limiting
-      if (to) {
-        // Check messages to this specific contact in last 24 hours
-        const { count: contactDailyCount } = await supabaseAdmin
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('direction', 'outbound')
-          .ilike('to_number', `%${to.replace(/\D/g, '').slice(-10)}%`)
-          .gte('created_at', oneDayAgo.toISOString());
-
-        const maxPerContact = spamProtection.maxMessagesPerContact || 5;
-        if ((contactDailyCount || 0) >= maxPerContact) {
-          return NextResponse.json({
-            error: `Contact limit exceeded: Maximum ${maxPerContact} messages per contact per day. This contact has already received ${contactDailyCount} messages today.`,
-            rateLimited: true,
-            limitType: 'per_contact',
-            contactMessages: contactDailyCount,
-            maxPerContact
-          }, { status: 429 });
-        }
-
-        // Check cooldown period - time since last message to this contact
-        const cooldownMinutes = spamProtection.cooldownMinutes || 30;
-        if (cooldownMinutes > 0) {
-          const { data: lastMessage } = await supabaseAdmin
-            .from('messages')
-            .select('created_at')
-            .eq('user_id', userId)
-            .eq('direction', 'outbound')
-            .ilike('to_number', `%${to.replace(/\D/g, '').slice(-10)}%`)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (lastMessage) {
-            const lastMessageTime = new Date(lastMessage.created_at);
-            const timeSinceLastMessage = (now.getTime() - lastMessageTime.getTime()) / 60000; // in minutes
-
-            if (timeSinceLastMessage < cooldownMinutes) {
-              const waitMinutes = Math.ceil(cooldownMinutes - timeSinceLastMessage);
-              return NextResponse.json({
-                error: `Cooldown active: Please wait ${waitMinutes} more minute${waitMinutes !== 1 ? 's' : ''} before messaging this contact again (${cooldownMinutes} min cooldown).`,
-                rateLimited: true,
-                limitType: 'cooldown',
-                cooldownMinutes,
-                waitMinutes
-              }, { status: 429 });
-            }
-          }
-        }
-      }
+      // The per-contact cap and cooldown that lived here are gone (#128).
+      //
+      // Both filtered on `.ilike('to_number', …)`. `to_number` is not a column
+      // on public.messages — it is `to_phone` — so PostgREST returned 42703,
+      // neither call checked `error`, and the undefined results made both
+      // conditions unreachable. They had never blocked a message, on any
+      // account, on any path.
+      //
+      // They now live in lib/smsGuard with the right column and checked errors,
+      // which also means they apply on all eight send paths rather than only
+      // this one.
     }
 
     // Check if this is the first message to this lead (new thread)

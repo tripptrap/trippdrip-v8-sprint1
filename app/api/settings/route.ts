@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { encrypt, safeDecrypt } from "@/lib/encryption";
+import { validateSpamProtection } from "@/lib/validateSpamProtection";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -120,6 +121,16 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { stripe, email, spamProtection, autoRefill, optOutKeyword } = body;
+
+    // Bounds are enforced here, not only by the form's min/max attributes —
+    // those are a suggestion to the browser, and this endpoint wrote whatever
+    // arrived straight into the column (#128). These numbers are the send caps,
+    // so a bad value does not fail loudly; it changes how much traffic the
+    // account may put on a shared carrier registration.
+    const spamValidation = validateSpamProtection(spamProtection);
+    if (!spamValidation.ok) {
+      return NextResponse.json({ ok: false, error: spamValidation.error }, { status: 400 });
+    }
 
     const { data: existing } = await supabase
       .from('user_settings')

@@ -67,21 +67,44 @@ export async function loadSettings(): Promise<Settings> {
   }
 }
 
+/**
+ * Throws on failure (#128).
+ *
+ * This used to swallow everything: the fetch result was never inspected, so a
+ * 400 or a 500 was indistinguishable from success, and the `catch` turned a
+ * network failure into a silent no-op. It then dispatched `settingsUpdated`
+ * regardless, so the rest of the app re-rendered with values the server had
+ * rejected.
+ *
+ * Every caller shows a success message, so swallowing here meant the product
+ * reported "saved!" for settings that were not saved — the same class of lie
+ * this issue is about. Throwing makes the three callers handle it; they now do.
+ */
 export async function saveSettings(settings: Settings): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  try {
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    });
+  const response = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  });
 
-    // Trigger custom event for real-time updates
-    window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: settings }));
-  } catch (error) {
-    console.error('Error saving settings:', error);
+  if (!response.ok) {
+    // Prefer the server's own explanation — validation returns a specific
+    // reason, and "could not save" helps nobody fix an out-of-range value.
+    let detail = `Save failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (body?.error) detail = String(body.error);
+    } catch {
+      /* non-JSON error body; keep the status line */
+    }
+    throw new Error(detail);
   }
+
+  // Only after the server has accepted it. Dispatching on a failed save told
+  // every listener the new values were live when they were not.
+  window.dispatchEvent(new CustomEvent('settingsUpdated', { detail: settings }));
 }
 
 export function getDefaultSettings(): Settings {

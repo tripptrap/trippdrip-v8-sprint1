@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseAdmin, type SupabaseClient } from '@supabase/supabase-js';
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
-import { checkSmsAllowed } from "@/lib/smsGuard";
+import { checkSmsAllowed, noteDeferred } from "@/lib/smsGuard";
 import { moderateOutbound, type ModerationDecision } from "@/lib/smsModeration";
 import { resolveFromNumber } from "@/lib/resolveFromNumber";
 import { alertAdminsThrottled } from '@/lib/alerting';
@@ -204,8 +204,11 @@ async function processScheduledMessages(supabase: any) {
 
         if (!guard.allowed) {
           if (guard.retryable) {
-            // Quiet hours or a rate cap — leave pending, a later run picks it up.
+            // Quiet hours or a rate cap — leave pending, a later run picks it up,
+            // and record WHY so a waiting message is distinguishable from a dead
+            // cron (#128).
             console.log(`Scheduled msg ${message.id} deferred — ${guard.detail}`);
+            await noteDeferred(supabase, message.id, guard.detail || `Waiting: ${guard.reason}`);
             continue;
           }
           console.log(`🚫 Scheduled msg ${message.id} blocked — ${guard.reason} (${guard.detail})`);
@@ -241,6 +244,7 @@ async function processScheduledMessages(supabase: any) {
           // A lookup failure is transient — leave the row pending so the next
           // run picks it up, exactly as a quiet-hours deferral does.
           console.log(`Scheduled msg ${message.id} deferred — ${resolved.detail}`);
+          await noteDeferred(supabase, message.id, resolved.detail);
           continue;
         }
         await supabase
