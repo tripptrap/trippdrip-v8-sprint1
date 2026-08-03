@@ -355,7 +355,7 @@ export async function POST(req: Request) {
           // route geo-routes per lead, so letting the caller name a number was
           // never a feature — only an unvalidated way to override the routing.
           // Now a failure is recorded against this lead and the run continues.
-          const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null });
+          const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null, toPhone: lead.phone });
           if (!resolved.ok) {
             console.error(`Campaign: no sending number for ${lead.phone} — ${resolved.reason}`);
             sendResults.push({

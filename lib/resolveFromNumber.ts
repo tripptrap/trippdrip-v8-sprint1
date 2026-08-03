@@ -76,6 +76,20 @@ export interface ResolveOptions {
   leadZipCode?: string | null;
   /** Skips the settings lookup when the caller already has the mode. */
   mode?: NumberSelectionMode;
+  /**
+   * Who is being messaged (#129).
+   *
+   * If a conversation with this person already exists, the send stays on the
+   * number it started on. When a business moves from its starter toll-free to
+   * its own local number, NEW conversations use the local one — but a lead first
+   * contacted from the toll-free keeps hearing from the toll-free. Switching
+   * mid-conversation breaks threading on the handset and reads as a stranger.
+   *
+   * Keyed on the recipient rather than a thread id because most callers resolve
+   * a from-number BEFORE they look up or create the thread, so a thread id is
+   * not available at the point of the decision — the recipient always is.
+   */
+  toPhone?: string | null;
 }
 
 interface NumberRow {
@@ -83,6 +97,8 @@ interface NumberRow {
   is_primary: boolean | null;
   locked_until: string | null;
   rested_until: string | null;
+  /** Derived by trigger from the number itself — never set in code (#129). */
+  number_type: string | null;
 }
 
 const inFuture = (ts: string | null | undefined): boolean =>
@@ -142,7 +158,7 @@ export async function resolveFromNumber(
 ): Promise<FromNumberResult> {
   const { data: numbers, error } = await supabase
     .from('user_telnyx_numbers')
-    .select('phone_number, is_primary, locked_until, rested_until')
+    .select('phone_number, is_primary, locked_until, rested_until, number_type')
     .eq('user_id', userId)
     .eq('status', 'active');
 
@@ -165,6 +181,33 @@ export async function resolveFromNumber(
   }
 
   const rows = numbers as NumberRow[];
+
+  // 0. A conversation stays on the number it started on (#129).
+  //
+  // Checked before everything else, including rest and capacity: those exist to
+  // protect a number's reputation when CHOOSING one, and this is not a choice —
+  // the number is already established with this person. Moving a live
+  // conversation to a different number to protect the first one just damages
+  // the second and confuses the recipient.
+  //
+  // Still requires the number to be one the account currently holds, so a
+  // released or reassigned number is not used.
+  if (options.toPhone) {
+    const { data: threads } = await supabase
+      .from('threads')
+      .select('sending_number')
+      .eq('user_id', userId)
+      .eq('phone_number', options.toPhone)
+      .not('sending_number', 'is', null)
+      .limit(1);
+
+    const pinned = threads?.[0]?.sending_number;
+    // Still has to be a number the account currently holds, so a released or
+    // reassigned one is never used.
+    if (pinned && rows.some(n => n.phone_number === pinned)) {
+      return { ok: true, number: pinned };
+    }
+  }
 
   // 1. Rested numbers are out of rotation entirely.
   const usable = rows.filter(n => !inFuture(n.rested_until));
@@ -254,6 +297,16 @@ export async function resolveFromNumber(
     }
   }
 
-  // 4. Primary, else anything left in the pool.
-  return { ok: true, number: (pool.find(n => n.is_primary) ?? pool[0]).phone_number };
+  // 4. Prefer the account's own local numbers over a shared starter toll-free
+  //    (#129). A toll-free from the pool is a starter number, used so a business
+  //    can work immediately while its own registration completes. Once it has a
+  //    local number, new conversations belong there — the toll-free is shared
+  //    infrastructure and its reputation is everyone's.
+  //
+  //    Only for NEW conversations: a reply already returned above.
+  const localOnly = pool.filter(n => n.number_type !== 'tollfree');
+  const preferred = localOnly.length ? localOnly : pool;
+
+  // 5. Primary, else anything left.
+  return { ok: true, number: (preferred.find(n => n.is_primary) ?? preferred[0]).phone_number };
 }

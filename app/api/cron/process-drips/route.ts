@@ -304,6 +304,7 @@ async function handleCron(req: NextRequest) {
         // numbers were never used for drip steps.
         const resolved = await resolveFromNumber(supabaseAdmin, enrollment.user_id, {
           leadZipCode: lead?.zip_code ?? null,
+          toPhone: lead.phone,
         });
 
         if (!resolved.ok) {

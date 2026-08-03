@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
     // using it.
     const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, {
       leadZipCode: lead.zip_code ?? null,
+      toPhone: lead.phone,
     });
 
     if (!resolved.ok) {

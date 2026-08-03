@@ -145,6 +145,7 @@ async function handleCron(req: NextRequest) {
         // ignoring the primary flag, geo, locks and rests alike.
         const resolved = await resolveFromNumber(supabaseAdmin, event.user_id, {
           leadZipCode: null,
+          toPhone: leadPhone,
         });
 
         if (!resolved.ok) {

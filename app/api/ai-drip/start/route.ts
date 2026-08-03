@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, {
         leadZipCode: lead?.zip_code ?? null,
+        toPhone: phoneNumber,
       });
       if (!resolved.ok) {
         return NextResponse.json(

@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       }
     }
     if (!resolvedFrom && supabaseAdmin) {
-      const resolved = await resolveFromNumber(supabaseAdmin, user.id, { leadZipCode: null });
+      const resolved = await resolveFromNumber(supabaseAdmin, user.id, { leadZipCode: null, toPhone });
       if (!resolved.ok) {
         return NextResponse.json(
           { error: resolved.detail, reason: resolved.reason, retryable: resolved.retryable },

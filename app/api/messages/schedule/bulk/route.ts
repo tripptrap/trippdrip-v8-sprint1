@@ -263,6 +263,7 @@ export async function PUT(req: NextRequest) {
           // reason and a temporary one leaves it pending for the next run.
           const resolved = await resolveFromNumber(adminClient, user.id, {
             leadZipCode: lead.zip_code ?? null,
+            toPhone: lead.phone,
           });
           if (!resolved.ok) {
             console.log(`Bulk send: no sending number for message ${message.id} — ${resolved.reason}`);

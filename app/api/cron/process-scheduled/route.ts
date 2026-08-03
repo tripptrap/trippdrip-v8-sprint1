@@ -238,6 +238,7 @@ async function processScheduledMessages(supabase: any) {
       // path, so that was the common case, not an edge one.
       const resolved = await resolveFromNumber(supabase, message.user_id, {
         leadZipCode: lead.zip_code,
+        toPhone: lead.phone,
       });
 
       if (!resolved.ok) {
