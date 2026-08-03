@@ -301,7 +301,15 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - `campaign_id` UUID - Associated campaign
 - `source` TEXT - Lead source
 - `zip_code` TEXT - For geo-routing
-- `last_contacted` TIMESTAMPTZ - Last outreach date
+- `last_interaction_at` TIMESTAMPTZ - last outreach. **There is no
+  `last_contacted`** (#112); code reading it gets undefined and silently falls
+  back to `created_at`
+- `last_engaged` TIMESTAMPTZ, `interaction_count` INTEGER
+- `sms_opt_in` BOOLEAN - true / false (opted out) / **NULL (unknown)**. No longer
+  defaults to true (#130)
+- `consent_source` TEXT - `opt_in_form` | `agent_attested` | `inbound_message` |
+  `legacy_unknown`. What established consent; NULL means nothing did
+- `consent_recorded_at` TIMESTAMPTZ
 - `created_at`, `updated_at` TIMESTAMPTZ
 
 #### `clients`
@@ -310,19 +318,35 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - Uses Receptionist AI instead of Flows
 
 #### `threads`
+Verified against the live database 2026-08-03 (#112). Three of the entries that
+used to be here did not exist: `ai_enabled`, `contact_type` and `last_message_at`.
+
 - `id` UUID - Primary key
 - `user_id` UUID - Owner reference
 - `lead_id` UUID - Associated lead/client
-- `phone_number` TEXT - Contact phone
+- `lead_name` TEXT, `lead_phone` TEXT - denormalised copies from the lead
+- `phone_number` TEXT - the CONTACT's number, not ours. Nothing records which of
+  our numbers a thread uses; that is derived from `messages.from_phone` (#129)
 - `channel` TEXT - 'sms' or 'email'
-- `status` TEXT - 'active', 'archived'
-- `contact_type` TEXT - 'lead' or 'client'
+- `status` TEXT - default 'active'
+- `is_archived` BOOLEAN / `archived_at` TIMESTAMPTZ - archiving lives here, not in `status`
 - `campaign_id` UUID - Associated campaign
 - `messages_from_user` INTEGER - Outbound count
 - `messages_from_lead` INTEGER - Inbound count
-- `last_message` TEXT - Preview text
-- `last_message_at` TIMESTAMPTZ
-- `ai_enabled` BOOLEAN - AI auto-respond on/off
+- `last_message` TEXT / `last_message_snippet` TEXT - preview text
+- `last_sender` TEXT, `unread` BOOLEAN
+- `updated_at` TIMESTAMPTZ - **use this for "when did this thread last move".**
+  There is no `last_message_at`
+- `conversation_tags` TEXT[] - default `{}`
+- `flow_step` JSONB, `pending_ai_draft` TEXT
+- **`ai_disabled` BOOLEAN, default false** - note the polarity. There is no
+  `ai_enabled`, and writing `ai_enabled: false` to mean "AI off" would mean the
+  opposite if it ever existed. `/api/threads/[id]` accepts `ai_enabled` in its
+  request body and inverts it (#109)
+
+**`contact_type` is computed, never stored.** `app/api/texts/threads/route.ts`
+derives it per thread by cross-referencing the `clients` table. Do not add it to
+a query — see the comment in `threads/bulk-ai-toggle/route.ts`.
 
 #### `messages`
 - `id` UUID - Primary key
@@ -407,8 +431,10 @@ All tables use Row Level Security (RLS) with `user_id` filtering. Users can only
 - Groups of leads for bulk outreach
 - `name` TEXT - Campaign name (e.g., "January Solar Leads")
 - `lead_ids` UUID[] - Array of leads in this campaign
-- `lead_count` INTEGER - Number of leads
-- `tags_applied` TEXT[] - Tags applied to leads in campaign
+- `total_leads` INTEGER - number of leads. **Not `lead_count`** — that name does
+  not exist as a column; `/api/campaigns` computes a `lead_count` field into its
+  response, which is what made the doc look right (#112)
+- `tags` TEXT[] - tags applied to leads in this campaign. **Not `tags_applied`**
 - `messages_sent` INTEGER - Total messages sent
 - `credits_used` INTEGER - Total credits spent
 

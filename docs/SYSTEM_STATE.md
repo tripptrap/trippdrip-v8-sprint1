@@ -1487,6 +1487,41 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Six columns CLAUDE.md documented that do not exist (#109, #112, 2026-08-03)
+
+The issue named two. Checking **every** column the file documents found six:
+
+| documented | reality |
+|---|---|
+| `threads.ai_enabled` | it is **`ai_disabled`** — opposite polarity |
+| `threads.contact_type` | computed per request, never stored |
+| `threads.last_message_at` | use `updated_at` |
+| `campaigns.lead_count` | the column is `total_leads`. `/api/campaigns` computes a `lead_count` **response field**, which is what made the doc look right |
+| `campaigns.tags_applied` | the column is `tags` |
+| `leads.last_contacted` | the column is `last_interaction_at` |
+
+All six were documentation-only — the code computes the value or falls back
+(`l.last_contacted || l.created_at`), so nothing was visibly broken, which is exactly why they
+survived. `lib/threadForSend.ts` already carried a comment from somebody who had tripped over
+`last_message_at`; the cost was being paid quietly.
+
+**Run `scripts/verify-claude-md-columns.py` after any schema change.** It parses the
+``#### `table` `` blocks out of CLAUDE.md, compares them against `information_schema`, and exits
+non-zero on a mismatch, so it can go in CI. Currently: 103 documented columns across 15 tables,
+all present.
+
+### Why a wrong doc is worse than no doc
+
+CLAUDE.md is the first file every session reads, and its own instructions warn that a column the
+code assumes may not exist — `user_telnyx_numbers.capabilities` shipped a real bug exactly that
+way. A doc asserting a column that is not there is a trap for whoever trusts it instead of
+checking, and it cost time in this session before it was fixed.
+
+**`ai_enabled` was the dangerous one** — not because it is missing, but because the real column
+has the *opposite polarity*. Writing `ai_enabled: false` to mean "AI off" turns it **on** if the
+name is ever taken literally. `/api/threads/[id]` now accepts `ai_enabled` in its request body,
+which is the natural thing for a caller to send, and inverts it into `ai_disabled`.
+
 ## Which tenant an inbound belongs to (#111, 2026-08-03)
 
 `resolve_inbound_tenant(p_to, p_from)` is the single answer. It returns

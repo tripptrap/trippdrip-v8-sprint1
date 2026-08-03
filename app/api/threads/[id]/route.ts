@@ -82,16 +82,40 @@ export async function PUT(
     const { ai_enabled, status } = body;
 
     const updatePayload: Record<string, unknown> = {};
-    if (ai_enabled !== undefined) updatePayload.ai_enabled = ai_enabled;
+
+    // `threads.ai_enabled` does not exist — the column is `ai_disabled`, with
+    // the opposite polarity (#109). This wrote the request value straight
+    // through under the wrong name, so PostgREST answered PGRST204 and the
+    // endpoint returned 500 for every caller that tried to toggle AI.
+    //
+    // The request field keeps its name: `ai_enabled: true` is the natural thing
+    // for a caller to send, and the two live togglers (`threads/bulk-ai-toggle`
+    // and `threads/manage`) already speak in terms of enabling. Only the column
+    // written changes — and the inversion is the reason this could not simply be
+    // renamed. Writing `ai_enabled: false` to a column called `ai_disabled`
+    // would have turned the AI ON for a caller asking to switch it off.
+    if (ai_enabled !== undefined) updatePayload.ai_disabled = !ai_enabled;
     if (status !== undefined) updatePayload.status = status;
 
-    const { data: thread, error } = await supabase
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json(
+        { ok: false, error: 'Nothing to update — pass ai_enabled or status' },
+        { status: 400 }
+      );
+    }
+
+    // `.select()` without `.single()`, then an explicit length check.
+    //
+    // `.single()` errors when the update matches no row — a thread that does not
+    // exist, or belongs to another account — and that error surfaced as a 500
+    // with a PostgREST message. "Not yours" is a 404, not a server fault; the
+    // same distinction #110 and #115 fixed across the other thread routes.
+    const { data: updated, error } = await supabase
       .from('threads')
       .update(updatePayload)
       .eq('id', threadId)
       .eq('user_id', user.id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error('Error updating thread:', error);
@@ -101,7 +125,11 @@ export async function PUT(
       }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, thread });
+    if (!updated?.length) {
+      return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, thread: updated[0] });
   } catch (error: any) {
     console.error('Error in PUT /api/threads/[id]:', error);
     return NextResponse.json({
