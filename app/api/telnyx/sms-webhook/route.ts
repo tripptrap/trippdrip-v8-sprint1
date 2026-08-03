@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import { ContactType } from '@/lib/receptionist/types';
 import { detectSpam } from '@/lib/spam/detector';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { exemptFromModeration } from '@/lib/smsModeration';
 import { sendSmsAlertToUser } from '@/lib/sendSmsAlert';
 import { cancelPendingDripMessages } from '@/lib/drip/materialize';
 import { isAffirmative, isAwaitingConfirmation, markAwaitingConfirmation, confirmAndBookAppointment } from '@/lib/flows/completeFlow';
@@ -654,6 +655,9 @@ async function handleInboundSMS(payload: any) {
           message:
             `${brand}: For help, ${contact ? `contact ${contact}` : 'reply to this message'}. ` +
             `Reply STOP to unsubscribe. Msg&data rates may apply.`,
+          // Carrier-mandated HELP text, identical for every account. Scoring it
+          // could block the one reply we are legally required to send (#123).
+          moderation: exemptFromModeration('system_message'),
         });
       } catch (helpErr) {
         console.error('Error sending HELP reply:', helpErr);
@@ -720,6 +724,10 @@ async function handleInboundSMS(payload: any) {
               `and promotional and marketing messages. ` +
               `Message frequency varies. Msg&data rates may apply. ` +
               `Consent is not a condition of purchase. Reply HELP for help, STOP to unsubscribe.`,
+            // Required consent confirmation, and it names "promotional and
+            // marketing messages" because the campaign declares them — wording
+            // the detector would score against us (#123).
+            moderation: exemptFromModeration('system_message'),
           });
           return;
         }
@@ -839,6 +847,7 @@ async function handleInboundSMS(payload: any) {
                 to: from,
                 from: replyFrom,
                 message: "Your appointment has been cancelled. If you'd like to reschedule, just reply RESCHEDULE.",
+                moderation: exemptFromModeration('system_message'),
               });
 
               // Log activity
@@ -870,6 +879,7 @@ async function handleInboundSMS(payload: any) {
                 to: from,
                 from: replyFrom,
                 message: "No problem! I'll help you find a new time. What day and time works better for you?",
+                moderation: exemptFromModeration('system_message'),
               });
 
               console.log(`Appointment reschedule initiated via SMS for lead ${leadId}`);

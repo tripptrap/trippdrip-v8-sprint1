@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { exemptFromModeration } from '@/lib/smsModeration';
 import { alertAdminsThrottled } from '@/lib/alerting';
 import { requireCronAuth } from '@/lib/cronAuth';
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
@@ -239,6 +240,11 @@ async function handleCron(req: NextRequest) {
           to: leadPhone,
           message,
           from: fromNumber,
+          // Our own fixed template — only the lead's name and the appointment
+          // time are interpolated, so there is no user-authored text to score.
+          // Transactional, and the recipient has an actual appointment booked:
+          // a dropped reminder is worse than an unscored one (#123).
+          moderation: exemptFromModeration('system_message'),
         });
 
         if (!sendResult.success) {

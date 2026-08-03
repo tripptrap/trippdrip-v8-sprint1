@@ -1,5 +1,7 @@
 // Telnyx utility functions for sending SMS/MMS
 
+import type { ModerationDecision } from './smsModeration';
+
 const TELNYX_API_URL = 'https://api.telnyx.com/v2';
 
 interface SendTelnyxSMSOptions {
@@ -7,6 +9,15 @@ interface SendTelnyxSMSOptions {
   message: string;
   from?: string;
   mediaUrls?: string[];
+  /**
+   * Required (#123). Every outbound message passes through this function, which
+   * makes it the one place a content check cannot be skipped by forgetting to
+   * add it to a new route — omitting this field is a type error.
+   *
+   * Supply `await moderateOutbound(...)`, or `exemptFromModeration('...')` for
+   * our own system text and account alerts. See lib/smsModeration.
+   */
+  moderation: ModerationDecision;
 }
 
 interface TelnyxSMSResult {
@@ -18,7 +29,15 @@ interface TelnyxSMSResult {
 }
 
 export async function sendTelnyxSMS(options: SendTelnyxSMSOptions): Promise<TelnyxSMSResult> {
-  const { to, message, from, mediaUrls } = options;
+  const { to, message, from, mediaUrls, moderation } = options;
+
+  // Belt and braces. Callers are expected to check `moderation.allowed` and
+  // handle a block properly — telling the user, marking the scheduled row
+  // failed, stopping the drip. Refusing here as well means a caller that checks
+  // badly still cannot put a blocked message on the wire.
+  if (!moderation?.allowed) {
+    return { success: false, error: moderation?.detail || 'Message blocked by content moderation' };
+  }
 
   const apiKey = process.env.TELNYX_API_KEY;
   const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;

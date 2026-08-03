@@ -1473,6 +1473,78 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Outbound content moderation (#123, #124, 2026-08-03)
+
+### The list of "send paths" was wrong for four issues running
+
+`SendTelnyxSMSOptions.moderation` is a **required** field. Every outbound message goes through
+`sendTelnyxSMS`, so a new send path cannot omit a decision without a type error, and the
+function refuses a blocked decision even when a caller checks badly. Supply either
+`await moderateOutbound(...)` or `exemptFromModeration('system_message' | 'account_alert')` —
+bypasses are greppable rather than accidental.
+
+That type requirement exists because centralising alone had already failed three times. Spam
+scoring blocked in `telnyx/send-sms` and `campaigns/run` and nowhere else — **the same two
+routes** that were the only ones covered before rate limits (#121) and from-number resolution
+(#122) were centralised. Each of those was found by audit, not by anything breaking.
+
+Worse, the enumeration itself was wrong. #40, #50, #121 and #122 each fixed **"the 8 send
+paths"**, a list built by grepping for `checkSmsAllowed` and `sendTelnyxSMS`.
+`follow-ups/send-calendar-link` calls neither — it hit `api.telnyx.com/v2/messages` with a raw
+`fetch` — so it was invisible to the search that defined the work, and every sweep confirmed
+itself complete against a list already missing an entry. It had **no DNC check**: a lead who
+texted STOP still received a calendar link from it. Fixed in #124.
+
+This is the third instance of the pattern in "The survey that missed one" above. The lesson is
+the same and it keeps costing: **a survey is only as complete as the grep that built it, and
+the grep is part of the finding — not a detail of how it was found.** The durable check here is
+
+```bash
+grep -rn "api.telnyx.com/v2/messages" app lib --include='*.ts'
+```
+
+Anything in that output other than `lib/telnyx.ts` and `telnyx/send-sms` is a send path outside
+every gate.
+
+Note four paths — `process-drips`, `process-ai-drips`, `receptionist/respond` and the webhook's
+AI replies — reach `/api/telnyx/send-sms` by internal `fetch` and inherit its checks. Counting
+routes rather than paths makes coverage look worse than it is; only tracing the fetches shows
+which is which.
+
+### What is exempt, and why exemption is the safe answer there
+
+- **`system_message`** — the HELP reply, the START confirmation, appointment confirmations and
+  reminders. Carrier-mandated fixed wording, identical for every account. The START text names
+  "promotional and marketing messages" because the campaign declares them, which is exactly the
+  wording the detector scores against. Blocking a HELP reply *is* the compliance failure.
+- **`account_alert`** — notifications to the account owner's own phone. Not marketing, not sent
+  to a lead, already DNC-exempt for the same reason.
+
+### Policy behaviour, verified
+
+`enabled: false` skips scoring. `blockOnHighRisk: false` scores **without** blocking — the score
+is still recorded on the message row, so number health and any future risk tier have data even
+for accounts that decline the block. Settings-read failure falls back to the default policy
+(score, block high risk), which is fail-closed at no availability cost because scoring is pure
+and local.
+
+Threshold is 30: one high-severity word, or two medium. Measured against eight realistic agent
+messages, **no false positives** — highest was 15 ("Limited time…"); "free consultation",
+"free quote" and "save up to 30%" all score 0. Genuinely promotional text scores 100.
+
+`campaigns/run` now scores the **personalized** message, not only the template. A clean template
+could still produce a flagged message once lead data was substituted, and only the template was
+ever checked. The policy is read once per campaign and applied per lead — `loadModerationPolicy`
+and `moderateWithPolicy` are separate exports for exactly this, so a 500-lead campaign does not
+make 500 identical settings queries.
+
+### Blocks are recorded, never swallowed
+
+A scheduled or bulk row blocked by moderation goes to `failed` / `cancelled` with the reason in
+`error_message`. It is treated as **permanent** — identical text scores identically, so leaving
+it pending would mean a cron rejecting it every run forever. The user sees why the message did
+not go out instead of finding it silently missing.
+
 ## Phone normalisation — one rule, in two languages (#100, 2026-07-29)
 
 `lib/phone.ts` → `normalizePhone(input): string | null`. **It must agree with the SQL

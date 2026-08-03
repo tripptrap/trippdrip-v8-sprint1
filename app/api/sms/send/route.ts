@@ -6,6 +6,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { moderateOutbound } from '@/lib/smsModeration';
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 // Admin client to bypass RLS for phone number lookup
@@ -120,6 +121,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Content moderation (#123). This route sent user-authored text with no
+    // spam check at all — `telnyx/send-sms` and `campaigns/run` had one and
+    // nothing else did.
+    //
+    // Scores `messageBody`, the part the user wrote, not `messageToSend` — the
+    // difference is our own mandatory opt-out footer, and "revise your message"
+    // is useless advice when the flagged wording is text we appended.
+    //
+    // Placed before the points deduction below: blocking after spending a point
+    // would charge for a message that never went out.
+    const moderation = await moderateOutbound(createServiceRoleClient(), user.id, messageBody);
+    if (!moderation.allowed) {
+      console.log(`🚫 sms/send blocked by moderation — score ${moderation.spamScore}`);
+      return NextResponse.json(
+        {
+          error: moderation.detail,
+          spamRisk: true,
+          spamScore: moderation.spamScore,
+          detectedWords: moderation.flags,
+          suggestions: moderation.suggestions,
+        },
+        { status: 400 }
+      );
+    }
+
     // Check and deduct points BEFORE sending
     const actionType = isBulk ? 'bulk_message' : 'sms_sent';
     const pointsResult = await spendPointsForAction(actionType, 1);
@@ -156,6 +182,7 @@ export async function POST(req: NextRequest) {
       message: messageToSend,
       from: resolvedFrom,
       mediaUrls: mediaUrls,
+      moderation,
     });
 
     if (!result.success) {
@@ -265,6 +292,10 @@ export async function POST(req: NextRequest) {
         provider: 'telnyx',
         media_urls: mediaUrls || null,
         num_media: mediaUrls?.length || 0,
+        // Recorded even when under the block threshold — an account that keeps
+        // sending 25-scoring messages is a signal worth having (#123).
+        spam_score: moderation.spamScore,
+        spam_flags: moderation.flags,
       });
     }
 

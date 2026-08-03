@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { resolveFromNumber } from "@/lib/resolveFromNumber";
-import { detectSpam } from "@/lib/spam/detector";
+import { loadModerationPolicy, moderateWithPolicy } from "@/lib/smsModeration";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { createNotification } from "@/lib/createNotification";
 import { checkSmsAllowed } from "@/lib/smsGuard";
@@ -183,21 +183,29 @@ export async function POST(req: Request) {
         }, { status: 402 });
       }
 
-      // Check spam risk using full detector
-      if (spamProtection.enabled) {
-        const spamResult = detectSpam(messageTemplate);
-
-        // Block if high risk and blockOnHighRisk is enabled
-        if (spamProtection.blockOnHighRisk && spamResult.isSpammy) {
-          return NextResponse.json({
-            ok: false,
-            error: `Message blocked: High spam risk detected (score: ${spamResult.spamScore}/100). Detected words: ${spamResult.detectedWords.map(w => w.word).join(', ')}. Please revise your message.`,
-            spamRisk: true,
-            spamScore: spamResult.spamScore,
-            detectedWords: spamResult.detectedWords,
-            suggestions: spamResult.suggestions
-          }, { status: 400 });
-        }
+      // Content moderation (#123). Two levels, both needed:
+      //
+      //   here          the raw template, so a spammy campaign is rejected once,
+      //                 before any lead is messaged or any credit spent.
+      //   per lead      the personalized text that actually goes on the wire.
+      //                 A clean template can still produce a flagged message
+      //                 once lead data is substituted in, and until now only the
+      //                 template was ever checked.
+      //
+      // The policy is read once here and reused for every lead — this loop runs
+      // up to `maxBulkRecipients` times and does not need that many identical
+      // settings queries.
+      const moderationPolicy = await loadModerationPolicy(supabase, user.id);
+      const templateModeration = moderateWithPolicy(moderationPolicy, messageTemplate);
+      if (!templateModeration.allowed) {
+        return NextResponse.json({
+          ok: false,
+          error: templateModeration.detail,
+          spamRisk: true,
+          spamScore: templateModeration.spamScore,
+          detectedWords: templateModeration.flags,
+          suggestions: templateModeration.suggestions
+        }, { status: 400 });
       }
 
       // Check rate limits
@@ -350,10 +358,26 @@ export async function POST(req: Request) {
             ? `${personalizedMessage}\n\nReply ${optOutKeyword} to opt out`
             : personalizedMessage;
 
+          // Scores `personalizedMessage`, not `messageToSend` — the difference
+          // is our own opt-out footer, and flagging text we appended would be
+          // both wrong and unactionable.
+          const moderation = moderateWithPolicy(moderationPolicy, personalizedMessage);
+          if (!moderation.allowed) {
+            console.log(`Campaign: blocked message to ${lead.phone} — score ${moderation.spamScore}`);
+            sendResults.push({
+              leadId: String(lead.id),
+              phone: lead.phone,
+              success: false,
+              error: moderation.detail,
+            });
+            continue;
+          }
+
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: messageToSend,
             from: effectiveFrom || undefined,
+            moderation,
           });
 
           if (result.success) {
@@ -430,7 +454,6 @@ export async function POST(req: Request) {
                 .eq('id', existingThread.id);
 
               // Save the message to database with spam score
-              const spamResult1 = detectSpam(personalizedMessage);
               await supabase
                 .from('messages')
                 .insert({
@@ -445,8 +468,8 @@ export async function POST(req: Request) {
                   channel: 'sms',
                   provider: 'telnyx',
                   message_sid: result.messageSid,
-                  spam_score: spamResult1.spamScore,
-                  spam_flags: spamResult1.detectedWords.map(w => w.word),
+                  spam_score: moderation.spamScore,
+                  spam_flags: moderation.flags,
                   created_at: new Date().toISOString()
                 });
             } else {
@@ -471,7 +494,6 @@ export async function POST(req: Request) {
 
               // Save message to database with spam score
               if (newThread) {
-                const spamResult2 = detectSpam(personalizedMessage);
                 await supabase
                   .from('messages')
                   .insert({
@@ -486,8 +508,8 @@ export async function POST(req: Request) {
                     channel: 'sms',
                     provider: 'telnyx',
                     message_sid: result.messageSid,
-                    spam_score: spamResult2.spamScore,
-                    spam_flags: spamResult2.detectedWords.map(w => w.word),
+                    spam_score: moderation.spamScore,
+                    spam_flags: moderation.flags,
                     created_at: new Date().toISOString()
                   });
               }

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
+import { createClient as createSupabaseAdmin, type SupabaseClient } from '@supabase/supabase-js';
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { attachToThread } from "@/lib/threadForSend";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { moderateOutbound, type ModerationDecision } from "@/lib/smsModeration";
 import { resolveFromNumber } from "@/lib/resolveFromNumber";
 import { alertAdminsThrottled } from '@/lib/alerting';
 import { requireCronAuth } from '@/lib/cronAuth';
@@ -270,7 +271,7 @@ async function processScheduledMessages(supabase: any) {
         }
 
         // Send SMS via Telnyx
-        const smsResult = await sendSMS(lead.phone, message.body, primaryNumber?.phone_number);
+        const smsResult = await sendSMS(supabase, message.user_id, lead.phone, message.body, primaryNumber?.phone_number);
 
         if (smsResult.success) {
           // CRIT-1: Atomic credit deduction via RPC — prevents race condition from read-then-write
@@ -540,7 +541,7 @@ async function processScheduledCampaigns(supabase: any) {
           }
 
           // Send SMS
-          const smsResult = await sendSMS(lead.phone, campaign.message, campaignPrimaryNumber?.phone_number);
+          const smsResult = await sendSMS(supabase, campaign.user_id, lead.phone, campaign.message, campaignPrimaryNumber?.phone_number);
 
           if (smsResult.success) {
             // CRIT-1: Atomic credit deduction via RPC
@@ -614,19 +615,43 @@ async function processScheduledCampaigns(supabase: any) {
 }
 
 /**
- * Send SMS via Telnyx
+ * Send SMS via Telnyx, after moderating the content (#123).
+ *
+ * Moderation lives here rather than at the two call sites because both of them
+ * — the scheduled-message loop and the campaign-batch loop — need it, and a
+ * helper that both already funnel through cannot be forgotten by one of them.
+ *
+ * A block is returned as an ordinary failure with a readable error. That is
+ * deliberate: both callers already mark the row `failed` and store `error` in
+ * `error_message`, so the user sees *why* their scheduled message did not go
+ * out instead of finding it silently missing. It is also correctly permanent —
+ * retrying identical text would fail identically, so `failed` beats leaving it
+ * pending for a cron that will keep rejecting it.
  */
-async function sendSMS(to: string, body: string, from?: string): Promise<{ success: boolean; error?: string; messageSid?: string }> {
+async function sendSMS(
+  supabase: SupabaseClient,
+  userId: string,
+  to: string,
+  body: string,
+  from?: string
+): Promise<{ success: boolean; error?: string; messageSid?: string; moderation: ModerationDecision }> {
+  const moderation = await moderateOutbound(supabase, userId, body);
+  if (!moderation.allowed) {
+    console.log(`🚫 Scheduled send blocked by moderation for user ${userId} — score ${moderation.spamScore}`);
+    return { success: false, error: moderation.detail || 'Blocked by content moderation', moderation };
+  }
+
   const result = await sendTelnyxSMS({
     to,
     message: body,
     from,
+    moderation,
   });
 
   if (result.success) {
-    return { success: true, messageSid: result.messageSid };
+    return { success: true, messageSid: result.messageSid, moderation };
   } else {
-    return { success: false, error: result.error || 'Failed to send SMS' };
+    return { success: false, error: result.error || 'Failed to send SMS', moderation };
   }
 }
 

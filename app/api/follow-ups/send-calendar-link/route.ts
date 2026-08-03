@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { checkSmsAllowed } from '@/lib/smsGuard';
+import { exemptFromModeration } from '@/lib/smsModeration';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
+import { sendTelnyxSMS } from '@/lib/telnyx';
 
 // Credit changes run on the service-role client, never the caller's (#114).
 //
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Get lead details
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('id, first_name, last_name, phone')
+      .select('id, first_name, last_name, phone, state, zip_code')
       .eq('id', leadId)
       .eq('user_id', user.id)
       .single();
@@ -47,6 +51,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Lead has no phone number' }, { status: 400 });
     }
 
+    // Opt-out, suspension and rate gate (#123).
+    //
+    // This route had **none** of them. It calls the Telnyx API directly instead
+    // of going through sendTelnyxSMS, and it is not in `follow-ups` or any cron,
+    // so every previous sweep of "the send paths" missed it — #40 (DNC), #50
+    // (quiet hours), #121 (suspension and rate caps) and #122 (from-number
+    // resolution) each enumerated eight paths and this was the ninth. A lead who
+    // texted STOP still received a calendar link from here.
+    //
+    // Placed before the message is built, sent, or charged for.
+    //
+    // Quiet hours off: a user pressing "send calendar link" is a deliberate act,
+    // the same rule manual sends follow (#50).
+    const guard = await checkSmsAllowed(createServiceRoleClient(), user.id, lead.phone, {
+      recipientState: lead.state,
+      context: { source: 'follow_up_calendar_link', lead_id: lead.id, follow_up_id: followUpId ?? null },
+    });
+
+    if (!guard.allowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: guard.detail || 'Message blocked',
+          reason: guard.reason,
+          retryable: !!guard.retryable,
+          on_dnc_list: guard.reason === 'dnc',
+        },
+        { status: guard.reason === 'rate_limited' ? 429 : 403 }
+      );
+    }
+
     // Get user's preferences
     const { data: prefs, error: prefsError } = await supabase
       .from('user_preferences')
@@ -57,15 +92,15 @@ export async function POST(req: NextRequest) {
     const calendlyUrl = prefs?.calendar_booking_url;
     const effectiveType = calendarType || prefs?.calendar_type || 'calendly';
 
-    // Get user's Telnyx number
-    const { data: telnyxNumber, error: telnyxError } = await supabase
-      .from('user_telnyx_numbers')
-      .select('phone_number')
-      .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single();
+    // Shared resolver (#122) rather than a blind is_primary lookup, which
+    // ignored geo-routing and — more importantly — sent from numbers the user
+    // had locked or rested. Resting a number is pointless if a send path keeps
+    // using it.
+    const fromNumber = await resolveFromNumber(createServiceRoleClient(), user.id, {
+      leadZipCode: lead.zip_code ?? null,
+    });
 
-    if (telnyxError || !telnyxNumber) {
+    if (!fromNumber) {
       return NextResponse.json({ ok: false, error: 'No phone number configured for sending' }, { status: 400 });
     }
 
@@ -130,25 +165,21 @@ export async function POST(req: NextRequest) {
       messageBody = `Hi${firstName ? ` ${firstName}` : ''}! Here's a link to schedule a time to chat: ${calendlyUrl}`;
     }
 
-    // Send via Telnyx
-    const telnyxResponse = await fetch('https://api.telnyx.com/v2/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.TELNYX_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: telnyxNumber.phone_number,
-        to: lead.phone,
-        text: messageBody,
-        messaging_profile_id: process.env.TELNYX_MESSAGING_PROFILE_ID,
-      }),
+    // Through the shared helper rather than a hand-rolled fetch, so this path
+    // is visible to anything that inspects sends in future (#123).
+    //
+    // Exempt from scoring: the body is our own template — a greeting, and either
+    // the user's booking URL or slots read from their calendar. There is no
+    // user-authored prose here to moderate.
+    const sendResult = await sendTelnyxSMS({
+      to: lead.phone,
+      from: fromNumber,
+      message: messageBody,
+      moderation: exemptFromModeration('system_message'),
     });
 
-    const telnyxData = await telnyxResponse.json();
-
-    if (!telnyxResponse.ok) {
-      console.error('Telnyx error:', telnyxData);
+    if (!sendResult.success) {
+      console.error('Telnyx error:', sendResult.error);
       return NextResponse.json({ ok: false, error: 'Failed to send SMS' }, { status: 500 });
     }
 
@@ -159,14 +190,14 @@ export async function POST(req: NextRequest) {
     const { error: msgInsertError } = await supabase.from('messages').insert({
       user_id: user.id,
       lead_id: leadId,
-      from_phone: telnyxNumber.phone_number,
+      from_phone: fromNumber,
       to_phone: lead.phone,
       content: messageBody,
       body: messageBody,
       direction: 'outbound',
       status: 'sent',
       channel: 'sms',
-      message_sid: telnyxData.data?.id,
+      message_sid: sendResult.messageSid,
     });
 
     if (msgInsertError) {

@@ -1,4 +1,5 @@
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { exemptFromModeration } from '@/lib/smsModeration';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createNotification, NotificationType } from '@/lib/createNotification';
 import { sendEmail } from '@/lib/sendEmail';
@@ -98,6 +99,8 @@ export async function sendSmsAlertToUser(
             to: userData.phone_number,
             message: alertBody,
             from: telnyxNum?.phone_number,
+            // The account owner's own phone — see /api/notifications/sms-alert (#123).
+            moderation: exemptFromModeration('account_alert'),
           }).catch(err => console.error('SMS alert send failed:', err));
         }
       }

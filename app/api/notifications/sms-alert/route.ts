@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { exemptFromModeration } from '@/lib/smsModeration';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,9 @@ export async function POST(req: NextRequest) {
       to: userData.phone_number,
       message: alertBody,
       from: telnyxNum?.phone_number,
+      // Alert to the account owner's own phone, not a lead. Not marketing, and
+      // already exempt from the DNC gate for the same reason (#123).
+      moderation: exemptFromModeration('account_alert'),
     });
 
     return NextResponse.json({ ok: result.success, error: result.error });

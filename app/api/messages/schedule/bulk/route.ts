@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { calculateSMSCredits } from "@/lib/creditCalculator";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { moderateOutbound } from "@/lib/smsModeration";
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
 
 export const dynamic = "force-dynamic";
@@ -252,10 +253,30 @@ export async function PUT(req: NextRequest) {
           const fromNumber = await resolveFromNumber(adminClient, user.id, {
             leadZipCode: lead.zip_code ?? null,
           });
+          // Content moderation (#123). Bulk scheduling sent user-authored text
+          // with no spam check — the same gap sms/send and the scheduled cron
+          // had. A block is permanent (identical text scores identically), so
+          // the row is cancelled with a readable reason rather than left pending
+          // for a cron that would reject it on every run.
+          const moderation = await moderateOutbound(adminClient, user.id, message.body);
+          if (!moderation.allowed) {
+            console.log(`Bulk send: blocked ${message.id} by moderation — score ${moderation.spamScore}`);
+            await adminClient
+              .from('scheduled_messages')
+              .update({
+                status: 'cancelled',
+                error_message: moderation.detail || 'Blocked by content moderation',
+              })
+              .eq('id', message.id);
+            failed++;
+            continue;
+          }
+
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: message.body,
             from: fromNumber || undefined,
+            moderation,
           });
 
           if (result.success) {

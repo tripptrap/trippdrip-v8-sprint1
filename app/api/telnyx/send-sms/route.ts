@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
-import { detectSpam } from '@/lib/spam/detector';
+import { moderateWithPolicy } from '@/lib/smsModeration';
 import { isInternalCaller } from '@/lib/cronAuth';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -183,21 +183,27 @@ export async function POST(req: NextRequest) {
       optOutKeyword = 'STOP';
     }
 
-    // Check spam risk using full detector
+    // Content moderation (#123). One shared implementation with every other
+    // send path now — this route and campaigns/run each carried their own copy,
+    // and the three paths that carried neither are what prompted centralising it.
+    //
+    // `spamProtection` is still loaded above because the per-contact and
+    // cooldown limits below read it; moderateWithPolicy takes the same object.
+    //
+    // No longer conditional on `userId && supabaseAdmin`. Scoring is pure and
+    // local, so there was never a reason an anonymous send got to skip it.
+    const moderation = moderateWithPolicy(spamProtection, message);
+    if (!moderation.allowed) {
+      return NextResponse.json({
+        error: moderation.detail,
+        spamRisk: true,
+        spamScore: moderation.spamScore,
+        detectedWords: moderation.flags,
+        suggestions: moderation.suggestions
+      }, { status: 400 });
+    }
+
     if (spamProtection.enabled && userId && supabaseAdmin) {
-      const spamResult = detectSpam(message);
-
-      // Block if high risk and blockOnHighRisk is enabled
-      if (spamProtection.blockOnHighRisk && spamResult.isSpammy) {
-        return NextResponse.json({
-          error: `Message blocked: High spam risk detected (score: ${spamResult.spamScore}/100). Please revise your message.`,
-          spamRisk: true,
-          spamScore: spamResult.spamScore,
-          detectedWords: spamResult.detectedWords.map(w => w.word),
-          suggestions: spamResult.suggestions
-        }, { status: 400 });
-      }
-
       // Check rate limits
       const now = new Date();
       const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
@@ -571,8 +577,6 @@ export async function POST(req: NextRequest) {
       // Save the message with spam score
       if (finalThreadId) {
         console.log('💾 Saving message to thread:', finalThreadId);
-        const spamResult = detectSpam(message);
-        const spamFlags = spamResult.detectedWords.map(w => w.word);
         const { error: insertError } = await supabaseAdmin.from('messages').insert({
           user_id: userId, // Required for RLS
           thread_id: finalThreadId,
@@ -587,8 +591,8 @@ export async function POST(req: NextRequest) {
           media_urls: mediaUrls?.length > 0 ? mediaUrls : null,
           channel: mediaUrls?.length > 0 ? 'mms' : 'sms',
           provider: 'telnyx',
-          spam_score: spamResult.spamScore,
-          spam_flags: spamFlags,
+          spam_score: moderation.spamScore,
+          spam_flags: moderation.flags,
           created_at: new Date().toISOString(),
         });
 
