@@ -1185,7 +1185,8 @@ export default function Page() {
               Global Rate Limits
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Set overall limits for all outbound messages across your account.
+              Applied to every outbound message, on every path — manual sends,
+              campaigns, drips, scheduled and bulk.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1258,7 +1259,10 @@ export default function Page() {
                   />
                   <span className="text-sm text-slate-500">msgs/hour</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Per campaign limit (10-500)</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Per campaign limit (10-500). Checked against the size of each run,
+                  not against how many were sent in the last hour.
+                </p>
               </div>
             </div>
           </div>
@@ -1332,7 +1336,10 @@ export default function Page() {
                 />
                 <span className="text-sm text-slate-500">recipients per send</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Maximum recipients in a single bulk send operation (10-5000)</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Maximum recipients in a single bulk send operation (10-5000).
+                Enforced on campaign runs.
+              </p>
             </div>
           </div>
 

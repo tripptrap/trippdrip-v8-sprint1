@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { Clock, User, Phone, DollarSign, RefreshCw, X, Send, CheckSquare, Square, Loader2, Calendar, Zap, Megaphone, Users } from "lucide-react";
+import { Clock, User, Phone, DollarSign, RefreshCw, X, Send, CheckSquare, Square, Loader2, Calendar, Zap, Megaphone, Users, PauseCircle, AlertTriangle } from "lucide-react";
 import CustomModal from "@/components/CustomModal";
 
 interface ScheduledMessage {
@@ -18,6 +18,11 @@ interface ScheduledMessage {
   created_at: string;
   source?: 'manual' | 'drip' | 'campaign' | 'bulk';
   campaign_id?: string;
+  /** Why status='failed'. */
+  error_message?: string | null;
+  /** Why a run declined to send a still-pending row — quiet hours, a cap (#128). */
+  last_deferred_reason?: string | null;
+  last_deferred_at?: string | null;
   leads?: {
     id: string;
     first_name: string;
@@ -229,6 +234,17 @@ export default function ScheduledMessagesPage() {
       case 'cancelled': return 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/10 border-slate-200 dark:border-slate-700';
       default: return 'text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
+  }
+
+  /** "3 minutes ago" — a stale value on a pending row means the cron itself stopped. */
+  function timeAgo(iso: string) {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days === 1 ? '' : 's'} ago`;
   }
 
   function getTimeUntil(scheduledFor: string) {
@@ -450,6 +466,32 @@ export default function ScheduledMessagesPage() {
                   </div>
 
                   <p className="text-slate-900 dark:text-slate-100 mb-3 line-clamp-2">{message.body}</p>
+
+                  {/* Why this is still waiting (#128).
+                      Without it, a message held back by quiet hours or a rate
+                      cap looked exactly like one the cron never picked up — the
+                      user had no way to tell the difference. */}
+                  {message.status === 'pending' && message.last_deferred_reason && (
+                    <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300">
+                      <PauseCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>
+                        <span className="font-medium">Waiting.</span> {message.last_deferred_reason}
+                        {message.last_deferred_at && (
+                          <span className="text-amber-700/70 dark:text-amber-400/70">
+                            {' '}— last checked {timeAgo(message.last_deferred_at)}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* A failed row showed only the word FAILED. */}
+                  {message.status === 'failed' && message.error_message && (
+                    <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{message.error_message}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
                     <div className="flex items-center gap-2">
