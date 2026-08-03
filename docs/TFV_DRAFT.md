@@ -170,24 +170,21 @@ agent, timestamp and the verbatim disclosure text.
 > business, that it can produce evidence on request, and that it is responsible for the lawful
 > basis on which they are contacted. The consent evidence itself is held by the business.
 
-### `optInConfirmationResponse` — NEEDS A DECISION
+### `optInConfirmationResponse` — DONE
 
 | | |
 |---|---|
 | current | `You are now subscribed to messages from {AgencyName}. Msg frequency varies. Msg & data rates may apply. Reply STOP to unsubscribe or HELP for info.` |
 
-**The product does not send this.** Completing the hosted form records consent and creates the
-contact; no message goes out. Declaring it would be the same class of misstatement that #131 just
-removed from the public evidence page.
+**Implemented 2026-08-03.** Completing the hosted form now sends exactly this, from the
+business's own number. It is guarded like any other send — someone on the suppression list who
+completes the form does not receive it, because opting in through a webpage does not override a
+STOP. Non-fatal: a send failure never loses the consent record.
 
-Two ways forward:
+Proposed text, near-identical to the current declaration:
 
-1. **Implement it** — one message when the hosted form is completed. Standard practice, confirms
-   to the consumer that consent registered, and lets the field stay. Small change.
-2. **Remove the claim** — accurate, but a reviewer expects a confirmation, and its absence invites
-   a question.
-
-**Recommendation: implement it**, and keep wording close to the current text.
+> You are now subscribed to messages from {BusinessName}. Msg frequency varies. Msg & data rates
+> may apply. Reply STOP to unsubscribe or HELP for info.
 
 ### `helpMessageResponse` — SHOULD CHANGE
 
@@ -204,10 +201,12 @@ contact. Quote what actually goes out.
 Approved for five; **three exist**: `+18887062631`, `+18886638510`, `+18884610148`.
 `+18886642550` and `+18884080726` are gone.
 
-> ⚠️ All three show `purchased_at` 2026-07-26 — **six months after this verification was granted
-> on 2026-01-16.** Either they were released and re-acquired, or the numbers now held are not the
-> ones verified. **Only you can resolve this**, and it should be settled before submitting
-> anything, because it determines whether this is an amendment or a fresh request.
+**Answered 2026-08-03:** these are the same numbers that were verified. They were released when
+the Telnyx account was suspended for non-payment, then re-acquired on 2026-07-26.
+
+That is worth stating to Telnyx rather than hiding: a number that leaves the account and comes
+back may or may not still be covered by the original verification, and assuming it is could mean
+sending on an unverified number. Included in the question below.
 
 ### `messageVolume` — NEEDS YOUR INPUT
 
@@ -225,7 +224,7 @@ ISV argument has to carry the whole request, and numbers will come in reviewed b
 
 `businessName` HyveWyre LLC · `doingBusinessAs` HyveWyre · `entityType` PRIVATE_PROFIT ·
 `businessRegistrationNumber` 41-2842279 (EIN) · `12325 Magnolia Street, San Antonio, FL 33576` ·
-contact **Carson Rios** (see note) · `corporateWebsite`
+contact **Carson Rios, support@hyvewyre.com, +18134658966** · `corporateWebsite`
 https://www.hyvewyre.com · `privacyPolicyURL` /privacy · `termsAndConditionURL` /terms ·
 `ageGatedContent` false · `optInKeywords` START · `isvReseller` HyveWyre LLC
 
@@ -234,8 +233,9 @@ majority owner. Either can be the authorised contact. Recommend leaving **Carson
 filing so it matches the registration Telnyx can verify, and adding Tripp as a second contact if
 the form allows one.
 
-The evidence page footer gives **support@hyvewyre.com** while the filing gives **business@** —
-these should agree. The product accepts START, UNSTOP and YES; declaring only START is fine,
+**Email, answered 2026-08-03:** both inboxes are reachable, so the filing moves to
+**support@hyvewyre.com** to match the public evidence page footer, rather than changing the page.
+One address, both places. The product accepts START, UNSTOP and YES; declaring only START is fine,
 since supporting more than declared is not a misstatement.
 
 ---
@@ -247,13 +247,10 @@ businesses, one number each) · verticals (not industry-specific).
 
 **Still open**
 
-1. Legal name, EIN and address unchanged? `business@` or `support@` as the contact email?
-2. **The phone numbers.** All three were purchased 2026-07-26; this verification was granted
-   2026-01-16. Released and re-bought, or were these never the verified set?
-3. Opt-in confirmation SMS — implement it, or drop the claim? (recommend: implement)
-4. **Ask Telnyx:** can a Verified request be amended in place, or does this mean a new
-   submission — and do the three numbers keep sending while a replacement is reviewed? Getting
-   this wrong could take your only sending capability offline.
+1. Legal name, EIN and address unchanged?
+2. **Ask Telnyx** — see `docs/TFV_QUESTION_FOR_TELNYX.md`. Two things must be settled before
+   anything is submitted: whether the numbers are still covered after being released and
+   re-acquired, and whether a Verified request can be amended in place or needs replacing.
 
 ---
 

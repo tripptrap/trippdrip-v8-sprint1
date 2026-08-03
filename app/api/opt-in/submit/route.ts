@@ -3,6 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { limitByIp, observeRate, clientIp } from '@/lib/rateLimit';
 import { normalizePhone } from '@/lib/phone';
 import { consentFields } from '@/lib/leadConsent';
+import { resolveFromNumber } from '@/lib/resolveFromNumber';
+import { checkSmsAllowed } from '@/lib/smsGuard';
+import { sendTelnyxSMS } from '@/lib/telnyx';
+import { exemptFromModeration } from '@/lib/smsModeration';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -175,6 +179,58 @@ export async function POST(req: NextRequest) {
       }
     } catch (leadErr) {
       console.error('Opt-in lead creation failed (consent still recorded):', leadErr);
+    }
+
+    // Confirm the subscription to the consumer (#3).
+    //
+    // The toll-free verification declares a confirmation message. Until now the
+    // form recorded consent and sent nothing, so the declaration was false —
+    // the same class of misstatement removed from the public evidence page in
+    // #131. Rather than drop the claim, the behaviour is completed: a
+    // confirmation is standard practice and tells the person their opt-in
+    // registered.
+    //
+    // Non-fatal, like the lead creation above. The consent record is what
+    // matters and it is already written; a failure to send must not lose it or
+    // make the form look broken to someone who did nothing wrong.
+    try {
+      const resolved = await resolveFromNumber(supabaseAdmin, business.id, { leadZipCode: null });
+
+      if (!resolved.ok) {
+        console.error(`Opt-in confirmation not sent for ${business.id}: ${resolved.reason}`);
+      } else {
+        // Guarded like any other send. Someone can complete this form while on
+        // the suppression list — opting in through a webpage does not override
+        // a STOP, which is permanent by design. Quiet hours stay off: this is a
+        // direct response to something the person just did.
+        const guard = await checkSmsAllowed(supabaseAdmin, business.id, e164, {
+          context: { source: 'opt_in_confirmation' },
+        });
+
+        if (!guard.allowed) {
+          console.log(`Opt-in confirmation withheld for ${e164} — ${guard.reason}`);
+        } else {
+          const brand = business.business_name?.trim() || 'this business';
+          const result = await sendTelnyxSMS({
+            to: e164,
+            from: resolved.number,
+            message:
+              `You are now subscribed to messages from ${brand}. ` +
+              `Msg frequency varies. Msg & data rates may apply. ` +
+              `Reply STOP to unsubscribe or HELP for info.`,
+            // Fixed, carrier-facing wording, identical for every business —
+            // scoring our own compliance text could block the confirmation the
+            // filing declares.
+            moderation: exemptFromModeration('system_message'),
+          });
+
+          if (!result.success) {
+            console.error(`Opt-in confirmation failed for ${e164}:`, result.error);
+          }
+        }
+      }
+    } catch (confirmErr) {
+      console.error('Opt-in confirmation failed (consent still recorded):', confirmErr);
     }
 
     return NextResponse.json({ ok: true });
