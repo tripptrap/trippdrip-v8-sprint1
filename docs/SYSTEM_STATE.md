@@ -1487,6 +1487,31 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Resubmitting a TFV makes the number UNVERIFIED until re-approved (#3, 2026-08-03)
+
+Confirmed by Telnyx support, verbatim:
+
+> if you submit a new Verification Request for an already approved toll-free number, it will be
+> overwritten and become unverified until the new request is approved
+
+**So the rewrite in `docs/TFV_DRAFT.md` must not be submitted.** Doing so takes the three
+toll-free numbers unverified for the length of the review — days to weeks — and every agent on a
+toll-free number stops sending. The draft is correct and ready; submitting it is the dangerous
+part.
+
+Two things are with Telnyx's compliance team and must come back before anything is filed:
+
+1. Whether the three numbers are still covered after being **released and re-acquired**. They were
+   released when the account was suspended for non-payment and re-bought 2026-07-26. Support
+   confirmed the verification still reads Verified and lists them, but could not confirm coverage
+   survives a release — it is not documented.
+2. The safe path to update a Verified request without a service gap, and how to request
+   100–1,000 numbers as an ISV.
+
+**The rule this establishes: never resubmit to correct a Verified record.** Ask compliance for an
+amendment path first. The instinct to "just resubmit with the right text" costs sending on every
+covered number.
+
 ## Six columns CLAUDE.md documented that do not exist (#109, #112, 2026-08-03)
 
 The issue named two. Checking **every** column the file documents found six:

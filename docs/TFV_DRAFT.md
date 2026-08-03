@@ -1,7 +1,19 @@
 # Toll-free verification — draft for review
 
-**Not submitted.** Project rule: never submit a TFV or 10DLC request without explicit
-instruction. This is a document to read, correct, and approve.
+> ## ⛔ DO NOT SUBMIT
+>
+> Telnyx support, 2026-08-03: *"if you submit a new Verification Request for an already approved
+> toll-free number, it will be overwritten and become unverified until the new request is
+> approved."*
+>
+> Submitting this takes all three numbers unverified for the length of the review, and every
+> agent on toll-free stops sending. **Wait for Telnyx compliance** to confirm an amendment path,
+> whether the re-acquired numbers are still covered, and how to request ISV-scale volume.
+>
+> The text below is ready. The timing is not.
+
+Project rule: never submit a TFV or 10DLC request without explicit instruction. This is a
+document to read, correct, and approve.
 
 Baseline is the currently **Verified** record `6723e639-83ee-5c48-9ec7-b550fdce868c`, re-fetched
 from the Telnyx API 2026-08-03. Every "current" value below is verbatim from it.
