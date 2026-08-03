@@ -1473,6 +1473,48 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## The client threw away the server's classification (#128, 2026-08-03)
+
+Parse a send failure with **`parseSendError(status, body)`** from `lib/sendError`. Never read
+`data.error` on its own.
+
+The four send endpoints classify every block — `reason`, `retryable`, `spamScore`,
+`detectedWords`, `suggestions`, `on_dnc_list` — plus a status that already separates 402
+(out of credits) from 429 (slow down) from 403 (not allowed). Across every `.tsx` in the
+product, **exactly one** of those fields was ever read: `on_dnc_list`, in two places.
+Everything else became `data.error` in a four-second toast, or was discarded outright in
+favour of a count.
+
+The classification work was being done and then deleted by the caller.
+
+### A block is a state, not an event
+
+A rate cap is still in force after a toast has faded, and a toast cannot hold a spam score with
+suggested rewrites. Anything the user must *act on* belongs in a persistent banner; only genuine
+one-offs stay toasts. The Composer's existing DNC banner was already the right shape and is the
+pattern to match.
+
+`SendBlockedError` carries the block through the throw-based flow in `TextsLayout` — the line
+`throw new Error(data.error)` was where the structure died, one line after the payload was
+parsed. Subclassing keeps every existing `catch (err) { toast.error(err.message) }` working.
+
+### Loops must stop when the block will not clear
+
+`BulkComposeDrawer` sends with a 100ms delay — ten a second, against a **default cap of ten a
+minute**. On hitting a rate cap it used to keep going, firing dozens of requests certain to be
+rejected and worsening the account's standing while reporting only "N failed". It now stops on
+a rate cap, suspension or empty balance, and reports how many were never attempted.
+
+### "Campaign started" was false
+
+The Leads page posts to `/api/campaigns/run` **without `sendSMS`**, so that request creates a
+campaign and applies tags — it sends nothing. The fixed success string said otherwise. When
+`sendSMS` is set, the route returns a per-lead breakdown carrying the guard's own
+`Deferred:` / `Skipped:` reasons, and the page discarded all of it.
+
+Worth remembering when reading that route: `sendSMS` defaults to false, so most of its send
+logic is unreachable from the current UI.
+
 ## Two rate limits that had never once fired (#128, 2026-08-03)
 
 `maxMessagesPerContact` and `cooldownMinutes` were offered in Settings, saved by users, and
