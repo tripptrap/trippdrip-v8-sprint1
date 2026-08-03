@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { spendPointsForAction, addPoints, getActionCost } from "@/lib/pointsSupabase";
+// pointsSupabaseServer, not pointsSupabase (audit, 2026-08-03).
+//
+// This route imported the CLIENT-side module, whose own first line says "For
+// server-side usage (API routes), use pointsSupabaseServer.ts instead". That
+// module builds a browser Supabase client, which in a route handler has no
+// cookies and therefore no session — so `auth.getUser()` returned null and
+// every upload answered 402 {"error":"Not authenticated"}.
+//
+// Confirmed against production with a two-row CSV before the fix. The whole
+// document-import feature was dead for every file type, not just the PDF path
+// fixed in 4627780.
+import { spendPointsForAction, addPoints, getActionCost } from "@/lib/pointsSupabaseServer";
 import { normalizePhone } from '@/lib/phone';
 
 export const dynamic = "force-dynamic";
