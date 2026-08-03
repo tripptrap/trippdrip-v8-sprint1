@@ -1473,6 +1473,56 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Send limits move with an account's behaviour (#123 gap 4, 2026-08-03)
+
+A rolling 7-day opt-out rate multiplies every configured cap, in `lib/riskTier`:
+
+| tier | opt-out rate | factor |
+|---|---|---|
+| healthy | < 3% | ×1 |
+| watch | 3–5% | ×0.5 |
+| poor | 5–10% | ×0.25 |
+| critical | ≥ 10% | ×0.1 **+ admin alert** |
+
+Content the detector would have blocked, sent anyway because the account turned blocking off,
+shifts the tier one worse — weaker than what recipients actually did, so it adjusts rather than
+decides.
+
+### Two properties that matter more than the thresholds
+
+**It recovers by itself.** The window is rolling, so as bad traffic ages out the tier improves
+with no operator action. A throttle that needs a human to lift it is a suspension with extra
+steps.
+
+**It never reaches zero.** The worst tier still permits a tenth of normal. Cutting an account
+off is a *suspension* — deliberate, reversible, accountable — and `account_status` already
+exists for it. An automatic system that can silently take a paying customer to zero is one bad
+threshold away from an outage nobody ordered. The worst tier throttles hard and **alerts**, and
+a human decides.
+
+`applyRiskFactor` is the only place a cap is ever scaled, and it **floors at 1**. `smsGuard`
+reads `cap === 0` as *zero allowed* (deliberately — that is how an operator stops an account),
+so a small cap rounding down would have silently converted a throttle into a total block.
+
+### The volume floor is load-bearing, not a nicety
+
+Run against production while building this, a live account reported an **80% opt-out rate** —
+4 opt-outs on 5 sends, from someone testing STOP. Without `MIN_SENDS_FOR_A_VERDICT` it would
+have been throttled to the bone on five messages of noise.
+
+**Any rate over a handful of sends is not a measurement.** The same floor already existed in the
+per-number health view; it now lives in `lib/riskTier` and is imported there, along with
+`OPT_OUT_WATCH` and `OPT_OUT_REST` — two places judging "is this opt-out rate bad" must not be
+able to drift to different answers.
+
+### Cost
+
+`getAccountRisk` runs on every send, as does `getNumberCapacity` (gap 2) — two extra round trips
+per message on top of what the guard already did. 3.3ms at current volume. `dnc_history` had no
+composite index, so `idx_dnc_history_user_added` was added; without it this degrades into a scan
+of one account's entire opt-out history per message. If this ever shows up in send latency, the
+tier changes slowly by construction and is the obvious thing to cache.
+
 ## Per-number capacity, and why it is not a per-number cap (#123 gap 2, 2026-08-03)
 
 Two thresholds with different jobs, in `lib/numberCapacity`:
