@@ -676,9 +676,14 @@ a query — see the comment in `threads/bulk-ai-toggle/route.ts`.
 - [ ] **10DLC campaign is APPROVED — one step left: assign the number.** The live campaign is
   `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` (brand `4b20019b-eba4-6bfd-8723-dca9058142e8`,
   VERIFIED). Verified 2026-07-30: `campaignStatus: MNO_PROVISIONED`, `isTMobileRegistered: true`,
-  `isTMobileSuspended: false`, `failureReasons: null`, all seven MNOs APPROVED. **0 numbers are
-  assigned**, which is the only thing left — assign `+18134972176` via Settings → Messaging
-  Registration ("Assign my number").
+  `isTMobileSuspended: false`, `failureReasons: null`, all seven MNOs APPROVED.
+  **Corrected 2026-08-03: it is NOT true that "0 numbers are assigned".** Checked against
+  `GET /10dlc/phone_number_campaigns/<number>`:
+  - `+18135187997` **is** assigned to CAAP953 and can send.
+  - `+18134972176` is assigned to nothing — this is the number #105 is about.
+  - `+18887062631` (toll-free) is TFV **Verified** and can send.
+  So the account has two numbers that can legitimately send. What is blocked is assigning
+  **that one specific number**, not messaging as a whole.
   **Blocked as of 2026-07-30 (#105):** the assignment fails — AT&T and T-Mobile report
   *"Longcode cannot be added/deleted as it is already associated with another campaign"* while
   non-T-Mobile carriers accept it. One of the five dead campaigns still holds the number at

@@ -2984,6 +2984,69 @@ code is a bug-finding technique, not just a copy exercise.
 
 ---
 
+## The resolver picked the one number that could not deliver (`ac9cbbd`, 2026-08-03)
+
+`resolveFromNumber` knew about type, primary, lock, rest and capacity — every property
+except the one carriers actually gate on. `user_telnyx_numbers` had no registration column
+at all, so it could not have known. On the live account it therefore chose the single number
+that cannot deliver:
+
+| number | type | primary | registration |
+|---|---|---|---|
+| `+18134972176` | local | **yes** | assigned to no campaign |
+| `+18135187997` | local | no | CAAP953, MNO_PROVISIONED |
+| `+18887062631` | tollfree | no | TFV **Verified** |
+
+It prefers local over toll-free for new conversations (#129), then takes the primary —
+landing on the unregistered local while two working numbers sat unused.
+
+**This corrects CLAUDE.md**, which said "0 numbers are assigned". One local number *is*
+assigned and the toll-free *is* verified. #105 is about `+18134972176` specifically, not
+about messaging being blocked account-wide.
+
+### Unknown is a third state, and collapsing it would have caused an outage
+
+`registration_synced_at IS NULL` means nobody has asked Telnyx — **not** "unregistered".
+Treating unknown as unregistered would have blocked every send on every account the moment
+this shipped, before the first sync ran.
+
+    registered    known good      always preferred
+    unknown       never synced    usable — refusing on data we never collected
+                                  punishes the user for our own gap
+    unregistered  known bad       refused, new `none_registered` reason
+
+Same shape as any cache-backed gate: *absence of a record is not a negative record.*
+
+### A thread pinned to an unregistered number now re-resolves
+
+#129 pins a conversation to the number it started on. That pin is now conditional on the
+number being able to deliver: continuity is a benefit of messages **arriving** from a
+familiar number, and keeping the pin would trade a visible number change for silent
+non-delivery.
+
+### Telnyx returns verification requests OLDEST first
+
+Not newest first. The first cut of `syncNumberRegistration` reversed the list on the
+opposite assumption, so the oldest verdict won and this account's currently-**Verified**
+toll-free was written as `rejected` — which would have blocked a number that works. The
+three records are Rejected (Dec 20), Rejected (Dec 26), Verified (Jan 10).
+
+Now sorted by `updatedAt`/`createdAt` explicitly, which is correct under either ordering.
+**Found only by running the sync and reading the result** — the code type-checked, ran
+without error, and produced a confident wrong answer.
+
+### Where the state comes from
+
+`lib/numberRegistration.ts` owns the rule (`isRegistered`: a long code needs a campaign, a
+toll-free needs verification) and the reconcile. Telnyx is the source of truth; the three
+columns are a cache. The sync runs from `GET /api/telnyx/numbers` when older than 6 hours —
+that route already calls Telnyx for the toll-free auto-release, so it is not a new class of
+round trip, and registration only matters when someone is looking at or about to use their
+numbers. `can_send` and `registration_gap` are computed server-side so the phone-numbers
+page cannot drift from what the resolver does.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
