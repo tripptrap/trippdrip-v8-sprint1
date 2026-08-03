@@ -1487,6 +1487,53 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Which tenant an inbound belongs to (#111, 2026-08-03)
+
+`resolve_inbound_tenant(p_to, p_from)` is the single answer. It returns
+`(user_id, matched_by, ambiguous)` — `matched_by` so a guess is logged as a guess, `ambiguous`
+so the caller can refuse rather than pick.
+
+Order, and why:
+
+| step | signal | authoritative? |
+|---|---|---|
+| 1 | `user_telnyx_numbers` by receiving number, **any status** | yes |
+| 2 | `number_pool.assigned_to_user_id` by receiving number | yes — and was never consulted before |
+| 3 | `threads` by sender, **only if one tenant matches** | a guess |
+| 4 | `leads` by sender, **only if one tenant matches** | a guess |
+
+**The receiving number is the only thing that identifies an account.** Everything after it is
+inference, and the handler's own comment said so long before this was fixed: *"can route to the
+wrong tenant if two tenants have the same lead."*
+
+### Normalising alone would have made it worse
+
+The two sender-based steps compared phone strings exactly, so a lead stored as `(813) 465-8966`
+was invisible to an E.164 inbound and the message was dropped.
+
+They also used `.single()`, which **errors** on multiple rows — and that accident is the only
+reason a shared lead produced a *dropped* message rather than one delivered to the wrong
+business's inbox. Fixing the comparison without addressing ambiguity would have removed the
+accident and started leaking consumer replies across tenants.
+
+**When a broken lookup is failing safe by accident, fix the safety before the lookup.**
+
+### An unattributable inbound alerts
+
+It is a lead's reply nobody will ever see, and Telnyx does not redeliver. A console line on a
+serverless log is the same failure as #80. The alert distinguishes "not our number" from "two
+accounts have this contact", and states that an ambiguous message was **not** delivered to a
+guess.
+
+### `dnc_list.phone_number` is the caller's string, not the normalised one
+
+`add_to_dnc` stores `p_phone_number` verbatim and the normalised form in `normalized_phone`.
+They match today only because every entry so far came from an E.164 inbound.
+
+An entry added by hand through `/api/dnc/add` as `(813) 465-8966` does **not** equal the E.164
+Telnyx sends — so the START re-subscribe lookup missed it, and someone who explicitly asked to
+resubscribe stayed opted out. **Always compare against `normalized_phone`.**
+
 ## Crons now say when they stop (#117, 2026-08-03)
 
 `public.cron_runs` holds one row per invocation, written by `requireCronAuth` — keyed off the
