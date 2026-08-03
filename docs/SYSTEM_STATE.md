@@ -1473,6 +1473,67 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Sends the counters could not see (#126, 2026-08-03)
+
+Everything that limits or measures sending reads `public.messages`. Three defects meant parts
+of the automated volume never landed there, or landed without a number attached — so the
+controls built on top of it were measuring a subset and reporting it as the whole.
+
+### Campaign-batch sends recorded nothing at all
+
+The insert wrote `sender`, `credits_cost` and `segments`. **None of those columns exist** — the
+live table has `points_cost`. Postgres rejects the entire INSERT when any one column is unknown,
+and the call was never destructured, so it failed in complete silence.
+
+Consequence: a campaign batch of any size moved `get_send_counts` by **zero**. That is the
+function enforcing the per-account rate limit, so the limit could not see the bulk path it most
+needed to see. The scheduled-**email** insert had the identical defect.
+
+**Validate a column set without writing rows:**
+
+```sql
+INSERT INTO public.messages (col_a, col_b, …)
+SELECT col_a, col_b, … FROM public.messages WHERE false;
+```
+
+Postgres parses and checks every column name on both sides and inserts nothing. This is the
+cheapest way to prove an insert is correct against the live schema, and it is what caught the
+above — TypeScript cannot, because these inserts are untyped object literals.
+
+### `from_phone` is what makes a send attributable, and it was optional in practice
+
+The scheduled cron and bulk scheduling both omitted it. `get_number_health_stats` computes
+`opt_out_rate = opt_outs / sent` over rows that **have** a `from_phone`, so automated volume was
+missing from the denominator and **inflated the opt-out rate** of whichever number sent it — on
+the page that tells the agent to rest a number at 5%.
+
+A number could be recommended for resting on a denominator missing most of its traffic.
+
+### `message_sid` is not optional either
+
+The delivery webhook matches on `.eq('message_sid', …)`. A row without one can never leave
+`sent` — `delivered` and `failed` never arrive — and is excluded from the analytics delivery
+rate. Fixed for #61 on two paths; appointment reminders and bulk scheduling still had it.
+
+### The rule, restated
+
+Every outbound `messages` insert needs **`from_phone`, `to_phone`, `message_sid`, `provider`,
+and a checked `error`**. Missing any one of them produces a send that is real to the carrier and
+invisible to this product. As of #126 all ten outbound inserts have all five; the scheduled-email
+insert is the one deliberate exception (no phone, no sid).
+
+### The claim in #126 that was wrong, and why
+
+The issue asserted that drips, AI drips and receptionist replies write no `messages` row,
+because none of those three files contains `.from('messages').insert`. **They all send by
+internal `fetch` to `/api/telnyx/send-sms`, which resolves or creates a thread and then inserts
+with `from_phone` set.** `ai_drips.thread_id` is NOT NULL, so that path always has a thread.
+
+Counting routes instead of tracing where they send is the same error as "the survey that missed
+one" above, and it has now produced a wrong conclusion three times in this codebase — twice
+inside the work that was written to warn against it. **When a route's behaviour depends on
+another route, follow the fetch.** A grep over file contents cannot see through an HTTP call.
+
 ## Outbound content moderation (#123, #124, 2026-08-03)
 
 ### The list of "send paths" was wrong for four issues running
