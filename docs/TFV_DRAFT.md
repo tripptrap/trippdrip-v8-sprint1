@@ -58,8 +58,9 @@ does not cover all selected use cases."*
 **Proposed:**
 
 > HyveWyre is an ISV providing a SaaS messaging and CRM platform to small businesses that contact
-> their own customers and prospects — insurance and real estate agencies, solar and roofing
-> contractors, home services and financial services firms.
+> their own customers and prospects. The platform is not specific to an industry; customers
+> include insurance and real estate agencies, solar and roofing contractors, home services,
+> financial services, and other small businesses that do their own outreach.
 >
 > Each business messages its own contacts. HyveWyre does not send messages on its own behalf to
 > consumers through these numbers, and does not share contacts between businesses.
@@ -210,44 +211,49 @@ Approved for five; **three exist**: `+18887062631`, `+18886638510`, `+1888461014
 
 ### `messageVolume` — NEEDS YOUR INPUT
 
-Currently `10,000`. Actual traffic through these numbers is **zero**. The figure should follow
-from expected agents × per-tier credits (Growth 3,000/month ≈ 100/day, Scale 10,000/month ≈
-333/day). **How many businesses do you expect on toll-free in the next 12 months?**
+**Answered 2026-08-03: 100–1,000 businesses in 12 months, one number each.**
+
+Proposed `messageVolume`: **500,000** per month. Basis: credits cap a Growth account at 3,000
+messages a month, so ~165 active businesses at full usage. That covers the near end of the range
+with headroom, and is far more defensible than the current `10,000` against zero actual traffic.
+
+**This is the hard part of the filing.** 100–1,000 businesses means 100–1,000 toll-free numbers.
+Telnyx caps at 5 per business without justification — that cap is what rejected `65ad888e`. The
+ISV argument has to carry the whole request, and numbers will come in reviewed batches (#3).
 
 ### Unchanged, pending your confirmation
 
 `businessName` HyveWyre LLC · `doingBusinessAs` HyveWyre · `entityType` PRIVATE_PROFIT ·
 `businessRegistrationNumber` 41-2842279 (EIN) · `12325 Magnolia Street, San Antonio, FL 33576` ·
-contact **Carson Rios, business@hyvewyre.com, +18134658966** · `corporateWebsite`
+contact **Carson Rios** (see note) · `corporateWebsite`
 https://www.hyvewyre.com · `privacyPolicyURL` /privacy · `termsAndConditionURL` /terms ·
 `ageGatedContent` false · `optInKeywords` START · `isvReseller` HyveWyre LLC
 
-Two notes: the public evidence page footer gives **support@hyvewyre.com** while this filing gives
-**business@** — they should agree. And the product accepts START, UNSTOP and YES; declaring only
-START is fine, since supporting more than declared is not a misstatement.
+**Contact, answered 2026-08-03:** the LLC is registered in Carson Rios's name; Tripp Browning is
+majority owner. Either can be the authorised contact. Recommend leaving **Carson Rios** on the
+filing so it matches the registration Telnyx can verify, and adding Tripp as a second contact if
+the form allows one.
+
+The evidence page footer gives **support@hyvewyre.com** while the filing gives **business@** —
+these should agree. The product accepts START, UNSTOP and YES; declaring only START is fine,
+since supporting more than declared is not a misstatement.
 
 ---
 
 ## Before this can be submitted
 
-**Questions only you can answer**
+**Answered 2026-08-03:** contact (Carson on the filing, Tripp as owner) · volume (100–1,000
+businesses, one number each) · verticals (not industry-specific).
 
-1. Legal name, EIN, entity type and address still correct?
-2. Carson Rios still the authorised contact? `business@` or `support@`?
-3. How many businesses on toll-free in 12 months — for `messageVolume`?
-4. Which verticals should be named? Current text says insurance and real estate; the product
-   ships templates for ten.
-5. **The six-month gap on the phone numbers** — released and re-bought, or never the verified set?
+**Still open**
 
-**One product decision**
-
-6. Implement the opt-in confirmation SMS, or drop the claim? (recommend: implement)
-
-**One thing to confirm with Telnyx before touching anything**
-
-7. Can a Verified request be amended in place, or does a rewrite mean a **new submission** — and
-   do the three numbers keep sending while a replacement is under review? Nothing in the API or
-   the repo answers this, and getting it wrong could take your only sending capability offline.
+1. Legal name, EIN and address unchanged? `business@` or `support@` as the contact email?
+2. **The phone numbers.** All three were purchased 2026-07-26; this verification was granted
+   2026-01-16. Released and re-bought, or were these never the verified set?
+3. Opt-in confirmation SMS — implement it, or drop the claim? (recommend: implement)
+4. **Ask Telnyx:** can a Verified request be amended in place, or does this mean a new
+   submission — and do the three numbers keep sending while a replacement is reviewed? Getting
+   this wrong could take your only sending capability offline.
 
 ---
 
