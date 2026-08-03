@@ -103,7 +103,12 @@ export async function GET(req: NextRequest) {
       num => !releasedNumbers.includes(num.phone_number)
     );
 
-    // Format numbers for the response
+    // Format numbers for the response.
+    //
+    // Rebuilding each row narrowly is what dropped `capabilities` before — the
+    // DB query selects `*`, so anything omitted here silently disappears from
+    // the API even though it exists. Routing state is added for the same reason
+    // it was needed then: the UI cannot show what the endpoint does not return.
     const numbers = activeNumbers.map((num, index) => ({
       id: num.id,
       phone_number: num.phone_number,
@@ -112,11 +117,26 @@ export async function GET(req: NextRequest) {
       status: num.status,
       capabilities: num.capabilities || { voice: true, sms: true, mms: true },
       purchased_at: num.created_at,
+      locked_until: num.locked_until ?? null,
+      rested_until: num.rested_until ?? null,
+      rest_reason: num.rest_reason ?? null,
     }));
+
+    // Routing mode lives on user_settings, not on any number, but the page that
+    // renders the numbers is the page that sets it — so it ships together.
+    // Read with the request-scoped client, not supabaseAdmin — that one is
+    // conditionally null above, and this is the user reading their own row.
+    const { data: settingsRow } = await supabase
+      .from('user_settings')
+      .select('number_selection_mode')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const numberSelectionMode = settingsRow?.number_selection_mode || 'geo';
 
     return NextResponse.json({
       success: true,
       numbers,
+      numberSelectionMode,
       ...(releasedNumbers.length > 0 && {
         numbersReleased: releasedNumbers,
         releaseMessage: `${releasedNumbers.length} unverified toll-free number(s) were released. Please claim a verified number.`,

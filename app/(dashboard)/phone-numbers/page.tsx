@@ -9,6 +9,10 @@ interface PhoneNumber {
   phone_number: string;
   phone_sid: string;
   friendly_name: string;
+  /** Routing state (#122) — both are timestamps so they expire on their own. */
+  locked_until?: string | null;
+  rested_until?: string | null;
+  rest_reason?: string | null;
   capabilities: {
     voice: boolean;
     sms: boolean;
@@ -71,6 +75,8 @@ export default function PhoneNumbersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null);
+  const [routingMode, setRoutingMode] = useState<'geo' | 'primary'>('geo');
+  const [busyNumber, setBusyNumber] = useState<string | null>(null);
   const [numberType, setNumberType] = useState<NumberType>('tollfree');
 
   // Purchase modal state
@@ -112,6 +118,43 @@ export default function PhoneNumbersPage() {
     }
   };
 
+  // Routing controls (#122). One endpoint, one ownership check — the page just
+  // names the action.
+  const numberControl = async (
+    action: 'set_primary' | 'lock' | 'rest' | 'clear' | 'set_mode',
+    opts: { phoneNumber?: string; hours?: number; mode?: 'geo' | 'primary'; reason?: string } = {}
+  ) => {
+    setBusyNumber(opts.phoneNumber || 'mode');
+    try {
+      const res = await fetch('/api/telnyx/numbers/controls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...opts }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        showMessage('error', data.error || 'Could not update the number');
+        return;
+      }
+      if (action === 'set_mode' && opts.mode) {
+        setRoutingMode(opts.mode);
+        showMessage('success', opts.mode === 'geo'
+          ? 'Now sending from the number closest to each contact'
+          : 'Now sending from your primary number');
+      } else {
+        await fetchMyNumbers();
+      }
+    } catch {
+      showMessage('error', 'Could not update the number');
+    } finally {
+      setBusyNumber(null);
+    }
+  };
+
+  const isActiveUntil = (ts?: string | null) => !!ts && new Date(ts).getTime() > Date.now();
+  const untilLabel = (ts?: string | null) =>
+    ts ? new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+
   // Fetch user's phone numbers (handles auto-release of unverified numbers)
   const fetchMyNumbers = async () => {
     try {
@@ -120,6 +163,7 @@ export default function PhoneNumbersPage() {
 
       if (data.success) {
         setMyNumbers(data.numbers || []);
+        if (data.numberSelectionMode) setRoutingMode(data.numberSelectionMode);
         // Alert user if unverified numbers were auto-released
         if (data.numbersReleased && data.numbersReleased.length > 0) {
           showMessage('error', data.releaseMessage || 'An unverified number was released. Please claim a verified number.');
@@ -528,6 +572,41 @@ export default function PhoneNumbersPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Routing mode (#122). Hidden with one number — there is nothing
+                    to route between, and an inert control invites the belief
+                    that something is being decided. */}
+                {myNumbers.length > 1 && (
+                  <div className="mb-4 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                    <div className="text-sm font-medium mb-1">Which number do messages come from?</div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      Applies to everything — replies, drips, scheduled sends and campaigns.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        ['geo', 'Closest to the contact', 'Picks whichever of your numbers is nearest to each contact, by area code.'],
+                        ['primary', 'Always my primary', 'Every message comes from the number marked Primary below.'],
+                      ] as const).map(([value, label, hint]) => (
+                        <button
+                          key={value}
+                          onClick={() => numberControl('set_mode', { mode: value })}
+                          disabled={busyNumber === 'mode'}
+                          title={hint}
+                          className={`px-3 py-2 rounded-lg text-sm border transition-colors disabled:opacity-50 ${
+                            routingMode === value
+                              ? 'border-sky-600 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-medium'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      A locked number overrides this.
+                    </p>
+                  </div>
+                )}
+
                 {myNumbers.map((number) => (
                   <div
                     key={number.id}
@@ -556,6 +635,60 @@ export default function PhoneNumbersPage() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                    </div>
+
+                    {/* Routing state and controls (#122) */}
+                    {(isActiveUntil(number.locked_until) || isActiveUntil(number.rested_until)) && (
+                      <div className={`mb-2 text-xs rounded px-2 py-1.5 inline-block ${
+                        isActiveUntil(number.rested_until)
+                          ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300'
+                          : 'bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-300'
+                      }`}>
+                        {isActiveUntil(number.rested_until)
+                          ? <>Resting until {untilLabel(number.rested_until)} — not being used to send{number.rest_reason ? ` · ${number.rest_reason}` : ''}</>
+                          : <>Locked until {untilLabel(number.locked_until)} — all messages use this number</>}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {!number.is_primary && (
+                        <button
+                          onClick={() => numberControl('set_primary', { phoneNumber: number.phone_number })}
+                          disabled={busyNumber === number.phone_number}
+                          className="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 hover:border-slate-400 disabled:opacity-50"
+                        >
+                          Make primary
+                        </button>
+                      )}
+
+                      {isActiveUntil(number.locked_until) || isActiveUntil(number.rested_until) ? (
+                        <button
+                          onClick={() => numberControl('clear', { phoneNumber: number.phone_number })}
+                          disabled={busyNumber === number.phone_number}
+                          className="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 hover:border-slate-400 disabled:opacity-50"
+                        >
+                          {isActiveUntil(number.rested_until) ? 'Put back in use' : 'Unlock'}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => numberControl('lock', { phoneNumber: number.phone_number, hours: 168 })}
+                            disabled={busyNumber === number.phone_number}
+                            title="Send everything from this number for the next week, ignoring the routing rule above."
+                            className="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 hover:border-slate-400 disabled:opacity-50"
+                          >
+                            Lock for a week
+                          </button>
+                          <button
+                            onClick={() => numberControl('rest', { phoneNumber: number.phone_number, hours: 168, reason: 'Rested manually' })}
+                            disabled={busyNumber === number.phone_number}
+                            title="Stop sending from this number for a week so its reputation with carriers can recover."
+                            className="px-2.5 py-1 text-xs rounded border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:border-amber-500 disabled:opacity-50"
+                          >
+                            Rest for a week
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
