@@ -1275,7 +1275,7 @@ export default function LeadsPage() {
       {/* Add Lead Modal */}
       {addLeadOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add New Lead</h3>
               <button onClick={() => { setAddLeadOpen(false); setNewLead({ first_name: "", last_name: "", phone: "", email: "", state: "", zip_code: "", tags: "", status: "new", campaign_id: "" }); setPreselectedCampaignName(""); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
@@ -1433,7 +1433,7 @@ export default function LeadsPage() {
       {/* Edit Lead Modal */}
       {editLeadOpen && editingLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Edit Lead</h3>
               <button onClick={() => { setEditLeadOpen(false); setEditingLead(null); setEditTagsDropdownOpen(false); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 text-xl">&times;</button>
