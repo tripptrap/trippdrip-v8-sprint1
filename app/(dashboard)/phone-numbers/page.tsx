@@ -77,6 +77,10 @@ export default function PhoneNumbersPage() {
   const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null);
   const [routingMode, setRoutingMode] = useState<'geo' | 'primary'>('geo');
   const [busyNumber, setBusyNumber] = useState<string | null>(null);
+  const [health, setHealth] = useState<Record<string, {
+    sent: number; opt_outs: number; opt_out_rate: number;
+    spam_ratio: number | null; verdict: 'ok'|'low_volume'|'watch'|'rest'; advice: string;
+  }>>({});
   const [numberType, setNumberType] = useState<NumberType>('tollfree');
 
   // Purchase modal state
@@ -115,6 +119,21 @@ export default function PhoneNumbersPage() {
       if (data?.ok) setNumberGate({ allowed: data.allowed, reason: data.reason ?? undefined });
     } catch {
       // Leave it null — no banner rather than a wrong one.
+    }
+  };
+
+  // Per-number health (#122). Separate from fetchMyNumbers because it makes a
+  // Telnyx call per number — slow enough that the list should not wait on it.
+  const fetchHealth = async () => {
+    try {
+      const res = await fetch('/api/telnyx/numbers/health');
+      const data = await res.json();
+      if (!data.ok) return;
+      const byNumber: any = {};
+      for (const n of data.numbers) byNumber[n.phone_number] = n;
+      setHealth(byNumber);
+    } catch {
+      // No health panel rather than a wrong one.
     }
   };
 
@@ -397,6 +416,7 @@ export default function PhoneNumbersPage() {
     fetchUserCredits();
     fetchPortingOrders();
     fetchNumberGate();
+    fetchHealth();
   }, []);
 
   return (
@@ -636,6 +656,40 @@ export default function PhoneNumbersPage() {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+
+                    {/* Health (#122). Shown above the controls because it is the
+                        reason someone would reach for Rest. */}
+                    {health[number.phone_number] && (() => {
+                      const h = health[number.phone_number];
+                      const tone = h.verdict === 'rest'
+                        ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800'
+                        : h.verdict === 'watch'
+                        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+                      return (
+                        <div className={`mb-2 text-xs rounded border px-2.5 py-2 ${tone}`}>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-medium">
+                            <span>{h.sent} sent · 30 days</span>
+                            <span>{h.opt_outs} opted out</span>
+                            {h.sent > 0 && <span>{(h.opt_out_rate * 100).toFixed(1)}% opt-out rate</span>}
+                            {h.spam_ratio !== null && <span>carrier spam {(h.spam_ratio * 100).toFixed(1)}%</span>}
+                          </div>
+                          <div className="mt-1 font-normal">{h.advice}</div>
+                          {h.verdict === 'rest' && !isActiveUntil(number.rested_until) && (
+                            <button
+                              onClick={() => numberControl('rest', {
+                                phoneNumber: number.phone_number, hours: 168,
+                                reason: `Rested on recommendation (${(h.opt_out_rate * 100).toFixed(1)}% opt-out rate)`,
+                              })}
+                              disabled={busyNumber === number.phone_number}
+                              className="mt-2 px-2.5 py-1 rounded bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                            >
+                              Rest this number for a week
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Routing state and controls (#122) */}
                     {(isActiveUntil(number.locked_until) || isActiveUntil(number.rested_until)) && (

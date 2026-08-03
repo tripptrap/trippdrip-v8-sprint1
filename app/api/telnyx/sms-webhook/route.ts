@@ -521,6 +521,29 @@ async function handleInboundSMS(payload: any) {
             p_notes: `Lead texted: "${messageBody}"`,
           });
 
+        // Record WHICH of our numbers took the STOP, so per-number opt-out
+        // rates are possible (#122).
+        //
+        // Written here rather than passed into add_to_dnc because that would
+        // mean changing the signature of a function this path depends on. And
+        // it cannot be derived later: purge_lead_after_opt_out (#109) deletes
+        // the lead's messages, so the inbound that carried the STOP is gone by
+        // the time anyone looks. dnc_history survives the purge by design —
+        // it is the evidence the opt-out happened.
+        //
+        // Best-effort: a failure here costs a statistic, never the suppression.
+        if (!dncAddError && to) {
+          const { error: attributionError } = await supabaseAdmin
+            .from('dnc_history')
+            .update({ received_on_number: to })
+            .eq('user_id', userId)
+            .eq('normalized_phone', (dncResult as any)?.normalized_phone ?? null)
+            .is('received_on_number', null);
+          if (attributionError) {
+            console.error(`Could not attribute the opt-out from ${from} to ${to}:`, attributionError);
+          }
+        }
+
         if (dncAddError) {
           // Loud: a silent failure here means the lead keeps receiving messages
           // after texting STOP, which is a legal problem, not just a data problem.
