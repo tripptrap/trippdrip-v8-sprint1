@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get referral stats
-    const { data, error } = await supabase.rpc('get_referral_stats', {
+    const { data, error } = await createServiceRoleClient().rpc('get_referral_stats', {
       p_user_id: user.id
     });
 

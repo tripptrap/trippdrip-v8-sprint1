@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
     // Get usage stats if requested
     let tagsWithStats = tags;
     if (includeStats) {
-      const { data: usageStats, error: statsError } = await supabase
+      // Privileged RPC on the service-role client (#114 pattern). The user id
+      // comes from the verified session, never the request.
+      const { data: usageStats, error: statsError } = await createServiceRoleClient()
         .rpc('get_tag_usage_stats', { user_id_param: user.id });
 
       if (!statsError && usageStats) {
@@ -230,8 +232,13 @@ export async function DELETE(req: NextRequest) {
       .contains('conversation_tags', [tag.name]);
 
     if (threadsWithTag && threadsWithTag.length > 0) {
+      // Service-role, like every other privileged RPC here (#114 pattern).
+      // remove_thread_tag takes a thread id and does no ownership check of its
+      // own — the query above is what scopes these to the caller, and the grant
+      // is being revoked so nobody can call it directly.
+      const admin = createServiceRoleClient();
       for (const thread of threadsWithTag) {
-        await supabase.rpc('remove_thread_tag', {
+        await admin.rpc('remove_thread_tag', {
           thread_id_param: thread.id,
           tag_name: tag.name,
         });

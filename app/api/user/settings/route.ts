@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Use the SQL function to get complete settings
-    const { data: settings, error: settingsError } = await supabase
+    // Privileged RPC on the service-role client, not the caller's (#114 pattern).
+    // The user id still comes from the verified session above, never the request.
+    const { data: settings, error: settingsError } = await createServiceRoleClient()
       .rpc('get_user_settings', { user_id_param: user.id });
 
     if (settingsError) {
