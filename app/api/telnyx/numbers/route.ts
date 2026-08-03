@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getVerifiedTollFreeNumbers, isTollFreeNumber } from '@/lib/telnyx';
 import { releasePoolNumber } from '@/lib/numberPool';
+import { syncNumberRegistration, isRegistered, registrationGap } from '@/lib/numberRegistration';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,16 +43,45 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Auto-release unverified toll-free numbers
-    const verifiedNumbers = await getVerifiedTollFreeNumbers();
-    const releasedNumbers: string[] = [];
-
     const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
       ? createAdminClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL,
           process.env.SUPABASE_SERVICE_ROLE_KEY
         )
       : null;
+
+    // Reconcile registration state against Telnyx when it is stale (audit,
+    // 2026-08-03). This is where it belongs rather than on a cron: registration
+    // only matters when someone is looking at or about to use their numbers,
+    // and this route is already making Telnyx calls for the toll-free release
+    // below, so it is not a new round trip class.
+    //
+    // Stale-only, so opening the page repeatedly does not hammer Telnyx. A null
+    // `registration_synced_at` always syncs — that is the never-checked case,
+    // which resolveFromNumber treats as "unknown" and which we want resolved
+    // into a real answer as soon as anyone looks.
+    const STALE_MS = 6 * 60 * 60 * 1000;
+    const needsSync = (userNumbers || []).some(
+      n => !n.registration_synced_at || Date.now() - Date.parse(n.registration_synced_at) > STALE_MS
+    );
+    if (needsSync && supabaseAdmin) {
+      await syncNumberRegistration(supabaseAdmin, user.id);
+      const { data: refreshed } = await supabaseAdmin
+        .from('user_telnyx_numbers')
+        .select('phone_number, messaging_campaign_id, tollfree_verification_status, registration_synced_at')
+        .eq('user_id', user.id);
+      // Patch the rows we already read rather than re-querying everything —
+      // the sync only touches these three columns.
+      const byNumber = new Map((refreshed || []).map(r => [r.phone_number, r]));
+      for (const n of userNumbers || []) {
+        const r = byNumber.get(n.phone_number);
+        if (r) Object.assign(n, r);
+      }
+    }
+
+    // Auto-release unverified toll-free numbers
+    const verifiedNumbers = await getVerifiedTollFreeNumbers();
+    const releasedNumbers: string[] = [];
 
     for (const num of userNumbers || []) {
       if (isTollFreeNumber(num.phone_number) && !verifiedNumbers.has(num.phone_number)) {
@@ -120,6 +150,15 @@ export async function GET(req: NextRequest) {
       locked_until: num.locked_until ?? null,
       rested_until: num.rested_until ?? null,
       rest_reason: num.rest_reason ?? null,
+      // Registration (audit, 2026-08-03). `can_send` and `registration_gap` are
+      // computed here rather than in the page so the rule lives in one place —
+      // a long code needs a campaign, a toll-free needs verification — and the
+      // UI cannot drift from what resolveFromNumber actually does.
+      messaging_campaign_id: num.messaging_campaign_id ?? null,
+      tollfree_verification_status: num.tollfree_verification_status ?? null,
+      registration_checked: !!num.registration_synced_at,
+      can_send: num.registration_synced_at ? isRegistered(num) : null,
+      registration_gap: num.registration_synced_at ? registrationGap(num) : null,
     }));
 
     // Routing mode lives on user_settings, not on any number, but the page that

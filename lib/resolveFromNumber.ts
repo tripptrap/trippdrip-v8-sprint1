@@ -33,6 +33,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { selectClosestNumber } from './geo/selectClosestNumber';
 import { getNumberCapacity } from './numberCapacity';
+import { isRegistered, registrationGap } from './numberRegistration';
 
 export type NumberSelectionMode = 'geo' | 'primary';
 
@@ -66,7 +67,7 @@ export type FromNumberResult =
        * can be used again (#123 gap 2). Retryable, so the crons defer rather
        * than failing the work.
        */
-      reason: 'none_owned' | 'lookup_failed' | 'all_exhausted';
+      reason: 'none_owned' | 'lookup_failed' | 'all_exhausted' | 'none_registered';
       detail: string;
       retryable: boolean;
     };
@@ -99,10 +100,24 @@ interface NumberRow {
   rested_until: string | null;
   /** Derived by trigger from the number itself — never set in code (#129). */
   number_type: string | null;
+  messaging_campaign_id: string | null;
+  tollfree_verification_status: string | null;
+  /** Null means never reconciled against Telnyx — "unknown", not "unregistered". */
+  registration_synced_at: string | null;
 }
 
 const inFuture = (ts: string | null | undefined): boolean =>
   !!ts && Date.parse(ts) > Date.now();
+
+/**
+ * Have we checked, and did it come back unregistered?
+ *
+ * Distinct from `!isRegistered(n)`, which is also true for a number nobody has
+ * ever checked. Only a number we have actually asked Telnyx about should be
+ * treated as known-bad.
+ */
+const isKnownUnregistered = (n: NumberRow): boolean =>
+  !!n.registration_synced_at && !isRegistered(n);
 
 /**
  * Does this account actually hold this number? (#127)
@@ -158,7 +173,9 @@ export async function resolveFromNumber(
 ): Promise<FromNumberResult> {
   const { data: numbers, error } = await supabase
     .from('user_telnyx_numbers')
-    .select('phone_number, is_primary, locked_until, rested_until, number_type')
+    // Kept on one line deliberately: supabase-js infers the row type from the
+    // literal, and a `+` concatenation widens it to `string` and loses that.
+    .select('phone_number, is_primary, locked_until, rested_until, number_type, messaging_campaign_id, tollfree_verification_status, registration_synced_at')
     .eq('user_id', userId)
     .eq('status', 'active');
 
@@ -204,13 +221,72 @@ export async function resolveFromNumber(
     const pinned = threads?.[0]?.sending_number;
     // Still has to be a number the account currently holds, so a released or
     // reassigned one is never used.
-    if (pinned && rows.some(n => n.phone_number === pinned)) {
-      return { ok: true, number: pinned };
+    const pinnedRow = pinned ? rows.find(n => n.phone_number === pinned) : undefined;
+    // ...and it has to be able to deliver. Continuity (#129) is a real benefit,
+    // but it is a benefit of messages ARRIVING from a familiar number. Keeping a
+    // conversation pinned to a number carriers will filter trades a visible
+    // number change for silent non-delivery, which is the worse of the two.
+    if (pinnedRow && !isKnownUnregistered(pinnedRow)) {
+      return { ok: true, number: pinnedRow.phone_number };
+    }
+    if (pinnedRow) {
+      console.warn(
+        `resolveFromNumber: thread with ${options.toPhone} is pinned to ${pinned}, which is not registered — re-resolving`
+      );
     }
   }
 
+  // 0.5 Registration (audit, 2026-08-03).
+  //
+  // A long code must be assigned to a 10DLC campaign and a toll-free must pass
+  // verification, or carriers filter the traffic and the number's reputation
+  // degrades. This ran nowhere, and on the live account the resolver reliably
+  // picked the ONE unregistered number: it prefers local over toll-free for new
+  // conversations (#129) and then takes the primary, which was the local number
+  // assigned to no campaign — while a campaign-assigned local and a verified
+  // toll-free sat unused.
+  //
+  // ── Three states, not two ─────────────────────────────────────────────────
+  //
+  // `registration_synced_at` being null means nobody has ever asked Telnyx, and
+  // that is NOT the same as "unregistered". Treating unknown as unregistered
+  // would have blocked every send on every account the moment this shipped,
+  // before the first sync ran — turning a routing fix into an outage.
+  //
+  //   registered    known good. Always preferred.
+  //   unknown       never synced. Usable, because refusing on missing data we
+  //                 never collected punishes the user for our own gap.
+  //   unregistered  known bad. Only used if there is nothing else at all, and
+  //                 the send is refused instead if the account has any other
+  //                 option. See below.
+  const registered = rows.filter(n => n.registration_synced_at && isRegistered(n));
+  const unknown = rows.filter(n => !n.registration_synced_at);
+  const eligible = registered.length ? registered : unknown;
+
+  if (!eligible.length) {
+    // Every number is KNOWN to be unregistered. Unlike rest — which the agent
+    // chose, and which falls back rather than losing a send — this is not a
+    // preference to override: the message would be filtered rather than
+    // delivered, and the attempt damages the number further.
+    const why = rows.map(n => `${n.phone_number}: ${registrationGap(n)}`).join('; ');
+    console.warn(`resolveFromNumber: no registered number for ${userId} — ${why}`);
+    return {
+      ok: false,
+      reason: 'none_registered',
+      detail:
+        'None of your numbers is registered to send. A local number must be assigned to your ' +
+        '10DLC campaign, and a toll-free number must pass verification. Carriers filter ' +
+        'unregistered traffic, so sending would not reach anyone.',
+      retryable: false,
+    };
+  }
+
   // 1. Rested numbers are out of rotation entirely.
-  const usable = rows.filter(n => !inFuture(n.rested_until));
+  //
+  // From here down every filter narrows `eligible`, not `rows` — so the rest
+  // fallback below cannot reach past the registration check and resurrect a
+  // number carriers will filter.
+  const usable = eligible.filter(n => !inFuture(n.rested_until));
   if (!usable.length) {
     // Everything is resting. Sending from a rested number defeats the point of
     // resting it, but not sending at all is worse — and the agent chose to rest
@@ -218,7 +294,7 @@ export async function resolveFromNumber(
     console.warn(
       `resolveFromNumber: every number for ${userId} is rested — falling back to the primary so the send is not lost`
     );
-    return { ok: true, number: (rows.find(n => n.is_primary) ?? rows[0]).phone_number };
+    return { ok: true, number: (eligible.find(n => n.is_primary) ?? eligible[0]).phone_number };
   }
 
   // 2. Per-number capacity (#123 gap 2).

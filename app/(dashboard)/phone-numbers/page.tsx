@@ -15,6 +15,13 @@ interface PhoneNumber {
   locked_until?: string | null;
   rested_until?: string | null;
   rest_reason?: string | null;
+  /**
+   * Registration (audit, 2026-08-03). Computed server-side from the number's
+   * type: a long code needs a 10DLC campaign, a toll-free needs verification.
+   * `null` means Telnyx has not been asked yet — unknown, not unregistered.
+   */
+  can_send?: boolean | null;
+  registration_gap?: string | null;
   capabilities: {
     voice: boolean;
     sms: boolean;
@@ -692,6 +699,22 @@ export default function PhoneNumbersPage() {
                         </div>
                       );
                     })()}
+
+                    {/* Registration (audit, 2026-08-03).
+                        `can_send` is computed server-side so this cannot drift
+                        from what resolveFromNumber does. null means nobody has
+                        asked Telnyx yet — shown as unknown, not as a failure. */}
+                    {number.can_send === false && (
+                      <div className="mb-2 text-xs rounded px-2 py-1.5 inline-block bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300">
+                        Cannot send — {number.registration_gap}. Carriers filter unregistered traffic,
+                        so this number is skipped when choosing who to send from.
+                      </div>
+                    )}
+                    {number.can_send === true && (
+                      <div className="mb-2 text-xs rounded px-2 py-1.5 inline-block bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300">
+                        Registered to send
+                      </div>
+                    )}
 
                     {/* Routing state and controls (#122) */}
                     {(isActiveUntil(number.locked_until) || isActiveUntil(number.rested_until)) && (
