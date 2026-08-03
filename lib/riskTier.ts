@@ -52,6 +52,28 @@ export const MIN_SENDS_FOR_A_VERDICT = 50;
 /** Above this share of sends scoring as spam, the account is treated one tier worse. */
 const HIGH_SPAM_SHARE = 0.2;
 
+/**
+ * How much sooner an account on SHARED infrastructure is throttled (#129).
+ *
+ * A business starts on a pool toll-free so it can work immediately while its own
+ * registration completes. That number is shared infrastructure: it is covered by
+ * HyveWyre's verification, it gets recycled to another business later, and its
+ * reputation is everyone's. Damage to a business's own local number costs that
+ * business; damage to a pool number costs every business.
+ *
+ * ── Why thresholds tighten rather than tiers starting worse ─────────────────
+ *
+ * The obvious move is to start a shared-number account one tier down. That
+ * punishes every new signup for being new — halving their limits on day one,
+ * before they have done anything — and credits already cap them far below.
+ *
+ * Halving the thresholds instead means a clean account on a pool number is
+ * treated exactly like any other, and a deteriorating one is caught twice as
+ * early. No cost for being new; a faster response to actual harm, which is the
+ * only thing that threatens the shared verification.
+ */
+const SHARED_NUMBER_SENSITIVITY = 0.5;
+
 export type RiskTier = 'healthy' | 'watch' | 'poor' | 'critical';
 
 export interface AccountRisk {
@@ -93,7 +115,15 @@ export interface RiskSignals {
  * Pure and exported so the boundaries are testable without manufacturing months
  * of traffic — the same reasoning as `classifyCapacity`.
  */
-export function classifyRisk(s: RiskSignals): AccountRisk {
+export function classifyRisk(
+  s: RiskSignals,
+  opts: { onSharedNumber?: boolean } = {}
+): AccountRisk {
+  // Tighter thresholds, not a worse starting tier — see SHARED_NUMBER_SENSITIVITY.
+  const k = opts.onSharedNumber ? SHARED_NUMBER_SENSITIVITY : 1;
+  const watchAt = OPT_OUT_WATCH * k;
+  const restAt = OPT_OUT_REST * k;
+
   const base = {
     sends: s.sends,
     optOuts: s.optOuts,
@@ -111,9 +141,9 @@ export function classifyRisk(s: RiskSignals): AccountRisk {
   }
 
   let tier: RiskTier;
-  if (s.optOutRate >= OPT_OUT_REST * 2) tier = 'critical';
-  else if (s.optOutRate >= OPT_OUT_REST) tier = 'poor';
-  else if (s.optOutRate >= OPT_OUT_WATCH) tier = 'watch';
+  if (s.optOutRate >= restAt * 2) tier = 'critical';
+  else if (s.optOutRate >= restAt) tier = 'poor';
+  else if (s.optOutRate >= watchAt) tier = 'watch';
   else tier = 'healthy';
 
   // Content the detector would have blocked, sent anyway because the account
@@ -129,7 +159,10 @@ export function classifyRisk(s: RiskSignals): AccountRisk {
       ? `${pct}% opt-out rate over ${s.sends} messages — healthy.`
       : `${pct}% of recipients opted out over ${s.sends} messages` +
         (spamPushed ? `, and ${s.highSpamSends} were flagged as spam risk` : '') +
-        `. Sending limits are reduced until this improves.`;
+        `. Sending limits are reduced until this improves.` +
+        (opts.onSharedNumber
+          ? ' This account sends from a shared starter number, so limits tighten sooner than they would on your own number.'
+          : '');
 
   return { ...base, tier, factor: FACTORS[tier], reason };
 }
@@ -196,12 +229,36 @@ export async function getAccountRisk(
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) return healthy('No signals yet.');
 
+    // Is this account still on shared infrastructure? (#129)
+    //
+    // "Shared" means every number it holds came from the pool. Once it has its
+    // own number, new conversations move there and it is judged normally — even
+    // though existing conversations stay pinned to the toll-free, because those
+    // are established relationships rather than new outreach.
+    //
+    // Fails to "not shared" on any error: tightening someone's limits because a
+    // lookup failed is the wrong direction.
+    let onSharedNumber = false;
+    try {
+      const [{ count: owned }, { count: pooled }] = await Promise.all([
+        supabase.from('user_telnyx_numbers')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId).eq('status', 'active'),
+        supabase.from('number_pool')
+          .select('id', { count: 'exact', head: true })
+          .eq('assigned_to_user_id', userId),
+      ]);
+      onSharedNumber = (owned ?? 0) > 0 && (owned ?? 0) === (pooled ?? 0);
+    } catch (e) {
+      console.error(`Shared-number check failed for ${userId} — treating as own number:`, e);
+    }
+
     const risk = classifyRisk({
       sends: Number(row.sends) || 0,
       optOuts: Number(row.opt_outs) || 0,
       optOutRate: Number(row.opt_out_rate) || 0,
       highSpamSends: Number(row.high_spam_sends) || 0,
-    });
+    }, { onSharedNumber });
 
     // The throttle is automatic; SUSPENSION is not, and this is what puts that
     // decision in front of a human. Keyed per account and throttled, because
