@@ -2868,6 +2868,68 @@ the user "Credits refunded" without checking whether the refund succeeded.
 
 ---
 
+## `/api/email/service` was an open phishing relay (audit 2026-08-03, `a9a53ad`)
+
+The gate was `if (!user && (!apiKey || apiKey !== systemApiKey))`. Read it carefully: a
+session **or** a key. Middleware does not run on `/api/*`, so that line was the whole
+door, and any Supabase session — including the unpaid signups anyone can create — could
+POST:
+
+```json
+{ "type": "password_reset", "to": "<anyone>", "data": { "resetUrl": "<attacker>" } }
+```
+
+The mail then left `support@hyvewyre.com` with SPF and DKIM passing and full HyveWyre
+branding. Credential phishing of our own customers, from our own domain, unthrottled, to
+any recipient — and a fast way to get that mailbox blacklisted, which takes every
+transactional and alerting email down with it.
+
+All four callers are server-side and already sent the key (`lib/serviceEmail.ts`,
+`admin/users/action` ×3), so the session branch had no legitimate user at all. It is gone;
+the key is the only way in, compared with `secureCompare` rather than `!==`.
+
+### The probe that proves an auth gate without exercising what it guards
+
+An unknown `type` hits the switch's `default:` and returns 400 — reached only *after* the
+auth check, and *before* anything is sent. So posting `type: "__probe_no_send__"` reads
+the gate directly:
+
+| response | meaning |
+|---|---|
+| `400 Unknown email type` | auth **passed** |
+| `401 Unauthorized` | auth **blocked** |
+
+Live production returned 400 from a signed-in browser before the fix, and 401 after —
+proof both ways, and no email ever sent. Look for an equivalent cheap post-auth 400 before
+testing any other gate the expensive way.
+
+### `service_emails` had zero rows, and it was not because sending failed
+
+Both inserts were wrapped in `if (user)` with the id taken from the *caller's session* — a
+thing that only exists when a browser hits the route, i.e. never for the four real callers,
+which are all server-side. So the table logged nothing, ever, while email worked fine.
+`user_id` is now resolved from the **recipient** (nullable, which the column allows), which
+is who a service email is actually about.
+
+### `SYSTEM_API_KEY` has a trailing newline in Vercel — and it is harmless
+
+`vercel env pull` writes it escaped as `\n`, which is what makes it visible at all. It is
+**not** a live bug: undici strips a trailing newline from a header value before sending, so
+the comparison always matched. Worth knowing for two reasons — a hand-rolled `curl` test
+*will* fail against it and look like a broken gate (this cost a detour), and the same
+newline in `SENDGRID_API_KEY` genuinely did break SMTP AUTH in #101, because that one is
+sent as a password rather than a header. Both sides now `.trim()`.
+
+`lib/serviceEmail.ts` also refuses loudly when the key is unset instead of quietly dropping
+the header: with the session branch gone, a missing key is a total silent outage of every
+transactional email.
+
+**`/api/email/send` is a different route and is fine** — it sends through the *user's own*
+SMTP credentials, from their own domain, costs a credit, and is correctly session-gated.
+Do not "fix" it to match.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
