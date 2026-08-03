@@ -9,6 +9,8 @@ interface PhoneNumber {
   phone_number: string;
   phone_sid: string;
   friendly_name: string;
+  /** Derived by trigger from the number itself (#129). */
+  number_type?: string | null;
   /** Routing state (#122) — both are timestamps so they expire on their own. */
   locked_until?: string | null;
   rested_until?: string | null;
@@ -482,7 +484,7 @@ export default function PhoneNumbersPage() {
                           {poolNum.phone_number}
                         </div>
                         <div className="text-xs text-slate-400 dark:text-slate-500">
-                          {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • ${poolNum.monthly_cost}/mo
+                          {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • Included with your plan
                         </div>
                       </div>
                       <div className="text-sky-600 text-xs font-semibold">
@@ -559,7 +561,7 @@ export default function PhoneNumbersPage() {
                           <div>
                             <div className="font-mono font-semibold text-slate-900 dark:text-slate-100">{poolNum.phone_number}</div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                              {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • ${poolNum.monthly_cost}/mo
+                              {poolNum.number_type === 'tollfree' ? 'Toll-Free' : 'Local'} • Included with your plan
                               <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">Free with plan</span>
                             </div>
                           </div>
@@ -646,7 +648,7 @@ export default function PhoneNumbersPage() {
                           )}
                         </div>
                         <div className="text-xs text-slate-400 dark:text-slate-500">
-                          $1.00/month • Purchased {new Date(number.purchased_at).toLocaleDateString()}
+                          {number.number_type === 'tollfree' ? 'Shared toll-free' : 'Your local number'} • Purchased {new Date(number.purchased_at).toLocaleDateString()}
                         </div>
                       </div>
                       <button
