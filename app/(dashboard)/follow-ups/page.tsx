@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { parseSendError } from '@/lib/sendError';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Calendar, Send, Settings, ExternalLink } from 'lucide-react';
@@ -245,11 +246,18 @@ export default function FollowUpsPage() {
               message: `Calendar link sent to ${followUp.leads?.first_name}. ${data.creditsCost} credits used.`
             });
           } else {
+            // The route returns reason/retryable/on_dnc_list; the modal used to
+            // show only `error` under a generic "Error" heading (#128). It has
+            // room for the real classification, so it says which kind of block
+            // it was and whether trying again can help.
+            const block = parseSendError(response.status, data);
             setModal({
               isOpen: true,
               type: 'error',
-              title: 'Error',
-              message: data.error || 'Failed to send calendar link'
+              title: block.title,
+              message: block.retryable
+                ? `${block.detail} You can try again shortly.`
+                : block.detail
             });
           }
         } catch (error) {

@@ -6,6 +6,7 @@ import { calculateSMSCredits, getCharacterWarning } from '@/lib/creditCalculator
 import ScheduleMessagePopover from './ScheduleMessagePopover';
 import type { Thread } from '@/lib/hooks/useTextsState';
 import toast from 'react-hot-toast';
+import { isSendBlocked, type SendBlock } from '@/lib/sendError';
 
 interface ComposerProps {
   thread: Thread;
@@ -37,6 +38,8 @@ export default function Composer({
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [isDncBlocked, setIsDncBlocked] = useState(false);
+  /** The last block, kept visible until the user changes the message or thread (#128). */
+  const [block, setBlock] = useState<SendBlock | null>(null);
   const [checkingDnc, setCheckingDnc] = useState(false);
   const [showAiMenu, setShowAiMenu] = useState(false);
   const [smartReplies, setSmartReplies] = useState<string[]>([]);
@@ -90,6 +93,8 @@ export default function Composer({
       })
       .catch(() => setIsDncBlocked(false))
       .finally(() => setCheckingDnc(false));
+    // A block belongs to the conversation it happened in.
+    setBlock(null);
   }, [thread.phone_number]);
 
   // Auto-resize textarea
@@ -296,7 +301,16 @@ export default function Composer({
       setAttachedFiles([]);
       setPreviewUrls([]);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to send message');
+      // A block is a state, not an event (#128). A 4-second toast cannot hold a
+      // spam score with suggested rewrites, and a rate cap is still in force
+      // after the toast has gone — so anything the user must act on becomes a
+      // banner, and only genuine one-offs stay a toast.
+      if (isSendBlocked(err)) {
+        setBlock(err.block);
+        if (err.block.kind === 'unknown') toast.error(err.block.detail);
+      } else {
+        toast.error(err.message || 'Failed to send message');
+      }
     } finally {
       setSending(false);
     }
@@ -312,7 +326,11 @@ export default function Composer({
       setShowSchedule(false);
       toast.success(`Message scheduled for ${new Date(scheduledFor).toLocaleString()}`);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to schedule message');
+      if (isSendBlocked(err)) {
+        setBlock(err.block);
+      } else {
+        toast.error(err.message || 'Failed to schedule message');
+      }
     } finally {
       setSending(false);
     }
@@ -354,6 +372,54 @@ export default function Composer({
 
   return (
     <div className="border-t border-slate-200 dark:border-slate-700 shrink-0">
+      {/* Why the last send did not go out (#128).
+          Every field here was already returned by the API and discarded at the
+          throw in TextsLayout. Dismissible, and cleared automatically when the
+          message is edited — for a spam block, editing IS the fix. */}
+      {block && (
+        <div
+          className={`px-3 py-2 border-b text-sm ${
+            block.retryable
+              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300'
+              : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300'
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">
+                {block.title}
+                {typeof block.spamScore === 'number' && (
+                  <span className="ml-2 font-normal opacity-80">score {block.spamScore}/100</span>
+                )}
+              </div>
+              <p className="mt-0.5">{block.detail}</p>
+              {!!block.flaggedWords?.length && (
+                <p className="mt-1 opacity-90">
+                  Flagged: {block.flaggedWords.slice(0, 6).join(', ')}
+                </p>
+              )}
+              {!!block.suggestions?.length && (
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 opacity-90">
+                  {block.suggestions.slice(0, 3).map((sug, i) => (
+                    <li key={i}>{sug}</li>
+                  ))}
+                </ul>
+              )}
+              {block.retryable && (
+                <p className="mt-1 opacity-80">You can try again shortly.</p>
+              )}
+            </div>
+            <button
+              onClick={() => setBlock(null)}
+              aria-label="Dismiss"
+              className="shrink-0 rounded p-0.5 opacity-70 hover:opacity-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* AI Draft Banner — shown when flow autonomy mode is "suggest" and AI has drafted a reply */}
       {thread.pending_ai_draft && (
         <div className="mx-3 mt-3 rounded-lg border border-violet-200 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 overflow-hidden">
@@ -579,7 +645,13 @@ export default function Composer({
           <textarea
             ref={textareaRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              // Editing is the answer to a spam block, and a good-faith attempt
+              // at any other — so the banner should not outlive the message
+              // that caused it (#128).
+              if (block) setBlock(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && text.trim() && !showSchedule) {
                 e.preventDefault();

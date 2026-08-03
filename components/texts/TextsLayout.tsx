@@ -15,6 +15,7 @@ import AIDripModal from '@/components/AIDripModal';
 import BulkComposeDrawer from '@/components/BulkComposeDrawer';
 import OutOfCreditsBlocker from '@/components/OutOfCreditsBlocker';
 import toast from 'react-hot-toast';
+import { parseSendError, SendBlockedError } from '@/lib/sendError';
 
 interface TextsLayoutProps {
   optOutKeyword: string;
@@ -172,7 +173,7 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
         });
         const data = await res.json();
         if (!data.ok && !data.success) {
-          throw new Error(data.error || 'Failed to schedule message');
+          throw new SendBlockedError(parseSendError(res.status, data));
         }
       } catch (err: any) {
         throw err;
@@ -196,10 +197,11 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        if (data.on_dnc_list) {
-          throw new Error('This contact is on the Do Not Call list');
-        }
-        throw new Error(data.error || 'Failed to send message');
+        // Was: read `on_dnc_list`, substitute a hardcoded sentence, and throw
+        // everything else away as a bare string (#128). The endpoint classifies
+        // the block — rate limit, quiet hours, spam risk with suggested
+        // rewrites — and none of that survived this line.
+        throw new SendBlockedError(parseSendError(res.status, data));
       }
 
       await Promise.all([refreshMessages(), refreshThreads()]);

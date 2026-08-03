@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Send, Clock, Users, Tag, Megaphone, Search, Sparkles, ChevronDown, ChevronUp, AlertTriangle, Check, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { parseSendError } from '@/lib/sendError';
 
 interface Lead {
   id: string;
@@ -291,6 +292,11 @@ export default function BulkComposeDrawer({
         // Send now - use existing bulk send logic
         let sent = 0;
         let failed = 0;
+        // Why each one failed, deduplicated. The loop used to keep only a count,
+        // so a run where every message was rate-limited read identically to one
+        // where every message hit a Telnyx error (#128).
+        const reasons = new Map<string, { title: string; detail: string; count: number }>();
+        let stoppedEarly = false;
 
         for (const lead of targetLeads) {
           try {
@@ -309,19 +315,51 @@ export default function BulkComposeDrawer({
               sent++;
             } else {
               failed++;
+              const block = parseSendError(res.status, data);
+              const seen = reasons.get(block.kind);
+              if (seen) seen.count++;
+              else reasons.set(block.kind, { title: block.title, detail: block.detail, count: 1 });
+
+              // A rate cap or a suspended account will not clear in the next
+              // 100ms, and this loop sends ten times a second against a default
+              // cap of ten a minute. Continuing would fire dozens of requests
+              // that are all certain to be rejected, and make the account look
+              // worse while doing it.
+              if (block.kind === 'rate_limited' || block.kind === 'not_allowed' || block.kind === 'no_credits') {
+                stoppedEarly = true;
+                break;
+              }
             }
           } catch {
             failed++;
+            const seen = reasons.get('unknown');
+            if (seen) seen.count++;
+            else reasons.set('unknown', { title: 'Could not send', detail: 'Network error', count: 1 });
           }
           // Small delay
           await new Promise(r => setTimeout(r, 100));
         }
 
-        if (sent > 0) {
-          toast.success(`Sent ${sent} messages${failed > 0 ? `, ${failed} failed` : ''}`);
+        const summary = Array.from(reasons.values())
+          .sort((a, b) => b.count - a.count)
+          .map(r => `${r.count} — ${r.title}: ${r.detail}`)
+          .join('\n');
+        const remaining = targetLeads.length - sent - failed;
+
+        if (sent > 0 && failed === 0) {
+          toast.success(`Sent ${sent} message${sent === 1 ? '' : 's'}`);
           handleClose();
+        } else if (sent > 0) {
+          // Long duration deliberately: this is multi-line and the user has to
+          // read it to know what to do next.
+          toast.error(
+            `Sent ${sent}, ${failed} failed` +
+              (stoppedEarly && remaining > 0 ? `, ${remaining} not attempted` : '') +
+              `\n\n${summary}`,
+            { duration: 12000 }
+          );
         } else {
-          toast.error('Failed to send messages');
+          toast.error(`No messages sent.\n\n${summary}`, { duration: 12000 });
         }
       }
     } catch (error) {

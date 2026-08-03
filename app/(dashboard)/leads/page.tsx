@@ -1179,8 +1179,34 @@ export default function LeadsPage() {
         setRunStates([]);
         setRunStatesDropdownOpen(false);
         setSelectedIds(new Set());
-        setToast("campaign started");
-        setTimeout(()=>setToast(""), 2500);
+
+        // Was the fixed string "campaign started", which is misleading twice
+        // over (#128): this request does not set `sendSMS`, so no message is
+        // sent at all, and when one is the API returns a per-lead breakdown —
+        // including the guard's own "Deferred: …" / "Skipped: …" reasons — that
+        // was thrown away entirely.
+        const r = j?.sendResults;
+        if (!j?.smsSent || !r?.total) {
+          setToast(`Campaign saved — ${j?.updated ?? ids.length} lead${(j?.updated ?? ids.length) === 1 ? '' : 's'} added. No messages sent.`);
+          setTimeout(()=>setToast(""), 4000);
+        } else {
+          const reasons = Array.from(
+            (r.details ?? [])
+              .filter((d: any) => !d.success && d.error)
+              .reduce((m: Map<string, number>, d: any) => m.set(d.error, (m.get(d.error) || 0) + 1), new Map<string, number>())
+              .entries()
+          )
+            .sort((a: any, b: any) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([reason, n]: any) => `${n} × ${reason}`)
+            .join(' · ');
+          setToast(
+            `Sent ${r.success} of ${r.total}` +
+              (r.failed ? ` — ${r.failed} not sent` : '') +
+              (reasons ? `: ${reasons}` : '')
+          );
+          setTimeout(()=>setToast(""), r.failed ? 10000 : 3000);
+        }
         await fetchLeads();
         await fetchCampaigns();
         await fetchTags();

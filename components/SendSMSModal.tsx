@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw, Clock, AlertTriangle, Shield, ShieldCheck, ShieldAlert, Wand2, ChevronDown, FileText } from 'lucide-react';
+import { parseSendError, type SendBlock } from '@/lib/sendError';
 import { analyzeSpamContent, type SpamAnalysis } from '@/lib/ai/spam-detection';
 
 // Helper function to guess timezone from phone number area code
@@ -169,6 +170,7 @@ export default function SendSMSModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [fromNumber, setFromNumber] = useState('');
+  const [block, setBlock] = useState<SendBlock | null>(null);
   const [toPhone, setToPhone] = useState(leadPhone || '');
   const [availableNumbers, setAvailableNumbers] = useState<Array<{ phone_number: string; friendly_name?: string; is_primary: boolean }>>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(true);
@@ -506,6 +508,7 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
 
     setSending(true);
     setError('');
+    setBlock(null);
 
     try {
       const response = await fetch('/api/telnyx/send-sms', {
@@ -522,7 +525,11 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send message');
+        // The endpoint returns a spam score with suggested rewrites, and a rate
+        // cap with which window was hit. All of it used to end here as a string
+        // (#128).
+        setBlock(parseSendError(response.status, data));
+        return;
       }
 
       setSuccess(true);
@@ -576,14 +583,46 @@ Provide exactly 3 reply suggestions, each on a new line. Keep them brief (under 
 
         {/* Body */}
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          {/* Text colours were red-300 on red-50 and sky-300 on sky-50 —
+              light-on-light, effectively unreadable. Corrected while extending
+              this region (#128). */}
           {error && (
-            <div className="bg-red-50 border border-red-500/50 text-red-300 px-4 py-3 rounded">
+            <div className="rounded border border-red-300 bg-red-50 px-4 py-3 text-red-800 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
               {error}
             </div>
           )}
 
+          {block && (
+            <div
+              className={`rounded border px-4 py-3 text-sm ${
+                block.retryable
+                  ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300'
+                  : 'border-red-300 bg-red-50 text-red-800 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300'
+              }`}
+            >
+              <div className="font-medium">
+                {block.title}
+                {typeof block.spamScore === 'number' && (
+                  <span className="ml-2 font-normal opacity-80">score {block.spamScore}/100</span>
+                )}
+              </div>
+              <p className="mt-0.5">{block.detail}</p>
+              {!!block.flaggedWords?.length && (
+                <p className="mt-1 opacity-90">Flagged: {block.flaggedWords.slice(0, 6).join(', ')}</p>
+              )}
+              {!!block.suggestions?.length && (
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 opacity-90">
+                  {block.suggestions.slice(0, 3).map((sug, i) => (
+                    <li key={i}>{sug}</li>
+                  ))}
+                </ul>
+              )}
+              {block.retryable && <p className="mt-1 opacity-80">You can try again shortly.</p>}
+            </div>
+          )}
+
           {success && (
-            <div className="bg-sky-50 border border-sky-500/50 text-sky-300 px-4 py-3 rounded">
+            <div className="rounded border border-sky-300 bg-sky-50 px-4 py-3 text-sky-800 dark:border-sky-900/40 dark:bg-sky-900/10 dark:text-sky-300">
               Message sent successfully!
             </div>
           )}
