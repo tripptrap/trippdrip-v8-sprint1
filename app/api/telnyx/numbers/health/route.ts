@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getNumberHealth } from '@/lib/telnyx';
 import { SPAM_RATIO_LIMIT } from '@/lib/numberPool';
+import { OPT_OUT_WATCH, OPT_OUT_REST, MIN_SENDS_FOR_A_VERDICT } from '@/lib/riskTier';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,11 +34,12 @@ export const runtime = 'nodejs';
  * Revisit once there is real volume; a threshold nobody has checked against
  * reality is a guess with a constant's confidence.
  */
-const OPT_OUT_WATCH = 0.03;
-const OPT_OUT_REST = 0.05;
+// Imported rather than redeclared (#123 gap 4). These same thresholds now also
+// drive the automatic risk tier in lib/riskTier, and two places judging "is this
+// opt-out rate bad" must not be able to drift to different answers.
 
 /** Below this, a rate is noise — 1 opt-out in 4 sends is 25% and means nothing. */
-const MIN_SENDS_FOR_A_VERDICT = 50;
+
 
 type Verdict = 'ok' | 'low_volume' | 'watch' | 'rest';
 

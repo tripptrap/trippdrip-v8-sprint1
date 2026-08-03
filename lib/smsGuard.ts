@@ -17,6 +17,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkQuietHours } from './quietHours';
+import { getAccountRisk, applyRiskFactor } from './riskTier';
 
 export interface SmsGuardResult {
   allowed: boolean;
@@ -94,6 +95,16 @@ async function checkSendRate(
     ? (limits.weekendLimitPercent || 50) / 100
     : 1;
 
+  // Risk tier (#123 gap 4). The account's configured caps are the ceiling; this
+  // reduces them while its opt-out rate is elevated and restores them as the
+  // rolling window clears — automatic in both directions, so a throttle never
+  // needs a human to lift it.
+  //
+  // Applied through applyRiskFactor, which floors at 1: `cap === 0` means "zero
+  // allowed" to the loop below, so a small cap rounding down to 0 would turn a
+  // throttle into a total block nobody authorised.
+  const risk = await getAccountRisk(supabase, userId);
+
   const { data, error } = await supabase.rpc('get_send_counts', { p_user_id: userId });
   if (error) {
     // Deliberately does NOT block. A rate check that cannot run is not evidence
@@ -105,10 +116,13 @@ async function checkSendRate(
   }
 
   const counts = Array.isArray(data) ? data[0] : data;
+  // Named to avoid shadowing the `cap` destructured in the loop below.
+  const effectiveCap = (configured: number) =>
+    applyRiskFactor(Math.round(configured * multiplier), risk.factor);
   const windows: [string, number, number][] = [
-    ['minute', counts?.last_minute ?? 0, Math.round(limits.maxMessagesPerMinute * multiplier)],
-    ['hour', counts?.last_hour ?? 0, Math.round(limits.maxHourlyMessages * multiplier)],
-    ['day', counts?.last_day ?? 0, Math.round(limits.maxDailyMessages * multiplier)],
+    ['minute', counts?.last_minute ?? 0, effectiveCap(limits.maxMessagesPerMinute)],
+    ['hour', counts?.last_hour ?? 0, effectiveCap(limits.maxHourlyMessages)],
+    ['day', counts?.last_day ?? 0, effectiveCap(limits.maxDailyMessages)],
   ];
 
   for (const [window, sent, cap] of windows) {
@@ -117,9 +131,13 @@ async function checkSendRate(
     // sending — silently permit everything. Missing keys get DEFAULT_LIMITS
     // above, so a 0 here is always deliberate.
     if (cap >= 0 && sent >= cap) {
-      const detail = `Send rate exceeded: ${sent}/${cap} messages this ${window}${
-        multiplier !== 1 ? ' (weekend limit)' : ''
-      }`;
+      const qualifiers = [
+        multiplier !== 1 ? 'weekend limit' : '',
+        risk.factor !== 1 ? `reduced — ${risk.reason}` : '',
+      ].filter(Boolean);
+      const detail =
+        `Send rate exceeded: ${sent}/${cap} messages this ${window}` +
+        (qualifiers.length ? ` (${qualifiers.join('; ')})` : '');
       console.log(`🛑 Rate limited: user ${userId} — ${detail}`);
       return { allowed: false, reason: 'rate_limited', retryable: true, detail };
     }
