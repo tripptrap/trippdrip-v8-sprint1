@@ -1473,6 +1473,54 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## A caller-supplied from-number is another tenant's property until proven otherwise (#127, 2026-08-03)
+
+`user_telnyx_numbers.phone_number` is **globally unique** — a number belongs to exactly one
+tenant at a time. So any route that takes a number off a request body and does not check it will
+send from *someone else's* number, attributing the traffic and any complaint or opt-out it earns
+to them.
+
+Call **`ownsNumber(supabase, userId, phoneNumber)`** in `lib/resolveFromNumber` before trusting
+one. It fails **closed**: "cannot tell whether they own this number" must not permit sending
+from it. That is the opposite of `resolveFromNumber`'s lookup failure, which is retryable —
+there the fallback is a number we would have chosen anyway; here it is one the caller named.
+
+Ownership only, deliberately. An agent explicitly picking one of their own numbers has made a
+deliberate choice, so this does not also refuse rested or locked numbers — that would override
+the person rest exists to serve.
+
+### The shape to watch for
+
+```ts
+let sender = body.fromNumber;      // trusted
+if (!sender) sender = resolve();   // ...only reached when the body did NOT supply one
+```
+
+**A truthy body value short-circuits the resolver, so the validated path is exactly the one that
+never runs.** This appeared in three routes; `telnyx/send-sms` was the only one that checked.
+
+Worst instance was `ai-drip/start`, where the number is written to `ai_drips.from_number` and
+replayed by `process-ai-drips` for **every message in the sequence** — one unchecked request
+would have sent an entire drip from another tenant's number.
+
+### Why the issue found one of three
+
+#127 was filed against `campaigns/run`. That one turned out to be **dead** — #125 had already
+replaced the `geoFrom || fromNumber || ''` chain, leaving the field parsed and unread (removed
+rather than validated, since a route that geo-routes per lead never wanted a caller-named number
+in the first place).
+
+The two live ones were found by sweeping for the *pattern* instead:
+
+```bash
+grep -rn "} = body;" app/api --include='*.ts' | grep -iE "from"
+grep -rn "body[?.]*\.\(from\|fromNumber\|phone_number\)" app/api --include='*.ts'
+```
+
+Same lesson as #124 and #126: **the issue describes one instance; the grep finds the class.**
+Fixing only what the ticket names leaves the other instances in place — and here the one the
+ticket named was the only one that no longer mattered.
+
 ## The from-number is chosen here, never by the carrier (#125, 2026-08-03)
 
 `SendTelnyxSMSOptions.from` is **required**, and the transport refuses an empty one.
