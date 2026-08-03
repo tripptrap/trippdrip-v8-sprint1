@@ -194,7 +194,14 @@ export async function POST(req: NextRequest) {
     // matters and it is already written; a failure to send must not lose it or
     // make the form look broken to someone who did nothing wrong.
     try {
-      const resolved = await resolveFromNumber(supabaseAdmin, business.id, { leadZipCode: null });
+      // Pass the recipient so an existing conversation keeps its number (#129).
+      // Usually this is a first contact with no thread to match, but someone who
+      // already talks to this business can submit the form too — and the
+      // confirmation should come from the number they already know.
+      const resolved = await resolveFromNumber(supabaseAdmin, business.id, {
+        leadZipCode: null,
+        toPhone: e164,
+      });
 
       if (!resolved.ok) {
         console.error(`Opt-in confirmation not sent for ${business.id}: ${resolved.reason}`);

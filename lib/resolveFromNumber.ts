@@ -89,8 +89,16 @@ export interface ResolveOptions {
    * Keyed on the recipient rather than a thread id because most callers resolve
    * a from-number BEFORE they look up or create the thread, so a thread id is
    * not available at the point of the decision — the recipient always is.
+   *
+   * **Required, not optional.** It was optional, and two callers quietly did not
+   * pass it — including `telnyx/send-sms`, which the composer, bulk send, the
+   * receptionist and both drip crons all fetch into. The pin silently did
+   * nothing on the highest-volume path in the app, and nothing failed or warned;
+   * conversations just changed number. Every caller is a send and every send has
+   * a recipient, so the type now insists. Pass `null` only where there genuinely
+   * is no counterparty.
    */
-  toPhone?: string | null;
+  toPhone: string | null;
 }
 
 interface NumberRow {
@@ -169,7 +177,7 @@ export async function ownsNumber(
 export async function resolveFromNumber(
   supabase: SupabaseClient,
   userId: string,
-  options: ResolveOptions = {}
+  options: ResolveOptions
 ): Promise<FromNumberResult> {
   const { data: numbers, error } = await supabase
     .from('user_telnyx_numbers')

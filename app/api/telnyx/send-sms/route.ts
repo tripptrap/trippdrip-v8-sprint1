@@ -122,7 +122,14 @@ export async function POST(req: NextRequest) {
 
       // Shared resolver rather than selectClosestNumber directly, so this path
       // also honours the user's mode, locks and rests (#122).
-      const resolved = await resolveFromNumber(supabaseAdmin, userId, { leadZipCode });
+      // `toPhone` matters as much as the zip (#129). Without it the resolver
+      // cannot see that a conversation with this person already exists, so it
+      // re-picks from scratch every time and a thread can change number
+      // mid-conversation — which breaks threading on the handset and reads as a
+      // stranger. This is the route the composer, bulk send, the receptionist
+      // and both drip crons all fetch into, so omitting it defeated the pin on
+      // the highest-volume path in the app.
+      const resolved = await resolveFromNumber(supabaseAdmin, userId, { leadZipCode, toPhone: to });
 
       // The "first active number" fallback that used to live here is gone (#125).
       // It ran whenever the resolver declined and took the OLDEST active number
