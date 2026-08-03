@@ -45,14 +45,24 @@ export async function POST(req: Request) {
         .eq('user_id', user.id)
         .eq('campaign_id', campaignId);
 
-      await supabase
+      // Derived bookkeeping, so a failure is logged rather than fatal — the
+      // leads did move. But an unchecked write here lets total_leads drift away
+      // from reality with nothing to indicate it (#115).
+      const { data: counted, error: countError } = await supabase
         .from('campaigns')
         .update({
           total_leads: newCount || 0,
           updated_at: new Date().toISOString(),
         })
         .eq('id', campaignId)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
+      if (countError || !counted?.length) {
+        console.error(
+          `Campaign ${campaignId} lead count not updated:`,
+          countError?.message ?? 'no rows matched'
+        );
+      }
     }
 
     console.log(`✅ Updated ${leadIds.length} leads to campaign: ${campaignId || 'none'}`);

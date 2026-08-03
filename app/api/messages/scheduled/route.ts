@@ -88,21 +88,30 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Update status to cancelled
-    const { error: updateError } = await supabase
+    // Update status to cancelled. Selecting the row is what distinguishes
+    // "cancelled" from "matched nothing" — see #115.
+    const { data: cancelled, error: updateError } = await supabase
       .from('scheduled_messages')
       .update({
         status: 'cancelled',
         updated_at: new Date().toISOString()
       })
       .eq('id', messageId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
 
     if (updateError) {
       console.error('Error cancelling message:', updateError);
       return NextResponse.json(
         { ok: false, error: updateError.message },
         { status: 500 }
+      );
+    }
+
+    if (!cancelled?.length) {
+      return NextResponse.json(
+        { ok: false, error: 'Scheduled message not found' },
+        { status: 404 }
       );
     }
 

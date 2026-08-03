@@ -204,18 +204,27 @@ export async function PATCH(req: NextRequest) {
         );
     }
 
-    // Update the campaign status
-    const { error: updateError } = await supabase
+    // Update the campaign status. Selected so a campaign id that is not the
+    // caller's reports not-found instead of success (#115).
+    const { data: updatedCampaign, error: updateError } = await supabase
       .from('scheduled_campaigns')
       .update({ status: newStatus })
       .eq('id', campaignId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
 
     if (updateError) {
       console.error("Error updating campaign:", updateError);
       return NextResponse.json(
         { ok: false, error: "Failed to update campaign" },
         { status: 500 }
+      );
+    }
+
+    if (!updatedCampaign?.length) {
+      return NextResponse.json(
+        { ok: false, error: 'Campaign not found' },
+        { status: 404 }
       );
     }
 

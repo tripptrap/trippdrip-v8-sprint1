@@ -83,11 +83,21 @@ export async function GET(
         if (messagesByPhone && messagesByPhone.length > 0) {
           // Update these messages to have the correct thread_id for future queries
           const messageIds = messagesByPhone.map(m => m.id);
-          await supabase
+          // Backfill, so a failure is not fatal — the response below already
+          // carries the corrected thread_id. But left unchecked this silently
+          // re-runs on every load of the conversation (#115).
+          const { data: linked, error: linkError } = await supabase
             .from('messages')
             .update({ thread_id: threadId })
             .in('id', messageIds)
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .select('id');
+          if (linkError || (linked?.length ?? 0) !== messageIds.length) {
+            console.error(
+              `Thread backfill incomplete for ${threadId}: linked ${linked?.length ?? 0}/${messageIds.length}`,
+              linkError?.message ?? ''
+            );
+          }
 
           const normalizedMessages = messagesByPhone.map((msg: any) => ({
             ...msg,

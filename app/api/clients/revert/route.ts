@@ -28,9 +28,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Client not found" }, { status: 404 });
     }
 
-    // Restore original lead if it exists
+    // Restore original lead if it exists.
+    //
+    // Checked and fatal (#115). The client record is deleted a few lines below,
+    // so a silent failure here loses the person entirely: the client row is
+    // gone and the lead was never reactivated. Aborting leaves the client
+    // intact and the revert repeatable, which is the recoverable failure.
     if (client.original_lead_id) {
-      await supabase
+      const { data: restored, error: restoreError } = await supabase
         .from("leads")
         .update({
           client_id: null,
@@ -41,7 +46,19 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", client.original_lead_id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select("id");
+
+      if (restoreError || !restored?.length) {
+        console.error(
+          `Revert aborted: could not restore lead ${client.original_lead_id} for client ${clientId}:`,
+          restoreError?.message ?? "no rows matched"
+        );
+        return NextResponse.json(
+          { ok: false, error: "Could not restore the original lead — the client was left unchanged." },
+          { status: restoreError ? 500 : 404 }
+        );
+      }
     }
 
     // Delete client record

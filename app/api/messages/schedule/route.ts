@@ -214,18 +214,31 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Update the status to cancelled
-    const { error: updateError } = await supabase
+    // Update the status to cancelled.
+    //
+    // `.select()` is what makes a zero-row match visible. Without it this
+    // returned error: null for an id that does not exist or is not the
+    // caller's, and the user was told their message was cancelled while it
+    // stayed queued and sent (#115).
+    const { data: cancelled, error: updateError } = await supabase
       .from('scheduled_messages')
       .update({ status: 'cancelled' })
       .eq('id', messageId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
 
     if (updateError) {
       console.error("Error cancelling scheduled message:", updateError);
       return NextResponse.json(
         { ok: false, error: "Failed to cancel scheduled message" },
         { status: 500 }
+      );
+    }
+
+    if (!cancelled?.length) {
+      return NextResponse.json(
+        { ok: false, error: 'Scheduled message not found' },
+        { status: 404 }
       );
     }
 

@@ -93,13 +93,24 @@ export async function DELETE(
       .eq("user_id", user.id)
       .single();
 
-    // Clear client_id on original lead if it exists
+    // Clear client_id on original lead if it exists.
+    //
+    // Logged rather than fatal (#115): the client is being deleted either way,
+    // and refusing that because of a stale pointer would be worse. But a lead
+    // left pointing at a deleted client is a dangling reference worth seeing.
     if (client?.original_lead_id) {
-      await supabase
+      const { data: cleared, error: clearError } = await supabase
         .from("leads")
         .update({ client_id: null })
         .eq("id", client.original_lead_id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select("id");
+      if (clearError || !cleared?.length) {
+        console.error(
+          `Lead ${client.original_lead_id} still points at deleted client ${params.id}:`,
+          clearError?.message ?? "no rows matched"
+        );
+      }
     }
 
     const { error } = await supabase

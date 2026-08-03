@@ -141,14 +141,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Update session to mark recovery link sent
-    await supabase
+    // Selected so a failure to record this is visible (#115). If the flag is
+    // not set, the recovery link can be sent to the same person again.
+    const { data: marked, error: markError } = await supabase
       .from('conversation_sessions')
       .update({
         recovery_link_sent: true,
         recovery_link_sent_at: new Date().toISOString()
       })
       .eq('id', sessionId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
+    if (markError || !marked?.length) {
+      console.error(
+        `⚠️ Could not mark recovery link sent for session ${sessionId} (${markError?.message ?? 'no rows matched'}) — it may be sent again.`
+      );
+    }
 
     // Generate recovery link
     const recoveryLink = `${process.env.NEXT_PUBLIC_APP_URL}/recover?sessionId=${sessionId}`;

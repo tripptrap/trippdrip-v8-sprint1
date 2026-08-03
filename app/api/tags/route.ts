@@ -222,18 +222,33 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'orderedIds array is required' }, { status: 400 });
     }
 
-    // Update positions for each tag
+    // Update positions for each tag.
+    //
+    // The results were previously discarded entirely — `await Promise.all` then
+    // `ok: true`. A reorder could fail outright, or silently touch nothing, and
+    // still report success (#115).
     const updates = orderedIds.map((id: string, index: number) =>
       supabase
         .from('tags')
         .update({ position: index + 1 })
         .eq('id', id)
         .eq('user_id', user.id)
+        .select('id')
     );
 
-    await Promise.all(updates);
+    const results = await Promise.all(updates);
+    const failed = results.filter(r => r.error);
+    const reordered = results.filter(r => !r.error && (r.data?.length ?? 0) > 0).length;
 
-    return NextResponse.json({ ok: true });
+    if (failed.length) {
+      console.error('Tag reorder failed for some tags:', failed.map(f => f.error?.message));
+      return NextResponse.json(
+        { ok: false, error: 'Could not reorder all tags', reordered, requested: orderedIds.length },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, reordered, requested: orderedIds.length });
   } catch (error: any) {
     console.error('Error in PATCH /api/tags:', error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

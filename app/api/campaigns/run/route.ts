@@ -514,19 +514,31 @@ export async function POST(req: Request) {
       }
     }
 
-    // Tag leads (always happens)
+    // Tag leads (always happens). Counted rather than fire-and-forget: the
+    // campaign reports what it did, and silently tagging nothing would make
+    // that report wrong (#115).
+    let taggedCount = 0;
     for (const lead of targetLeads) {
       const currentTags = Array.isArray(lead.tags) ? lead.tags : [];
       const mergedTags = Array.from(new Set([...currentTags, ...addTags]));
 
-      await supabase
+      const { data: tagged, error: tagError } = await supabase
         .from('leads')
         .update({
           tags: mergedTags,
           updated_at: new Date().toISOString()
         })
         .eq('id', lead.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
+      if (tagError || !tagged?.length) {
+        console.error(`Campaign tagging missed lead ${lead.id}:`, tagError?.message ?? 'no rows matched');
+      } else {
+        taggedCount++;
+      }
+    }
+    if (taggedCount !== targetLeads.length) {
+      console.error(`Campaign tagged ${taggedCount}/${targetLeads.length} leads`);
     }
 
     // Update campaign stats after sending

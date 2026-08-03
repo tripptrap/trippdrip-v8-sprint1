@@ -119,29 +119,44 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: false, error: 'threadId and tagName required' }, { status: 400 });
         }
 
-        // Try RPC first, fall back to direct array append
-        const rpcResult = await supabase.rpc('add_thread_tag', { thread_id_param: threadId, tag_name: tagName });
-        if (rpcResult.error) {
-          // Direct approach: fetch current tags, add new one
-          const { data: thread } = await supabase
+        // Direct scoped update rather than the add_thread_tag RPC, for the same
+        // reason archive/unarchive stopped using theirs (#110).
+        //
+        // The RPC returns void and reports no error whether it matched a row or
+        // not, and the route only fell through to the checked path when the RPC
+        // *errored*. So tagging a thread that does not exist — or belongs to
+        // someone else — answered "Tag added successfully". Verified: a bogus
+        // threadId returned 200 ok:true (#115).
+        const { data: thread, error: readError } = await supabase
+          .from('threads')
+          .select('conversation_tags')
+          .eq('id', threadId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (readError) {
+          console.error('Error reading thread for tagging:', readError);
+          return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+        }
+        if (!thread) {
+          return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const currentTags: string[] = thread.conversation_tags || [];
+        if (!currentTags.includes(tagName)) {
+          const { data: tagged, error } = await supabase
             .from('threads')
-            .select('conversation_tags')
+            .update({ conversation_tags: [...currentTags, tagName] })
             .eq('id', threadId)
             .eq('user_id', user.id)
-            .single();
+            .select('id');
 
-          const currentTags: string[] = thread?.conversation_tags || [];
-          if (!currentTags.includes(tagName)) {
-            const { error } = await supabase
-              .from('threads')
-              .update({ conversation_tags: [...currentTags, tagName] })
-              .eq('id', threadId)
-              .eq('user_id', user.id);
-
-            if (error) {
-              console.error('Error adding tag:', error);
-              return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-            }
+          if (error) {
+            console.error('Error adding tag:', error);
+            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+          }
+          if (!tagged?.length) {
+            return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
           }
         }
 
@@ -153,26 +168,37 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: false, error: 'threadId and tagName required' }, { status: 400 });
         }
 
-        const rpcResult = await supabase.rpc('remove_thread_tag', { thread_id_param: threadId, tag_name: tagName });
-        if (rpcResult.error) {
-          const { data: thread } = await supabase
-            .from('threads')
-            .select('conversation_tags')
-            .eq('id', threadId)
-            .eq('user_id', user.id)
-            .single();
+        // Same as add_tag: the RPC reports no error whether or not it matched,
+        // so the checked path only ran when the RPC errored (#115).
+        const { data: thread, error: readError } = await supabase
+          .from('threads')
+          .select('conversation_tags')
+          .eq('id', threadId)
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-          const currentTags: string[] = thread?.conversation_tags || [];
-          const { error } = await supabase
-            .from('threads')
-            .update({ conversation_tags: currentTags.filter((t: string) => t !== tagName) })
-            .eq('id', threadId)
-            .eq('user_id', user.id);
+        if (readError) {
+          console.error('Error reading thread for tag removal:', readError);
+          return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+        }
+        if (!thread) {
+          return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
+        }
 
-          if (error) {
-            console.error('Error removing tag:', error);
-            return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-          }
+        const currentTags: string[] = thread.conversation_tags || [];
+        const { data: untagged, error } = await supabase
+          .from('threads')
+          .update({ conversation_tags: currentTags.filter((t: string) => t !== tagName) })
+          .eq('id', threadId)
+          .eq('user_id', user.id)
+          .select('id');
+
+        if (error) {
+          console.error('Error removing tag:', error);
+          return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        }
+        if (!untagged?.length) {
+          return NextResponse.json({ ok: false, error: 'Conversation not found' }, { status: 404 });
         }
 
         return NextResponse.json({ ok: true, message: 'Tag removed successfully' });

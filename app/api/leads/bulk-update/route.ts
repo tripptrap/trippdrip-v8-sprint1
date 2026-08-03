@@ -98,16 +98,20 @@ export async function POST(req: NextRequest) {
 
       updateData.tags = newTags;
 
-      // Perform the update
+      // Selected so a lead that matched nothing is distinguishable from one
+      // that updated — errors were already checked below, zero-row matches were
+      // not (#115).
       return supabase
         .from('leads')
         .update(updateData)
         .eq('id', lead.id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
     });
 
     const results = await Promise.all(updatePromises);
     const errors = results.filter(r => r.error);
+    const changed = results.filter(r => !r.error && (r.data?.length ?? 0) > 0).length;
 
     if (errors.length > 0) {
       console.error('Some updates failed:', errors);
@@ -118,10 +122,13 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
+    // `changed`, not `results.length` — the latter counts attempts. A request
+    // naming leads the caller does not own reported them all as updated (#115).
     return NextResponse.json({
       ok: true,
-      updatedCount: results.length,
-      message: `Successfully updated ${results.length} lead(s)`,
+      updatedCount: changed,
+      requested: results.length,
+      message: `Successfully updated ${changed} lead(s)`,
     });
   } catch (error: any) {
     console.error("Error in bulk update:", error);

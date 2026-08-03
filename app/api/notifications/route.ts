@@ -53,11 +53,20 @@ export async function PATCH(req: NextRequest) {
         .eq('user_id', user.id)
         .eq('is_read', false);
     } else if (ids && ids.length > 0) {
-      await supabase
+      // Reports how many were actually marked, not how many were asked for
+      // (#115). A list containing ids the caller does not own used to answer
+      // ok:true regardless.
+      const { data: read, error: readError } = await supabase
         .from('notifications')
         .update({ is_read: true, read_at: now })
         .in('id', ids)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
+      if (readError) {
+        console.error('Error marking notifications read:', readError);
+        return NextResponse.json({ ok: false, error: readError.message }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true, updated: read?.length ?? 0, requested: ids.length });
     }
 
     return NextResponse.json({ ok: true });

@@ -40,11 +40,24 @@ export async function POST(req: NextRequest) {
 
     if (action === 'dismiss') {
       // Clear the draft without sending
-      await supabase
+      const { data: dismissed, error: dismissError } = await supabase
         .from('threads')
         .update({ pending_ai_draft: null })
         .eq('id', threadId)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
+      // Checked, not silent (#115): if the draft is not actually cleared it
+      // stays on the thread and can be approved again later.
+      if (dismissError || !dismissed?.length) {
+        console.error(
+          `Draft dismiss did not clear thread ${threadId} for user ${user.id}:`,
+          dismissError?.message ?? 'no rows matched'
+        );
+        return NextResponse.json(
+          { ok: false, error: 'Could not dismiss the draft' },
+          { status: dismissError ? 500 : 404 }
+        );
+      }
 
       return NextResponse.json({ ok: true, action: 'dismissed' });
     }
@@ -85,13 +98,28 @@ export async function POST(req: NextRequest) {
     }
 
     // Clear the draft
-    await supabase
+    // The SMS has already gone out, so a failure here is NOT reported as a
+    // failed request — but it must be loud. An uncleared draft can be approved
+    // a second time, which sends the same message to the same person again
+    // (#115).
+    const { data: cleared, error: clearError } = await supabase
       .from('threads')
       .update({ pending_ai_draft: null })
       .eq('id', threadId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id');
+    if (clearError || !cleared?.length) {
+      console.error(
+        `⚠️ Sent the draft for thread ${threadId} but could not clear it (${clearError?.message ?? 'no rows matched'}) — it can be approved again and re-sent.`
+      );
+    }
 
-    return NextResponse.json({ ok: true, action: 'approved', messageSent: true });
+    return NextResponse.json({
+      ok: true,
+      action: 'approved',
+      messageSent: true,
+      draftCleared: !clearError && !!cleared?.length,
+    });
 
   } catch (error: any) {
     console.error('Draft action error:', error);

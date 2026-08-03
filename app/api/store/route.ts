@@ -72,6 +72,9 @@ export async function POST(req: NextRequest) {
 
     const results: any = {};
 
+    let leadFailures = 0;
+    let threadFailures = 0;
+
     if (leads && Array.isArray(leads)) {
       for (const lead of leads) {
         const leadData = {
@@ -87,15 +90,27 @@ export async function POST(req: NextRequest) {
           custom_fields: lead.custom_fields || {}
         };
 
+        // Both branches checked (#115). This reported `results.leads = 'updated'`
+        // no matter what happened — including every write failing, and including
+        // ids belonging to someone else matching nothing.
         if (lead.id && typeof lead.id === 'string' && lead.id.includes('-')) {
-          // Update existing
-          await supabase.from('leads').update(leadData).eq('id', lead.id).eq('user_id', user.id);
+          const { data, error } = await supabase
+            .from('leads').update(leadData).eq('id', lead.id).eq('user_id', user.id).select('id');
+          if (error || !data?.length) {
+            leadFailures++;
+            console.error(`store: lead ${lead.id} not updated:`, error?.message ?? 'no rows matched');
+          }
         } else {
-          // Insert new
-          await supabase.from('leads').insert(leadData);
+          const { error } = await supabase.from('leads').insert(leadData);
+          if (error) {
+            leadFailures++;
+            console.error('store: lead insert failed:', error.message);
+          }
         }
       }
-      results.leads = 'updated';
+      results.leads = leadFailures === 0
+        ? 'updated'
+        : `partial: ${leads.length - leadFailures}/${leads.length}`;
     }
 
     if (threads && Array.isArray(threads)) {
@@ -114,14 +129,23 @@ export async function POST(req: NextRequest) {
         };
 
         if (thread.id && typeof thread.id === 'string' && thread.id.includes('-')) {
-          // Update existing
-          await supabase.from('threads').update(threadData).eq('id', thread.id).eq('user_id', user.id);
+          const { data, error } = await supabase
+            .from('threads').update(threadData).eq('id', thread.id).eq('user_id', user.id).select('id');
+          if (error || !data?.length) {
+            threadFailures++;
+            console.error(`store: thread ${thread.id} not updated:`, error?.message ?? 'no rows matched');
+          }
         } else {
-          // Insert new
-          await supabase.from('threads').insert(threadData);
+          const { error } = await supabase.from('threads').insert(threadData);
+          if (error) {
+            threadFailures++;
+            console.error('store: thread insert failed:', error.message);
+          }
         }
       }
-      results.threads = 'updated';
+      results.threads = threadFailures === 0
+        ? 'updated'
+        : `partial: ${threads.length - threadFailures}/${threads.length}`;
     }
 
     if (messages && Array.isArray(messages)) {

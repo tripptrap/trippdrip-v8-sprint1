@@ -204,7 +204,10 @@ export async function POST(req: NextRequest) {
         ? `${currentNotes}\n[${typeLabel} link sent ${new Date().toLocaleString()}]`
         : `[${typeLabel} link sent ${new Date().toLocaleString()}]`;
 
-      await supabase
+      // The calendar link has already been sent. A failure to mark the
+      // follow-up complete leaves it due, so it gets actioned again and the
+      // contact receives the link twice (#115).
+      const { data: completed, error: completeError } = await supabase
         .from('follow_ups')
         .update({
           status: 'completed',
@@ -212,7 +215,13 @@ export async function POST(req: NextRequest) {
           notes: updatedNotes
         })
         .eq('id', followUpId)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select('id');
+      if (completeError || !completed?.length) {
+        console.error(
+          `⚠️ Sent the calendar link but could not complete follow-up ${followUpId} (${completeError?.message ?? 'no rows matched'}) — it will come due again.`
+        );
+      }
     }
 
     return NextResponse.json({
