@@ -304,10 +304,24 @@ number is provisioned 1:1 to a separate, independent client business… No singl
 than one number."* **Scale holding more than one directly contradicts what was approved.** The new
 TFV request has to describe the real model or the verification does not cover what we do.
 
-Two more the new request must fix: the use case is `Conversational / Alerts` while agents send
-marketing (Telnyx: *"any non-marketing content and also marketing content → Mixed"*), and the
-opt-in workflow lists three methods when the approval was won by narrowing to one — including
-"verbal consent", which the product does not capture.
+**Correction, 2026-08-03 (#130):** the "three methods including verbal consent" criticism below
+was **wrong** — that text belongs to the *first rejected* request (`65ad888e`), not the approved
+one. The approved record already carries a single web-form method. Verified against the Telnyx
+API. The remaining criticism stands and is worse than recorded:
+
+The use case is `Conversational / Alerts` while agents send marketing (Telnyx: *"any non-marketing
+content and also marketing content → Mixed"*) — and this is not one field. **Four** fields of the
+approved request describe non-marketing traffic: `useCase`, `useCaseSummary`,
+`productionMessageContent`, and the consent disclosure quoted inside `optInWorkflow`. Changing
+the use case alone leaves three fields describing a product that does not exist, which is the
+exact shape of 10DLC rejection #6.
+
+**And the far larger problem (#130): no lead in the system has a consent record at all.**
+`leads.sms_opt_in` has `DEFAULT true`, and of 209 leads there are **0** rows in
+`contact_form_submissions`. The branded opt-in page works correctly and has never been used;
+CSV import, manual entry and the browser extension capture nothing. The approved TFV's
+description of consent collection is accurate about a page nobody goes through. **The product's
+intake has to change before any filing can honestly describe it.**
 
 **Inventory is now the binding constraint.** 2 numbers available; Telnyx caps at 5 per business
 without justification, which is exactly the rejection on `65ad888e`. Every batch beyond that needs
