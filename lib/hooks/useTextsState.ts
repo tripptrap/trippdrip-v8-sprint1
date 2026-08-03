@@ -194,9 +194,13 @@ export function useTextsState(): UseTextsStateReturn {
       const data = await res.json();
 
       if (data.success) {
-        setThreads(data.threads || []);
+        const list: Thread[] = data.threads || [];
+        setThreads(list);
         if (data.counts) setCounts(data.counts);
         errorShownRef.current = false;
+        // Returned so a caller that needs one thread out of this response does
+        // not fetch the identical list again — see refreshActiveThread.
+        return list;
       } else if (!errorShownRef.current) {
         toast.error('Failed to load conversations');
         errorShownRef.current = true;
@@ -274,24 +278,15 @@ export function useTextsState(): UseTextsStateReturn {
 
   // Refresh the active thread's data (e.g. after editing contact info)
   const refreshActiveThread = useCallback(async () => {
-    await loadThreads(true);
-    if (activeThreadRef.current) {
-      const params = new URLSearchParams();
-      params.set('channel', channel);
-      params.set('tab', tab);
-      if (searchQuery) params.set('search', searchQuery);
-      const res = await fetchWithTimeout(`/api/texts/threads?${params}`, { timeout: 10000 });
-      const data = await res.json();
-      if (data.success) {
-        const updated = (data.threads || []).find(
-          (t: Thread) => t.id === activeThreadRef.current?.id
-        );
-        if (updated) {
-          setActiveThread(updated);
-        }
-      }
+    // One fetch, not two. This called loadThreads(true) and then immediately
+    // re-fetched the identical URL just to pick one thread out of the response
+    // — the same list, twice, every time contact info changed.
+    const fresh = await loadThreads(true);
+    if (activeThreadRef.current && fresh) {
+      const updated = fresh.find((t: Thread) => t.id === activeThreadRef.current?.id);
+      if (updated) setActiveThread(updated);
     }
-  }, [loadThreads, channel, tab, searchQuery]);
+  }, [loadThreads]);
 
   const selectThread = useCallback((thread: Thread | null) => {
     setActiveThread(thread);
@@ -314,6 +309,14 @@ export function useTextsState(): UseTextsStateReturn {
   // Uses guard refs to prevent concurrent requests from piling up
   useEffect(() => {
     const interval = setInterval(() => {
+      // Nothing to refresh for someone who is not looking. This polled every 5
+      // seconds regardless of visibility — roughly 720 requests an hour per open
+      // tab, most of them into a background tab nobody was watching.
+      //
+      // Safe to skip entirely: the visibility listener below refreshes the
+      // moment the tab comes back, so returning to it still shows current data.
+      if (document.visibilityState !== 'visible') return;
+
       loadThreads(true);
       if (activeThreadRef.current) {
         loadMessages(activeThreadRef.current.id, true);

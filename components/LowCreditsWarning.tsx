@@ -3,35 +3,32 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Zap, X, AlertTriangle } from 'lucide-react';
+import { getCredits } from '@/lib/creditsStore';
 
 export default function LowCreditsWarning() {
   const [credits, setCredits] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    fetch('/api/user/credits')
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok && typeof data.credits === 'number') {
-          setCredits(data.credits);
-        }
-      })
-      .catch(() => {});
+    getCredits().then(data => {
+      if (data?.ok && typeof data.credits === 'number') {
+        setCredits(data.credits);
+      }
+    });
   }, []);
 
   // Refresh every 2 minutes
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch('/api/user/credits')
-        .then(r => r.json())
-        .then(data => {
-          if (data.ok && typeof data.credits === 'number') {
-            setCredits(data.credits);
-            // Re-show banner if credits hit 0 (even if previously dismissed)
-            if (data.credits === 0) setDismissed(false);
-          }
-        })
-        .catch(() => {});
+      // Forced: this poll exists to notice the balance changing, so the shared
+      // cache would defeat its whole purpose.
+      getCredits(true).then(data => {
+        if (data?.ok && typeof data.credits === 'number') {
+          setCredits(data.credits);
+          // Re-show banner if credits hit 0 (even if previously dismissed)
+          if (data.credits === 0) setDismissed(false);
+        }
+      });
     }, 120000);
     return () => clearInterval(interval);
   }, []);

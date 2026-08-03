@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Send, Loader2, Sparkles, Minimize2, Maximize2, Briefcase, RefreshCw, Clock, AlertTriangle, Shield, ShieldCheck, ShieldAlert, Wand2, ChevronDown, FileText } from 'lucide-react';
 import { parseSendError, type SendBlock } from '@/lib/sendError';
 import { analyzeSpamContent, type SpamAnalysis } from '@/lib/ai/spam-detection';
+import { getCredits } from '@/lib/creditsStore';
 
 // Helper function to guess timezone from phone number area code
 function getTimezoneFromPhone(phone: string | undefined): { abbr: string; name: string } | null {
@@ -226,9 +227,8 @@ export default function SendSMSModal({
 
   const loadUserCredits = async () => {
     try {
-      const res = await fetch('/api/user/credits');
-      const data = await res.json();
-      if (data.ok) {
+      const data = await getCredits();
+      if (data?.ok) {
         setUserCredits(data.credits);
       }
     } catch {

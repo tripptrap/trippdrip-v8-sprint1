@@ -16,6 +16,7 @@ import BulkComposeDrawer from '@/components/BulkComposeDrawer';
 import OutOfCreditsBlocker from '@/components/OutOfCreditsBlocker';
 import toast from 'react-hot-toast';
 import { parseSendError, SendBlockedError } from '@/lib/sendError';
+import { getCredits } from '@/lib/creditsStore';
 
 interface TextsLayoutProps {
   optOutKeyword: string;
@@ -72,9 +73,10 @@ export default function TextsLayout({ optOutKeyword }: TextsLayoutProps) {
   useEffect(() => {
     const fetchCredits = async () => {
       try {
-        const res = await fetch('/api/user/credits');
-        const data = await res.json();
-        if (data.credits !== undefined) {
+        // Shared, deduped fetch (#texts-dupes). Seven components read this
+        // number; they used to make seven requests.
+        const data = await getCredits();
+        if (data?.credits !== undefined) {
           setUserCredits(data.credits);
         }
       } catch {

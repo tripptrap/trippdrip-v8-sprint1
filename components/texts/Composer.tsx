@@ -7,6 +7,7 @@ import ScheduleMessagePopover from './ScheduleMessagePopover';
 import type { Thread } from '@/lib/hooks/useTextsState';
 import toast from 'react-hot-toast';
 import { isSendBlocked, type SendBlock } from '@/lib/sendError';
+import { getCredits } from '@/lib/creditsStore';
 
 interface ComposerProps {
   thread: Thread;
@@ -60,9 +61,8 @@ export default function Composer({
   useEffect(() => {
     const fetchCredits = async () => {
       try {
-        const res = await fetch('/api/user/credits');
-        const data = await res.json();
-        if (data.credits !== undefined) {
+        const data = await getCredits();
+        if (data?.credits !== undefined) {
           setUserCredits(data.credits);
         }
       } catch {

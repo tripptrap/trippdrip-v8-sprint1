@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Zap, ShoppingCart, X } from 'lucide-react';
+import { getCredits } from '@/lib/creditsStore';
 
 /**
  * Full-viewport overlay that appears when the user's credit balance reaches zero.
@@ -21,9 +22,8 @@ export default function ZeroCreditsModal() {
 
   const fetchCredits = async () => {
     try {
-      const res = await fetch('/api/user/credits');
-      const data = await res.json();
-      if (data.ok && typeof data.credits === 'number') {
+      const data = await getCredits();
+      if (data?.ok && typeof data.credits === 'number') {
         setCredits(data.credits);
         if (data.credits === 0) {
           setShow(true);
