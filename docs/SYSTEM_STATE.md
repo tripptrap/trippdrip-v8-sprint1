@@ -1487,6 +1487,57 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Crons now say when they stop (#117, 2026-08-03)
+
+`public.cron_runs` holds one row per invocation, written by `requireCronAuth` — keyed off the
+request path, so **a new cron is monitored without anyone registering it**. `find_overdue_crons()`
+returns jobs whose last run is older than their grace period, or which have never run.
+
+```sql
+SELECT * FROM public.find_overdue_crons();
+```
+
+Expected intervals live in that function's `VALUES` list, next to the data they judge, so a
+schedule change in `vercel.json` has one obvious place to mirror.
+
+### Peer checking, because a watchdog is itself a cron
+
+Each cron checks the **others** on the way past. Anything scheduled inside this system dies
+exactly when it is needed, so there is no dedicated watchdog — any single surviving cron notices
+the rest have stopped, and the most frequent runs every five minutes.
+
+That cannot cover them all stopping, so `/api/cron/heartbeat` is called by the **GitHub Actions**
+workflow, which does not depend on Vercel's scheduler. It is the only check that survives a total
+outage, and it deliberately runs no jobs.
+
+### Why detection rather than a second scheduler
+
+Only `process-scheduled` had a backup. Adding one for the other four is the weaker answer:
+GitHub's shared runners throttle a `*/5` schedule to roughly hourly, so it is a safety net rather
+than a trigger — and **`auto-buy` charges a customer's card**, so it must not be fired by a backup
+without deciding what a double-run does. Detection catches every cause, including unseen ones.
+
+### Grace periods absorb the deploy gap
+
+**Every production deploy pauses Vercel Cron for around 20 minutes** (measured: deploy 22:59Z,
+config updated 23:01Z, first invocation 23:20Z). An alert that fires on every deploy is trained
+away within a week, so the grace periods are deliberately generous — 30 min for a 5-minute job,
+40 for a 10-minute one, 180 for the 2-hourly. Verified: a 20-minute gap is silent, 45 minutes on
+a 10-minute job alerts.
+
+`cron_runs.source` distinguishes `vercel` from `backup` (the latter sends `x-cron-secret`), which
+is how you notice the primary scheduler has quietly stopped while the backup covers for it.
+
+### The bug making it async immediately found
+
+`requireCronAuth` was synchronous, and all five routes did
+`const denied = requireCronAuth(req); if (denied) return denied;`. Making it async meant **an
+unawaited Promise is truthy** — every cron would have returned it and done nothing. The compiler
+caught all five call sites at once.
+
+Awaited rather than fire-and-forget on purpose: un-awaited work is not guaranteed to run on
+Vercel, and a heartbeat that sometimes fails to write reports a healthy cron as dead.
+
 ## Consent: what the product actually knows (#130, #131, 2026-08-03)
 
 **`leads.sms_opt_in` no longer defaults to true.** It had, which meant every lead created by any
