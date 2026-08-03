@@ -7,7 +7,21 @@ const TELNYX_API_URL = 'https://api.telnyx.com/v2';
 interface SendTelnyxSMSOptions {
   to: string;
   message: string;
-  from?: string;
+  /**
+   * Required (#125). This used to be optional, and omitting it did not fail the
+   * send — the request fell back to `messaging_profile_id` and **Telnyx picked a
+   * number from the profile pool**.
+   *
+   * That turned every unchecked resolver result into a successful send from a
+   * number nobody selected: it ignored rest and lock, it attributed the traffic
+   * (and any complaint it earned) to whichever tenant happened to hold that
+   * number, and it reported success. Three callers passed `from: x || undefined`
+   * with no null check, so this was the normal path, not an edge case.
+   *
+   * A number is per-tenant reputation in this product. Choosing one is never
+   * something to leave to the provider.
+   */
+  from: string;
   mediaUrls?: string[];
   /**
    * Required (#123). Every outbound message passes through this function, which
@@ -39,31 +53,30 @@ export async function sendTelnyxSMS(options: SendTelnyxSMSOptions): Promise<Teln
     return { success: false, error: moderation?.detail || 'Message blocked by content moderation' };
   }
 
+  // Belt and braces again: `from` is required by the type, but these options are
+  // built from untyped route bodies in places, so an empty string can still get
+  // through. Refusing is the whole point — the previous behaviour was to let
+  // Telnyx choose (#125).
+  if (!from) {
+    return { success: false, error: 'No sending number was resolved — refusing to let the carrier choose one' };
+  }
+
   const apiKey = process.env.TELNYX_API_KEY;
-  const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
 
   if (!apiKey) {
     return { success: false, error: 'Telnyx API key not configured' };
   }
 
-  if (!messagingProfileId) {
-    return { success: false, error: 'Telnyx messaging profile ID not configured' };
-  }
-
   try {
-    // When we have a specific 'from' number, send it directly without messaging_profile_id.
-    // Including messaging_profile_id with 'from' causes Telnyx to validate against the
-    // number pool, which fails if Number Pool isn't enabled on the profile.
+    // `from` is always set, so `messaging_profile_id` is never sent. Including
+    // both makes Telnyx validate against the number pool, which fails unless
+    // Number Pool is enabled on the profile — and sending the profile id *alone*
+    // is what let Telnyx pick a number, which is the bug in #125.
     const requestBody: any = {
       to,
       text: message,
+      from,
     };
-
-    if (from) {
-      requestBody.from = from;
-    } else {
-      requestBody.messaging_profile_id = messagingProfileId;
-    }
 
     // Add media for MMS
     if (mediaUrls && mediaUrls.length > 0) {

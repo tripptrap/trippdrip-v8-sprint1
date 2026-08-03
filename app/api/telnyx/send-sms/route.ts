@@ -122,29 +122,32 @@ export async function POST(req: NextRequest) {
 
       // Shared resolver rather than selectClosestNumber directly, so this path
       // also honours the user's mode, locks and rests (#122).
-      resolvedFrom = await resolveFromNumber(supabaseAdmin, userId, { leadZipCode });
-      if (resolvedFrom) {
-        console.log('📍 Geo-routed to number:', resolvedFrom, 'for zip:', leadZipCode);
+      const resolved = await resolveFromNumber(supabaseAdmin, userId, { leadZipCode });
+
+      // The "first active number" fallback that used to live here is gone (#125).
+      // It ran whenever the resolver declined and took the OLDEST active number
+      // straight from the table — ignoring rest, lock, geo and mode, every rule
+      // the resolver exists to apply. Because this route is also what
+      // receptionist/respond, process-drips and process-ai-drips fetch into,
+      // resting a number did not stop it being used on any of them. The Rest
+      // button on the Phone Numbers page was, on these paths, decorative.
+      //
+      // Declining to send is the correct answer: if every number is rested the
+      // resolver already falls back to the primary itself, deliberately, so
+      // reaching here means something is genuinely wrong.
+      if (!resolved.ok) {
+        return NextResponse.json(
+          { error: resolved.detail, reason: resolved.reason, retryable: resolved.retryable },
+          { status: resolved.retryable ? 503 : 400 }
+        );
       }
+
+      resolvedFrom = resolved.number;
+      console.log('📍 Geo-routed to number:', resolvedFrom, 'for zip:', leadZipCode);
     }
 
-    // Fallback: If still no from number, get user's first active number
-    if (!resolvedFrom && userId && supabaseAdmin) {
-      const { data: userNumbers } = await supabaseAdmin
-        .from('user_telnyx_numbers')
-        .select('phone_number')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: true })
-        .limit(1);
-
-      if (userNumbers && userNumbers.length > 0) {
-        resolvedFrom = userNumbers[0].phone_number;
-        console.log('📱 Fallback to first number:', resolvedFrom);
-      }
-    }
-
-    // Final check: no from number available
+    // An explicit `from` that failed the ownership check above, or a caller that
+    // passed an empty string.
     if (!resolvedFrom) {
       return NextResponse.json(
         { error: 'No phone number available. Please claim a phone number first.' },

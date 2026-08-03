@@ -337,8 +337,24 @@ export async function POST(req: Request) {
         // Send via Telnyx API
         try {
           // Geo-route: pick closest number to lead's zip code
-          const geoFrom = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null });
-          const effectiveFrom = geoFrom || fromNumber || '';
+          //
+          // A failure here used to fall through to `fromNumber` (unvalidated,
+          // straight from the request body — see #127) and then to '', which
+          // sendTelnyxSMS turned into a profile-pool send from a number nobody
+          // chose (#125). Now it records the failure against this lead and moves
+          // on, so a campaign does not silently send from arbitrary numbers.
+          const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, { leadZipCode: lead.zip_code || null });
+          if (!resolved.ok) {
+            console.error(`Campaign: no sending number for ${lead.phone} — ${resolved.reason}`);
+            sendResults.push({
+              leadId: String(lead.id),
+              phone: lead.phone,
+              success: false,
+              error: resolved.detail,
+            });
+            continue;
+          }
+          const effectiveFrom = resolved.number;
 
           // Check if this is the first message to this lead (for opt-out footer)
           let isFirstMessageToLead = true;
@@ -376,7 +392,7 @@ export async function POST(req: Request) {
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: messageToSend,
-            from: effectiveFrom || undefined,
+            from: effectiveFrom,
             moderation,
           });
 

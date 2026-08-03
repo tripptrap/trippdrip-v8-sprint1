@@ -143,22 +143,27 @@ async function handleCron(req: NextRequest) {
 
         // Shared resolver (#122) — this took whichever number was created first,
         // ignoring the primary flag, geo, locks and rests alike.
-        const resolvedFrom = await resolveFromNumber(supabaseAdmin, event.user_id, {
+        const resolved = await resolveFromNumber(supabaseAdmin, event.user_id, {
           leadZipCode: null,
         });
-        const userNumber = resolvedFrom ? { phone_number: resolvedFrom } : null;
 
-        if (!userNumber?.phone_number) {
-          console.error(`Appointment reminder: No Telnyx number for user ${event.user_id}`);
-          await supabaseAdmin
-            .from('calendar_events')
-            .update({ reminder_status: 'skipped_no_from_number' })
-            .eq('id', event.id);
+        if (!resolved.ok) {
+          console.error(`Appointment reminder: no sending number for user ${event.user_id} — ${resolved.reason}`);
+          // Only a permanent cause may mark the event. Stamping
+          // reminder_status on a transient lookup failure would drop the
+          // reminder for good, since nothing re-sends a marked event — the same
+          // distinction the guard block below already respects (#125).
+          if (!resolved.retryable) {
+            await supabaseAdmin
+              .from('calendar_events')
+              .update({ reminder_status: 'skipped_no_from_number' })
+              .eq('id', event.id);
+          }
           skipped++;
           continue;
         }
 
-        const fromNumber = userNumber.phone_number;
+        const fromNumber = resolved.number;
 
         // Format the appointment time
         const appointmentTime = formatAppointmentTime(new Date(event.start_time));

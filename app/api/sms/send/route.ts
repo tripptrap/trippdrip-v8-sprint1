@@ -146,6 +146,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Resolve the from-number: an explicit one wins, otherwise the shared
+    // resolver (#122). This used to take whichever number was created first,
+    // which ignored the primary flag as well as geo, locks and rests.
+    //
+    // Moved ABOVE the point deduction (#125). Failing to resolve a number used
+    // to return 400 after a point had already been spent, with no refund — rare
+    // while the only cause was owning no numbers, but a guaranteed way to burn
+    // points once a temporary lookup failure became a reportable outcome.
+    let resolvedFrom = fromPhone;
+    if (!resolvedFrom && supabaseAdmin) {
+      const resolved = await resolveFromNumber(supabaseAdmin, user.id, { leadZipCode: null });
+      if (!resolved.ok) {
+        return NextResponse.json(
+          { error: resolved.detail, reason: resolved.reason, retryable: resolved.retryable },
+          { status: resolved.retryable ? 503 : 400 }
+        );
+      }
+      resolvedFrom = resolved.number;
+    }
+
+    if (!resolvedFrom) {
+      return NextResponse.json(
+        { error: 'No phone number available. Please claim a phone number first.' },
+        { status: 400 }
+      );
+    }
+
     // Check and deduct points BEFORE sending
     const actionType = isBulk ? 'bulk_message' : 'sms_sent';
     const pointsResult = await spendPointsForAction(actionType, 1);
@@ -154,23 +181,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: pointsResult.error || 'Insufficient points' },
         { status: 402 } // Payment Required
-      );
-    }
-
-    // Resolve the from-number: an explicit one wins, otherwise the shared
-    // resolver (#122). This used to take whichever number was created first,
-    // which ignored the primary flag as well as geo, locks and rests.
-    let resolvedFrom = fromPhone;
-    if (!resolvedFrom && supabaseAdmin) {
-      resolvedFrom = (await resolveFromNumber(supabaseAdmin, user.id, {
-        leadZipCode: null,
-      })) || undefined;
-    }
-
-    if (!resolvedFrom) {
-      return NextResponse.json(
-        { error: 'No phone number available. Please claim a phone number first.' },
-        { status: 400 }
       );
     }
 

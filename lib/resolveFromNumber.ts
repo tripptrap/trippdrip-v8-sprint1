@@ -35,6 +35,30 @@ import { selectClosestNumber } from './geo/selectClosestNumber';
 
 export type NumberSelectionMode = 'geo' | 'primary';
 
+/**
+ * Why this is a discriminated result and not `string | null` (#125).
+ *
+ * A bare null collapsed two conditions that need opposite handling:
+ *
+ *   none_owned      permanent. The agent has no active number. Telling them to
+ *                   claim one is correct, and a scheduled row should be failed
+ *                   rather than retried for ever.
+ *   lookup_failed   transient. The numbers table could not be read. Telling
+ *                   someone to buy a number they already own is wrong, and
+ *                   failing their scheduled message for a database blip is
+ *                   worse — the next cron run would have succeeded.
+ *
+ * Every caller previously branched on falsiness alone and rendered some variant
+ * of "claim a phone number first", so a transient error was reported as a
+ * missing purchase, and on the cron paths it could mark work permanently failed.
+ *
+ * `retryable` mirrors the same field on SmsGuardResult, so the crons can apply
+ * one rule to both: retryable means leave the row alone for the next run.
+ */
+export type FromNumberResult =
+  | { ok: true; number: string }
+  | { ok: false; reason: 'none_owned' | 'lookup_failed'; detail: string; retryable: boolean };
+
 export interface ResolveOptions {
   /** Lead's ZIP, used in `geo` mode. Absent is fine — falls back to primary. */
   leadZipCode?: string | null;
@@ -55,13 +79,15 @@ const inFuture = (ts: string | null | undefined): boolean =>
 /**
  * @param supabase service-role client — several callers are crons acting for
  *                 another user, and `user_telnyx_numbers` is under RLS.
- * @returns an E.164 number, or null when the agent has no usable number.
+ * @returns the chosen number, or why one could not be chosen. See
+ *          {@link FromNumberResult} — the two failure reasons need opposite
+ *          handling and must not be collapsed back into a falsy check.
  */
 export async function resolveFromNumber(
   supabase: SupabaseClient,
   userId: string,
   options: ResolveOptions = {}
-): Promise<string | null> {
+): Promise<FromNumberResult> {
   const { data: numbers, error } = await supabase
     .from('user_telnyx_numbers')
     .select('phone_number, is_primary, locked_until, rested_until')
@@ -70,9 +96,21 @@ export async function resolveFromNumber(
 
   if (error) {
     console.error(`resolveFromNumber: could not read numbers for ${userId}:`, error);
-    return null;
+    return {
+      ok: false,
+      reason: 'lookup_failed',
+      detail: 'Could not look up your phone numbers. This is usually temporary.',
+      retryable: true,
+    };
   }
-  if (!numbers?.length) return null;
+  if (!numbers?.length) {
+    return {
+      ok: false,
+      reason: 'none_owned',
+      detail: 'No active phone number on this account. Claim a number before sending.',
+      retryable: false,
+    };
+  }
 
   const rows = numbers as NumberRow[];
 
@@ -85,15 +123,15 @@ export async function resolveFromNumber(
     console.warn(
       `resolveFromNumber: every number for ${userId} is rested — falling back to the primary so the send is not lost`
     );
-    return (rows.find(n => n.is_primary) ?? rows[0]).phone_number;
+    return { ok: true, number: (rows.find(n => n.is_primary) ?? rows[0]).phone_number };
   }
 
   // 2. A lock beats everything, including geo.
   const locked = usable.find(n => inFuture(n.locked_until));
-  if (locked) return locked.phone_number;
+  if (locked) return { ok: true, number: locked.phone_number };
 
   // One number and nothing to decide.
-  if (usable.length === 1) return usable[0].phone_number;
+  if (usable.length === 1) return { ok: true, number: usable[0].phone_number };
 
   // 3. Mode.
   let mode = options.mode;
@@ -110,9 +148,11 @@ export async function resolveFromNumber(
     const closest = await selectClosestNumber(userId, options.leadZipCode, supabase);
     // Only accept it if it is not resting — selectClosestNumber knows nothing
     // about rest state, so filtering here is what keeps that guarantee true.
-    if (closest && usable.some(n => n.phone_number === closest)) return closest;
+    if (closest && usable.some(n => n.phone_number === closest)) {
+      return { ok: true, number: closest };
+    }
   }
 
   // 4. Primary, else anything usable.
-  return (usable.find(n => n.is_primary) ?? usable[0]).phone_number;
+  return { ok: true, number: (usable.find(n => n.is_primary) ?? usable[0]).phone_number };
 }

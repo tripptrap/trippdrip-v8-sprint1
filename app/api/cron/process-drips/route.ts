@@ -302,14 +302,31 @@ async function handleCron(req: NextRequest) {
         // Shared resolver — geo, lock and rest all apply here now (#122).
         // This took the primary unconditionally, so a Scale agent's extra
         // numbers were never used for drip steps.
-        const fromNumber = (await resolveFromNumber(supabaseAdmin, enrollment.user_id, {
+        const resolved = await resolveFromNumber(supabaseAdmin, enrollment.user_id, {
           leadZipCode: lead?.zip_code ?? null,
-        })) || '';
-        if (!fromNumber) {
-          console.error(`📧 Drip: No from number for user ${enrollment.user_id}`);
+        });
+
+        if (!resolved.ok) {
+          console.error(`📧 Drip: no sending number for user ${enrollment.user_id} — ${resolved.reason}`);
           errors++;
+          // A permanent cause ends the enrollment. This used to `continue`
+          // unconditionally with next_send_at untouched, so an account with no
+          // number was retried on every run for ever, visible only in the
+          // console (#125). A transient lookup failure still defers, which is
+          // what that behaviour was right for.
+          if (!resolved.retryable) {
+            await supabaseAdmin
+              .from('drip_campaign_enrollments')
+              // `status` only — drip_campaign_enrollments has no last_error
+              // column, and naming one would make Postgres reject the whole
+              // UPDATE (the #126 failure mode). The reason goes to the log.
+              .update({ status: 'failed' })
+              .eq('id', enrollment.id);
+          }
           continue;
         }
+
+        const fromNumber = resolved.number;
 
         // Find or create thread for this lead
         let threadId: string | null = null;

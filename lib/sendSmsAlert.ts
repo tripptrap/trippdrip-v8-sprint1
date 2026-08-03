@@ -94,11 +94,18 @@ export async function sendSmsAlertToUser(
           alertBody = `HyveWyre: Appointment booked with ${leadName || leadPhone || 'a lead'}${context.appointmentTime ? ` — ${context.appointmentTime}` : ''}. Check your calendar.`;
         }
 
-        if (alertBody) {
+        // Explicit, because `telnyxNum` comes from an untyped query — `any`
+        // slips past the required `from` (#125). Without a number we skip the
+        // SMS rather than let the transport refuse it opaquely; the email
+        // branch below still runs, so the alert is not lost.
+        const alertFrom: string | undefined = telnyxNum?.phone_number;
+        if (alertBody && !alertFrom) {
+          console.warn(`SMS alert skipped for ${userId}: no active number to send from`);
+        } else if (alertBody && alertFrom) {
           await sendTelnyxSMS({
             to: userData.phone_number,
             message: alertBody,
-            from: telnyxNum?.phone_number,
+            from: alertFrom,
             // The account owner's own phone — see /api/notifications/sms-alert (#123).
             moderation: exemptFromModeration('account_alert'),
           }).catch(err => console.error('SMS alert send failed:', err));

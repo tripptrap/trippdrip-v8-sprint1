@@ -96,13 +96,19 @@ export async function POST(req: NextRequest) {
     // ignored geo-routing and — more importantly — sent from numbers the user
     // had locked or rested. Resting a number is pointless if a send path keeps
     // using it.
-    const fromNumber = await resolveFromNumber(createServiceRoleClient(), user.id, {
+    const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, {
       leadZipCode: lead.zip_code ?? null,
     });
 
-    if (!fromNumber) {
-      return NextResponse.json({ ok: false, error: 'No phone number configured for sending' }, { status: 400 });
+    if (!resolved.ok) {
+      // Was a single "No phone number configured for sending", which is the
+      // wrong thing to tell someone whose lookup merely failed (#125).
+      return NextResponse.json(
+        { ok: false, error: resolved.detail, reason: resolved.reason, retryable: resolved.retryable },
+        { status: resolved.retryable ? 503 : 400 }
+      );
     }
+    const fromNumber = resolved.number;
 
     // Build the message based on calendar type
     const firstName = lead.first_name || '';

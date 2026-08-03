@@ -48,10 +48,16 @@ export async function POST(req: NextRequest) {
         .eq('user_id', user.id)
         .eq('phone', phoneNumber)
         .maybeSingle();
-      senderNumber =
-        (await resolveFromNumber(createServiceRoleClient(), user.id, {
-          leadZipCode: lead?.zip_code ?? null,
-        })) || undefined;
+      const resolved = await resolveFromNumber(createServiceRoleClient(), user.id, {
+        leadZipCode: lead?.zip_code ?? null,
+      });
+      if (!resolved.ok) {
+        return NextResponse.json(
+          { success: false, error: resolved.detail, reason: resolved.reason, retryable: resolved.retryable },
+          { status: resolved.retryable ? 503 : 400 }
+        );
+      }
+      senderNumber = resolved.number;
     }
 
     if (!senderNumber) {

@@ -250,9 +250,27 @@ export async function PUT(req: NextRequest) {
           }
 
           // Send SMS via Telnyx
-          const fromNumber = await resolveFromNumber(adminClient, user.id, {
+          //
+          // The result used to be passed straight through as
+          // `from: fromNumber || undefined`, and a missing number meant Telnyx
+          // picked one from the profile pool while the row was marked sent
+          // (#125). Now a permanent failure cancels the row with a readable
+          // reason and a temporary one leaves it pending for the next run.
+          const resolved = await resolveFromNumber(adminClient, user.id, {
             leadZipCode: lead.zip_code ?? null,
           });
+          if (!resolved.ok) {
+            console.log(`Bulk send: no sending number for message ${message.id} — ${resolved.reason}`);
+            if (!resolved.retryable) {
+              await adminClient
+                .from('scheduled_messages')
+                .update({ status: 'cancelled', error_message: resolved.detail })
+                .eq('id', message.id);
+            }
+            failed++;
+            continue;
+          }
+          const fromNumber = resolved.number;
           // Content moderation (#123). Bulk scheduling sent user-authored text
           // with no spam check — the same gap sms/send and the scheduled cron
           // had. A block is permanent (identical text scores identically), so
@@ -275,7 +293,7 @@ export async function PUT(req: NextRequest) {
           const result = await sendTelnyxSMS({
             to: lead.phone,
             message: message.body,
-            from: fromNumber || undefined,
+            from: fromNumber,
             moderation,
           });
 

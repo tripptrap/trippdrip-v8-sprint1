@@ -226,10 +226,36 @@ async function processScheduledMessages(supabase: any) {
       // locks and rests like every other one (#122). It previously took the
       // primary unconditionally, so extra numbers did nothing for scheduled
       // sends — most of the automated volume.
-      const resolvedFrom = await resolveFromNumber(supabase, message.user_id, {
+      //
+      // A failure here used to become `primaryNumber = null`, which was passed
+      // on as `primaryNumber?.phone_number` — undefined — and sendTelnyxSMS then
+      // sent via the messaging profile from a number nobody chose, marked the row
+      // `sent` and deducted credits (#125). This is the highest-volume automated
+      // path, so that was the common case, not an edge one.
+      const resolved = await resolveFromNumber(supabase, message.user_id, {
         leadZipCode: lead.zip_code,
       });
-      const primaryNumber = resolvedFrom ? { phone_number: resolvedFrom } : null;
+
+      if (!resolved.ok) {
+        if (resolved.retryable) {
+          // A lookup failure is transient — leave the row pending so the next
+          // run picks it up, exactly as a quiet-hours deferral does.
+          console.log(`Scheduled msg ${message.id} deferred — ${resolved.detail}`);
+          continue;
+        }
+        await supabase
+          .from('scheduled_messages')
+          .update({
+            status: 'failed',
+            error_message: resolved.detail,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', message.id);
+        failed++;
+        continue;
+      }
+
+      const primaryNumber = { phone_number: resolved.number };
 
       // Send the message based on channel
       if (message.channel === 'sms') {
@@ -673,7 +699,7 @@ async function sendSMS(
   userId: string,
   to: string,
   body: string,
-  from?: string
+  from: string
 ): Promise<{ success: boolean; error?: string; messageSid?: string; moderation: ModerationDecision }> {
   const moderation = await moderateOutbound(supabase, userId, body);
   if (!moderation.allowed) {

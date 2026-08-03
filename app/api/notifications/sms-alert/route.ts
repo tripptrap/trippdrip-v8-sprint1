@@ -67,10 +67,19 @@ export async function POST(req: NextRequest) {
       alertBody = message || 'HyveWyre notification';
     }
 
+    // Explicit, because `telnyxNum` comes from an untyped query — `any` slips
+    // past the required `from` (#125).
+    if (!telnyxNum?.phone_number) {
+      return NextResponse.json(
+        { ok: false, error: 'No active phone number to send the alert from' },
+        { status: 400 }
+      );
+    }
+
     const result = await sendTelnyxSMS({
       to: userData.phone_number,
       message: alertBody,
-      from: telnyxNum?.phone_number,
+      from: telnyxNum.phone_number,
       // Alert to the account owner's own phone, not a lead. Not marketing, and
       // already exempt from the DNC gate for the same reason (#123).
       moderation: exemptFromModeration('account_alert'),
