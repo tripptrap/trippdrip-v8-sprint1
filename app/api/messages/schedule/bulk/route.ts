@@ -233,9 +233,9 @@ export async function PUT(req: NextRequest) {
 
           if (!guard.allowed) {
             console.log(`Bulk send: skipping ${lead.phone} — ${guard.reason} (${guard.detail})`);
-            // Only cancel on a permanent block. A quiet-hours deferral leaves
-            // the message pending so the scheduled-send cron picks it up once
-            // the window opens.
+            // Only cancel on a permanent block. Quiet-hours and rate-cap
+            // deferrals leave the message pending so the scheduled-send cron
+            // picks it up once the window opens or the cap resets (#121).
             if (!guard.retryable) {
               await adminClient
                 .from('scheduled_messages')

@@ -412,7 +412,7 @@ export async function POST(req: NextRequest) {
       if (!guard.allowed) {
         return NextResponse.json(
           { error: guard.detail || 'Message blocked', reason: guard.reason, retryable: !!guard.retryable },
-          { status: guard.reason === 'quiet_hours' ? 429 : 403 }
+          { status: guard.reason === 'quiet_hours' || guard.reason === 'rate_limited' ? 429 : 403 }
         );
       }
 

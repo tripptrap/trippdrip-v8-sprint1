@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { spendPointsForAction } from '@/lib/pointsSupabaseServer';
 import { sendTelnyxSMS } from '@/lib/telnyx';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -87,46 +88,35 @@ export async function POST(req: NextRequest) {
       ? `${messageBody}\n\nReply ${optOutKeyword} to opt out`
       : messageBody;
 
-    // Check DNC list BEFORE sending
-    const { data: dncCheck, error: dncError } = await createServiceRoleClient().rpc('check_dnc', {
-      p_user_id: user.id,
-      p_phone_number: toPhone
+    // Single gate for DNC, opt-out, account suspension and send rate (#121).
+    //
+    // This route hand-rolled the DNC check instead of using the shared guard,
+    // and got it wrong in a way that mattered: on a `check_dnc` error it logged
+    // and **carried on sending**. A transient failure of the opt-out lookup
+    // meant messaging someone who may have texted STOP. The guard fails closed.
+    //
+    // Routing through it also picks up the two gates this path never had: a
+    // suspended account can no longer send, and per-account rate caps now apply
+    // here as they do everywhere else.
+    //
+    // Quiet hours stay off — a person pressing Send is a deliberate act, and
+    // that is the established rule for manual sends (#50).
+    const guard = await checkSmsAllowed(createServiceRoleClient(), user.id, toPhone, {
+      context: { source: 'sms/send', campaign_id: campaignId, message_body: messageBody },
     });
 
-    if (dncError) {
-      console.error('Error checking DNC list:', dncError);
-    } else if (dncCheck) {
-      const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
-
-      if (dncResult.on_dnc_list) {
-        console.log(`🚫 Message blocked - ${toPhone} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list, reason: ${dncResult.reason})`);
-
-        // Log blocked message to history
-        await supabase.from('dnc_history').insert({
-          user_id: user.id,
-          phone_number: toPhone,
-          normalized_phone: dncResult.normalized_phone,
-          action: 'blocked',
-          list_type: dncResult.on_user_list ? 'user' : 'global',
-          result: true,
-          metadata: {
-            reason: dncResult.reason,
-            source: dncResult.source,
-            message_body: messageBody,
-            campaign_id: campaignId
-          }
-        });
-
-        return NextResponse.json(
-          {
-            error: 'Message blocked: Recipient is on Do Not Call list',
-            on_dnc_list: true,
-            dnc_reason: dncResult.reason,
-            list_type: dncResult.on_user_list ? 'user' : 'global'
-          },
-          { status: 403 } // Forbidden
-        );
-      }
+    if (!guard.allowed) {
+      console.log(`🚫 sms/send blocked — ${guard.reason}: ${guard.detail}`);
+      return NextResponse.json(
+        {
+          error: guard.detail || 'Message blocked',
+          reason: guard.reason,
+          retryable: !!guard.retryable,
+          on_dnc_list: guard.reason === 'dnc',
+          list_type: guard.listType,
+        },
+        { status: guard.reason === 'rate_limited' ? 429 : 403 }
+      );
     }
 
     // Check and deduct points BEFORE sending

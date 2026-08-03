@@ -21,7 +21,7 @@ import { checkQuietHours } from './quietHours';
 export interface SmsGuardResult {
   allowed: boolean;
   /** Machine-readable reason when blocked. */
-  reason?: 'dnc' | 'opted_out' | 'quiet_hours' | 'check_failed';
+  reason?: 'dnc' | 'opted_out' | 'quiet_hours' | 'check_failed' | 'account_blocked' | 'rate_limited';
   /** Human-readable detail, safe to log. */
   detail?: string;
   /**
@@ -55,6 +55,72 @@ interface GuardOptions {
   recipientState?: string | null;
 }
 
+/** Defaults mirror app/api/telnyx/send-sms — the only place these existed before (#121). */
+const DEFAULT_LIMITS = {
+  maxMessagesPerMinute: 10,
+  maxHourlyMessages: 100,
+  maxDailyMessages: 1000,
+  enableWeekendLimits: false,
+  weekendLimitPercent: 50,
+};
+
+/**
+ * Per-account send rate. Returns a blocking result, or null when under the cap.
+ *
+ * One RPC rather than three COUNT queries — the guard runs per message, and a
+ * 100-message bulk loop would otherwise fire 300 round trips.
+ */
+async function checkSendRate(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<SmsGuardResult | null> {
+  const { data: settingsRow } = await supabase
+    .from('user_settings')
+    .select('spam_protection')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const limits = { ...DEFAULT_LIMITS, ...(settingsRow?.spam_protection || {}) };
+
+  const isWeekend = [0, 6].includes(new Date().getDay());
+  const multiplier = limits.enableWeekendLimits && isWeekend
+    ? (limits.weekendLimitPercent || 50) / 100
+    : 1;
+
+  const { data, error } = await supabase.rpc('get_send_counts', { p_user_id: userId });
+  if (error) {
+    // Deliberately does NOT block. A rate check that cannot run is not evidence
+    // of abuse, and failing closed here would stop every send on a transient
+    // error — the opposite of the containment this is for. The account-status
+    // gate above is the one that fails closed.
+    console.error(`Send-rate lookup failed for user ${userId} — allowing send:`, error);
+    return null;
+  }
+
+  const counts = Array.isArray(data) ? data[0] : data;
+  const windows: [string, number, number][] = [
+    ['minute', counts?.last_minute ?? 0, Math.round(limits.maxMessagesPerMinute * multiplier)],
+    ['hour', counts?.last_hour ?? 0, Math.round(limits.maxHourlyMessages * multiplier)],
+    ['day', counts?.last_day ?? 0, Math.round(limits.maxDailyMessages * multiplier)],
+  ];
+
+  for (const [window, sent, cap] of windows) {
+    // `cap === 0` means zero allowed, not unlimited. Guarding with `cap > 0`
+    // made setting a limit to zero — the obvious way to stop one account
+    // sending — silently permit everything. Missing keys get DEFAULT_LIMITS
+    // above, so a 0 here is always deliberate.
+    if (cap >= 0 && sent >= cap) {
+      const detail = `Send rate exceeded: ${sent}/${cap} messages this ${window}${
+        multiplier !== 1 ? ' (weekend limit)' : ''
+      }`;
+      console.log(`🛑 Rate limited: user ${userId} — ${detail}`);
+      return { allowed: false, reason: 'rate_limited', retryable: true, detail };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Returns whether an SMS to `phone` is permitted for `userId`.
  *
@@ -73,6 +139,65 @@ export async function checkSmsAllowed(
   if (!phone) {
     return { allowed: false, reason: 'check_failed', detail: 'No phone number provided' };
   }
+
+  // 0. Is this account allowed to send at all? (#121)
+  //
+  // `account_status` and `suspended_until` existed and were checked when buying
+  // or porting a number — but **not on any send path**. So suspending someone
+  // stopped them acquiring numbers and did nothing about the messages they were
+  // already sending, which is the thing suspension is for.
+  //
+  // Only these two columns: `banned_until` is on **auth.users**, not
+  // public.users. Selecting it here errored with 42703, and because this gate
+  // fails closed that would have blocked every send in the product. Querying
+  // `information_schema.columns` without `table_schema = 'public'` matches both
+  // tables and is what produced the wrong column list.
+  //
+  // Not retryable: a scheduled message from a suspended account should fail
+  // visibly rather than sit in the queue quietly draining once the suspension
+  // lifts. The operator suspended them for a reason.
+  const { data: account, error: accountError } = await supabase
+    .from('users')
+    .select('account_status, suspended_until')
+    .eq('id', userId)
+    .single();
+
+  if (accountError) {
+    // Fail closed. Unlike quiet hours, "cannot tell whether this account is
+    // banned" is not a reason to send — this gate exists to contain damage.
+    console.error(`Account-status lookup failed for user ${userId} — blocking send:`, accountError);
+    return { allowed: false, reason: 'check_failed', detail: accountError.message };
+  }
+
+  const nowMs = Date.now();
+  const suspendedUntil = account?.suspended_until ? Date.parse(account.suspended_until) : null;
+  // Values come from the users_account_status_check constraint:
+  // active | suspended | trial | cancelled. 'trialing' is not one of them — a
+  // guess at that name would have blocked every trial user from sending.
+  const SENDING_STATUSES = ['active', 'trial'];
+  const statusBlocks = account?.account_status && !SENDING_STATUSES.includes(account.account_status);
+
+  if (statusBlocks || (suspendedUntil && suspendedUntil > nowMs)) {
+    const detail = statusBlocks
+      ? `Account status is "${account!.account_status}"`
+      : `Account is suspended until ${account!.suspended_until}`;
+    console.log(`🚫 Blocked: send for user ${userId} — ${detail}`);
+    return { allowed: false, reason: 'account_blocked', retryable: false, detail };
+  }
+
+  // 0b. Per-account send rate (#121).
+  //
+  // These limits lived in `telnyx/send-sms` and `campaigns/run` only — absent
+  // from sms/send, all three crons and messages/schedule/bulk, which are
+  // precisely the high-volume paths. One agent could not blast by hand but
+  // could schedule or drip without any cap, and on shared numbers that burns
+  // everyone's deliverability (#120, #121).
+  //
+  // Retryable on purpose: hitting the cap should defer a scheduled message to
+  // the next run, not mark it failed. Only the caller knows whether it has a
+  // "later" — the crons do, a human pressing send does not.
+  const rate = await checkSendRate(supabase, userId);
+  if (rate) return rate;
 
   // Quiet hours first — it's the cheapest check and, unlike DNC, a block here
   // is temporary, so there's no point writing a dnc_history row for it.

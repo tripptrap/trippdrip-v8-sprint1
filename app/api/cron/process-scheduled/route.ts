@@ -202,7 +202,7 @@ async function processScheduledMessages(supabase: any) {
 
         if (!guard.allowed) {
           if (guard.retryable) {
-            // Quiet hours — leave pending, the next run will pick it up.
+            // Quiet hours or a rate cap — leave pending, a later run picks it up.
             console.log(`Scheduled msg ${message.id} deferred — ${guard.detail}`);
             continue;
           }
