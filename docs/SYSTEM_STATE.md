@@ -1473,6 +1473,66 @@ service-role endpoints. `/api/contact-form` reaches the same privileges via
 `createServiceRoleClient()` and did not match. **Grep for both spellings** — the real list is
 three, all now limited.
 
+## Per-number capacity, and why it is not a per-number cap (#123 gap 2, 2026-08-03)
+
+Two thresholds with different jobs, in `lib/numberCapacity`:
+
+| | value | job |
+|---|---|---|
+| **soft** | 250/day | selection preference — `resolveFromNumber` avoids a number over it while another is under |
+| **hard** | 60/min, 200/hr, 1200/day | circuit breaker — the number is removed from the pool entirely |
+
+**Every hard ceiling sits above its per-account equivalent** (10/100/1000 in `smsGuard`
+DEFAULT_LIMITS). That is not incidental — it is the property that guarantees no single-number
+account is newly restricted. Verified by test: nothing at or below an account cap is ever
+refused by a per-number ceiling.
+
+### Why the obvious design was rejected
+
+#123 recorded "extend `get_send_counts` to return per-number counts; block on account **or**
+number limit." Wrong twice:
+
+- `user_telnyx_numbers.phone_number` is **globally unique**, so a number belongs to one tenant
+  at a time, and Growth is one number (#120). For those accounts a per-number count selects the
+  *same rows* as the per-account count — a hard per-number cap is not a new dimension of
+  control, only a second lower account cap. Every Growth customer would lose allowance and gain
+  nothing.
+- For a multi-number account, **refusing is the wrong response** when three other numbers are
+  idle. Sending from a different one is.
+
+So the value for Scale accounts is in *selection*, and the hard ceiling exists only for the case
+no per-account cap can see.
+
+### The case the account cap cannot see
+
+A **recycled pool number**. Numbers pass between businesses, and the 30-day quarantine is
+explicitly not a hard block — under pool exhaustion a number goes to a new business early,
+carrying its reputation. Every account can then sit inside its own cap while the *number* takes
+more than any single account would be allowed.
+
+That is why `get_number_send_counts` has **no `user_id` predicate**.
+`get_number_health_stats` does have one — correct for "how are my numbers doing", and copying
+its shape here would have reproduced the exact blindness this exists to close. It is an
+RLS-crossing read, so SECURITY DEFINER, `service_role` only.
+
+### Ordering inside the resolver
+
+Capacity is applied **before** the lock check. "Keep using this one" is a routing preference;
+the ceiling is there to stop a number being damaged, so it wins.
+
+Exhaustion returns `ok: false`, unlike rest — which the agent chose, and which therefore falls
+back rather than losing a send. Falling back on a ceiling would defeat the only thing it does.
+It is `retryable`, so the crons defer rather than failing the work.
+
+### The bug a type-checker cannot see
+
+After filtering `usable` → `withCapacity` → `pool`, the geo and primary branches at the bottom
+of the function still read `usable`. Same type, still in scope, compiles clean — and would have
+returned a number the function had just excluded for being at its ceiling.
+
+**When a function narrows a collection in stages, every later reference has to move with it.**
+Grep the variable name after any such refactor; the compiler will not help.
+
 ## The client threw away the server's classification (#128, 2026-08-03)
 
 Parse a send failure with **`parseSendError(status, body)`** from `lib/sendError`. Never read
