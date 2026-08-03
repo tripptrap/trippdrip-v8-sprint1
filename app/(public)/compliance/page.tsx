@@ -11,10 +11,14 @@ export default function CompliancePage() {
       <div className="card space-y-6">
         <section>
           <h2 className="text-xl font-semibold mb-3">Overview</h2>
+          <p className="text-slate-700 dark:text-slate-300 mb-3">
+            HyveWyre™ builds compliance controls into the platform rather than leaving them to the sender.
+            This page describes what the platform actually enforces today, and what remains the
+            responsibility of the business using it.
+          </p>
           <p className="text-slate-700 dark:text-slate-300">
-            HyveWyre™ is committed to maintaining the highest standards of compliance with U.S. telecommunications
-            regulations. We help our customers navigate complex compliance requirements while providing powerful
-            marketing tools.
+            Where a control is not implemented, it is not listed here. Nothing on this page is a
+            certification, and none of it is legal advice.
           </p>
         </section>
 
@@ -30,8 +34,14 @@ export default function CompliancePage() {
             <li><strong>Clear Opt-In Language:</strong> Use clear, conspicuous consent language that discloses
             the nature of messages</li>
             <li><strong>Opt-Out Mechanisms:</strong> Include "Reply STOP to unsubscribe" in all marketing messages</li>
-            <li><strong>Time Restrictions:</strong> Send messages only between 8 AM - 9 PM recipient's local time</li>
-            <li><strong>Record Keeping:</strong> Maintain consent records for at least 4 years</li>
+            <li><strong>Time Restrictions:</strong> The platform blocks sending outside the permitted
+            window, calculated in the <em>recipient&apos;s</em> local time rather than the sender&apos;s.
+            The default window is 8:00 AM – 8:00 PM, an hour tighter than the TCPA limit, and is
+            configurable per account. Where a recipient&apos;s state spans multiple time zones, a
+            message is held if it is quiet hours in <em>any</em> of them</li>
+            <li><strong>Record Keeping:</strong> HyveWyre records how and when consent was established
+            for each contact, and retains that record for the life of the account. Deciding how long
+            your own records must be kept, and preserving them if you leave, is your responsibility</li>
           </ul>
         </section>
 
@@ -74,26 +84,50 @@ export default function CompliancePage() {
             We follow guidelines from major U.S. carriers (AT&T, Verizon, T-Mobile) to ensure deliverability:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Proper 10DLC registration for business messaging</li>
-            <li>Brand and campaign registration with The Campaign Registry (TCR)</li>
-            <li>Spam score monitoring and reputation management</li>
-            <li>Message content filtering for prohibited content</li>
-            <li>Rate limiting to prevent spam flags</li>
+            <li>Brand and campaign registration with The Campaign Registry (TCR) is <strong>required
+            before an account can obtain a number</strong> — every number-acquisition path is gated on
+            it, because an unregistered number cannot legitimately carry business traffic</li>
+            <li>Every outbound message is scored for spam characteristics before it is sent, and the
+            score is shown to the sender in the composer</li>
+            <li>Per-number volume limits, with a daily ceiling and shorter-interval caps, so a single
+            number cannot be driven into a pattern carriers filter on</li>
+            <li>Numbers with a poor opt-out or delivery record are automatically throttled, and can be
+            rested from sending entirely</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-xl font-semibold mb-3">Data Protection</h2>
           <p className="text-slate-700 dark:text-slate-300 mb-3">
-            We implement industry-standard data protection measures:
+            What is actually in place today:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li><strong>Encryption:</strong> TLS 1.3 for data in transit, AES-256 for data at rest</li>
-            <li><strong>Access Controls:</strong> Role-based permissions and multi-factor authentication</li>
-            <li><strong>Data Minimization:</strong> Collect only necessary information</li>
-            <li><strong>Regular Audits:</strong> Third-party security assessments and penetration testing</li>
-            <li><strong>Incident Response:</strong> 24/7 monitoring and rapid breach notification</li>
+            <li><strong>Encryption in transit:</strong> TLS 1.3, enforced by our hosting provider
+            (Vercel) on every connection</li>
+            <li><strong>Encryption at rest:</strong> AES-256, provided by our database platform
+            (Supabase, on AWS). Sensitive stored credentials are separately encrypted by HyveWyre
+            before they reach the database</li>
+            <li><strong>Tenant isolation:</strong> Every table carries row-level security tied to the
+            account that owns the row, so one customer&apos;s data is not reachable from another
+            customer&apos;s session</li>
+            <li><strong>Data minimization:</strong> We collect only what the product needs to operate</li>
+            <li><strong>Incident response:</strong> Automated alerting on failures and abuse signals,
+            and breach notification as required by law</li>
           </ul>
+          <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-4">
+            <p className="text-slate-700 dark:text-slate-300 font-semibold mb-2">
+              What we do not yet have
+            </p>
+            <p className="text-slate-700 dark:text-slate-300 mb-2">
+              We would rather say this plainly than imply otherwise:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-slate-700 dark:text-slate-300 ml-2">
+              <li>No multi-factor authentication. Sign-in is email and password today; MFA is planned</li>
+              <li>No role-based access or team accounts — an account is a single owner</li>
+              <li>No third-party penetration test or security audit has been performed</li>
+              <li>No 24/7 staffed monitoring, and no SOC 2, ISO 27001 or HIPAA certification</li>
+            </ul>
+          </div>
         </section>
 
         <section>
@@ -117,12 +151,24 @@ export default function CompliancePage() {
             HyveWyre™ provides built-in compliance features:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li><strong>Consent Tracking:</strong> Tag leads with consent status and date</li>
-            <li><strong>Auto Opt-Out:</strong> Automatic handling of STOP, UNSUBSCRIBE, CANCEL keywords</li>
-            <li><strong>Time Zone Detection:</strong> Respect local time restrictions automatically</li>
-            <li><strong>Message Templates:</strong> Pre-approved compliant message templates</li>
-            <li><strong>Audit Logs:</strong> Complete message history for regulatory audits</li>
-            <li><strong>Compliance Alerts:</strong> Real-time warnings for potential violations</li>
+            <li><strong>Consent Tracking:</strong> Every contact records how consent was established
+            — opt-in form, agent attestation, or an inbound message from the contact — and when.
+            A contact with no consent record is marked as such rather than assumed to be consenting</li>
+            <li><strong>Auto Opt-Out:</strong> STOP, UNSUBSCRIBE, CANCEL and a broad set of equivalent
+            phrases are handled automatically, without the sender needing to act</li>
+            <li><strong>HELP Handling:</strong> HELP and INFO always receive a reply identifying the
+            sender, as carriers require</li>
+            <li><strong>Time Zone Detection:</strong> The recipient&apos;s local time is derived from
+            their location and applied to the sending window automatically</li>
+            <li><strong>Opt-Out Footer:</strong> Bulk and scheduled sends automatically append opt-out
+            instructions to the first message to a new contact. On individual sends the sender is
+            responsible for including them</li>
+            <li><strong>Message Templates:</strong> Starting templates written to follow the rules on
+            this page. They are a starting point, not a legal review — you remain responsible for
+            what you send</li>
+            <li><strong>Audit Logs:</strong> Complete message and consent history, exportable</li>
+            <li><strong>Spam Scoring:</strong> Messages are scored before sending and the score is
+            shown in the composer, so problems are visible before a message goes out</li>
           </ul>
         </section>
 
@@ -178,7 +224,7 @@ export default function CompliancePage() {
             <li>FCC TCPA guidelines: <a href="https://www.fcc.gov/TCPA" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">fcc.gov/TCPA</a></li>
             <li>CTIA Messaging Principles: <a href="https://www.ctia.org" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">ctia.org</a></li>
             <li>National Do Not Call Registry: <a href="https://www.donotcall.gov" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">donotcall.gov</a></li>
-            <li>HyveWyre™ Compliance Center: Coming soon in your dashboard</li>
+            <li>The Campaign Registry (10DLC): <a href="https://www.campaignregistry.com" className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer">campaignregistry.com</a></li>
           </ul>
         </section>
 
@@ -189,8 +235,14 @@ export default function CompliancePage() {
           </p>
           <div className="mt-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
             <p className="text-slate-700 dark:text-slate-300">Email: compliance@hyvewyre.com</p>
-            <p className="text-slate-700 dark:text-slate-300">Response time: Within 24 hours</p>
+            <p className="text-slate-700 dark:text-slate-300 mt-1 text-sm text-slate-500 dark:text-slate-400">
+              We aim to respond within one business day. Opt-out requests do not depend on us
+              replying — replying STOP takes effect immediately and automatically.
+            </p>
           </div>
+          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+            Last reviewed against the running platform: 3 August 2026.
+          </p>
         </section>
       </div>
     </div>

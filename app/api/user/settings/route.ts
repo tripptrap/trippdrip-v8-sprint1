@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { encrypt } from '@/lib/encryption';
 
 export const dynamic = "force-dynamic";
 
@@ -146,8 +147,17 @@ export async function PUT(req: NextRequest) {
         prefUpdates.email_provider = preferences.emailProvider;
       }
       if (preferences.emailApiKey !== undefined) {
-        // In production, encrypt this before storing
-        prefUpdates.email_api_key_encrypted = preferences.emailApiKey;
+        // The column is named `_encrypted` and, until now, the value was written
+        // straight through with a comment saying to fix it "in production" —
+        // which production then read as a promise already kept.
+        //
+        // Safe to change with no migration: nothing reads this column (it has
+        // exactly one reference in the codebase, this write) and no row holds a
+        // value. A future reader must go through safeDecrypt, which passes
+        // through anything that was not encrypted by us.
+        prefUpdates.email_api_key_encrypted = preferences.emailApiKey
+          ? encrypt(preferences.emailApiKey)
+          : preferences.emailApiKey;
       }
 
       if (Object.keys(prefUpdates).length > 0) {
