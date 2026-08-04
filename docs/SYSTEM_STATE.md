@@ -3163,6 +3163,81 @@ response — this section exists because that had already happened once.
 
 ---
 
+## 10DLC mock mode: what it proves, and what it does not (2026-08-04)
+
+**Status: waiting on Telnyx support.** Question drafted in
+[`docs/TELNYX_QUESTION_TCR_TESTING.md`](TELNYX_QUESTION_TCR_TESTING.md), **not sent**.
+
+Enabled by `TELNYX_10DLC_MOCK=true`, read from the environment and never from the request
+body — a caller-supplied mock flag would let someone mark themselves registered without
+facing a carrier. Set on **Preview only**. `is_mock` is recorded on the row.
+
+### Mock is a sandbox record, not the absence of a record
+
+It creates a real object in Telnyx's system and stops before TCR and the carriers. It shows
+up in listings and occupies account state permanently.
+
+| | mock | the real one |
+|---|---|---|
+| brand `identityStatus` | **VERIFIED instantly**, no identity check | VERIFIED after review |
+| `tcrCampaignId` | the internal UUID echoed back | `CAAP953` |
+| `campaignStatus` | **stuck at `TCR_PENDING`** | `MNO_PROVISIONED` |
+| `isTMobileRegistered` | false | true |
+
+**It is genuinely free.** Telnyx balance was $49.54 before and $49.54 after — checked, not
+assumed.
+
+### What the test established
+
+Ran the real onboarding field set through `createBrand` + `createCampaign` with `mock: true`
+(a fictional insurance LLC in Tampa). Both succeeded. So **the payload is correct** — field
+shapes, required values, and the sub-usecase counts (`MIXED` needs 2–5) are all accepted.
+That was the unknown, and it is answered.
+
+### What it does NOT establish — do not claim otherwise
+
+The brand auto-VERIFIED with no identity check and the campaign never leaves `TCR_PENDING`.
+So mock exercises the **submission half only**. Untested: brand verification against real
+business data, campaign approval, carrier provisioning, number assignment, sending.
+
+*"Registration works"* means *"a registration can be submitted"*. Whether a given customer's
+would be **approved** is still unknown, and the only way to find out today is a real
+submission with a real EIN and the $15 fee.
+
+**One safety property does fall out of it:** `isCampaignUsable('TCR_PENDING')` is false, so a
+mock registration can never unlock a real number. Verified.
+
+### Mock artifacts cannot be deleted
+
+    DELETE /10dlc/brand/{id}     -> 500
+    DELETE /10dlc/campaign/{id}  -> 404
+
+Three mock brands now sit on the production Telnyx account and every test run adds another
+(#118). If Telnyx confirms they are permanent, testing wants its own Telnyx account.
+
+### The preview environment is deliberately half-finished
+
+Preview holds 4 environment variables against production's 25. It needs
+`SUPABASE_SERVICE_ROLE_KEY` and `TELNYX_API_KEY` to run, and **those were not copied on
+purpose**: every branch deployment would then read and write production data with
+service-role access, on URLs that are public by default, while #29 says those secrets may
+already be exposed. That is the account owner's call, not a default.
+
+Building the preview did surface a real bug, now fixed (`71c5c0e`): two routes constructed
+`new OpenAI()` at module scope, which throws without a key during Next's build-time
+page-data collection — so the app could not build in **any** environment lacking
+`OPENAI_API_KEY`, including a fresh clone.
+
+### Sole proprietor was withdrawn in the same pass (#119)
+
+Telnyx requires an SMS OTP step for sole props that nothing here implements, so choosing it
+submitted a registration that reached Telnyx and stopped, with no error and no number.
+Removed from both pickers, refused by the API, and the EIN exemption it left in
+`checkNumberEligibility` was closed — that exemption would have let such a row pass the gate
+and receive a local number it could never use.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
