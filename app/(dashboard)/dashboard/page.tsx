@@ -73,6 +73,9 @@ export default function Dashboard(){
   const [userCredits, setUserCredits] = useState<{ credits: number; monthly_credits: number } | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  // Work the receptionist could not finish itself (#ai_handoff).
+  const [handoffs, setHandoffs] = useState<any[]>([]);
+  const [handoffsLoading, setHandoffsLoading] = useState(true);
   const [unreadThreads, setUnreadThreads] = useState<UnreadThread[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadLoading, setUnreadLoading] = useState(true);
@@ -99,6 +102,7 @@ export default function Dashboard(){
     fetchRecentClients();
     fetchCredits();
     fetchAppointments();
+    fetchHandoffs();
     fetchUnreadThreads();
     fetchPipelineTags();
     fetchFlowNames();
@@ -245,6 +249,40 @@ export default function Dashboard(){
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error);
+    }
+  }
+
+  // Pending follow-ups the receptionist raised because it could not act:
+  // posting a document, looking up an account, correcting a record. Sorted by
+  // due date server-side, and these are created due-now, so the oldest
+  // unanswered customer is always at the top.
+  async function fetchHandoffs() {
+    try {
+      const res = await fetch('/api/follow-ups?status=pending');
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.items)) setHandoffs(data.items.slice(0, 5));
+    } catch (error) {
+      console.error('Failed to fetch receptionist follow-ups:', error);
+    } finally {
+      setHandoffsLoading(false);
+    }
+  }
+
+  async function completeHandoff(id: string) {
+    // Optimistic: ticking something off should feel instant. Restored on failure.
+    const previous = handoffs;
+    setHandoffs(h => h.filter(x => x.id !== id));
+    try {
+      const res = await fetch('/api/follow-ups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'completed' }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Update failed');
+    } catch (error) {
+      console.error('Could not mark the follow-up done:', error);
+      setHandoffs(previous);
     }
   }
 
@@ -595,6 +633,56 @@ export default function Dashboard(){
           </div>
         </motion.div>
       </div>
+
+      {/* Receptionist to-do — things the AI could not finish itself */}
+      {!handoffsLoading && handoffs.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 md:p-5"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base md:text-lg font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+              The receptionist needs you
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100">
+                {handoffs.length}
+              </span>
+            </h2>
+            <a href="/follow-ups" className="text-sm font-medium text-amber-900 dark:text-amber-200 underline underline-offset-2">
+              All follow-ups
+            </a>
+          </div>
+
+          <p className="text-sm text-amber-800 dark:text-amber-300 mb-3">
+            Someone asked for something the AI cannot do itself. They have been told you will follow up.
+          </p>
+
+          <ul className="space-y-2">
+            {handoffs.map((f: any) => (
+              <li key={f.id} className="flex items-start gap-3 rounded-lg bg-white/70 dark:bg-slate-900/40 p-3">
+                <button
+                  onClick={() => completeHandoff(f.id)}
+                  aria-label={`Mark done: ${f.title}`}
+                  className="mt-0.5 h-5 w-5 flex-none rounded border-2 border-amber-500 dark:border-amber-600 hover:bg-amber-500 hover:border-amber-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 transition-colors"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{f.title}</div>
+                  {(f.leads?.first_name || f.leads?.phone) && (
+                    <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                      {[f.leads?.first_name, f.leads?.last_name].filter(Boolean).join(' ') || f.leads?.phone}
+                      {f.leads?.phone ? ` · ${f.leads.phone}` : ''}
+                    </div>
+                  )}
+                  {f.notes && (
+                    <div className="text-xs text-slate-500 dark:text-slate-500 mt-1 line-clamp-2 whitespace-pre-line">{f.notes}</div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
+
 
       {/* Appointments & Unread Messages Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
