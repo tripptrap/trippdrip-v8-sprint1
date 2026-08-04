@@ -6,6 +6,7 @@ import { loadModerationPolicy, moderateWithPolicy } from "@/lib/smsModeration";
 import { sendTelnyxSMS } from "@/lib/telnyx";
 import { createNotification } from "@/lib/createNotification";
 import { checkSmsAllowed } from "@/lib/smsGuard";
+import { isFirstContact, appendOptOut } from '@/lib/optOutFooter';
 
 // Credit changes run on the service-role client, never the caller's (#114).
 //
@@ -368,22 +369,15 @@ export async function POST(req: Request) {
           }
           const effectiveFrom = resolved.number;
 
-          // Check if this is the first message to this lead (for opt-out footer)
-          let isFirstMessageToLead = true;
-          const { data: existThreadCheck } = await supabase
-            .from('threads')
-            .select('id')
-            .eq('user_id', user.id)
-            .or(`lead_id.eq.${lead.id},phone_number.eq.${lead.phone}`)
-            .limit(1)
-            .single();
-          if (existThreadCheck) {
-            isFirstMessageToLead = false;
-          }
-
-          // Append opt-out footer on first message to lead
-          const messageToSend = isFirstMessageToLead
-            ? `${personalizedMessage}\n\nReply ${optOutKeyword} to opt out`
+          // Opt-out footer on a first contact, through the shared helper — one
+          // definition of "first", rather than a third hand-rolled copy of it.
+          //
+          // isFirstContact + appendOptOut rather than withOptOutFooterIfFirst:
+          // the keyword is fetched once for the whole campaign above, and the
+          // helper is split exactly so a batch can reuse it instead of querying
+          // settings per recipient.
+          const messageToSend = (await isFirstContact(supabase, user.id, lead.phone))
+            ? appendOptOut(personalizedMessage, optOutKeyword || 'STOP')
             : personalizedMessage;
 
           // Scores `personalizedMessage`, not `messageToSend` — the difference

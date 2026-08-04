@@ -8,6 +8,7 @@ import { checkSmsAllowed } from '@/lib/smsGuard';
 import { resolveFromNumber } from '@/lib/resolveFromNumber';
 import { moderateWithPolicy } from '@/lib/smsModeration';
 import { isInternalCaller } from '@/lib/cronAuth';
+import { isFirstContact, appendOptOut } from '@/lib/optOutFooter';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -299,22 +300,23 @@ export async function POST(req: NextRequest) {
       // this one.
     }
 
-    // Check if this is the first message to this lead (new thread)
-    let isFirstMessage = false;
-    if (userId && supabaseAdmin) {
-      const { data: existingCheck } = await supabaseAdmin
-        .from('threads')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('phone_number', to)
-        .single();
-      isFirstMessage = !existingCheck;
-    }
-
-    // Append opt-out footer on first message
-    const messageToSend = isFirstMessage
-      ? `${message}\n\nReply ${optOutKeyword} to opt out`
-      : message;
+    // Opt-out footer on a first contact, through the shared helper.
+    //
+    // This was a hand-rolled copy — one of four, which is how the coverage came
+    // to be misread as incomplete when it was not. The shared test also fixes a
+    // real defect in this copy: it used `.single()` with no `.limit(1)`, and
+    // `.single()` errors when more than one thread matches. The error was
+    // discarded, so `existingCheck` came back null and a long-running
+    // conversation was treated as a first contact. Harmless in direction — an
+    // extra opt-out line — but wrong, and invisible.
+    //
+    // isFirstContact + appendOptOut rather than withOptOutFooterIfFirst, because
+    // the keyword is already loaded above and the helper is split precisely so a
+    // caller can reuse it instead of re-querying per message.
+    const messageToSend =
+      userId && supabaseAdmin && (await isFirstContact(supabaseAdmin, userId, to))
+        ? appendOptOut(message, optOutKeyword)
+        : message;
 
     // HIGH-7: DNC check — block send if recipient is on do-not-contact list
     if (userId && supabaseAdmin) {

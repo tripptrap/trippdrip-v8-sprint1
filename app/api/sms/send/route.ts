@@ -8,6 +8,7 @@ import { sendTelnyxSMS } from '@/lib/telnyx';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { moderateOutbound } from '@/lib/smsModeration';
 import { resolveFromNumber, ownsNumber } from '@/lib/resolveFromNumber';
+import { isFirstContact, appendOptOut } from '@/lib/optOutFooter';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -76,18 +77,13 @@ export async function POST(req: NextRequest) {
 
     const optOutKeyword = userSettings?.opt_out_keyword || 'STOP';
 
-    // Check if this is the first message to this lead (no existing thread)
-    const { data: existingThreadCheck } = await supabase
-      .from('threads')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('phone_number', toPhone)
-      .eq('channel', channel)
-      .single();
-
-    const isFirstMessage = !existingThreadCheck;
-    const messageToSend = isFirstMessage
-      ? `${messageBody}\n\nReply ${optOutKeyword} to opt out`
+    // Opt-out footer on a first contact, through the shared helper — the last of
+    // four hand-rolled copies of this test. The helper also uses
+    // `.limit(1).maybeSingle()`, where this used a bare `.single()` that errors
+    // on multiple matching threads and discards the error, quietly reporting a
+    // long conversation as a first contact.
+    const messageToSend = (await isFirstContact(supabase, user.id, toPhone, channel))
+      ? appendOptOut(messageBody, optOutKeyword)
       : messageBody;
 
     // Single gate for DNC, opt-out, account suspension and send rate (#121).

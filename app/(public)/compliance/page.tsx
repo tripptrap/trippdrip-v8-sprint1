@@ -160,9 +160,10 @@ export default function CompliancePage() {
             sender, as carriers require</li>
             <li><strong>Time Zone Detection:</strong> The recipient&apos;s local time is derived from
             their location and applied to the sending window automatically</li>
-            <li><strong>Opt-Out Footer:</strong> Bulk and scheduled sends automatically append opt-out
-            instructions to the first message to a new contact. On individual sends the sender is
-            responsible for including them</li>
+            <li><strong>Opt-Out Footer:</strong> The first message to any new contact automatically
+            carries opt-out instructions, on every sending path — individual, bulk, scheduled,
+            campaigns and automated follow-ups alike. Later messages in the same conversation do
+            not repeat them</li>
             <li><strong>Message Templates:</strong> Starting templates written to follow the rules on
             this page. They are a starting point, not a legal review — you remain responsible for
             what you send</li>
