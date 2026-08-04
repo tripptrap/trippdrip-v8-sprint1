@@ -144,14 +144,29 @@ export async function POST(req: NextRequest) {
       // filter is free and this is the same class the AI drip cron had.
       const { data: messages } = await supabase
         .from('messages')
-        .select('direction, body')
+        // `content` as well as `body`: some paths write only one of them, and a
+        // history row with a null body gave the model a blank turn.
+        .select('direction, body, content, created_at')
         .eq('thread_id', threadId)
         .eq('user_id', userId)
-        .order('created_at', { ascending: true })
+        // NEWEST 20, then reversed below.
+        //
+        // This was ascending — the OLDEST 20 messages of a 97-message thread, all
+        // from days earlier. The AI never saw the conversation it was in. That is
+        // the single cause of every loop reported today: repeated openers, asking
+        // the same question twice, and answering "Yes please" with "What do you
+        // need help with?" — it had no idea what had just been offered.
+        .order('created_at', { ascending: false })
         .limit(20);
 
       if (messages) {
-        conversationHistory = messages;
+        // Back to chronological — the model needs the conversation in the order
+        // it happened, and the query above fetches newest-first to get the RIGHT
+        // twenty rather than the first twenty.
+        conversationHistory = [...messages]
+          .reverse()
+          .map((m: any) => ({ ...m, body: m.body ?? m.content ?? '' }))
+          .filter((m: any) => m.body.trim().length > 0);
       }
     }
 
