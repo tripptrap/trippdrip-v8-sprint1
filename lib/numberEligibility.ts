@@ -85,11 +85,17 @@ export async function checkNumberEligibility(
     return { allowed: false, code: 'no_registration', reason: GATE_MESSAGES.no_registration };
   }
 
-  // Sole proprietors register with an SSN rather than an EIN, and Telnyx does
-  // not require a tax ID from them — so the EIN check must not apply. Mirrors
-  // the same exemption in the register route.
-  const needsTaxId = reg.entity_type !== 'SOLE_PROPRIETOR';
-  if (needsTaxId && !reg.tax_id?.trim()) {
+  // Sole proprietor used to be exempt from the EIN check, on the grounds that
+  // Telnyx registers them with an SSN instead. That exemption is now a hole: the
+  // entity type was withdrawn (#119) because Telnyx also requires an SMS OTP
+  // step we do not implement, so a sole-prop registration can never complete —
+  // and leaving the exemption in place would let such a row pass this gate and
+  // be handed a local number that cannot send.
+  //
+  // No live rows are affected (the only registration on the system is
+  // PRIVATE_PROFIT), but the exemption outliving the feature it existed for is
+  // exactly how a latent hole is created.
+  if (!reg.tax_id?.trim()) {
     return { allowed: false, code: 'missing_ein', reason: GATE_MESSAGES.missing_ein };
   }
 

@@ -54,10 +54,50 @@ export async function POST(req: NextRequest) {
     // the EIN actually buys is a number, and `checkNumberEligibility` is what
     // holds that line.
     //
-    // Sole proprietors register with an SSN and Telnyx asks for no tax ID, so
-    // they are complete without one.
-    const isSoleProprietor = body.entityType === 'SOLE_PROPRIETOR';
-    const canSubmit = isSoleProprietor || !!body.taxId?.trim();
+    // Sole proprietor is not offered (#119). Telnyx requires an SMS OTP step for
+    // sole props that nothing here implements, so a registration submitted as one
+    // reaches Telnyx and then stops — the user's number never arrives and no
+    // error explains why. Refusing up front is honest; the silent dead end was
+    // not.
+    //
+    // Enforced here as well as removed from the two pickers, because a picker is
+    // not a boundary and existing drafts may already hold this value.
+    if (body.entityType === 'SOLE_PROPRIETOR') {
+      return NextResponse.json({
+        ok: false,
+        error:
+          'Sole proprietor registration is not available yet — carriers require an extra ' +
+          'phone verification step we do not support. Register as an LLC or corporation, ' +
+          'which is what an EIN covers.',
+      }, { status: 400 });
+    }
+
+    const canSubmit = !!body.taxId?.trim();
+
+    // ── Mock mode (free, no carriers, no fees) ──────────────────────────────
+    //
+    // Telnyx accepts `mock: true` on brands and campaigns: the flow runs and
+    // returns real-shaped objects without contacting carriers, without the
+    // $15-per-submission review fee, and without creating anything that can send.
+    // It exists precisely so this can be exercised before a paying customer does.
+    //
+    // The route hardcoded `mock: false` in all three places, so the only way to
+    // test per-user registration was to register a real business and pay for it.
+    // Exactly one real registration has ever been created — ours — and it took
+    // eight campaign submissions and Telnyx support to finish, so "does this work
+    // for a customer" was genuinely unknown.
+    //
+    // Environment-controlled and NEVER from the request body: a caller-supplied
+    // mock flag would let someone mark themselves registered without ever facing
+    // a carrier.
+    //
+    // Scope is 10DLC only. Number ORDERS are still real and still cost money, so
+    // a mock environment can prove registration works but must not be used to
+    // test number purchase.
+    const mock = process.env.TELNYX_10DLC_MOCK?.trim() === 'true';
+    if (mock) {
+      console.warn('⚠️ 10DLC registration running in MOCK mode — no carrier submission, no fees.');
+    }
 
     // Block re-submission while a registration is already in flight or active.
     // Keyed on `brand_id`, not status: a draft has never been sent to Telnyx and
@@ -83,7 +123,7 @@ export async function POST(req: NextRequest) {
       entity_type: body.entityType,
       legal_business_name: body.legalBusinessName.trim(),
       display_name: body.displayName.trim(),
-      tax_id: isSoleProprietor ? null : (body.taxId?.trim() || null),
+      tax_id: body.taxId?.trim() || null,
       contact_phone: body.contactPhone.trim(),
       contact_email: body.contactEmail.trim(),
       website: body.website?.trim() || null,
@@ -93,7 +133,7 @@ export async function POST(req: NextRequest) {
       state: body.state.trim(),
       postal_code: body.postalCode.trim(),
       country,
-      is_mock: false,
+      is_mock: mock,
       brand_status: 'pending',
       brand_failure_reason: null,
       campaign_status: 'not_started',
@@ -135,7 +175,7 @@ export async function POST(req: NextRequest) {
       entityType: body.entityType as EntityType,
       displayName: body.displayName.trim(),
       companyName: body.legalBusinessName.trim(),
-      ein: isSoleProprietor ? undefined : body.taxId?.trim(),
+      ein: body.taxId?.trim(),
       phone: body.contactPhone.trim(),
       street: body.street.trim(),
       city: body.city.trim(),
@@ -145,7 +185,7 @@ export async function POST(req: NextRequest) {
       email: body.contactEmail.trim(),
       website: body.website?.trim() || undefined,
       vertical: body.vertical,
-      mock: false,
+      mock,
     });
 
     if (!brandResult.success) {
@@ -232,7 +272,7 @@ export async function POST(req: NextRequest) {
       directLending: false,
       privacyPolicyLink: 'https://hyvewyre.com/privacy',
       termsAndConditionsLink: 'https://hyvewyre.com/terms',
-      mock: false,
+      mock,
     });
 
     if (!campaignResult.success) {

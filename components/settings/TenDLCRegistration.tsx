@@ -54,7 +54,10 @@ const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'PUBLIC_PROFIT', label: 'Public for-profit company' },
   { value: 'NON_PROFIT', label: 'Non-profit' },
   { value: 'GOVERNMENT', label: 'Government entity' },
-  { value: 'SOLE_PROPRIETOR', label: 'Sole proprietor (no EIN)' },
+  // Sole proprietor removed (#119): Telnyx requires an SMS OTP step for sole
+  // props that we do not implement, so choosing it submitted a registration that
+  // silently never completed. The API refuses it too — this list is convenience,
+  // not the boundary.
 ];
 
 function statusPill(status: string) {

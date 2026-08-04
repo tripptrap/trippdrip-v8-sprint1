@@ -820,7 +820,7 @@ function OnboardingContent() {
                   <option value="PRIVATE_PROFIT">LLC / Corporation (private)</option>
                   <option value="PUBLIC_PROFIT">Publicly traded company</option>
                   <option value="NON_PROFIT">Non-profit</option>
-                  <option value="SOLE_PROPRIETOR">Sole proprietor</option>
+                  {/* Sole proprietor removed (#119) — needs an OTP step we do not support. */}
                 </select>
               </div>
 
