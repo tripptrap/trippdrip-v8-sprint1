@@ -194,8 +194,26 @@ export async function POST(req: NextRequest) {
       await handleInboundSMS(payload);
     }
 
-    // Handle delivery status updates
-    if (eventType === 'message.sent' || eventType === 'message.delivered' || eventType === 'message.failed') {
+    // Handle delivery status updates.
+    //
+    // `message.finalized` is the one that matters and it was missing (#135).
+    // Telnyx API v2 emits it for the TERMINAL state of a message — delivered or
+    // failed. This allowlist named three events that are intermediate or, in the
+    // case of message.failed, not what v2 actually sends. So every terminal
+    // outcome was dropped and the endpoint answered 200 {"received":true}.
+    //
+    // Consequence, verified against production: 62 outbound rows sat at 'sent'
+    // and NOT ONE message had ever recorded 'delivered' or 'failed'. Asking
+    // Telnyx directly about those same message ids returns `delivered`. The
+    // messages were arriving the whole time; we simply never wrote it down —
+    // which is also why zero failures were ever recorded, since a failure
+    // arrives as message.finalized too.
+    if (
+      eventType === 'message.finalized' ||
+      eventType === 'message.sent' ||
+      eventType === 'message.delivered' ||
+      eventType === 'message.failed'
+    ) {
       await handleDeliveryStatus(payload, eventType);
     }
 
@@ -998,13 +1016,45 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
   }
 
   const messageSid = payload.id;
-  let status = 'sent';
 
-  if (eventType === 'message.delivered') {
+  // Status comes from the PAYLOAD, not the event name.
+  //
+  // Deriving it from eventType only worked for events Telnyx does not actually
+  // send. The per-recipient status in `to[0].status` is the authoritative value
+  // and is present on every delivery event, including message.finalized — which
+  // is the only one that reports a terminal outcome. Confirmed against a live
+  // message: to[0].status === 'delivered' on a row this app had as 'sent'.
+  //
+  // Falls back to the event name so nothing regresses if a payload ever arrives
+  // without the recipient block.
+  const recipient = payload.to?.[0];
+  const telnyxStatus = String(recipient?.status || '').toLowerCase();
+
+  let status: string;
+  if (telnyxStatus === 'delivered') {
+    status = 'delivered';
+  } else if (telnyxStatus === 'delivery_failed' || telnyxStatus === 'sending_failed') {
+    status = 'failed';
+  } else if (telnyxStatus === 'delivery_unconfirmed') {
+    // Telnyx reached the carrier but the carrier never confirmed. Deliberately
+    // recorded as 'sent' rather than as its own value: messages_status_check
+    // constrains this column to draft/queued/sent/delivered/failed/read, and a
+    // value outside that set is rejected by the database. supabase-js returns
+    // { error } instead of throwing, so an unconstrained write here would have
+    // silently left the row untouched — the precise failure this whole fix is
+    // about. The distinction is preserved in error_message below instead.
+    status = 'sent';
+  } else if (telnyxStatus === 'queued' || telnyxStatus === 'sending' || telnyxStatus === 'sent') {
+    status = 'sent';
+  } else if (eventType === 'message.delivered') {
     status = 'delivered';
   } else if (eventType === 'message.failed') {
     status = 'failed';
+  } else {
+    status = 'sent';
   }
+
+  const isTerminalFailure = status === 'failed';
 
   // Why it failed, not just that it did (audit, 2026-08-03).
   //
@@ -1021,9 +1071,16 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
   // `errors?.[0]?.detail` matches how send-sms, purchase-number, search-numbers
   // and port-number already read Telnyx errors — one convention, not a second.
   const telnyxError = payload.errors?.[0];
-  const errorCode = status === 'failed' ? (telnyxError?.code ?? null) : null;
+  // Carrier never confirmed. Not an error, but worth recording rather than
+  // letting it look identical to a normal 'sent'.
+  const unconfirmed = telnyxStatus === 'delivery_unconfirmed';
+  const errorCode = isTerminalFailure ? (telnyxError?.code ?? null) : null;
   const errorMessage =
-    status === 'failed' ? (telnyxError?.detail || telnyxError?.title || null) : null;
+    isTerminalFailure
+      ? (telnyxError?.detail || telnyxError?.title || null)
+      : unconfirmed
+        ? 'Carrier did not confirm delivery (Telnyx: delivery_unconfirmed)'
+        : null;
 
   console.log('📬 Telnyx delivery status:', { messageSid, status, eventType, errorCode, errorMessage });
 

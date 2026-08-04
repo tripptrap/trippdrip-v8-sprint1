@@ -94,7 +94,58 @@ async function recordRunAndCheckPeers(job: string, source: string): Promise<void
     // Exclude the job that is running right now: its own row was just written,
     // but the RPC reads a snapshot and a slow write would otherwise make a cron
     // report itself missing.
-    const others = (overdue || []).filter((o: any) => o.job !== job);
+    const candidates = (overdue || []).filter((o: any) => o.job !== job);
+    if (!candidates.length) return;
+
+    // ── Confirm against the table before waking anyone ──────────────────────
+    //
+    // find_overdue_crons has reported `last_ran_at: null` for jobs that plainly
+    // had rows. Verified from the alert history: the 03:50:26Z alert claimed
+    // auto-buy had NEVER run, while cron_runs held an auto-buy row from
+    // 03:00:36Z — 50 minutes earlier and well inside its 90-minute grace. Six
+    // such emails went out overnight. Not reproducible on demand: the same RPC
+    // called through PostgREST with the same key returns [] every time.
+    //
+    // Rather than keep guessing at the cause, the alert now checks the table
+    // directly before firing. A single read that has been caught lying is not a
+    // good enough reason to wake someone at 4am, and a watchdog that cries wolf
+    // trains you to ignore the channel it shares with real outages — the exact
+    // failure #117 exists to prevent.
+    //
+    // The direct read is also the diagnostic: when the two disagree, that gets
+    // logged with both values, so the next occurrence explains itself instead of
+    // requiring another investigation.
+    const { data: actualRuns } = await admin
+      .from('cron_runs')
+      .select('job, ran_at')
+      .in('job', candidates.map((o: any) => o.job))
+      .order('ran_at', { ascending: false });
+
+    const lastSeen = new Map<string, string>();
+    for (const r of (actualRuns || []) as any[]) {
+      if (!lastSeen.has(r.job)) lastSeen.set(r.job, r.ran_at);
+    }
+
+    const others = candidates.filter((o: any) => {
+      const seen = lastSeen.get(o.job);
+      if (!seen) return true; // table agrees it has never run
+
+      const minutesSince = (Date.now() - Date.parse(seen)) / 60000;
+      // grace is not returned by the RPC; expected_minutes * 1.5 + 20 mirrors the
+      // migration's grace values closely enough to decide "is this really late",
+      // and the 20 covers the ~20-minute Vercel Cron pause around a deploy.
+      const graceMinutes = o.expected_minutes * 1.5 + 20;
+      if (minutesSince <= graceMinutes) {
+        console.error(
+          `⚠️ find_overdue_crons disagrees with cron_runs for "${o.job}": RPC said ` +
+            `last_ran_at=${o.last_ran_at ?? 'null'}, table says ${seen} ` +
+            `(${Math.round(minutesSince)}m ago, grace ${graceMinutes}m). Alert suppressed.`
+        );
+        return false;
+      }
+      return true;
+    });
+
     if (!others.length) return;
 
     const detail = others
