@@ -178,6 +178,7 @@ export async function syncNumberRegistration(
 
   const syncedAt = new Date().toISOString();
   let updated = 0;
+  const assignedToCampaign: string[] = [];
 
   for (const n of numbers) {
     let campaignId: string | null = null;
@@ -216,6 +217,37 @@ export async function syncNumberRegistration(
     // supabase-js returns { error }, it does not throw.
     if (upErr) console.error(`syncNumberRegistration: update failed for ${n.phone_number}:`, upErr);
     else updated++;
+    if (campaignId) assignedToCampaign.push(n.phone_number);
+  }
+
+  // ── Reconcile user_10dlc_registrations.assigned_phone_number ────────────────
+  //
+  // That column drifted to null while Telnyx had two numbers on the campaign,
+  // because the assignment was performed by Telnyx support rather than through
+  // our route, and nothing here ever looked again.
+  //
+  // The column is singular and the relationship is not: a campaign holds many
+  // numbers. `user_telnyx_numbers.messaging_campaign_id` is the authoritative
+  // per-number record — this one exists so `assign-number` can tell it has
+  // already done its job and refuse to run twice. So it is filled from whichever
+  // assigned number is primary, falling back to the first, and read as a flag
+  // rather than as the complete list.
+  if (assignedToCampaign.length) {
+    const { data: primary } = await supabase
+      .from('user_telnyx_numbers')
+      .select('phone_number')
+      .eq('user_id', userId)
+      .eq('is_primary', true)
+      .in('phone_number', assignedToCampaign)
+      .maybeSingle();
+
+    const { error: regErr } = await supabase
+      .from('user_10dlc_registrations')
+      .update({ assigned_phone_number: primary?.phone_number ?? assignedToCampaign[0] })
+      .eq('user_id', userId)
+      .is('assigned_phone_number', null);
+
+    if (regErr) console.error('syncNumberRegistration: registration reconcile failed:', regErr);
   }
 
   return updated;
