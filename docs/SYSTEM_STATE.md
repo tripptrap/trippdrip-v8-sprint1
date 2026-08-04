@@ -3269,10 +3269,24 @@ decision against the segment. Three things are now known that were not when it w
   Scale's `MIXED` ($10). It fits the Growth tier's economics almost exactly.
 - `SOLE_PROPRIETOR` **is a valid use case** — confirmed against the live `/10dlc/enum/usecase`.
   Nothing blocks it on Telnyx's side.
-- **The work is the PIN flow, not the dropdown.** A PIN goes to the registered mobile and must
-  be verified within 24 hours, so it needs a pending state on `user_10dlc_registrations`, a way
-  to enter the PIN, expiry handling, and a resend path. Re-adding the option without that
-  recreates the original bug exactly.
+- **The work is the PIN flow, not the dropdown** — and it is smaller than it first looked.
+  Verification is an **SMS OTP, not a phone call**: a 6-digit PIN to the mobile number on the
+  brand. Telnyx exposes **three API endpoints** for it — trigger the SMS, check delivery
+  status, verify the PIN — so it is fully automatable. The `10dlcquestions@telnyx.com` email
+  route is only the manual fallback.
+
+  **Resend is supported:** *"If the OTP expires, simply call the trigger endpoint again to send
+  a new PIN."* An earlier note here said that needed confirming from Telnyx; it did not, it is
+  documented.
+
+  **But expiry is not free:** *"If the PIN is not returned within 24 hours, it will expire, and
+  you will need to restart the brand creation process."* So the UI has to make the window and
+  the resend control obvious rather than letting someone discover the cost.
+
+  Build: pending OTP state on `user_10dlc_registrations`, trigger after brand creation, a PIN
+  field with a visible countdown and resend, expiry handling that restarts brand creation and
+  says so, then re-add the option and drop the API refusal in `register/route.ts`.
+  Source: [Telnyx sole-proprietor guide](https://support.telnyx.com/en/articles/13545282-guide-to-sole-proprietor-10dlc-brand-and-campaign-registration).
 
 ---
 
