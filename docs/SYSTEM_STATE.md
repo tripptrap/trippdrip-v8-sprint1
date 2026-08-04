@@ -3047,6 +3047,82 @@ page cannot drift from what the resolver does.
 
 ---
 
+## Credits and document upload (audit, 2026-08-03)
+
+Four separate faults, all in one call chain, each hiding the next.
+
+### 1. Read-then-write lost most deductions — measured, not theorised
+
+`spendPoints` did SELECT credits, subtract in JavaScript, UPDATE the result.
+25 concurrent spends of 1 point, run against the live database:
+
+| implementation | balance dropped by | lost |
+|---|---|---|
+| old read-then-write | **2** | 23 of 25 (**92%**) |
+| `deduct_credits` RPC | 25 | 0 |
+
+Bulk campaigns fire many sends at once, which is exactly the shape that loses the most — the
+busier the account, the more free credits it got.
+
+`deduct_credits` already did it correctly and **nothing called it**: one statement,
+`UPDATE ... WHERE credits >= amount RETURNING`, so the guard cannot be separated from the
+write. It raises `check_violation`, confirmed as SQLSTATE **23514** by calling it. Same for
+`add_credits`. Both go through the service-role client, because `cd21589` revoked EXECUTE on
+every SECURITY DEFINER function from anon and authenticated.
+
+### 2. Document upload had been 402ing for everyone
+
+`app/api/leads/upload-document` imported the **client-side** points module, whose own first
+line says to use `pointsSupabaseServer` in API routes. That module builds a browser Supabase
+client; in a route handler it has no cookies, so `auth.getUser()` returned null and every
+upload answered `402 {"error":"Not authenticated"}` — CSV, XLSX, JSON, DOCX, TXT, all of it.
+CSV is the primary documented import path for this product.
+
+That is also why the broken PDF parser below was never noticed: nothing reached it.
+
+### 3. Refunds reported success and did nothing
+
+`addPoints` had the same read-then-write shape **and** issued its UPDATE on the caller's
+client. `close_anon_lead_and_user_grants` had revoked UPDATE on `users` from `authenticated`
+except four profile columns, and `credits` is deliberately not one of them — so the write
+failed outright while the route said "Your points have been refunded".
+
+Nothing checked the error. Same failure class as the STOP opt-outs that logged success for
+months: **supabase-js returns `{ error }`, it does not throw.**
+
+### 4. PDF upload had never worked, for three stacked reasons
+
+`parsePDF` was written against pdf-parse **v1** (module itself callable) while package.json
+pinned `^2.4.5`, which exports named classes and no default. `(pdfParse as any).default ||
+pdfParse` fell through to the module namespace object, so calling it threw. **A fallback that
+cannot work is worse than no fallback** — it moves the error away from the mistake.
+
+Then, deployed, two more:
+
+    DOMMatrix is not defined
+    Cannot find module '.../pdfjs-dist/legacy/build/pdf.worker.mjs'
+
+pdf-parse v2 wraps **pdfjs-dist, a browser library**. The audit said this route imports a
+browser library server-side; I checked the imports, saw Node-capable packages and
+`runtime = "nodejs"`, and dismissed it. It was right and I was wrong — the browser dependency
+is transitive.
+
+Fixes: shim `DOMMatrix`/`Path2D`/`ImageData` (constructors only — text extraction does no
+geometry), and name the worker in `outputFileTracingIncludes`, since Vercel's tracing only
+ships what it can see statically and a runtime path import is invisible to it.
+
+### The rule this leaves behind
+
+**Local Node proved nothing here.** Local Node has no `DOMMatrix` either and parsed the same
+PDF fine — the runtimes take different pdfjs code paths. Three deploys were spent guessing.
+
+What actually cracked it was returning the parse reason to the caller instead of a generic
+"Could not read that PDF file". Each deploy then named its own next error. For any package
+that resolves files or globals at runtime, **the deployed endpoint is the only test that
+counts, and it needs to be able to tell you what it hit.**
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
