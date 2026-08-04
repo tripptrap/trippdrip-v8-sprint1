@@ -183,7 +183,7 @@ export async function resolveFromNumber(
     .from('user_telnyx_numbers')
     // Kept on one line deliberately: supabase-js infers the row type from the
     // literal, and a `+` concatenation widens it to `string` and loses that.
-    .select('phone_number, is_primary, locked_until, rested_until, number_type, messaging_campaign_id, tollfree_verification_status, registration_synced_at')
+    .select('phone_number, is_primary, locked_until, rested_until, number_type, messaging_campaign_id, tollfree_verification_status, registration_synced_at, att_mapping_status, tmobile_mapping_status, other_carrier_mapping_status')
     .eq('user_id', userId)
     .eq('status', 'active');
 

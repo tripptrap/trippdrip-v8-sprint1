@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { getVerifiedTollFreeNumbers, isTollFreeNumber } from '@/lib/telnyx';
 import { releasePoolNumber } from '@/lib/numberPool';
-import { syncNumberRegistration, isRegistered, registrationGap } from '@/lib/numberRegistration';
+import { syncNumberRegistration, isRegistered, registrationGap, unmappedCarriers } from '@/lib/numberRegistration';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       await syncNumberRegistration(supabaseAdmin, user.id);
       const { data: refreshed } = await supabaseAdmin
         .from('user_telnyx_numbers')
-        .select('phone_number, messaging_campaign_id, tollfree_verification_status, registration_synced_at')
+        .select('phone_number, messaging_campaign_id, tollfree_verification_status, registration_synced_at, att_mapping_status, tmobile_mapping_status, other_carrier_mapping_status')
         .eq('user_id', user.id);
       // Patch the rows we already read rather than re-querying everything —
       // the sync only touches these three columns.
@@ -164,6 +164,10 @@ export async function GET(req: NextRequest) {
       registration_checked: !!num.registration_synced_at,
       can_send: num.registration_synced_at ? isRegistered(num) : null,
       registration_gap: num.registration_synced_at ? registrationGap(num) : null,
+      // Carriers the number is assigned for but NOT mapped at. Separate from
+      // can_send: it still delivers to everyone else, so this is a warning, not
+      // a block. See unmappedCarriers().
+      unmapped_carriers: num.registration_synced_at ? unmappedCarriers(num) : [],
     }));
 
     // Routing mode lives on user_settings, not on any number, but the page that

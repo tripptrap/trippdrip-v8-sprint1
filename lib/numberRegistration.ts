@@ -28,6 +28,35 @@ export interface RegistrationFields {
   number_type: string | null;
   messaging_campaign_id: string | null;
   tollfree_verification_status: string | null;
+  /** Per-carrier mapping. Absent on callers that predate these columns. */
+  att_mapping_status?: string | null;
+  tmobile_mapping_status?: string | null;
+  other_carrier_mapping_status?: string | null;
+}
+
+/**
+ * Carriers this number is assigned to the campaign for, but NOT mapped at.
+ *
+ * A number can be `assignmentStatus: ASSIGNED` while an individual carrier's
+ * mapping is FAILED — which is the live state of both long codes on this
+ * account, AT&T failed on each. That is not a small detail: AT&T is roughly a
+ * third of US mobile, and the failure is silent. Messages are accepted, then
+ * filtered, and it reads as "they never replied".
+ *
+ * Deliberately does NOT make isRegistered() false. A number mapped at T-Mobile
+ * and everyone else still delivers to most people, and refusing to send from it
+ * would be a bigger outage than the gap it is warning about. This is for
+ * surfacing, and for choosing between two otherwise-equal numbers.
+ */
+export function unmappedCarriers(n: RegistrationFields): string[] {
+  if (n.number_type === 'tollfree') return [];
+  const failed: string[] = [];
+  if (n.att_mapping_status && n.att_mapping_status !== 'ADDED') failed.push('AT&T');
+  if (n.tmobile_mapping_status && n.tmobile_mapping_status !== 'ADDED') failed.push('T-Mobile');
+  if (n.other_carrier_mapping_status && n.other_carrier_mapping_status !== 'ADDED') {
+    failed.push('Verizon and others');
+  }
+  return failed;
 }
 
 /**
@@ -147,6 +176,9 @@ export async function syncNumberRegistration(
   for (const n of numbers) {
     let campaignId: string | null = null;
     let tfvStatus: string | null = null;
+    let att: string | null = null;
+    let tmo: string | null = null;
+    let other: string | null = null;
 
     if (n.number_type === 'tollfree') {
       tfvStatus = tfvByNumber.get(n.phone_number) ?? null;
@@ -154,6 +186,13 @@ export async function syncNumberRegistration(
       const res = await telnyx(`/10dlc/phone_number_campaigns/${encodeURIComponent(n.phone_number)}`);
       if (res === null) continue; // transient — keep whatever is already stored
       campaignId = res.notFound ? null : (res.campaignId ?? null);
+      // Per-carrier mapping. ASSIGNED with a FAILED carrier is a real state and
+      // was invisible until it was stored — see unmappedCarriers().
+      if (!res.notFound) {
+        att = res.attNumberMappingStatus ?? null;
+        tmo = res.tmobileNumberMappingStatus ?? null;
+        other = res.nonTmobileNumberMappingStatus ?? null;
+      }
     }
 
     const { error: upErr } = await supabase
@@ -161,6 +200,9 @@ export async function syncNumberRegistration(
       .update({
         messaging_campaign_id: campaignId,
         tollfree_verification_status: tfvStatus,
+        att_mapping_status: att,
+        tmobile_mapping_status: tmo,
+        other_carrier_mapping_status: other,
         registration_synced_at: syncedAt,
       })
       .eq('id', n.id);

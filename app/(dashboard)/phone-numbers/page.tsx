@@ -22,6 +22,8 @@ interface PhoneNumber {
    */
   can_send?: boolean | null;
   registration_gap?: string | null;
+  /** Carriers assigned but not mapped — delivers elsewhere, so a warning. */
+  unmapped_carriers?: string[];
   capabilities: {
     voice: boolean;
     sms: boolean;
@@ -740,9 +742,15 @@ export default function PhoneNumbersPage() {
                         so this number is skipped when choosing who to send from.
                       </div>
                     )}
-                    {number.can_send === true && (
+                    {number.can_send === true && !number.unmapped_carriers?.length && (
                       <div className="mb-2 text-xs rounded px-2 py-1.5 inline-block bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300">
                         Registered to send
+                      </div>
+                    )}
+                    {number.can_send === true && !!number.unmapped_carriers?.length && (
+                      <div className="mb-2 text-xs rounded px-2 py-1.5 inline-block bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300">
+                        Registered, but not active at {number.unmapped_carriers.join(' and ')} — messages
+                        to those subscribers may be filtered. Telnyx support can re-run the carrier mapping.
                       </div>
                     )}
 
