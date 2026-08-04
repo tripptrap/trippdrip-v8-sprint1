@@ -85,8 +85,10 @@ export default function CompliancePage() {
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>Brand and campaign registration with The Campaign Registry (TCR) is <strong>required
-            before an account can obtain a number</strong> — every number-acquisition path is gated on
-            it, because an unregistered number cannot legitimately carry business traffic</li>
+            before an account can obtain its own local number</strong>, because an unregistered long
+            code cannot legitimately carry business traffic. A business can start immediately on a
+            shared toll-free number that is already verified with the carriers, under a strict daily
+            sending limit that lifts once its own registration is filed</li>
             <li>Every outbound message is scored for spam characteristics before it is sent, and the
             score is shown to the sender in the composer</li>
             <li>Per-number volume limits, with a daily ceiling and shorter-interval caps, so a single
