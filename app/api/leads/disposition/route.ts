@@ -81,9 +81,27 @@ export async function POST(req: NextRequest) {
       // Update lead with sold status and client reference
       const { data: lead, error: leadUpdateError } = await supabase
         .from('leads')
+        // ── Values the database actually permits ────────────────────────────
+        //
+        // This wrote disposition: 'sold' and status: 'sold'. Neither is allowed:
+        //
+        //   leads_disposition_check  new | qualified | contacted | callback |
+        //                            not-interested | converted | dnc
+        //   leads_status_check       active | inactive | archived | deleted
+        //
+        // So every conversion violated two CHECK constraints, failed with 23514,
+        // hit the rollback below, deleted the freshly-created client and returned
+        // a 500. **Mark as sold has never once succeeded** — all 209 leads on this
+        // account still have disposition null, and the only two client rows
+        // predate the constraints.
+        //
+        // `converted` is the permitted disposition and means exactly this. Status
+        // is deliberately left alone: it describes whether the record is live,
+        // not what stage it reached, and 'sold' was never a legal value for it.
+        // `converted` + `client_id` are the durable markers, and the clients table
+        // remains authoritative for "is this a client" (see the receptionist).
         .update({
-          disposition: 'sold',
-          status: 'sold',
+          disposition: 'converted',
           client_id: client.id,
           converted: true,
           converted_at: new Date().toISOString(),

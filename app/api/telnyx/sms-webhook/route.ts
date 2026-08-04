@@ -1459,10 +1459,14 @@ async function checkAndTriggerReceptionist(
       }
       } // end !isSoldEarly — flow block
 
-      // Check if this is a sold client
-      const isSoldClient = lead.disposition === 'sold' ||
-                           lead.status === 'sold' ||
-                           lead.disposition === 'closed_won';
+      // Is this a client? Reuses isSoldEarly, computed above from the clients
+      // table (authoritative) plus the lead's own markers.
+      //
+      // This repeated the same dead test: 'sold' and 'closed_won' are forbidden
+      // by leads_disposition_check and 'sold' by leads_status_check, so all three
+      // comparisons were against values the database cannot hold. Every client
+      // fell through to the new-contact branch.
+      const isSoldClient = isSoldEarly;
 
       if (isSoldClient) {
         contactType = 'sold_client';
