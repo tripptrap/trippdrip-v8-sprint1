@@ -3264,6 +3264,62 @@ and receive a local number it could never use.
 
 ---
 
+## Delivery outcomes were never recorded — `message.finalized` (#135, `bebbef9`)
+
+The Telnyx webhook allowlisted `message.sent` / `message.delivered` / `message.failed`.
+**Telnyx API v2 sends `message.finalized` for the terminal state**, and that string appeared
+nowhere in the codebase. Every terminal outcome was dropped, and the endpoint answered
+`200 {"received":true}` while doing so.
+
+Verified by asking Telnyx about message ids this database has as `sent`:
+
+    40319fb6-8aac-4205-8…   telnyx: delivered   ours: sent
+    40319fb6-8881-4666-b…   telnyx: delivered   ours: sent
+    40319fb6-8c4b-4cd8-a…   telnyx: delivered   ours: sent
+
+**The messages were arriving the whole time.** 62 rows sat at `sent`, none had ever reached
+`delivered` or `failed`, and the zero-failures figure has the same cause — a failure arrives
+as `message.finalized` too.
+
+Status now comes from **`payload.to[0].status`**, which is authoritative and present on every
+delivery event, rather than being inferred from the event name. The event name only ever
+worked for events Telnyx does not send.
+
+`delivery_unconfirmed` maps to `sent` deliberately: **`messages_status_check` constrains that
+column to `draft|queued|sent|delivered|failed|read`**, and supabase-js returns `{ error }`
+rather than throwing — so writing a value outside the set would have silently left the row
+untouched, which is the exact class of bug being fixed. The distinction is kept in
+`error_message`.
+
+This also retires the AT&T worry from a different direction: messages deliver.
+
+## The cron watchdog cries wolf, and its own reading is unreliable
+
+**The crons are healthy.** `cron_runs` holds 206 rows across all five Vercel crons plus the
+GitHub Actions heartbeat, every one on cadence. Nothing is overdue. Vercel is on Pro, the
+schedules are registered, `CRON_SECRET` is correct.
+
+**"cron_runs has zero rows" was a reading error of mine** — a fragile JSON parse of the CLI
+output, the same one that reported `number_pool` as empty when it held three rows. When
+checking a table is empty, print `count(*)` and read it, rather than parsing rows out of the
+CLI envelope.
+
+Six false emails went out overnight. `find_overdue_crons()` returned `last_ran_at: null` for
+jobs that plainly had rows — the 03:50:26Z alert said `auto-buy` had **never** run while
+`cron_runs` held an `auto-buy` row from 03:00:36Z, 50 minutes earlier and inside its
+90-minute grace.
+
+**Cause undetermined.** Not reproducible: the same RPC through PostgREST with the same key
+returns `[]` every time, direct SQL agrees, the table owner has `BYPASSRLS`, RLS is enabled
+but not forced, there is one function definition and no replica.
+
+So the alert now **confirms against `cron_runs` before firing** and logs both values when they
+disagree. A single read caught lying is not grounds to wake someone at 4am, and a watchdog
+that cries wolf trains you to ignore the channel it shares with real outages — the failure
+#117 exists to prevent. The disagreement log is the diagnostic for the next occurrence.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
