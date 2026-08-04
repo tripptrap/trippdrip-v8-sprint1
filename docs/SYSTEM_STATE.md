@@ -3123,6 +3123,46 @@ counts, and it needs to be able to tell you what it hit.**
 
 ---
 
+## Confirmed by real-world test — do not re-derive these from API fields
+
+Things that were checked against actual handsets and actual behaviour. An API field that
+seems to contradict one of these does **not** override it. Add to this list whenever
+something is verified in the physical world; that is the evidence that outranks everything
+else here.
+
+| what | result | when |
+|---|---|---|
+| SMS delivery to an **AT&T** handset from this account's long codes | **works** | 2026-08-04, user-verified with a real AT&T subscriber |
+
+### `attNumberMappingStatus: FAILED` does not mean AT&T is blocked
+
+Both long codes report `attNumberMappingStatus: FAILED` while `assignmentStatus` is
+`ASSIGNED`:
+
+    +18134972176   ASSIGNED   att FAILED   tmobile ADDED   other ADDED
+    +18135187997   ASSIGNED   att FAILED   tmobile ADDED   other ADDED
+
+**Messages to AT&T handsets go through anyway.** Tested. `failureReasons` is null on both.
+
+I shipped a UI warning saying messages to AT&T subscribers "may be filtered", reasoning
+from the field name and from AT&T's subscriber share. That was wrong, and wrong in the
+expensive direction — it would have sent someone chasing a carrier problem that does not
+exist, and it contradicted a test that had already been run.
+
+The three mapping columns are still recorded (`att_mapping_status` and friends) because
+they are real data. Their *meaning* is not established. **If deliverability is in question,
+send to a handset on that carrier — do not infer it from this field.**
+
+### The rule
+
+A status field is a claim about a system's internal state, not an observation of what
+happens to a message. When the two are available, the observation wins and the field gets
+re-interpreted, never the other way round. Anything verified against a real handset belongs
+in the table above so it is not quietly re-litigated by the next person reading an API
+response — this section exists because that had already happened once.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the

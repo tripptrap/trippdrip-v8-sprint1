@@ -35,18 +35,24 @@ export interface RegistrationFields {
 }
 
 /**
- * Carriers this number is assigned to the campaign for, but NOT mapped at.
+ * Carriers reporting something other than ADDED for this number's campaign
+ * mapping.
  *
- * A number can be `assignmentStatus: ASSIGNED` while an individual carrier's
- * mapping is FAILED — which is the live state of both long codes on this
- * account, AT&T failed on each. That is not a small detail: AT&T is roughly a
- * third of US mobile, and the failure is silent. Messages are accepted, then
- * filtered, and it reads as "they never replied".
+ * ── Do not read this as a deliverability signal ─────────────────────────────
  *
- * Deliberately does NOT make isRegistered() false. A number mapped at T-Mobile
- * and everyone else still delivers to most people, and refusing to send from it
- * would be a bigger outage than the gap it is warning about. This is for
- * surfacing, and for choosing between two otherwise-equal numbers.
+ * Both long codes on this account report `attNumberMappingStatus: FAILED` while
+ * `assignmentStatus` is ASSIGNED. **Delivery to AT&T handsets was confirmed
+ * working by a real test** (2026-08-04, user-verified with an AT&T subscriber),
+ * so FAILED here does not mean AT&T traffic is blocked or filtered.
+ *
+ * I previously shipped a UI warning saying those messages "may be filtered",
+ * reasoning from the field name alone. That was wrong, and it was wrong in the
+ * expensive direction: it would have sent someone chasing a carrier problem that
+ * does not exist. The field is recorded because it is real data worth having, not
+ * because its meaning is understood.
+ *
+ * If deliverability is ever actually in question, test by sending to a handset on
+ * that carrier. Do not infer it from this value.
  */
 export function unmappedCarriers(n: RegistrationFields): string[] {
   if (n.number_type === 'tollfree') return [];
