@@ -228,9 +228,17 @@ export async function POST(req: NextRequest) {
         leads = await aiExtractLeads(text);
       }
     } catch (parseError: any) {
-      await refundUpload(parseError?.message || 'parse failed');
+      const detail = parseError?.message || 'parse failed';
+      console.error(`Upload parse failed (${kind}):`, parseError);
+      await refundUpload(detail);
       return NextResponse.json(
-        { error: `Could not read that ${kind.toUpperCase()} file. Your points have been refunded.` },
+        {
+          error: `Could not read that ${kind.toUpperCase()} file. Your points have been refunded.`,
+          // The reason, not just the fact. "Could not read that PDF file" is
+          // unactionable for someone holding a file that opens fine everywhere
+          // else — and it is what made this bug take two deploys to pin down.
+          detail,
+        },
         { status: 400 }
       );
     }
