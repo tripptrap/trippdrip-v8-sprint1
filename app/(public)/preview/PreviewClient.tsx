@@ -185,7 +185,10 @@ export default function PreviewClient() {
               transition={{ delay: 0.2, duration: 0.8 }}
               className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-gray-900 mb-4 sm:mb-6"
             >
-              <span className="hidden sm:inline">AI-Powered SMS Marketing for Insurance & Real Estate Agents</span>
+              {/* Verticals are open — see the note in page.tsx. The headline named
+                  two industries while the product, and the registered 10DLC
+                  campaign, cover any business that does outreach. */}
+              <span className="hidden sm:inline">AI-Powered SMS Marketing for Teams That Sell</span>
               <span className="sm:hidden">AI-Powered SMS Marketing</span>
               <br />
               <span className="bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
@@ -259,7 +262,7 @@ export default function PreviewClient() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
           {[
             { step: '1', title: 'Create Account', desc: 'Sign up in under a minute. Choose your plan and get instant access to all features.', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-            { step: '2', title: 'Get Your Number', desc: 'Claim your phone number right away, then we handle registering it for compliant messaging under your business.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
+            { step: '2', title: 'Get Your Number', desc: 'Claim a verified toll-free number and start texting the same day. Add your business details to unlock a local number and full sending volume.', icon: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z' },
             { step: '3', title: 'Import Leads', desc: 'Upload a CSV, import from a spreadsheet, or add leads manually. We map the fields for you.', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
             { step: '4', title: 'Start Sending', desc: 'Launch campaigns, set up AI workflows, and watch your response rates soar.', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
           ].map((item, i) => (
@@ -613,7 +616,7 @@ export default function PreviewClient() {
           {[
             {
               q: 'How quickly can I start sending messages?',
-              a: 'You get your phone number right after signup, and you can set up leads, flows and campaigns straight away. Before any business can send text campaigns in the US, carriers require the number to be registered (10DLC) — we handle that paperwork for you, but approval is the carriers\' call and typically takes a few business days. We\'ll tell you the moment your number is cleared to send.'
+              a: 'The same day. You can claim a shared toll-free number that is already verified with the carriers and start sending straight after signup — up to 50 messages a day while you are getting set up. To raise that limit and to get your own local number, US carriers require your business to be registered (10DLC). You provide your EIN and business details, we file it, and approval is the carriers\' call — usually a few business days. We tell you the moment it clears.'
             },
             {
               q: 'Is HyveWyre TCPA compliant?',
@@ -857,7 +860,7 @@ export default function PreviewClient() {
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Get Set Up Fast</h3>
             <p className="text-gray-500">
-              Claim your number right away. We handle registering it for compliant messaging under your business — no paperwork on your end.
+              Claim a carrier-verified toll-free number and send your first message today. When you are ready for your own local number, you give us your business details and we file the carrier registration for you.
             </p>
           </motion.div>
 
