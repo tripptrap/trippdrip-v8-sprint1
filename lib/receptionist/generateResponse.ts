@@ -155,6 +155,15 @@ function buildSystemPrompt(
   if (id.callbackPhone)   identityLines.push(`- Phone to give out: ${id.callbackPhone}`);
   if (id.website)         identityLines.push(`- Website: ${id.website}`);
   if (id.tagline)         identityLines.push(`- Value prop: ${id.tagline}`);
+  // Filled from the account's own signup answer when the operator has not set
+  // an identity — so the AI never asks a customer what industry it is in.
+  if (id.industryContext) identityLines.push(`- Industry: ${id.industryContext}`);
+  if (id.industryContext) {
+    identityLines.push(
+      `- You already KNOW this business is in ${id.industryContext}. Never ask the ` +
+      `contact what industry or what kind of business this is — you work here.`
+    );
+  }
 
   const identityBlock = identityLines.length > 0
     ? `WHO YOU ARE — answer ANY identity question from this section IMMEDIATELY and confidently:\n${identityLines.join('\n')}\n\nWhen someone asks "who are you?", "who do you work for?", "what do you want?", "what is this about?" — answer naturally using the above. NEVER say you don't know who you work for or what you're selling.\n\n`

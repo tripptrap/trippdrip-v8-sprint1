@@ -5,6 +5,12 @@
  * "who are you?", "who do you work for?", "what do you want?" etc.
  */
 export interface ReceptionistIdentity {
+  /**
+   * The account's industry, filled from its signup answer when the operator has
+   * not set an identity of their own. Exists so the AI never asks a contact what
+   * kind of business it is — it works there.
+   */
+  industryContext?: string;
   agentName?: string;       // Name the AI introduces itself as
   businessName?: string;    // Company / agency name
   whatYouOffer?: string;    // One-liner: what product/service you sell

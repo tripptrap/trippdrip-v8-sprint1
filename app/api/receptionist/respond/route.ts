@@ -54,6 +54,49 @@ export async function POST(req: NextRequest) {
         success: false,
         error: 'Receptionist mode not enabled or configured',
       }, { status: 400 });
+
+    // ── The AI must not ask what business it works for ────────────────────
+    //
+    // Everything the AI knows about the business comes from
+    // receptionist_settings.identity. That JSONB is empty until someone fills
+    // in the Receptionist form, so a brand-new account's AI opens with
+    // businessName = 'this business' and no idea what it sells.
+    //
+    // Meanwhile the account already answered this at signup. The industry sits
+    // in auth user_metadata, the business name in users.business_name, and the
+    // vertical in user_10dlc_registrations — onboarding reads the industry to
+    // seed tags and flows and then never persists it anywhere the AI can see.
+    //
+    // Observed live: a flow asked an insurance customer "what kind of business
+    // do you run?" while the account's own industry was 'insurance'.
+    //
+    // So anything the operator has not explicitly set is filled from what the
+    // account already told us. Explicit settings always win — this only fills
+    // blanks, it never overwrites.
+    const { data: acct } = await supabase
+      .from('users')
+      .select('business_name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    let metaIndustry: string | null = null;
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+      metaIndustry = (authUser?.user?.user_metadata as any)?.industry ?? null;
+    } catch {
+      // Non-fatal: the AI simply keeps whatever identity it already had.
+    }
+
+    const industry = settings.industry || metaIndustry || null;
+    settings.industry = industry;
+    settings.identity = {
+      ...((acct as { business_name?: string } | null)?.business_name
+    ? { businessName: (acct as { business_name?: string }).business_name }
+    : {}),
+      ...(industry ? { industryContext: industry } : {}),
+      // Operator-set values last, so they override the inferred ones.
+      ...(settings.identity || {}),
+    };
     }
 
     // Check user has premium subscription
