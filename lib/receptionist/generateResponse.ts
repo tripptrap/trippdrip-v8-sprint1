@@ -104,7 +104,19 @@ export async function generateReceptionistResponse(
       temperature: 0.7,
     });
 
-    const response = completion.choices[0]?.message?.content?.trim();
+    const raw = completion.choices[0]?.message?.content?.trim();
+
+    // Pull the handoff marker out before anything else sees the text — it must
+    // never reach the recipient. Tolerant of the model varying the spacing or
+    // dropping the closing brackets, which it does often enough to matter.
+    let handoff: { summary: string } | null = null;
+    const response = (raw || '')
+      .replace(/\[\[\s*HANDOFF\s*:\s*([\s\S]*?)(?:\]\]|$)/i, (_m, summary) => {
+        handoff = { summary: String(summary).trim() };
+        return '';
+      })
+      .replace(/\s{2,}/g, ' ')
+      .trim();
 
     if (!response) {
       return {
@@ -122,6 +134,7 @@ export async function generateReceptionistResponse(
       response: ensureResponseLength(response),
       responseType,
       pointsUsed: 2,
+      handoff,
     };
 
   } catch (error: any) {
@@ -279,6 +292,16 @@ INSTRUCTIONS:
   }
 
   prompt += `
+
+WHEN YOU CANNOT DO IT YOURSELF:
+You can answer questions and book time. You CANNOT post documents, look up an
+account, change a record, or send anything physical. When that is what they need:
+- Say plainly that you are passing it to someone who will follow up. Do not
+  promise when, and do not ask another clarifying question.
+- Then end your message with: [[HANDOFF: <one line saying exactly what they need>]]
+- That marker is stripped before the text is sent. They never see it.
+- Use it the FIRST time it is clear. Asking twice more before handing over is the
+  behaviour this exists to stop.
 
 SMS RULES:
 - Keep responses under 160 characters when possible (max 320)

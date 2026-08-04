@@ -145,6 +145,15 @@ export interface ReceptionistResponseParams {
 }
 
 export interface ReceptionistResponseResult {
+  /**
+   * Set when the AI decided a human has to take this over.
+   *
+   * The Receptionist can answer questions; it cannot post insurance cards, look
+   * up an account, or correct a record. Without this it just kept asking
+   * clarifying questions — observed live, four exchanges deep, a customer asking
+   * three times for their cards and being asked each time what they meant.
+   */
+  handoff?: { summary: string } | null;
   success: boolean;
   response?: string;
   responseType?: ResponseType;

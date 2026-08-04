@@ -7,6 +7,7 @@ import { generateReceptionistResponse } from '@/lib/receptionist/generateRespons
 import { ReceptionistSettings, ContactType, ReceptionistResponseParams } from '@/lib/receptionist/types';
 import { isInternalCaller } from '@/lib/cronAuth';
 import { checkSmsAllowed } from '@/lib/smsGuard';
+import { createNotification } from '@/lib/createNotification';
 
 // Use service role client for internal operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -252,6 +253,20 @@ export async function POST(req: NextRequest) {
       }, { status: guard.reason === 'quiet_hours' || guard.reason === 'rate_limited' ? 429 : 403 });
     }
 
+    // Answer at human speed, not machine speed.
+    //
+    // Replies were landing 3 seconds after the inbound. Nobody types that fast,
+    // and an instant answer is the clearest tell that a person is talking to a
+    // bot — more obvious than anything in the wording.
+    //
+    // 10-20s, varied per message so the gap is not itself a pattern. Held in the
+    // request rather than scheduled: this route already runs after an inbound
+    // webhook and the whole exchange stays inside one invocation, which keeps the
+    // send atomic with the guard and the charge above it.
+    const replyDelayMs = 10_000 + Math.floor(Math.random() * 10_000);
+    console.log(`⏳ Holding the reply ${Math.round(replyDelayMs / 1000)}s so it reads as typed`);
+    await new Promise(resolve => setTimeout(resolve, replyDelayMs));
+
     // FULL AUTO MODE: send the SMS response using Telnyx
     const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telnyx/send-sms`, {
       method: 'POST',
@@ -301,6 +316,48 @@ export async function POST(req: NextRequest) {
         // send response".
         error: `Failed to send response: ${sendResult.error || 'unknown error'}`,
       }, { status: 500 });
+    }
+
+    // ── Hand it to a person, with a todo ──────────────────────────────────
+    //
+    // The Receptionist can answer and book; it cannot post insurance cards, look
+    // up an account or correct a record. Without somewhere to put those, it just
+    // kept asking clarifying questions — observed live, a customer asked three
+    // times for their cards and was asked each time what they meant.
+    //
+    // The model marks its own reply with [[HANDOFF: ...]] when it decides a human
+    // is needed; that marker is stripped before sending. Here it becomes a
+    // follow-up the operator can see and tick off, plus a notification.
+    //
+    // Non-fatal by design: the customer has already been told someone will follow
+    // up. Failing this request would not un-send that.
+    if (result.handoff?.summary && leadId) {
+      try {
+        // reminder_type is constrained to manual|auto_no_response|auto_follow_up|
+        // auto_callback — there is no 'ai_handoff' value, and an out-of-set write
+        // would be rejected silently by supabase-js's { error } return.
+        const { error: fuError } = await supabase.from('follow_ups').insert({
+          user_id: userId,
+          lead_id: leadId,
+          title: result.handoff.summary,
+          notes: `Asked by SMS: "${inboundMessage}"\n\nReceptionist replied: "${result.response}"`,
+          // Due now: the contact is waiting, and a date in the future would hide
+          // it from a list sorted by what is due.
+          due_date: new Date().toISOString(),
+          status: 'pending',
+          priority: 'high',
+          reminder_type: 'auto_follow_up',
+        });
+        if (fuError) console.error('Receptionist handoff: could not create the follow-up:', fuError);
+
+        await createNotification(userId, 'ai_handoff', 'The receptionist needs you', result.handoff.summary, {
+          lead_id: leadId,
+          thread_id: threadId ?? null,
+          phone_number: phoneNumber,
+        });
+      } catch (e) {
+        console.error('Receptionist handoff failed:', e);
+      }
     }
 
     // Charge AFTER a confirmed send, not before.
