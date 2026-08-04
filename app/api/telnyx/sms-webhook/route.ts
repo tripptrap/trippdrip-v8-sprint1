@@ -1084,9 +1084,30 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
 
   console.log('📬 Telnyx delivery status:', { messageSid, status, eventType, errorCode, errorMessage });
 
-  // Written on every event, not only on failure: a message that fails and is
-  // then redelivered must not keep a stale reason attached to a delivered row.
-  const { data: updated, error } = await supabaseAdmin
+  // ── Never regress out of a terminal state ────────────────────────────────
+  //
+  // Telnyx emits BOTH message.sent and message.finalized for one outbound
+  // message, and its docs are explicit that "message.finalized may arrive before
+  // message.sent" — there is no guaranteed order.
+  //
+  // This handler treated every event as authoritative, so whichever arrived last
+  // won. Observed on a real send (sid 40319fcd-6f7c-42c8-b6d7-df415901b1d1):
+  // both webhooks landed at 15:41:04 and both got HTTP 200 from us —
+  //
+  //   message.finalized   to[0].status = delivered
+  //   message.sent        to[0].status = sent
+  //
+  // — and the row finished as 'sent'. The message was on the recipient's handset
+  // while our record said it was merely sent. That is the whole of #135's
+  // remaining symptom: not a missing webhook, a clobbered one.
+  //
+  // `delivered` and `failed` are terminal. Once a row reaches either, a later
+  // non-terminal event carries no new information and must not overwrite it.
+  // Scoped in the WHERE clause rather than by reading first, so two events racing
+  // cannot both pass a check and then both write.
+  const terminal = status === 'delivered' || status === 'failed';
+
+  let q = supabaseAdmin
     .from('messages')
     .update({
       status,
@@ -1094,11 +1115,20 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
       error_message: errorMessage,
       updated_at: new Date().toISOString(),
     })
-    .eq('message_sid', messageSid)
-    .select('id');
+    .eq('message_sid', messageSid);
+
+  if (!terminal) {
+    // A non-terminal update may only touch a row that is not already finished.
+    q = q.not('status', 'in', '("delivered","failed")');
+  }
+
+  const { data: updated, error } = await q.select('id');
 
   if (error) {
     console.error('Error updating message status:', error);
+  } else if (!updated?.length && !terminal) {
+    // Expected: a non-terminal event arriving after the row already finished.
+    console.log(`↩︎ Ignored ${eventType} for ${messageSid} — row is already in a terminal state`);
   } else if (!updated?.length) {
     // supabase-js reports no error when an UPDATE matches nothing, so without
     // this a webhook for a message we never stored looks like a success. That
