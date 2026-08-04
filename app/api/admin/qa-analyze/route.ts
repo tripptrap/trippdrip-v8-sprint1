@@ -5,7 +5,23 @@ import { createClient } from '@/lib/supabase/server';
 import { isAdminEmail } from '@/lib/admin';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+// Constructed lazily, not at module scope.
+//
+// `new OpenAI({ apiKey })` throws when the key is missing, and at module scope
+// that runs during Next's build-time page-data collection — so the whole app
+// failed to build in any environment without OPENAI_API_KEY. That is what broke
+// the first preview deployment, and it would break a fresh clone too.
+//
+// Same shape as lib/ai/openai.ts, which already did this correctly. The cost of
+// a missing key should be that this one route fails at request time with a clear
+// error, not that nothing builds.
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+  }
+  return openaiClient;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,7 +61,7 @@ Please provide:
 
 Be concise and specific. If you can see an error message or broken UI element, describe it exactly.`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
