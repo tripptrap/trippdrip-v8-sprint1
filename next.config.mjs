@@ -11,7 +11,19 @@ const nextConfig = {
     //
     // Anything that loads files relative to its own package at runtime belongs
     // here; the symptom is always "works locally, fails deployed".
-    serverComponentsExternalPackages: ['pdf-parse'],
+    serverComponentsExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+
+    // pdfjs loads its worker as a sibling file at runtime:
+    //
+    //   Cannot find module '/var/task/node_modules/pdfjs-dist/legacy/build/
+    //   pdf.worker.mjs' imported from .../pdf.mjs
+    //
+    // Vercel's file tracing only ships what it can see statically, and a
+    // dynamic import by path is invisible to it. This names the files so they
+    // are deployed alongside the function.
+    outputFileTracingIncludes: {
+      '/api/leads/upload-document': ['./node_modules/pdfjs-dist/legacy/build/**'],
+    },
   },
 
   async redirects() {
