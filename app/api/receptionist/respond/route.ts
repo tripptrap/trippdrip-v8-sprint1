@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateReceptionistResponse } from '@/lib/receptionist/generateResponse';
 import { ReceptionistSettings, ContactType, ReceptionistResponseParams } from '@/lib/receptionist/types';
 import { isInternalCaller } from '@/lib/cronAuth';
+import { checkSmsAllowed } from '@/lib/smsGuard';
 
 // Use service role client for internal operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -162,16 +163,46 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Deduct credits atomically via RPC — only after guardrail check passes and we know we're sending
-    if (result.pointsUsed && result.pointsUsed > 0) {
-      const { error: deductError } = await supabase.rpc('deduct_credits', {
-        user_id: userId,
-        amount: result.pointsUsed
-      });
-      if (deductError) {
-        console.error('Failed to deduct credits:', deductError);
-        // Continue anyway — don't block the send over a credit bookkeeping error
-      }
+    // ── DNC, opt-out, suspension and quiet hours ──────────────────────────
+    //
+    // send-sms wraps checkSmsAllowed in `if (!internalCaller)`, and this route
+    // authenticates with x-internal-secret — so it skipped the entire guard.
+    // Both drip crons call it themselves for exactly this reason
+    // (process-drips:350, process-ai-drips:222); the Receptionist never did.
+    //
+    // That was harmless only because the send below has never worked. Fixing
+    // the body/message key in this same commit turns this path on, and without
+    // this it would auto-reply to opted-out numbers, from suspended accounts,
+    // at 3am in the recipient's local time — on the highest-volume automated
+    // path in the product.
+    //
+    // enforceQuietHours is true: an unprompted AI reply is automated sending,
+    // not a human pressing send. The recipient's state drives the window (#50).
+    let recipientState: string | null = null;
+    if (leadId) {
+      const { data: stateLead } = await supabase
+        .from('leads')
+        .select('state')
+        .eq('id', leadId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      recipientState = stateLead?.state ?? null;
+    }
+
+    const guard = await checkSmsAllowed(supabase, userId, phoneNumber, {
+      enforceQuietHours: true,
+      recipientState,
+      context: { source: 'receptionist', thread_id: threadId ?? null, lead_id: leadId ?? null },
+    });
+
+    if (!guard.allowed) {
+      console.log(`🤖 Receptionist: send blocked — ${guard.reason}: ${guard.detail}`);
+      return NextResponse.json({
+        success: false,
+        error: guard.detail || 'Send not allowed',
+        reason: guard.reason,
+        retryable: guard.retryable ?? false,
+      }, { status: guard.reason === 'quiet_hours' || guard.reason === 'rate_limited' ? 429 : 403 });
     }
 
     // FULL AUTO MODE: send the SMS response using Telnyx
@@ -184,7 +215,15 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         to: phoneNumber,
         from: toPhoneNumber,
-        body: guardrailResult.message,
+        // `message`, not `body`. /api/telnyx/send-sms destructures
+        // `{ to, from, message, ... }` and rejects with
+        // "Missing required fields: to, message" when it is absent.
+        //
+        // This said `body:`, so EVERY receptionist reply 400'd at the send and
+        // the route returned "Failed to send response". The Receptionist has
+        // never delivered a single message. Proven by posting this exact
+        // shape to the live endpoint: 400, missing fields.
+        message: guardrailResult.message,
         userId,
         threadId,
         leadId,
@@ -198,8 +237,32 @@ export async function POST(req: NextRequest) {
       console.error('Failed to send receptionist response:', sendResult.error);
       return NextResponse.json({
         success: false,
-        error: 'Failed to send response',
+        // The real reason, not a generic string. The generic one is why the
+        // body/message mismatch went unnoticed: the send replied "Missing
+        // required fields: to, message" and this reported only "Failed to
+        // send response".
+        error: `Failed to send response: ${sendResult.error || 'unknown error'}`,
       }, { status: 500 });
+    }
+
+    // Charge AFTER a confirmed send, not before.
+    //
+    // The deduction used to run before the fetch, so every failed send still
+    // took the user's credits — and since the send has never once succeeded,
+    // that is every AI reply ever attempted. Charging for a message nobody
+    // received is the same defect as the document-upload path fixed earlier.
+    //
+    // Deliberately does not block on a deduction error: the message has
+    // already gone out, so failing here would report failure for something
+    // that succeeded. A missed charge is the cheaper mistake.
+    if (result.pointsUsed && result.pointsUsed > 0) {
+      const { error: deductError } = await supabase.rpc('deduct_credits', {
+        user_id: userId,
+        amount: result.pointsUsed
+      });
+      if (deductError) {
+        console.error('Sent the reply but could not deduct credits:', deductError);
+      }
     }
 
     // Log the interaction

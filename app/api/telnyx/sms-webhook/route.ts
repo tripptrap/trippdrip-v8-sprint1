@@ -1186,7 +1186,16 @@ async function checkAndTriggerReceptionist(
     // Get lead info for this phone number
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('id, name, status, disposition')
+      // `leads` has NO `name` column — first_name / last_name are the real ones.
+      // Selecting it made PostgREST return 42703, and because the result is
+      // destructured as `const { data: lead }` with no error check, `lead` was
+      // ALWAYS null. Every inbound was therefore classified 'new_contact': no
+      // flow ever ran, no qualification question was ever asked, and the
+      // clients-table routing added today could never be reached.
+      //
+      // This same file warns about exactly this column 300 lines further down.
+      // Only the other copy had been fixed.
+      .select('id, first_name, last_name, status, disposition, converted')
       .eq('user_id', userId)
       .eq('phone', phoneNumber)
       .single();
@@ -1199,7 +1208,7 @@ async function checkAndTriggerReceptionist(
 
     if (lead) {
       leadId = lead.id;
-      leadName = lead.name;
+      leadName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || undefined;
 
       // Sold/converted clients skip Flow AI entirely — Receptionist handles them.
       //
@@ -1445,7 +1454,7 @@ async function checkAndTriggerReceptionist(
                 inboundMessage: messageBody,
                 contactType: 'existing_lead',
                 leadId: lead?.id,
-                leadName: (lead as any)?.first_name || lead?.name || 'Lead',
+                leadName: (lead as any)?.first_name || 'Lead',
                 draftOnly: true,
                 flowContext,
               }),
