@@ -3134,6 +3134,32 @@ else here.
 |---|---|---|
 | SMS delivery to an **AT&T** handset from this account's long codes | **works** | 2026-08-04, user-verified with a real AT&T subscriber |
 
+### Toll-free numbers are NOT limited to 5 per verification request
+
+There is **no documented maximum** per request. From Telnyx's own
+[Toll Free Verification Request Guide](https://support.telnyx.com/en/articles/10729979-toll-free-verification-request-guide):
+
+> "If you are submitting more than 5 Toll Free Numbers in a single Verification Request then
+> please include a detailed valid explanation for why multiple numbers are needed."
+
+So **5 is the justification threshold, not a ceiling.** The rejection this account received —
+*"Additional Information Requested - Justification for more than 5 numbers per business"* — is
+listed by Telnyx as **eligible for resubmission once justification is provided**. It was never
+a refusal; it was a request for an explanation that was not given.
+
+I previously stated the opposite in conversation — *"you can't scale on demand, 5 numbers at
+a time, and Telnyx has to approve each new batch"* — reasoning from the rejection text rather
+than checking the rule. It never reached a file, but it did shape planning for a while, which
+is why it is recorded here.
+
+**What this changes:** the shared-pool model scales further than assumed. The justification a
+platform can give is also the strongest kind — one number per end customer, each serving a
+distinct business, not one business accumulating numbers.
+
+**What is still true:** every request is a carrier review cycle with a real wait, so it is not
+self-service, and **an approved request must never be resubmitted** — Telnyx confirmed that
+unverifies the numbers on it until re-approved. New numbers go on a NEW request.
+
 ### `attNumberMappingStatus: FAILED` does not mean AT&T is blocked
 
 Both long codes report `attNumberMappingStatus: FAILED` while `assignmentStatus` is
