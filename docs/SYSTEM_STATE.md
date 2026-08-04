@@ -3254,13 +3254,25 @@ Building the preview did surface a real bug, now fixed (`71c5c0e`): two routes c
 page-data collection — so the app could not build in **any** environment lacking
 `OPENAI_API_KEY`, including a fresh clone.
 
-### Sole proprietor was withdrawn in the same pass (#119)
+### Sole proprietor was withdrawn in the same pass (#119) — to be rebuilt, not abandoned
 
-Telnyx requires an SMS OTP step for sole props that nothing here implements, so choosing it
+Telnyx requires an SMS PIN step for sole props that nothing here implements, so choosing it
 submitted a registration that reached Telnyx and stopped, with no error and no number.
 Removed from both pickers, refused by the API, and the EIN exemption it left in
 `checkNumberEligibility` was closed — that exemption would have let such a row pass the gate
 and receive a local number it could never use.
+
+**#119 stays open on purpose.** This is a withdrawal until it can be built properly, not a
+decision against the segment. Three things are now known that were not when it was filed:
+
+- Telnyx prices **Sole Proprietor at $2/month**, between Growth's `LOW_VOLUME` ($1.50) and
+  Scale's `MIXED` ($10). It fits the Growth tier's economics almost exactly.
+- `SOLE_PROPRIETOR` **is a valid use case** — confirmed against the live `/10dlc/enum/usecase`.
+  Nothing blocks it on Telnyx's side.
+- **The work is the PIN flow, not the dropdown.** A PIN goes to the registered mobile and must
+  be verified within 24 hours, so it needs a pending state on `user_10dlc_registrations`, a way
+  to enter the PIN, expiry handling, and a resend path. Re-adding the option without that
+  recreates the original bug exactly.
 
 ---
 
