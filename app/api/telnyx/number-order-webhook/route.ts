@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
+import { verifyTelnyxWebhook } from '@/lib/telnyxSignature';
 
 // Create Supabase admin client (bypasses RLS)
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -15,28 +16,6 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
   : null;
 
 // Verify Telnyx webhook signature (Ed25519)
-function verifyTelnyxSignature(
-  rawBody: string,
-  signature: string,
-  timestamp: string,
-  publicKey: string
-): boolean {
-  try {
-    const ed25519Sig = Buffer.from(signature, 'base64');
-    const signedPayload = `${timestamp}|${rawBody}`;
-    const publicKeyBuffer = Buffer.from(publicKey, 'base64');
-    return crypto.verify(
-      null, // Ed25519 doesn't use a digest algorithm
-      Buffer.from(signedPayload),
-      { key: publicKeyBuffer, format: 'der', type: 'spki' },
-      ed25519Sig
-    );
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -56,7 +35,7 @@ export async function POST(req: NextRequest) {
       }
       console.warn('⚠️ Allowing unsigned webhook in non-production mode');
     } else if (publicKey) {
-      const isValid = verifyTelnyxSignature(rawBody, signature, timestamp, publicKey);
+      const isValid = verifyTelnyxWebhook(rawBody, signature, timestamp, publicKey);
       if (!isValid) {
         console.error('❌ Invalid Telnyx webhook signature');
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
