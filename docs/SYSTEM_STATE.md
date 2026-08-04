@@ -3320,6 +3320,64 @@ that cries wolf trains you to ignore the channel it shares with real outages —
 
 ---
 
+## 10DLC economics and lifecycle — from Telnyx support, 2026-08-04
+
+Straight from Telnyx. This supersedes anything inferred elsewhere.
+
+### The $15 is per campaign per three months, not per submission
+
+> "The charge for 15 dollars is a three month charge in advance, for the creation of the
+> campaign. No matter how many times the campaign is rejected and edited, there are no
+> further charges for 3 months. As long as we are working on the same campaign. After 3
+> months, the campaign will be billed monthly."
+
+**I previously said the opposite** — that each resubmission after a rejection costs another
+$15, and that this account's eight submissions implied ~$120. That was wrong. Rejections and
+edits of the *same* campaign are free within the three-month window. Cost scales with
+**campaigns**, not attempts, so the eight-attempt history is far cheaper than I implied and
+iterating on a rejected campaign is not something to avoid on cost grounds.
+
+Unit economics: **$15 per customer for the first three months, then monthly per campaign.**
+At 100–1000 agents that is a recurring per-seat cost that has to be in the pricing model.
+
+### Mock mode tests the API and nothing else — confirmed
+
+> "The mock brand is to test the API. There is no mock vetting. Vetting is done by a third
+> party and they have no sandbox."
+
+Matches what was measured: the mock brand returns VERIFIED with no identity check and the
+mock campaign never leaves TCR_PENDING. **There is no way to test whether a real customer
+would be approved.** Not a gap in our tooling — the sandbox does not exist.
+
+### ⚠️ Dormancy, and a $500+ carrier penalty
+
+> "If a campaign is inactive for I believe 45 days we place it in dormant status. There is a
+> wireless carrier fine/penalty if a campaign is verified and inactive on their networks. So
+> we place the campaign into dormant status to avoid $500 plus fees."
+
+**This is a live financial exposure in the per-agent model and nothing in the product handles
+it.** Every customer gets their own campaign. Customers churn, pause, or simply stop sending.
+A verified campaign left idle attracts a carrier penalty measured in hundreds of dollars, and
+Telnyx's dormancy mechanism is what normally absorbs it.
+
+Nothing here tracks per-campaign last-send, notices a campaign going quiet, or deactivates on
+churn. At 100–1000 agents with ordinary churn that is a recurring bill nobody is watching.
+Filed as its own issue.
+
+### Deleting a brand or campaign requires deactivating it first
+
+> "You have to deactivate brand or campaign before you can delete."
+
+Explains the failures recorded under #118 (`DELETE` → 500 on the brand, 404 on the campaign):
+the delete was attempted on active objects.
+
+**Do not guess the deactivation payload against the live account.** A `PUT /10dlc/campaign/{id}`
+with `{"campaignStatus":"DEACTIVATED"}` returned 200 but moved the campaign from `TCR_FAILED`
+to `TCR_PENDING` — that is an edit-and-resubmit, not a deactivation. Harmless on a mock
+campaign; it would not have been on a real one. Get the correct call from Telnyx.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
