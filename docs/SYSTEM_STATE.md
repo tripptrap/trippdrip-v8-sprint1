@@ -3404,6 +3404,75 @@ campaign; it would not have been on a real one. Get the correct call from Telnyx
 
 ---
 
+## The Receptionist had never sent a message (2026-08-04)
+
+Found by the account owner texting his own number. Six defects between "inbound arrives" and
+"AI replies", none visible from reading the code.
+
+### There are not two AIs — there is one
+
+`app/api/receptionist/respond` is the **only** inbound AI endpoint. "Flow AI" and
+"Receptionist" are the same call with `flowContext` either attached or null; the persona
+always comes from `receptionist_settings`. A lead in a flow is the Receptionist wearing an
+extra prompt block.
+
+### What was broken
+
+| # | defect | effect |
+|---|---|---|
+| 1 | posted the text as `body:`, send-sms reads `message:` | **every** reply 400'd — `receptionist_logs` had 0 rows, ever |
+| 2 | lead lookup selected `name`, a column `leads` does not have | PostgREST 42703, error unchecked, `lead` always null → everyone was a "new contact" and no flow could run |
+| 3 | send-sms wraps `checkSmsAllowed` in `if (!internalCaller)` | Receptionist bypassed DNC, opt-out, suspension, quiet hours |
+| 4 | credits deducted **before** the send | every failed attempt still charged |
+| 5 | `isAutomated` accepted and discarded | AI messages indistinguishable from typed ones |
+| 6 | `deduct_credits` writes no ledger row | the charge vanished (#137) |
+
+**#2 is why the client-routing fix earlier the same day was unreachable** — the whole
+`if (lead)` branch was dead code. The same file already warned about that column 300 lines
+below; only the other copy had been fixed.
+
+**#1 and #3 had to ship together.** Fixing the send alone would have switched on an AI that
+auto-replies to opted-out numbers, from suspended accounts, at 3am.
+
+### A reply is not unsolicited outbound
+
+Wiring the guard in immediately caused a regression: the owner texted twice in 18 minutes and
+the second was swallowed by the 30-minute per-contact cooldown. `GuardOptions.isReply` now
+skips **quiet hours** and the **per-contact cooldown** — both exist to restrain unsolicited
+outbound, and someone who texts you at 11pm has invited an answer. Everything protecting the
+recipient still applies: DNC, opt-out, suspension, and the per-account rate limits, which are
+what stop a reply loop running away. Only the Receptionist sets it.
+
+### Two clocks, and they are not the same clock
+
+    Quiet Hours (Settings)          8am-8pm ET   may an automated message send AT ALL
+    Receptionist business hours     9am-5pm ET   real answer, or the after-hours text
+
+Both fired correctly and the combination reads as a bug. Outside business hours the
+Receptionist **sends** the after-hours message; it does not stay silent.
+
+### After-hours and greeting are free, by the owner's decision
+
+Neither calls the model, so both already cost 0 AI points — but each still took 1 SMS credit,
+so an automatic "we're closed" nobody wrote appeared on the statement.
+
+The greeting was not free *or* canned: `greeting_message` was passed to the model as a style
+hint and rewritten, so it cost 2 points **and the configured greeting was not what anyone
+received**. It is now sent verbatim.
+
+The signal is `pointsUsed === 0` (no model ran), not a list of response types that would
+drift, and it is honoured only for a verified internal caller — otherwise a browser session
+could send unlimited free SMS.
+
+### Settings can be configured on the wrong account and fail silently
+
+`receptionist_settings` existed for `trippbrowning620@gmail.com` while every lead, thread and
+number belongs to `tripped620@gmail.com`. `GET /api/receptionist/settings` returns **defaults**
+when no row exists, so the page shows `enabled: false` rather than "no configuration here" —
+indistinguishable from a deliberate off.
+
+---
+
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)
 
 **Audit status (2026-07-28).** An overnight read-only audit filed 13 findings under the
