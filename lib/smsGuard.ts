@@ -51,6 +51,28 @@ interface GuardOptions {
    */
   enforceQuietHours?: boolean;
   /**
+   * This send is a direct REPLY to a message the contact just sent.
+   *
+   * Skips the two checks that exist to restrain unsolicited outbound and make
+   * no sense as an answer:
+   *
+   *   quiet hours          TCPA governs unsolicited marketing. Someone who
+   *                        texts you at 11pm has invited a response; staying
+   *                        silent is worse service, not better compliance.
+   *   per-contact cooldown  Built to stop an agent blasting the same person
+   *                        repeatedly. Applied to a reply it means a customer
+   *                        who texts twice in half an hour is ignored.
+   *
+   * Everything that protects the RECIPIENT still applies: DNC, opt-out,
+   * account suspension, and the per-account rate limits — those last ones stay
+   * deliberately, because they are what stops a reply loop running away.
+   *
+   * Added after the Receptionist was wired to this guard and immediately went
+   * silent: the account owner texted twice in 18 minutes and the second was
+   * swallowed by a 30-minute cooldown.
+   */
+  isReply?: boolean;
+  /**
    * Recipient's state code, used to gate on *their* local time rather than the
    * sender's — which is what TCPA actually requires. Falls back to the sender's
    * timezone when absent or unrecognised.
@@ -277,7 +299,7 @@ export async function checkSmsAllowed(
   phone: string,
   options: GuardOptions = {}
 ): Promise<SmsGuardResult> {
-  const { context, logBlocked = true, enforceQuietHours = false, recipientState } = options;
+  const { context, logBlocked = true, enforceQuietHours = false, recipientState, isReply = false } = options;
 
   if (!phone) {
     return { allowed: false, reason: 'check_failed', detail: 'No phone number provided' };
@@ -371,7 +393,7 @@ export async function checkSmsAllowed(
 
   // Quiet hours first — it's the cheapest check and, unlike DNC, a block here
   // is temporary, so there's no point writing a dnc_history row for it.
-  if (enforceQuietHours) {
+  if (enforceQuietHours && !isReply) {
     const { data: settings, error: settingsError } = await supabase
       .from('users')
       .select('quiet_hours_enabled, quiet_hours_start, quiet_hours_end, timezone')
@@ -468,7 +490,8 @@ export async function checkSmsAllowed(
   // 3. Per-contact frequency. Last, because it is the only temporary block left
   //    and the permanent ones above should answer first — a contact on the DNC
   //    list should be told that, not that they are in a cooldown.
-  const contact = await checkContactLimits(
+  // Skipped for a reply — see GuardOptions.isReply.
+  const contact = isReply ? null : await checkContactLimits(
     supabase,
     userId,
     candidates,

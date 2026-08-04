@@ -190,6 +190,10 @@ export async function POST(req: NextRequest) {
     }
 
     const guard = await checkSmsAllowed(supabase, userId, phoneNumber, {
+      // Answering someone who just messaged in. DNC, opt-out, suspension and
+      // the per-account rate limits all still apply; quiet hours and the
+      // per-contact cooldown do not — see GuardOptions.isReply.
+      isReply: true,
       enforceQuietHours: true,
       recipientState,
       context: { source: 'receptionist', thread_id: threadId ?? null, lead_id: leadId ?? null },
