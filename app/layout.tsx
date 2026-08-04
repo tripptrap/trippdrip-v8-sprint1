@@ -5,8 +5,10 @@ import { Toaster } from "react-hot-toast";
 import Script from "next/script";
 
 export const metadata = {
-  title: "HyveWyre - AI-Powered SMS Marketing Platform for Insurance & Real Estate Agents",
-  description: "HyveWyre is an AI-powered SMS marketing and lead management platform built for insurance agents and real estate professionals. Automate conversations, manage leads, and boost conversions with smart messaging workflows.",
+  // Fallback title for any route that sets none of its own. The landing routes
+  // override it from lib/landingMetadata; this must not contradict them.
+  title: "HyveWyre - AI-Powered SMS Marketing for Sales Teams",
+  description: "HyveWyre is an AI-powered SMS marketing and lead management platform for businesses that do outreach. Automate conversations, manage leads, and boost conversions with smart messaging workflows.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
