@@ -82,6 +82,46 @@ async function parsePDF(buf: Buffer) {
   // Verified against a real PDF: `new PDFParse({ data }).getText()` returns
   // `{ text }`. destroy() releases the worker — without it the handle leaks on
   // every upload.
+  // pdf-parse v2 wraps pdfjs-dist, which is a BROWSER library and reaches for
+  // browser globals. On Vercel this threw `DOMMatrix is not defined`; under
+  // local Node it does not, even with DOMMatrix absent — the two runtimes take
+  // different code paths, which is why verifying locally proved nothing here.
+  //
+  // Shimmed rather than polyfilled with a real implementation: text extraction
+  // never does geometry with these, it only needs the constructors to exist
+  // when pdfjs touches them. Assigned only when missing, so a runtime that has
+  // the real ones keeps them.
+  const g = globalThis as any;
+  if (typeof g.DOMMatrix === 'undefined') {
+    g.DOMMatrix = class DOMMatrix {
+      a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+      constructor(init?: number[]) {
+        if (Array.isArray(init) && init.length >= 6) {
+          [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+        }
+      }
+      multiply() { return this; }
+      translate() { return this; }
+      scale() { return this; }
+      inverse() { return this; }
+    };
+  }
+  if (typeof g.Path2D === 'undefined') {
+    g.Path2D = class Path2D {
+      addPath() {} closePath() {} moveTo() {} lineTo() {}
+      bezierCurveTo() {} quadraticCurveTo() {} arc() {} rect() {}
+    };
+  }
+  if (typeof g.ImageData === 'undefined') {
+    g.ImageData = class ImageData {
+      data: Uint8ClampedArray; width: number; height: number;
+      constructor(width: number, height: number) {
+        this.width = width; this.height = height;
+        this.data = new Uint8ClampedArray(width * height * 4);
+      }
+    };
+  }
+
   const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: buf });
   try {
