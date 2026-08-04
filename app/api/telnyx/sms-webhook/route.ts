@@ -1201,10 +1201,51 @@ async function checkAndTriggerReceptionist(
       leadId = lead.id;
       leadName = lead.name;
 
-      // Sold/converted clients skip Flow AI entirely — Receptionist handles them
-      const isSoldEarly = lead.disposition === 'sold' ||
+      // Sold/converted clients skip Flow AI entirely — Receptionist handles them.
+      //
+      // ── The clients table is authoritative, not the lead's disposition ──────
+      //
+      // This used to read ONLY lead.disposition/status. Those are set by the
+      // "mark as sold" action, and they drift: a lead can be edited afterwards,
+      // and older conversions were written before that action set both. On this
+      // account BOTH clients disagreed with their lead record —
+      //
+      //   clients.phone 4079513717   -> lead status=active disposition=null
+      //   clients.phone 18708824134  -> lead status=active disposition=null
+      //
+      // — so 100% of clients were being routed to Flow AI, the prospecting path,
+      // instead of the Receptionist. CLAUDE.md is explicit that a client is
+      // handled by the Receptionist and a lead by Flows; the code decided that
+      // from a field that is a *consequence* of conversion rather than from the
+      // conversion itself.
+      //
+      // Phone is normalised on both sides because `clients` stores it
+      // unnormalised ("4079513717") while leads and messages use E.164
+      // ("+14079513717"). The threads endpoint already normalises for exactly
+      // this reason (texts/threads/route.ts:150); this is the same fix in the
+      // place that decides which AI answers.
+      const normalisedInbound = normalizePhone(phoneNumber);
+      const { data: clientRows } = await supabaseAdmin
+        .from('clients')
+        .select('id, phone, original_lead_id')
+        .eq('user_id', userId);
+
+      const isClient = (clientRows || []).some(
+        (c: any) =>
+          c.original_lead_id === lead.id ||
+          (c.phone && normalizePhone(c.phone) === normalisedInbound)
+      );
+
+      const isSoldEarly = isClient ||
+                          lead.disposition === 'sold' ||
                           lead.status === 'sold' ||
                           lead.disposition === 'closed_won';
+
+      if (isClient && lead.disposition !== 'sold' && lead.status !== 'sold') {
+        console.log(
+          `👤 Receptionist: ${phoneNumber} is in the clients table but its lead is not marked sold — treating as a client.`
+        );
+      }
 
       if (!isSoldEarly) {
       // Check if lead has a flow assigned — respect its autonomy mode
