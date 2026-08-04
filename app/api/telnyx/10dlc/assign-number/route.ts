@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import { assignNumberToCampaign, getCampaignStatus } from '@/lib/telnyx10dlc';
+import { assignNumberToCampaign, getCampaignStatus, isCampaignUsable } from '@/lib/telnyx10dlc';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -41,8 +41,15 @@ export async function POST() {
     }
 
     // Re-check live status — don't trust a possibly-stale campaign_status column
+    //
+    // Compared through isCampaignUsable, not against 'ACTIVE'. getCampaignStatus
+    // returns `campaignStatus`, whose vocabulary is TCR_PENDING / MNO_PENDING /
+    // MNO_PROVISIONED — it never takes the value 'ACTIVE', which belongs to the
+    // separate `status` field. So this refused every campaign, including the
+    // approved one, and told the user to check back once Telnyx approved a
+    // campaign Telnyx had already approved.
     const statusResult = await getCampaignStatus(registration.campaign_id);
-    if (!statusResult.success || statusResult.status !== 'ACTIVE') {
+    if (!statusResult.success || !isCampaignUsable(statusResult.status)) {
       return NextResponse.json({
         ok: false,
         error: `Campaign is not active yet (status: ${statusResult.status || 'unknown'}). Check back once Telnyx approves it.`,

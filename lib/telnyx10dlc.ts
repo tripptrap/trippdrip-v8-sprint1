@@ -489,3 +489,23 @@ export async function deleteBrand(brandId: string): Promise<{ success: boolean; 
     return { success: false, error: error.message || 'Network error' };
   }
 }
+
+/**
+ * Is this campaign approved far enough to attach a number and send?
+ *
+ * The one definition of "usable", because there were three and one of them was
+ * wrong. See the vocabulary note above: `campaignStatus` never takes the value
+ * `ACTIVE`, so `assign-number` comparing against it refused every campaign,
+ * including a fully approved MNO_PROVISIONED one — the button told the user to
+ * "check back once Telnyx approves it" about a campaign Telnyx had approved.
+ *
+ * `autoAssignCampaignNumber` had already been fixed with a local list; that list
+ * moved here rather than being copied a third time.
+ *
+ * Accepts either status field and is case-insensitive, since the two vocabularies
+ * differ in case as well as in value.
+ */
+export function isCampaignUsable(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return ['active', 'approved', 'mno_provisioned'].includes(status.trim().toLowerCase());
+}

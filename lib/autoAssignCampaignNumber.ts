@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { assignNumberToCampaign } from '@/lib/telnyx10dlc';
+import { assignNumberToCampaign, isCampaignUsable } from '@/lib/telnyx10dlc';
 import { isTollFreeNumber } from '@/lib/telnyx';
 import { alertAdminsThrottled } from '@/lib/alerting';
 
@@ -63,7 +63,7 @@ export async function autoAssignNumberToCampaign(
     }
 
     const status = (reg.campaign_status || '').toLowerCase();
-    if (status && !['active', 'approved', 'mno_provisioned'].includes(status)) {
+    if (status && !isCampaignUsable(status)) {
       return { attempted: false, submitted: false, reason: `campaign not approved (${status})` };
     }
 
