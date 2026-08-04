@@ -464,7 +464,7 @@ export default function PhoneNumbersPage() {
             <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
               Claim a shared toll-free number below and start sending straight away. Until your
               business is registered you can send up to{' '}
-              {numberGate.provisionalLimits?.maxDailyMessages ?? 50} messages a day, because shared
+              {numberGate.provisionalLimits?.maxDailyMessages ?? 500} messages a day, because shared
               numbers send under our carrier verification. Registering lifts that and unlocks local
               numbers.
             </p>

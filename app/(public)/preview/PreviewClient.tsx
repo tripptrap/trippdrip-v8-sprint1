@@ -616,7 +616,7 @@ export default function PreviewClient() {
           {[
             {
               q: 'How quickly can I start sending messages?',
-              a: 'The same day. You can claim a shared toll-free number that is already verified with the carriers and start sending straight after signup — up to 50 messages a day while you are getting set up. To raise that limit and to get your own local number, US carriers require your business to be registered (10DLC). You provide your EIN and business details, we file it, and approval is the carriers\' call — usually a few business days. We tell you the moment it clears.'
+              a: 'The same day. You can claim a shared toll-free number that is already verified with the carriers and start sending straight after signup — up to 500 messages a day while you are getting set up. To raise that limit and to get your own local number, US carriers require your business to be registered (10DLC). You provide your EIN and business details, we file it, and approval is the carriers\' call — usually a few business days. We tell you the moment it clears.'
             },
             {
               q: 'Is HyveWyre TCPA compliant?',

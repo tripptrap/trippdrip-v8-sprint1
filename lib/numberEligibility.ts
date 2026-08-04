@@ -142,9 +142,33 @@ export async function checkNumberEligibility(
  * risk signals have enough data to say anything, and those take over after.
  */
 export const PROVISIONAL_LIMITS = {
-  maxMessagesPerMinute: 3,
-  maxHourlyMessages: 20,
-  maxDailyMessages: 50,
+  // The daily total is the cap. The per-minute and per-hour figures match what a
+  // fully registered account gets, deliberately — throttling the *shape* of the
+  // traffic as well as its volume would make an unregistered account feel broken
+  // rather than bounded, and the thing being protected is the daily footprint on
+  // a shared number, not the burst rate.
+  maxMessagesPerMinute: 10,
+  maxHourlyMessages: 100,
+  /**
+   * Strict: never exceeded, and never raised by anything the account can set.
+   *
+   * Applied with Math.min against the account's own settings, so a user can
+   * choose something lower but nothing can choose higher. The risk tier can
+   * reduce it further while an account's opt-out rate is elevated, and does so
+   * automatically in both directions.
+   *
+   * Raised from 50 on request. 50 was set for "someone evaluating the product";
+   * 500 is a working day of real outreach, which is the actual job. The exposure
+   * that comes with it is real and worth naming: pool numbers send under
+   * HyveWyre's own Toll-Free Verification, so this is the volume an unregistered
+   * account can put against our verification before it registers. With two pool
+   * numbers that is up to 1,000 messages a day of unregistered traffic.
+   *
+   * What contains it is not this number alone — it is this plus the tighter
+   * shared-number thresholds in lib/riskTier, which cut the cap automatically
+   * once opt-outs start arriving, long before 500/day could do lasting damage.
+   */
+  maxDailyMessages: 500,
 };
 
 /**
