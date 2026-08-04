@@ -83,7 +83,16 @@ export default function PhoneNumbersPage() {
   const [areaCode, setAreaCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null);
+  const [numberGate, setNumberGate] = useState<{
+    /** LOCAL numbers — the 10DLC gate. */
+    allowed: boolean;
+    reason?: string;
+    /** Shared toll-free pool. Not 10DLC, so gated separately. */
+    tollFreeAllowed: boolean;
+    /** Can claim a pool number but has not registered — capped, not blocked. */
+    provisional: boolean;
+    provisionalLimits: { maxMessagesPerDay?: number; maxDailyMessages?: number } | null;
+  } | null>(null);
   const [routingMode, setRoutingMode] = useState<'geo' | 'primary'>('geo');
   const [busyNumber, setBusyNumber] = useState<string | null>(null);
   const [health, setHealth] = useState<Record<string, {
@@ -125,7 +134,16 @@ export default function PhoneNumbersPage() {
     try {
       const res = await fetch('/api/number-eligibility');
       const data = await res.json();
-      if (data?.ok) setNumberGate({ allowed: data.allowed, reason: data.reason ?? undefined });
+      // `allowed` is about LOCAL numbers; the shared pool is gated separately
+      // now, because toll-free is not 10DLC. Both are carried so the page can
+      // stop telling someone they cannot claim a number they can claim.
+      if (data?.ok) setNumberGate({
+        allowed: data.allowed,
+        reason: data.reason ?? undefined,
+        tollFreeAllowed: data.tollFreeAllowed ?? data.allowed,
+        provisional: data.provisional ?? false,
+        provisionalLimits: data.provisionalLimits ?? null,
+      });
     } catch {
       // Leave it null — no banner rather than a wrong one.
     }
@@ -436,9 +454,21 @@ export default function PhoneNumbersPage() {
       {numberGate && !numberGate.allowed && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
           <h2 className="font-semibold text-amber-900 dark:text-amber-200">
-            Business registration required before you can get a number
+            {numberGate.provisional
+              ? 'You can start now — registration unlocks the rest'
+              : 'Business registration required before you can get a number'}
           </h2>
-          <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">{numberGate.reason}</p>
+          {numberGate.provisional ? (
+            <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+              Claim a shared toll-free number below and start sending straight away. Until your
+              business is registered you can send up to{' '}
+              {numberGate.provisionalLimits?.maxDailyMessages ?? 50} messages a day, because shared
+              numbers send under our carrier verification. Registering lifts that and unlocks local
+              numbers.
+            </p>
+          ) : (
+            <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">{numberGate.reason}</p>
+          )}
           <a
             href="/settings#messaging-registration"
             className="mt-3 inline-block text-sm font-semibold text-amber-900 dark:text-amber-200 underline underline-offset-2"

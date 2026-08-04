@@ -16,6 +16,7 @@
 // and must not be gated on the recipient's DNC status.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isProvisionalAccount, PROVISIONAL_LIMITS } from './numberEligibility';
 import { checkQuietHours } from './quietHours';
 import { getAccountRisk, applyRiskFactor } from './riskTier';
 import { getPlatformState } from './platformCeiling';
@@ -86,7 +87,27 @@ async function checkSendRate(
     .eq('user_id', userId)
     .maybeSingle();
 
-  const limits = { ...DEFAULT_LIMITS, ...(settingsRow?.spam_protection || {}) };
+  let limits = { ...DEFAULT_LIMITS, ...(settingsRow?.spam_protection || {}) };
+
+  // An account that has not completed its own carrier registration is capped
+  // hard, because it is sending on OUR toll-free verification.
+  //
+  // Claiming a pool number no longer requires registration — that gate was the
+  // 10DLC one and toll-free is not 10DLC (lib/numberEligibility). This is what
+  // replaces it: a ceiling instead of a door. A trial never notices 50/day;
+  // bulk abuse hits it in minutes, long before it can cost every account on the
+  // pool its verification.
+  //
+  // Applied with Math.min, not by replacing the limits, so an account that has
+  // deliberately set itself something lower keeps it.
+  if (await isProvisionalAccount(supabase, userId)) {
+    limits = {
+      ...limits,
+      maxMessagesPerMinute: Math.min(limits.maxMessagesPerMinute, PROVISIONAL_LIMITS.maxMessagesPerMinute),
+      maxHourlyMessages: Math.min(limits.maxHourlyMessages, PROVISIONAL_LIMITS.maxHourlyMessages),
+      maxDailyMessages: Math.min(limits.maxDailyMessages, PROVISIONAL_LIMITS.maxDailyMessages),
+    };
+  }
   // Handed back so the per-contact check below reuses them rather than making a
   // second identical settings query on every send.
   if (out) out.limits = limits;

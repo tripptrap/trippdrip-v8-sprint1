@@ -39,7 +39,12 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    const gate = await checkNumberEligibility(supabaseAdmin, user.id);
+    // Pool numbers are toll-free, which is authorised by Toll-Free Verification
+    // rather than 10DLC — so the registration gate does not apply to them, and
+    // applying it withheld a number for a reason that was not about that number.
+    // A new account can claim and send immediately, under the provisional cap in
+    // lib/numberEligibility. See the header there.
+    const gate = await checkNumberEligibility(supabaseAdmin, user.id, { numberType: 'tollfree' });
     if (!gate.allowed) {
       return NextResponse.json(
         { error: gate.reason, code: gate.code, registrationRequired: true },

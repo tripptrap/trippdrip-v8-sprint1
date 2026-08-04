@@ -44,8 +44,30 @@ export const GATE_MESSAGES: Record<NumberGateCode, string> = {
  */
 export async function checkNumberEligibility(
   supabase: any,
-  userId: string
+  userId: string,
+  opts: { numberType?: 'tollfree' | 'local' } = {}
 ): Promise<NumberGate> {
+  // ── Toll-free is not 10DLC ──────────────────────────────────────────────────
+  //
+  // Everything this gate checks — EIN, brand, campaign — is the **10DLC** path,
+  // which governs long codes. A toll-free number is authorised by Toll-Free
+  // Verification instead, and the shared pool numbers are already verified under
+  // HyveWyre's own request. Demanding an EIN before handing one out withheld a
+  // number for a reason that does not apply to it.
+  //
+  // The product said so on the same screen: /phone-numbers offers "claim a
+  // pre-verified number from our shared pool and send messages immediately - no
+  // waiting for verification", and clicking Claim returned 403 "Add your EIN".
+  //
+  // The real risk with pool numbers is not registration, it is that they send
+  // under OUR verification — so one bad account can cost every account on the
+  // pool. That is a volume problem, not an onboarding one, and it is answered by
+  // the provisional cap below plus the tighter shared-number risk thresholds
+  // already in lib/riskTier, not by a gate that stops honest users starting.
+  if (opts.numberType === 'tollfree') {
+    return { allowed: true };
+  }
+
   const { data: reg, error } = await supabase
     .from('user_10dlc_registrations')
     .select('tax_id, entity_type, brand_id, brand_status')
@@ -87,4 +109,48 @@ export async function checkNumberEligibility(
   // number can be provisioned and attached; assignment to the campaign happens
   // automatically when it is approved (#107).
   return { allowed: true };
+}
+
+/**
+ * Send allowance for an account that has not completed its own 10DLC
+ * registration.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ *
+ * Toll-free pool numbers no longer require registration to claim (see above), so
+ * a brand-new account can send within minutes. Good — that is the product's
+ * promise. But those numbers send under **HyveWyre's** Toll-Free Verification,
+ * not the user's, so a single abusive account puts the verification behind every
+ * pool number at risk simultaneously.
+ *
+ * The answer is a ceiling, not a gate. Someone evaluating the product needs tens
+ * of messages, not thousands; someone who needs thousands has a business worth
+ * registering. So the cap is set where a genuine trial never notices it and bulk
+ * abuse hits it in the first minutes.
+ *
+ * It lifts by itself the moment registration is submitted — the same trigger
+ * that already unlocks local numbers. Nobody has to ask.
+ *
+ * This composes with, and does not replace, the tighter shared-number risk
+ * thresholds in lib/riskTier: this bounds how much damage is possible before the
+ * risk signals have enough data to say anything, and those take over after.
+ */
+export const PROVISIONAL_LIMITS = {
+  maxMessagesPerMinute: 3,
+  maxHourlyMessages: 20,
+  maxDailyMessages: 50,
+};
+
+/**
+ * Has this account completed its own carrier registration?
+ *
+ * Reuses checkNumberEligibility's local-number rules verbatim rather than
+ * restating them, so the cap lifts on exactly the condition that unlocks a local
+ * number — there is no second definition of "registered" to drift.
+ *
+ * @param supabase a **service-role** client, as above.
+ */
+export async function isProvisionalAccount(supabase: any, userId: string): Promise<boolean> {
+  const gate = await checkNumberEligibility(supabase, userId, { numberType: 'local' });
+  return !gate.allowed;
 }

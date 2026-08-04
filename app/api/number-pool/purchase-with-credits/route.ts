@@ -5,6 +5,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { notifyAdmins } from '@/lib/createNotification';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
+import { isTollFreeNumber } from '@/lib/telnyx';
 
 // Credit changes run on the service-role client, never the caller's (#114).
 //
@@ -30,21 +31,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    const { phoneNumber, credits } = await req.json();
+
+    // Validated before the gate, which now inspects the number to decide which
+    // rules apply — passing an undefined number into that check would decide the
+    // type from nothing.
+    if (!phoneNumber) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
+    }
+
     // Same gate as the other two number paths (#1) — a number bought before the
     // business is registered cannot carry A2P traffic, and spending the user's
     // credits on one is worse than refusing.
-    const gate = await checkNumberEligibility(createServiceRoleClient(), user.id);
+    //
+    // Type-aware, because the gate is the 10DLC one and toll-free is not 10DLC.
+    // The body is read first so the type is known before gating; it used to be
+    // read after, which is why this check could not tell the two apart.
+    const gate = await checkNumberEligibility(createServiceRoleClient(), user.id, {
+      numberType: isTollFreeNumber(phoneNumber) ? 'tollfree' : 'local',
+    });
     if (!gate.allowed) {
       return NextResponse.json(
         { error: gate.reason, code: gate.code, registrationRequired: true },
         { status: 403 }
       );
-    }
-
-    const { phoneNumber, credits } = await req.json();
-
-    if (!phoneNumber) {
-      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
     const requiredCredits = credits || CREDITS_PER_NUMBER;

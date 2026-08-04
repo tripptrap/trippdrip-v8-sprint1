@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import { checkNumberEligibility } from '@/lib/numberEligibility';
+import { checkNumberEligibility, PROVISIONAL_LIMITS } from '@/lib/numberEligibility';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,13 +29,28 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: 'Server not configured' }, { status: 500 });
     }
 
-    const gate = await checkNumberEligibility(supabaseAdmin, user.id);
+    // Reported per number type, because they are gated differently: a long code
+    // needs 10DLC registration, a toll-free pool number does not (it runs on our
+    // Toll-Free Verification, bounded by the provisional send cap instead).
+    //
+    // The UI needs both to be honest — the shared-pool panel and the local
+    // purchase form live on the same page and are no longer available or
+    // unavailable together.
+    const gate = await checkNumberEligibility(supabaseAdmin, user.id, { numberType: 'local' });
+    const tollFreeGate = await checkNumberEligibility(supabaseAdmin, user.id, { numberType: 'tollfree' });
 
     return NextResponse.json({
       ok: true,
+      // Unchanged shape: existing callers asking "can I have a number?" are
+      // asking about local ones, which is what this always meant.
       allowed: gate.allowed,
       code: gate.allowed ? null : gate.code,
       reason: gate.allowed ? null : gate.reason,
+      tollFreeAllowed: tollFreeGate.allowed,
+      // True when the account can claim a shared number but has not registered,
+      // so the UI can say the send cap applies and how to lift it.
+      provisional: tollFreeGate.allowed && !gate.allowed,
+      provisionalLimits: PROVISIONAL_LIMITS,
     });
   } catch (error: any) {
     console.error('Error in GET /api/number-eligibility:', error);
