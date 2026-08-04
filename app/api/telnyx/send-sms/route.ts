@@ -19,7 +19,15 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, from, message, userId: passedUserId, threadId, mediaUrls, leadId, campaignId } = await req.json();
+    // `isAutomated` / `automationSource` were being SENT by callers and silently
+    // discarded — the receptionist passes isAutomated:true and it never reached
+    // the row, so an AI-sent message was indistinguishable from one the user
+    // typed. That matters for "what did the AI say on my behalf" and for any
+    // analytics separating automated from human traffic.
+    const {
+      to, from, message, userId: passedUserId, threadId, mediaUrls, leadId, campaignId,
+      isAutomated, automationSource,
+    } = await req.json();
 
     // Get current user from session if userId not passed
     let userId = passedUserId;
@@ -418,6 +426,36 @@ export async function POST(req: NextRequest) {
         console.error(`send-sms: could not deduct credits for user ${userId} — refusing to send:`, deductError);
         return NextResponse.json({ error: 'Could not process credits' }, { status: 500 });
       }
+
+      // Record the charge (#137).
+      //
+      // deduct_credits moves the balance and writes nothing else, so a credit
+      // spent on this route vanished from the ledger. /points showed Flow
+      // creations, AI responses and uploads but only the SMS sent through
+      // /api/sms/send — while THIS route carries the composer, bulk send, the
+      // receptionist and both drip crons. A customer reconciling "where did my
+      // credits go" against their balance could not.
+      //
+      // Labelled by origin: an unattended auto-reply reads differently from a
+      // message someone typed, and the after-hours case is exactly where
+      // "why was I charged?" gets asked.
+      const spendLabel = internalCaller && isAutomated
+        ? `Automated SMS (${automationSource || 'receptionist'})`
+        : 'SMS sent (1x)';
+
+      const { error: txnError } = await supabaseAdmin!
+        .from('points_transactions')
+        .insert({
+          user_id: userId,
+          action_type: 'spend',
+          points_amount: -1,
+          description: spendLabel,
+          created_at: new Date().toISOString(),
+        });
+
+      // Log-only: the charge succeeded and the message is about to go out. A
+      // missing ledger row must not fail a send that was already paid for.
+      if (txnError) console.error('send-sms: could not record the points transaction:', txnError);
     }
 
     // Send via Telnyx API
@@ -564,6 +602,12 @@ export async function POST(req: NextRequest) {
           provider: 'telnyx',
           spam_score: moderation.spamScore,
           spam_flags: moderation.flags,
+          // Only a body-supplied flag from a verified internal caller counts. A
+          // session caller is a human pressing send, whatever it claims.
+          is_automated: internalCaller ? !!isAutomated : false,
+          automation_source: internalCaller && isAutomated
+            ? (automationSource || 'receptionist')
+            : null,
           created_at: new Date().toISOString(),
         });
 
