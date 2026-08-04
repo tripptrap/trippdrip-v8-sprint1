@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     // analytics separating automated from human traffic.
     const {
       to, from, message, userId: passedUserId, threadId, mediaUrls, leadId, campaignId,
-      isAutomated, automationSource,
+      isAutomated, automationSource, freeSystemMessage,
     } = await req.json();
 
     // Get current user from session if userId not passed
@@ -403,6 +403,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // System courtesy replies cost nothing.
+      //
+      // after-hours and greeting messages are canned text with no model call, so
+      // an automatic "we're closed" the account owner never wrote was showing up
+      // on their statement as an SMS charge. Their call, 2026-08-04.
+      //
+      // Gated on internalCaller: a session caller could otherwise set this and
+      // send unlimited free SMS. The balance check is skipped too — refusing a
+      // free message for lack of credits would leave someone at zero unable to
+      // send even an automated "we're closed", which is the moment it matters.
+      const isFreeSystemMessage = internalCaller && !!freeSystemMessage;
+
+      if (!isFreeSystemMessage) {
       const { data: creditRow } = await supabaseAdmin!
         .from('users')
         .select('credits')
@@ -456,6 +469,7 @@ export async function POST(req: NextRequest) {
       // Log-only: the charge succeeded and the message is about to go out. A
       // missing ledger row must not fail a send that was already paid for.
       if (txnError) console.error('send-sms: could not record the points transaction:', txnError);
+      }
     }
 
     // Send via Telnyx API

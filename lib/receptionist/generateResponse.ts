@@ -54,6 +54,27 @@ export async function generateReceptionistResponse(
     const isFirstMessage = !params.conversationHistory || params.conversationHistory.length <= 1;
     const isNewContact = params.contactType === 'new_contact';
 
+    // A configured greeting is sent verbatim, free.
+    //
+    // It used to be handed to the model as a style hint ("Use this greeting
+    // style: ...") and OpenAI rewrote it, which cost 2 points and meant the
+    // greeting you configured was not the greeting anyone received.
+    //
+    // Sending it as written is both free and more predictable: a first
+    // impression is the one message a business most wants to control. The AI
+    // still handles everything the contact says after this.
+    //
+    // Only when a greeting is actually configured — otherwise fall through and
+    // let the model write a welcome, which is better than sending nothing.
+    if (isFirstMessage && isNewContact && settings.greeting_message?.trim()) {
+      return {
+        success: true,
+        response: settings.greeting_message.trim(),
+        responseType: 'greeting',
+        pointsUsed: 0, // canned, no model call
+      };
+    }
+
     // Build the system prompt
     const systemPrompt = buildSystemPrompt(settings, params, isFirstMessage && isNewContact);
 

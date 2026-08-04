@@ -224,6 +224,17 @@ export async function POST(req: NextRequest) {
         // never delivered a single message. Proven by posting this exact
         // shape to the live endpoint: 400, missing fields.
         message: guardrailResult.message,
+        // System courtesy replies are free (owner's decision, 2026-08-04).
+        //
+        // after_hours and greeting are canned text with no model call, so they
+        // already cost 0 AI points. They were still costing 1 SMS credit, which
+        // meant an automatic "we're closed" the user never wrote showed up on
+        // their statement. `pointsUsed === 0` is the signal — it means no model
+        // ran — rather than a list of response types that would drift.
+        //
+        // send-sms only honours this from a verified internal caller, so it
+        // cannot be used to send free SMS from a session.
+        freeSystemMessage: result.pointsUsed === 0,
         userId,
         threadId,
         leadId,
