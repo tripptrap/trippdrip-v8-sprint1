@@ -252,28 +252,26 @@ export async function POST(req: NextRequest) {
         // an admin grant can easily coincide with the user spending, and a
         // read-then-add would hand back whatever they'd just used.
         // creditAmount is validated > 0 above, which add_credits also requires.
+        // The ledger row is written by add_credits itself now, in the same
+        // transaction as the grant (#137). userData.id, not the body-supplied
+        // userId: the grant keys on the email lookup, and if the two disagreed
+        // the credits and the ledger row would land on different accounts (#92).
         const { data: newCredits, error: updateError } = await adminClient
-          .rpc('add_credits', { user_id: userData.id, amount: creditAmount });
+          .rpc('add_credits', {
+            user_id: userData.id,
+            amount: creditAmount,
+            action_type: 'admin_grant',
+            reason: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits`,
+          });
 
         if (updateError) {
           console.error('Error granting credits:', updateError);
           return NextResponse.json({ error: updateError.message }, { status: 500 });
         }
 
-        // Log the transaction. `balance_after` was dropped (#55) — the column
-        // doesn't exist and nothing read it, so including it made Postgres
-        // reject the insert and admin grants went unrecorded. The resulting
-        // balance is recoverable from users.credits plus this row's amount.
-        const { error: txError } = await adminClient.from('points_transactions').insert({
-          // userData.id, not the body-supplied userId: the grant above keys on
-          // the email lookup, and if the two ever disagreed the credits and the
-          // ledger row would land on different accounts (#92).
-          user_id: userData.id,
-          points_amount: creditAmount,
-          action_type: 'admin_grant',
-          description: grantReason || `Admin granted ${creditAmount.toLocaleString()} credits (balance after: ${newCredits.toLocaleString()})`,
-          created_at: new Date().toISOString(),
-        });
+        // No ledger insert here — add_credits wrote it above. A second one
+        // would record every admin grant twice.
+        const txError = null;
 
         if (txError) {
           console.error(`❌ Admin granted ${creditAmount} credits to ${userId} but failed to log the transaction:`, txError);

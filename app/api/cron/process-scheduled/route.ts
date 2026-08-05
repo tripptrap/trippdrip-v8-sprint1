@@ -415,11 +415,29 @@ async function processScheduledMessages(supabase: any) {
         const emailResult = await sendEmail(lead.email, message.subject, message.body);
 
         if (emailResult.success) {
-          // Similar process as SMS
-          await supabase
-            .from('users')
-            .update({ credits: userSettings.credits - message.credits_cost })
-            .eq('id', message.user_id);
+          // Same primitive as the SMS branch a few lines up — this one was left
+          // behind (#137).
+          //
+          // It was `credits: userSettings.credits - message.credits_cost`, a
+          // read-then-write from a balance fetched much earlier in the loop. Two
+          // scheduled messages processed in the same pass both subtract from that
+          // same stale figure, so one charge disappears; and because the batch
+          // walks a queue, the busier the account the more it loses. The call
+          // also never destructured `error`, and supabase-js reports failures
+          // that way rather than throwing, so a rejected write was invisible.
+          //
+          // deduct_credits does it in one statement, refuses rather than going
+          // negative, and writes the ledger row itself.
+          const { error: emailDeductError } = await supabase.rpc('deduct_credits', {
+            user_id: message.user_id,
+            amount: message.credits_cost,
+            reason: 'Scheduled email',
+          });
+          if (emailDeductError) {
+            // The email has already gone out; it cannot be recalled. Make the
+            // uncharged send loud rather than silent (#90).
+            console.error(`❌ Scheduled email sent to lead ${message.lead_id} but ${message.credits_cost} credits NOT deducted for user ${message.user_id}:`, emailDeductError);
+          }
 
           // `sender` and `credits_cost` are not columns on public.messages — the
           // live table has points_cost, and `content` is NOT NULL (#126).

@@ -351,7 +351,16 @@ export async function POST(req: NextRequest) {
               );
             } else {
               const { data: newBalance, error: grantError } = await supabaseAdmin
-                .rpc('add_credits', { user_id: userId, amount: monthlyCredits });
+                .rpc('add_credits', {
+                  user_id: userId,
+                  amount: monthlyCredits,
+                  // This branch inserts its own points_transactions row BEFORE
+                  // granting, because the unique indexes on stripe_session_id are
+                  // what make a redelivered Stripe event idempotent. Letting the
+                  // RPC write a second row would double every plan grant in the
+                  // ledger, so it is told not to (#137).
+                  write_ledger: false,
+                });
 
               if (grantError) {
                 console.error(`❌ Plan applied for ${userId} but ${monthlyCredits} credits NOT granted:`, grantError);
@@ -426,7 +435,12 @@ export async function POST(req: NextRequest) {
           // balance may have moved since the read above, and a pack purchase is
           // exactly when someone is likely to be sending.
           const { data: newCredits, error: updateError } = await supabaseAdmin
-            .rpc('add_credits', { user_id: userId, amount: points });
+            .rpc('add_credits', {
+              user_id: userId,
+              amount: points,
+              // Point-pack branch — same insert-first idempotency claim as above.
+              write_ledger: false,
+            });
 
           if (updateError) {
             console.error('Error updating user credits:', updateError);
@@ -538,7 +552,12 @@ export async function POST(req: NextRequest) {
         // Credits via add_credits (#92). A renewal lands on active accounts, so
         // read-then-add here was the most likely of the three to lose a spend.
         const { error: renewalUpdateError } = await supabaseAdmin
-          .rpc('add_credits', { user_id: renewingUser.id, amount: monthlyCredits });
+          .rpc('add_credits', {
+            user_id: renewingUser.id,
+            amount: monthlyCredits,
+            // Renewal branch — same insert-first idempotency claim as above.
+            write_ledger: false,
+          });
 
         if (renewalUpdateError) {
           console.error('Error applying renewal credits:', renewalUpdateError);

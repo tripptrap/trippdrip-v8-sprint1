@@ -144,8 +144,12 @@ export async function addPoints(
   // move. Exactly the failure class CLAUDE.md warns about — supabase-js returns
   // { error } rather than throwing, and here nothing was checking it before the
   // caller reported success.
+  // `reason`/`action_type` are what add_credits writes into
+  // points_transactions, in the same transaction as the grant (#137). This used
+  // to insert its own row afterwards, on a DIFFERENT client and in a separate
+  // transaction, so a failed insert left the balance and the ledger disagreeing.
   const { data: rpcBalance, error: addError } = await createServiceRoleClient()
-    .rpc('add_credits', { user_id: user.id, amount });
+    .rpc('add_credits', { user_id: user.id, amount, reason: description, action_type: type });
 
   if (addError) {
     console.error('Error adding credits:', addError);
@@ -154,20 +158,8 @@ export async function addPoints(
 
   const newBalance = typeof rpcBalance === 'number' ? rpcBalance : (userData?.credits ?? 0) + amount;
 
-  // Record transaction
-  const { error: transactionError } = await supabase
-    .from('points_transactions')
-    .insert({
-      user_id: user.id,
-      action_type: type,
-      points_amount: amount,
-      description,
-      created_at: new Date().toISOString()
-    });
-
-  if (transactionError) {
-    console.error('Error recording transaction:', transactionError);
-  }
+  // The ledger row was written by add_credits above, atomically with the grant.
+  // No insert here — a second one would double-count every refund and top-up.
 
   return { success: true, balance: newBalance };
 }

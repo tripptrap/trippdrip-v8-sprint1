@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { analyzeSpamContent, getSpamFreeRewritePrompt } from '@/lib/ai/spam-detection';
 import OpenAI from 'openai';
 
@@ -101,11 +101,37 @@ export async function POST(req: NextRequest) {
 
     const rewrittenMessage = completion.choices[0]?.message?.content?.trim() || message;
 
-    // Deduct credits
-    await supabase
-      .from('users')
-      .update({ credits: userData.credits - pointsCost })
-      .eq('id', user.id);
+    // Deduct credits.
+    //
+    // This was `.update({ credits: userData.credits - pointsCost })` on the
+    // SESSION client, with no error check — and it could never have worked:
+    // column grants give `authenticated` UPDATE on business_hours, business_name,
+    // timezone and updated_at only, so Postgres refuses to write credits from a
+    // user session. supabase-js reports that via { error } rather than throwing,
+    // and nothing here read it, so every AI rewrite was free and the response
+    // still reported points spent (#137).
+    //
+    // Service-role client because EXECUTE on deduct_credits is granted to
+    // service_role and postgres only. The user id still comes from the verified
+    // session above. The RPC is atomic, refuses rather than going negative, and
+    // writes the points_transactions row itself.
+    const { data: balanceAfterCharge, error: deductError } = await createServiceRoleClient()
+      .rpc('deduct_credits', {
+        user_id: user.id,
+        amount: pointsCost,
+        reason: 'AI spam rewrite',
+      });
+
+    if (deductError) {
+      // The model call already happened, but nothing has been sent and the user
+      // has not seen the rewrite yet — so refusing here is honest and costs them
+      // nothing.
+      console.error('Spam rewrite: could not deduct credits:', deductError);
+      return NextResponse.json(
+        { error: 'Insufficient credits for AI rewrite', pointsRequired: pointsCost },
+        { status: 402 }
+      );
+    }
 
     // Analyze the rewritten message to confirm improvement
     const newAnalysis = analyzeSpamContent(rewrittenMessage);
@@ -116,7 +142,11 @@ export async function POST(req: NextRequest) {
       rewrittenMessage,
       newAnalysis,
       pointsUsed: pointsCost,
-      remainingCredits: userData.credits - pointsCost,
+      // The balance the RPC actually wrote, not one recomputed from the stale
+      // figure read before the charge.
+      remainingCredits: typeof balanceAfterCharge === 'number'
+        ? balanceAfterCharge
+        : Math.max(0, (userData.credits || 0) - pointsCost),
     });
   } catch (error) {
     console.error('Spam check error:', error);

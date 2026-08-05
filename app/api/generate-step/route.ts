@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -44,28 +44,9 @@ export async function POST(req: NextRequest) {
       }, { status: 402 });
     }
 
-    // Deduct points
-    const newBalance = currentBalance - STEP_CREATION_COST;
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ credits: newBalance, updated_at: new Date().toISOString() })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 });
-    }
-
-    // Record transaction
-    await supabase
-      .from('points_transactions')
-      .insert({
-        user_id: user.id,
-        action_type: 'spend',
-        points_amount: -STEP_CREATION_COST,
-        description: 'Single step generation',
-        created_at: new Date().toISOString()
-      });
+    // The charge itself happens after the step exists — see the bottom of this
+    // route. The check above is advisory: it stops someone burning a model call
+    // they cannot pay for, but deduct_credits is the authority on the balance.
 
     // Generate the step with OpenAI
     const prompt = `You are an expert at creating effective text message conversation flows for sales.
@@ -156,6 +137,34 @@ Return ONLY valid JSON (no markdown):
 
     try {
       const stepData = JSON.parse(cleanedResponse);
+
+      // Charge now that a step actually exists (#137).
+      //
+      // This used to deduct before the model call, with a read-then-write on
+      // users.credits and a separate ledger insert. Three faults in one block:
+      // an unparseable response or a model error still took the point with no
+      // refund; two concurrent generations both read the same balance and both
+      // wrote balance-1, losing a charge; and the session client cannot write
+      // credits at all (column grants), so the update was silently refused and
+      // the route reported a spend that never happened.
+      //
+      // deduct_credits is atomic, is granted to service_role only, and writes
+      // the points_transactions row itself — so no insert here, or the step
+      // would be counted twice.
+      const { data: newBalance, error: chargeError } = await createServiceRoleClient()
+        .rpc('deduct_credits', {
+          user_id: user.id,
+          amount: STEP_CREATION_COST,
+          reason: 'Single step generation',
+        });
+
+      if (chargeError) {
+        console.error('Step generated but could not charge for it:', chargeError);
+        return NextResponse.json({
+          error: `Insufficient points. You need ${STEP_CREATION_COST} point to generate a step.`,
+          pointsNeeded: STEP_CREATION_COST,
+        }, { status: 402 });
+      }
 
       return NextResponse.json({
         ...stepData,

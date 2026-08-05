@@ -117,8 +117,39 @@ export async function GET(req: NextRequest) {
           // add_credits (#92). Re-reading immediately before the write narrowed
           // the race but didn't close it — and this runs right after charging a
           // card, so losing the grant means the customer paid for nothing.
+          //
+          // stripe_session_id carries the PaymentIntent id into the RPC, which
+          // writes the ledger row inside the same transaction as the grant. The
+          // partial unique index on that column therefore guards the grant
+          // ATOMICALLY. It previously granted first and wrote the guard row
+          // afterwards — a guard cannot protect something that already happened,
+          // so a redelivered PaymentIntent could double-credit before the insert
+          // ever ran (#137).
           const { error: updateError } = await supabase
-            .rpc('add_credits', { user_id: user.id, amount: pack.points });
+            .rpc('add_credits', {
+              user_id: user.id,
+              amount: pack.points,
+              action_type: 'purchase',
+              reason: `Auto-buy: ${pack.name} pack (${tier} pricing)`,
+              stripe_session_id: paymentIntent.id,
+              amount_paid: finalPrice,
+            });
+
+          // 23505 is the unique violation on stripe_session_id: this exact
+          // PaymentIntent has already been credited. That is a replay, not a
+          // failure — the customer has their credits and the row exists, so
+          // treating it as an error would page an admin about a success.
+          if (updateError?.code === '23505') {
+            console.log(`Auto-buy: ${paymentIntent.id} was already credited — skipping duplicate grant`);
+            results.push({
+              userId: user.id,
+              email: user.email,
+              status: 'success',
+              message: 'Already credited for this payment',
+              pointsAdded: 0,
+            });
+            continue;
+          }
 
           if (updateError) {
             // The card is already charged. Throwing here sent this into the
@@ -144,33 +175,8 @@ export async function GET(req: NextRequest) {
             continue;
           }
 
-          // Log transaction. The column is stripe_session_id (#55) — it already
-          // stores checkout session ids and invoice ids, so it's the generic
-          // "Stripe object this transaction came from". Using it also picks up
-          // the partial unique index on that column, so a repeated auto-buy for
-          // the same PaymentIntent can't double-grant.
-          const { error: txError } = await supabase.from('points_transactions').insert({
-            user_id: user.id,
-            action_type: 'purchase',
-            points_amount: pack.points,
-            description: `Auto-buy: ${pack.name} pack (${tier} pricing)`,
-            stripe_session_id: paymentIntent.id,
-            amount_paid: finalPrice,
-          });
-
-          if (txError) {
-            // Credits were already granted and the card already charged, so
-            // this can't be rolled back here — but it must not stay silent:
-            // without this row there's no audit trail linking the charge to the
-            // grant, and /api/user/plan-value under-reports.
-            console.error(`❌ Auto-buy charged and credited user ${user.id} but failed to log the transaction:`, txError);
-            await notifyAdmins(
-              'fulfillment_failed',
-              'Auto-refill charged and credited but the ledger row failed',
-              `${user.email} was charged $${(finalPrice / 100).toFixed(2)} and received ${pack.points} credits, but no points_transactions row was written — the balance and the ledger now disagree.`,
-              { reason: 'autobuy_ledger_failed', user_id: user.id, email: user.email, points: pack.points, amount_cents: finalPrice, payment_intent: paymentIntent.id, db_error: txError.message }
-            );
-          }
+          // No ledger insert here — add_credits wrote the row inside the grant
+          // transaction, which is also what makes the PaymentIntent guard work.
 
           results.push({
             userId: user.id,

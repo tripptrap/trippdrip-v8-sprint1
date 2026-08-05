@@ -118,9 +118,14 @@ export async function POST(req: NextRequest) {
      * route used to do unconditionally.
      */
     const refundCredits = async (reason: string): Promise<boolean> => {
+      // `reason` is what add_credits writes into points_transactions. Without
+      // it this refund moved the balance and recorded NOTHING (#137), while the
+      // matching charge DID write a -N 'spend' row — so a failed purchase left
+      // the customer's history claiming they paid for a number they never got.
       const { error: refundError } = await createServiceRoleClient().rpc('add_credits', {
         user_id: user.id,
         amount: requiredCredits,
+        reason: `Refund — number purchase failed: ${phoneNumber}`,
       });
       if (refundError) {
         console.error(`❌ ${reason} — and the ${requiredCredits}-credit refund ALSO failed for user ${user.id}:`, refundError);

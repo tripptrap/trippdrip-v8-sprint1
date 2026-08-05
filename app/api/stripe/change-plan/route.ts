@@ -4,7 +4,7 @@
 // touched real billing. See GitHub issue #12-#15 for background.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
@@ -78,15 +78,41 @@ export async function POST(req: NextRequest) {
       monthly_credits: newMonthlyCredits,
       updated_at: new Date().toISOString(),
     };
-    // Preserve balance on downgrade; top up immediately on upgrade.
-    if (planType === 'scale' && oldPlan === 'growth') {
-      updateData.credits = (userData.credits || 0) + newMonthlyCredits;
-    }
+    // ── Service-role client, and the credit top-up via add_credits ──────────
+    //
+    // This whole UPDATE ran on the SESSION client and could never have
+    // succeeded: column grants let `authenticated` write only business_hours,
+    // business_name, timezone and updated_at on public.users. subscription_tier,
+    // plan_type, monthly_credits and credits are all refused, so Postgres
+    // rejected the statement AFTER Stripe had already been charged, and the user
+    // was told to contact support. Every plan change, in both directions (#137).
+    //
+    // The top-up is no longer folded into this UPDATE either. It was
+    // `credits = (userData.credits || 0) + newMonthlyCredits`, a read-then-write
+    // off a balance read earlier in the request, so anything the user spent in
+    // between was handed back. add_credits adds a delta atomically and writes
+    // the ledger row in the same transaction.
+    const admin = createServiceRoleClient();
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await admin
       .from('users')
       .update(updateData)
       .eq('id', user.id);
+
+    // Preserve balance on downgrade; top up immediately on upgrade.
+    if (!updateError && planType === 'scale' && oldPlan === 'growth') {
+      const { error: topUpError } = await admin.rpc('add_credits', {
+        user_id: user.id,
+        amount: newMonthlyCredits,
+        action_type: 'subscription',
+        reason: `Upgrade to Scale — ${newMonthlyCredits.toLocaleString()} credits`,
+      });
+      if (topUpError) {
+        // The plan is already switched with Stripe and locally; refusing here
+        // would misreport a change that did happen. Make it loud instead.
+        console.error(`Plan upgraded for ${user.id} but the ${newMonthlyCredits}-credit top-up failed:`, topUpError);
+      }
+    }
 
     if (updateError) {
       console.error('Stripe subscription updated but Supabase write failed:', updateError);
