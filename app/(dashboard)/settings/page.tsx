@@ -1817,8 +1817,23 @@ export default function Page() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-1">Enable Quiet Hours</h3>
+                    {/*
+                      The old copy — "Prevent automated messages from being sent
+                      outside of specified hours" — was wrong in the way that
+                      matters: it reads as covering auto-replies, and it does not.
+                      Replies to an inbound text deliberately skip quiet hours
+                      (lib/smsGuard.ts, GuardOptions.isReply), because someone who
+                      texts you at 11pm has invited an answer. Naming the two
+                      windows apart is the whole of #140.
+                    */}
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Prevent automated messages from being sent outside of specified hours (8am-8pm by default)
+                      The window in which outreach you didn&apos;t send by hand — campaigns, drips and
+                      scheduled messages — is allowed to go out. Outside it, they wait.
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
+                      Replies to someone who texted you first are <strong>not</strong> held back; a person
+                      who messages you at 11pm gets an answer. What the Receptionist says outside your
+                      opening times is set separately, under <strong>Receptionist → Business Hours</strong>.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">

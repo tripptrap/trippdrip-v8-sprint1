@@ -159,6 +159,7 @@ export default function ReceptionistSettings() {
   const [hoursEnd, setHoursEnd]               = useState('17:00');
   const [hoursTz, setHoursTz]                 = useState('America/New_York');
   const [businessDays, setBusinessDays]       = useState<number[]>([1, 2, 3, 4, 5]);
+  const [quietWindow, setQuietWindow]         = useState<{ start: string; end: string } | null>(null);
   const [afterHours, setAfterHours]           = useState('');
 
   // response settings
@@ -207,6 +208,23 @@ export default function ReceptionistSettings() {
         setCalendarEnabled(s.calendar_enabled ?? false);
         setIndustry(s.industry ?? '');
         setUsePreset(s.use_industry_preset ?? true);
+
+        // Quiet Hours lives on the Settings page and governs a different
+        // thing entirely (see the note by the warning below). Read here
+        // only so an operator can be told when the two windows coincide —
+        // failure is non-fatal, it just means no warning (#140).
+        try {
+          const qhRes = await fetch('/api/settings/quiet-hours');
+          const qh = qhRes.ok ? await qhRes.json() : null;
+          if (qh?.ok && qh.quietHours?.enabled) {
+            setQuietWindow({
+              start: String(qh.quietHours.start).substring(0, 5),
+              end: String(qh.quietHours.end).substring(0, 5),
+            });
+          }
+        } catch {
+          /* no warning, nothing else changes */
+        }
       } catch {
         toast.error('Failed to load settings');
       } finally {
@@ -562,6 +580,38 @@ export default function ReceptionistSettings() {
 
         {hoursEnabled && (
           <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            {/*
+              Two windows govern messaging and nothing on screen said which was
+              which, so an operator seeing "no reply" could not tell them apart
+              (#140). They are genuinely different axes:
+
+                Business Hours (here)   what the Receptionist SAYS — a real
+                                        answer, or the after-hours message
+                Quiet Hours (Settings)  whether unsolicited automated outbound
+                                        may SEND at all
+
+              Outside business hours the contact still gets a reply. That is the
+              part people misread as a bug.
+            */}
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Inside these hours the Receptionist answers normally. Outside them it still replies —
+              it sends your after-hours message, once per closed stretch rather than once per text.
+              This is separate from <strong>Settings → Quiet Hours</strong>, which decides when
+              campaigns and drips may go out.
+            </p>
+
+            {quietWindow && quietWindow.start === hoursStart && quietWindow.end === hoursEnd && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5">
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                  <strong>These match your Quiet Hours ({quietWindow.start}–{quietWindow.end}).</strong>{' '}
+                  Both windows close at the same moment, so if something doesn&apos;t go out you
+                  won&apos;t be able to tell which one stopped it. That&apos;s allowed — just worth
+                  knowing. Most accounts keep business hours <em>inside</em> a wider quiet-hours
+                  window.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Start Time</label>

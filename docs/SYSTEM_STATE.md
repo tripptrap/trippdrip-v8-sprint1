@@ -3502,7 +3502,32 @@ Receptionist **sends** the after-hours message; it does not stay silent.
 **As configured on the test account (2026-08-04) both windows are 08:00-20:00 America/New_York**,
 which makes them impossible to tell apart from an observed "no reply" — they fail at the same
 instant. Do not read the times off this doc; they are per-account rows
-(`users.quiet_hours_*` and `receptionist_settings.business_hours_*`). #140.
+(`users.quiet_hours_*` and `receptionist_settings.business_hours_*`).
+
+Addressed in #140, and worth being precise about what was and was not wrong. The **column
+defaults are fine and deliberately different** — quiet 08:00-20:00, business 09:00-17:00, so out
+of the box business hours sit inside a wider quiet window. The collision is one account's own
+configuration. The quiet-hours values matching across all four `tripp*` accounts is just the
+default showing through: nothing has ever edited them, because until now no screen explained what
+editing them would do.
+
+So the fix was naming, not behaviour:
+
+- Every column on both clocks now carries a `COMMENT` saying which of the two jobs it does.
+- The Settings copy was actively wrong. "Prevent automated messages from being sent outside of
+  specified hours" reads as covering auto-replies, and quiet hours does not touch them
+  (`isReply`). It now says what it governs and points at the other setting.
+- The Receptionist's Business Hours card explains that outside those hours the contact still
+  gets a reply, and warns when the two windows are identical. Verified rendering against the live
+  account.
+
+**`business_days` is ISO — 1=Monday … 7=Sunday — and that is now enforced**, not merely
+conventional. It was an untyped `integer[]` with no constraint and no comment, so whether it
+meant ISO or Postgres DOW (0=Sunday) was undeterminable from the database. `{1,2,3,4,5}` is
+Mon-Fri under *both* readings, which is exactly the coincidence that hides the ambiguity until
+someone stores a `0` — which matches no day and would silently close that day for ever.
+`receptionist_settings_business_days_iso` rejects it. Duplicates are deliberately not checked:
+that needs a subquery, and `CHECK` cannot contain one (`0A000`).
 
 Quiet hours does **not** protect the after-hours message. `isReply: true` disarms the
 quiet-hours branch (`lib/smsGuard.ts:396`) and `send-sms` skips its own guard for internal
