@@ -553,6 +553,54 @@ Verified against `app/api/leads/disposition/route.ts` and `app/api/texts/threads
 
 ## Credits / Points System
 
+### The ledger is authoritative from 2026-08-05, and not before
+
+`deduct_credits` used to move the balance and write nothing. **Twelve call sites use it** —
+the receptionist AI, every cron, campaign runs, drips, bulk sends — so most spending left no
+trace at all. Measured before the fix: `points_transactions` summed to **+2600** against a
+live balance of **59,568**. The ledger could not be reconciled to the balance in either
+direction, and no screen reading it could be right.
+
+It now writes the row itself, in the same transaction as the charge, so the two cannot
+disagree; a failed ledger write rolls the charge back. Callers pass a `reason` for the
+description, and **must not write a row of their own** — `telnyx/send-sms` and
+`pointsSupabaseServer` both did, and that is now a double count.
+
+**This is not retroactive.** Charges made before 2026-08-05 00:52 UTC were never recorded and
+cannot be reconstructed. Any all-time total is a floor, not a figure.
+
+### "How did I use over 300 points?" — nobody did
+
+Worth keeping because the investigation was longer than the answer. Real spend that day was
+**31 points**: 28 from `receptionist_logs` (14 AI replies × 2, plus 3 canned after-hours at 0)
+and ~3 for SMS. The 300 came from the UI, not the balance.
+
+Every points figure in the app was wrong, each differently, and all were fixed together:
+
+| surface | was | cause |
+|---|---|---|
+| `/credit-history` "Total Spent" | 425 | all-time sum, no date filter, unlabelled — **this is the number that prompted the question** |
+| `/points` "This Week" | 0 | filtered on `t.type` / `t.amount`; the columns are `action_type` / `points_amount`, so it matched nothing and read 0 for every user, forever |
+| `/analytics` "credits used" | −49,568 | `monthly_credits - credits` — not a usage figure, and negative for any account holding more than its grant |
+| dashboard | "of 0 monthly" | read `monthly_credits`; the API returns `monthlyCredits` |
+
+### Two ways to bound a balance when there is no audit table
+
+Both were needed to settle it, and neither is obvious:
+
+- **`pg_stat_statements`** survives across sessions and counts every execution. It showed 133
+  `deduct_credits` and 62 `add_credits` calls since 2026-07-25. Careful: it counts *calls*,
+  not successful charges — a call that RAISEs still counts, and so do zero-amount permission
+  probes. 128 successful deductions against a ~430-point decline is ~3.4 points each, which
+  is ordinary SMS and AI traffic, not a runaway.
+- **This project's own session transcripts** under
+  `/Users/trippbrowning/.claude/projects/-Applications-hyvewyre/` contain dated `credits`
+  readings printed by earlier live queries. Grepping them reconstructs a balance history that
+  exists nowhere in the database. The readings run 59,998 → 59,568 with rises in between,
+  which is what 62 refund calls look like.
+
+An agent asserted "no historical balance exists to diff against" and it was false both ways.
+
 Costs and tier amounts are documented in the main `CLAUDE.md`. Renewal (monthly credit
 grant) is now driven server-side by real Stripe billing (`invoice.paid`, see Billing
 section above) — it used to be a client-side function (`checkAndRenewCredits` in
