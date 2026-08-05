@@ -3445,11 +3445,30 @@ what stop a reply loop running away. Only the Receptionist sets it.
 
 ### Two clocks, and they are not the same clock
 
-    Quiet Hours (Settings)          8am-8pm ET   may an automated message send AT ALL
-    Receptionist business hours     9am-5pm ET   real answer, or the after-hours text
+    Quiet Hours (Settings)          may an automated message send AT ALL
+    Receptionist business hours     real answer, or the after-hours text
 
 Both fired correctly and the combination reads as a bug. Outside business hours the
 Receptionist **sends** the after-hours message; it does not stay silent.
+
+**As configured on the test account (2026-08-04) both windows are 08:00-20:00 America/New_York**,
+which makes them impossible to tell apart from an observed "no reply" — they fail at the same
+instant. Do not read the times off this doc; they are per-account rows
+(`users.quiet_hours_*` and `receptionist_settings.business_hours_*`). #140.
+
+Quiet hours does **not** protect the after-hours message. `isReply: true` disarms the
+quiet-hours branch (`lib/smsGuard.ts:396`) and `send-sms` skips its own guard for internal
+callers (`send-sms/route.ts:381`), so a contact texting at 3am gets an automated "we're closed"
+— and gets one for *every* message, since nothing suppresses a repeat. #138.
+
+Verified by executing the real `checkSmsAllowed` against the live settings at 20:11 ET:
+`isReply: true` → allowed; `isReply: false` → `quiet_hours`. It is the only thing standing
+between that send and a block.
+
+**The reply claim is checked before the business-hours branch**, so the after-hours message is
+covered by the one-reply-per-burst lock too — a burst of three texts while closed produces one
+canned reply, not three. That makes the lock testable outside business hours, when no model
+runs at all.
 
 ### After-hours and greeting are free, by the owner's decision
 
