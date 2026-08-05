@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, CreditCard, Zap, Phone, Loader2, Check, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NUMBER_PRICE_CREDITS } from '@/lib/numberPricing';
 
 interface PurchaseNumberModalProps {
   isOpen: boolean;
@@ -14,7 +15,10 @@ interface PurchaseNumberModalProps {
 
 type PaymentMethod = 'stripe' | 'credits';
 
-const POINTS_PER_NUMBER = 100; // 100 credits/month for additional numbers
+// Imported, not redeclared. The server charges from lib/numberPricing and
+// ignores anything this component sends, so a second copy of the number here
+// could only ever disagree with what the user is actually billed (#141).
+const POINTS_PER_NUMBER = NUMBER_PRICE_CREDITS;
 
 export default function PurchaseNumberModal({
   isOpen,
@@ -63,10 +67,9 @@ export default function PurchaseNumberModal({
         const response = await fetch('/api/number-pool/purchase-with-credits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phoneNumber,
-            credits: POINTS_PER_NUMBER
-          })
+          // Price intentionally omitted — the server derives it. Sending it
+          // was the bug: the route charged whatever arrived in the body (#141).
+          body: JSON.stringify({ phoneNumber })
         });
 
         const data = await response.json();

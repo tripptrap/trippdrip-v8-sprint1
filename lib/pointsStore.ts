@@ -83,48 +83,17 @@ export async function addPoints(amount: number, description: string, type: 'earn
   return getDefaultPoints();
 }
 
-// Use the API endpoint to spend points
-export async function spendPoints(amount: number, description: string, actionType?: ActionType): Promise<{ success: boolean; data?: PointsData; error?: string }> {
-  try {
-    const response = await fetch('/api/points/spend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, description })
-    });
-
-    const data = await response.json();
-
-    if (data.ok) {
-      // Dispatch event for UI updates
-      window.dispatchEvent(new CustomEvent('pointsUpdated', { 
-        detail: { balance: data.balance } 
-      }));
-
-      return { success: true, data: { ...getDefaultPoints(), balance: data.balance } };
-    }
-
-    return { success: false, error: data.error || 'Failed to spend points' };
-  } catch (error: any) {
-    console.error('Error spending points:', error);
-    return { success: false, error: error.message || 'Failed to spend points' };
-  }
-}
-
-// Spend points for a specific action
-export async function spendPointsForAction(actionType: ActionType, count: number = 1): Promise<{ success: boolean; data?: PointsData; error?: string }> {
-  const costPerAction = POINT_COSTS[actionType];
-  const totalCost = costPerAction * count;
-
-  const actionDescriptions: Record<ActionType, string> = {
-    sms_sent: `SMS sent (${count}x)`,
-    ai_response: `AI response generated (${count}x)`,
-    email_sent: `Email sent (${count}x)`,
-    ai_chat: `AI chat message (${count}x)`,
-    flow_generation: `Flow generation (${count}x)`
-  };
-
-  return spendPoints(totalCost, actionDescriptions[actionType], actionType);
-}
+// spendPoints() and spendPointsForAction() were removed with POST /api/points/spend.
+//
+// That endpoint took the charge amount straight from the request body, validated
+// only that it was > 0, and applied it with a non-atomic read-then-write on
+// users.credits — an unbounded self-charge primitive (#141). Nothing imported
+// these wrappers, and the endpoint could not have worked regardless: column
+// grants give `authenticated` UPDATE on business_hours, business_name, timezone
+// and updated_at only, so writing credits from a session client is refused.
+//
+// Server-side spending goes through lib/pointsSupabaseServer, which derives the
+// cost from POINT_COSTS and charges via the deduct_credits RPC.
 
 // Check if user has enough points for an action
 export async function canAffordAction(actionType: ActionType, count: number = 1): Promise<boolean> {

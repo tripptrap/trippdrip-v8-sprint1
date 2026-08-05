@@ -6,6 +6,7 @@ import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { notifyAdmins } from '@/lib/createNotification';
 import { autoAssignNumberToCampaign } from '@/lib/autoAssignCampaignNumber';
 import { isTollFreeNumber } from '@/lib/telnyx';
+import { numberPriceInCredits } from '@/lib/numberPricing';
 
 // Credit changes run on the service-role client, never the caller's (#114).
 //
@@ -19,7 +20,6 @@ import { isTollFreeNumber } from '@/lib/telnyx';
 // EXECUTE is revoked from authenticated; these calls run as service_role. The
 // user id still comes from the verified session.
 
-const CREDITS_PER_NUMBER = 100; // 100 credits/month for a phone number
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +31,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { phoneNumber, credits } = await req.json();
+    // `credits` is deliberately NOT read from the body. It used to be, and the
+    // charge was `credits || CREDITS_PER_NUMBER` — so a caller posting
+    // `{ phoneNumber, credits: 1 }` bought a 100-credit number for 1 credit,
+    // and the affordability check above the deduction used the same
+    // caller-supplied number, so it passed trivially (#141). The client still
+    // sends the field on older builds; ignoring it is what makes this safe.
+    const { phoneNumber } = await req.json();
 
     // Validated before the gate, which now inspects the number to decide which
     // rules apply — passing an undefined number into that check would decide the
@@ -57,7 +63,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requiredCredits = credits || CREDITS_PER_NUMBER;
+    // Server-derived, from lib/numberPricing — never from the request.
+    const requiredCredits = numberPriceInCredits(phoneNumber);
 
     // Get user's current credits
     const { data: userData, error: userError } = await supabase
