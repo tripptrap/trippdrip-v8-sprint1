@@ -3471,6 +3471,55 @@ number belongs to `tripped620@gmail.com`. `GET /api/receptionist/settings` retur
 when no row exists, so the page shows `enabled: false` rather than "no configuration here" —
 indistinguishable from a deliberate off.
 
+### People text in bursts, and every message got its own reply
+
+Observed live: the contact sent "Yes please" at 23:52:33 and "Why not?" at 23:52:36, and got
+**two replies in the same second** plus two `follow_ups` rows for one request. Two inbound
+webhooks, two invocations of this route, neither aware of the other.
+
+The 10-20s human-pacing delay makes this *more* likely, not less — it widens the window in
+which a second message lands while the first is still being answered.
+
+Two changes, and both are needed:
+
+**The delay now runs before the history read, not after generation.** Whatever arrives during
+the pause is already in the conversation the model sees, so one reply answers the whole burst.
+
+**`threads.ai_reply_lock_until` is claimed atomically.** Checking "has anything been sent
+since?" and then sending is a race — those two replies landed in the *same second*, so a read
+check would have let both through. A conditional `UPDATE` is not a race: Postgres serialises
+the writers on the row lock, the loser re-evaluates its `WHERE` against the winner's committed
+row and matches zero rows.
+
+Verified against the live DB — two concurrent claims, one wins; a third mid-flight stands down;
+a claim left in the past by a crashed invocation is re-claimable.
+
+**"Free" is the sentinel `-infinity`, never NULL.** The nullable version needs
+`(x IS NULL OR x < now())`, which through supabase-js is `.or('...is.null,...lt.<ts>')` — and
+PostgREST rejects that with:
+
+    column threads.ai_reply_lock_until does not exist
+
+The column exists. `.select()`, `.update()`, `.is()` and `.lt()` on it all work; only the
+`or()` form breaks, because PostgREST re-parses dotted names inside a logical group. The error
+names the column, so it reads as a missing-column problem and sends you to the schema. It is a
+filter-syntax problem. **A failing claim fails open** — every claim erroring means every reply
+either duplicates or stands down forever, depending on which way the code reads the error.
+
+### A new column is invisible to PostgREST until the cache reloads
+
+Same session, before the above: the column was confirmed present in `information_schema` and
+supabase-js still reported *"column does not exist"*. PostgREST caches the schema. Applying a
+migration is not enough:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+It is not instant either — roughly 10s here. So the sequence "apply migration, immediately test
+through the app, conclude the migration failed" produces a false negative, and every migration
+that adds a column should end with that NOTIFY.
+
 ---
 
 ## Known open gaps (not yet fixed, worth checking before assuming otherwise)

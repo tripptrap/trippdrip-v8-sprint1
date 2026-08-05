@@ -14,6 +14,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(req: NextRequest) {
+  // Set once this invocation has claimed the right to answer (see the claim
+  // below). A closure rather than a (client, id) pair so the Supabase client
+  // stays in the scope that created it — declared out here only so the
+  // `finally` can hand the conversation back no matter which of the route's
+  // many early returns fires.
+  let releaseReplyClaim: (() => Promise<void>) | null = null;
+
   try {
     // MED-5: Internal-only endpoint — require x-internal-secret to prevent
     // unauthenticated callers from burning any user's AI credits. Constant-time
@@ -134,6 +141,78 @@ export async function POST(req: NextRequest) {
         error: rateCheck.reason || 'Rate limit exceeded',
       }, { status: 429 });
     }
+
+    // ── One reply per burst ──────────────────────────────────────────────────
+    //
+    // People text in bursts. On 2026-08-04 the contact sent "Yes please" and,
+    // three seconds later, "Why not?" — and got two replies in the same second,
+    // plus two follow_ups rows for one request. Both inbound webhooks ran this
+    // route, neither knew about the other.
+    //
+    // Claiming the conversation has to be atomic. Checking "has anything been
+    // sent since?" and then sending is a race, and those two replies landed in
+    // the SAME SECOND — a read check would have let both through. This is a
+    // conditional UPDATE instead: Postgres serialises the two writers on the row
+    // lock, the second re-evaluates the WHERE against the winner's committed row
+    // and matches nothing. One caller proceeds, the rest stand down.
+    //
+    // "Free" is the sentinel `-infinity`, never NULL, so this is one comparison
+    // rather than `(x IS NULL OR x < now())`. That matters: the or() form is
+    // rejected by PostgREST with "column threads.ai_reply_lock_until does not
+    // exist" even though it does — see the migration for the full write-up.
+    if (threadId) {
+      const { data: claim, error: claimError } = await supabase
+        .from('threads')
+        // 45s comfortably covers the pacing delay + generation + send. A
+        // timestamp, not a boolean, so an invocation that dies mid-reply cannot
+        // mute the conversation permanently — the claim just expires.
+        .update({ ai_reply_lock_until: new Date(Date.now() + 45_000).toISOString() })
+        .eq('id', threadId)
+        .eq('user_id', userId)
+        .lt('ai_reply_lock_until', new Date().toISOString())
+        .select('id');
+
+      // supabase-js returns { error }; it does not throw. Treat a failed claim
+      // as "someone else has it" rather than replying anyway — a duplicate reply
+      // to a real contact is worse than a missed one, and the inbound that
+      // actually holds the claim is about to answer.
+      if (claimError) {
+        console.error('🤖 Receptionist: could not claim thread, standing down:', claimError.message);
+        return NextResponse.json({ success: false, error: 'Could not claim thread' }, { status: 409 });
+      }
+      if (!claim || claim.length === 0) {
+        console.log('🤖 Receptionist: another reply is already in flight for this thread — standing down');
+        return NextResponse.json({ success: true, skipped: 'reply_already_in_flight' });
+      }
+
+      releaseReplyClaim = async () => {
+        const { error: releaseError } = await supabase
+          .from('threads')
+          // Back to the free sentinel, not NULL — the column is NOT NULL.
+          .update({ ai_reply_lock_until: '-infinity' })
+          .eq('id', threadId);
+        // Not fatal — the claim expires on its own. Worth knowing about.
+        if (releaseError) {
+          console.error('🤖 Receptionist: failed to release reply claim:', releaseError.message);
+        }
+      };
+    }
+
+    // Answer at human speed, not machine speed.
+    //
+    // Replies were landing 3 seconds after the inbound. Nobody types that fast,
+    // and an instant answer is the clearest tell that a person is talking to a
+    // bot — more obvious than anything in the wording.
+    //
+    // 10-20s, varied per message so the gap is not itself a pattern.
+    //
+    // This waits BEFORE reading the conversation, not after generating. That
+    // ordering is the other half of the burst fix: whatever the contact sends
+    // during the pause is already in the history below, so the single reply
+    // answers the whole burst instead of only its first message.
+    const replyDelayMs = 10_000 + Math.floor(Math.random() * 10_000);
+    console.log(`⏳ Holding the reply ${Math.round(replyDelayMs / 1000)}s so it reads as typed`);
+    await new Promise(resolve => setTimeout(resolve, replyDelayMs));
 
     // Get conversation history from thread
     let conversationHistory: Array<{ direction: string; body: string }> = [];
@@ -267,20 +346,6 @@ export async function POST(req: NextRequest) {
         retryable: guard.retryable ?? false,
       }, { status: guard.reason === 'quiet_hours' || guard.reason === 'rate_limited' ? 429 : 403 });
     }
-
-    // Answer at human speed, not machine speed.
-    //
-    // Replies were landing 3 seconds after the inbound. Nobody types that fast,
-    // and an instant answer is the clearest tell that a person is talking to a
-    // bot — more obvious than anything in the wording.
-    //
-    // 10-20s, varied per message so the gap is not itself a pattern. Held in the
-    // request rather than scheduled: this route already runs after an inbound
-    // webhook and the whole exchange stays inside one invocation, which keeps the
-    // send atomic with the guard and the charge above it.
-    const replyDelayMs = 10_000 + Math.floor(Math.random() * 10_000);
-    console.log(`⏳ Holding the reply ${Math.round(replyDelayMs / 1000)}s so it reads as typed`);
-    await new Promise(resolve => setTimeout(resolve, replyDelayMs));
 
     // FULL AUTO MODE: send the SMS response using Telnyx
     const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telnyx/send-sms`, {
@@ -424,5 +489,12 @@ export async function POST(req: NextRequest) {
       success: false,
       error: error.message || 'Internal server error',
     }, { status: 500 });
+  } finally {
+    // Hand the conversation back the moment this reply is done, however it
+    // ended. The claim expires by itself after 45s, but leaving it set would
+    // ignore a genuinely new message that arrives inside that window — and this
+    // route has a dozen early returns, so a `finally` is the only placement that
+    // covers all of them.
+    if (releaseReplyClaim) await releaseReplyClaim();
   }
 }
