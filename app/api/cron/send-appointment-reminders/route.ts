@@ -215,6 +215,7 @@ async function handleCron(req: NextRequest) {
         const { error: deductError } = await supabaseAdmin.rpc('deduct_credits', {
           user_id: event.user_id,
           amount: 1,
+          reason: 'Appointment reminder',
         });
 
         if (deductError) {

@@ -79,8 +79,13 @@ export async function spendPoints(
   // Service-role client because #114/`cd21589` revoked EXECUTE on every
   // SECURITY DEFINER function from anon and authenticated. The user id comes
   // from the verified session above, never from an argument.
+  //
+  // `reason` is what deduct_credits writes into points_transactions. The charge
+  // and its ledger row happen in one transaction inside the function (#137), so
+  // this no longer inserts a row of its own — doing both would double-count
+  // every spend that goes through here.
   const { data: rpcBalance, error: deductError } = await createServiceRoleClient()
-    .rpc('deduct_credits', { user_id: user.id, amount });
+    .rpc('deduct_credits', { user_id: user.id, amount, reason: description });
 
   if (deductError) {
     // The function RAISEs check_violation (23514) for both "not enough credits"
@@ -94,20 +99,8 @@ export async function spendPoints(
 
   const newBalance = typeof rpcBalance === 'number' ? rpcBalance : currentBalance - amount;
 
-  // Record transaction
-  const { error: transactionError } = await supabase
-    .from('points_transactions')
-    .insert({
-      user_id: user.id,
-      action_type: 'spend',
-      points_amount: -amount,
-      description,
-      created_at: new Date().toISOString()
-    });
-
-  if (transactionError) {
-    console.error('Error recording transaction:', transactionError);
-  }
+  // The ledger row was written by deduct_credits above, atomically with the
+  // charge. No insert here — see the note on the rpc call.
 
   // Fire low-credits alert when balance crosses below threshold
   if (currentBalance >= LOW_CREDITS_THRESHOLD && newBalance < LOW_CREDITS_THRESHOLD) {

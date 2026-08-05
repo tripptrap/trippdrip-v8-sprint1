@@ -320,6 +320,7 @@ async function processScheduledMessages(supabase: any) {
           const { error: deductError } = await supabase.rpc('deduct_credits', {
             user_id: message.user_id,
             amount: message.credits_cost,
+            reason: 'Scheduled message',
           });
 
           if (deductError) {
@@ -607,7 +608,7 @@ async function processScheduledCampaigns(supabase: any) {
 
           if (smsResult.success) {
             // CRIT-1: Atomic credit deduction via RPC
-            const { error: batchDeductError } = await supabase.rpc('deduct_credits', { user_id: campaign.user_id, amount: creditsNeeded });
+            const { error: batchDeductError } = await supabase.rpc('deduct_credits', { user_id: campaign.user_id, amount: creditsNeeded, reason: 'Scheduled campaign batch' });
             if (batchDeductError) {
               // Already sent — can't be rolled back, so make it visible (#90).
               console.error(`❌ Campaign batch message sent for campaign ${campaign.id} but ${creditsNeeded} credits NOT deducted for user ${campaign.user_id}:`, batchDeductError);

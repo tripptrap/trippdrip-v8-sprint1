@@ -390,6 +390,7 @@ export async function PUT(req: NextRequest) {
         const { error: deductError } = await adminClient.rpc('deduct_credits', {
           user_id: user.id,
           amount: creditsUsed,
+          reason: 'Bulk send',
         });
         if (deductError) {
           console.error(`❌ Bulk send-now: ${sent} messages sent but ${creditsUsed} credits NOT deducted for user ${user.id}:`, deductError);

@@ -429,26 +429,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { error: deductError } = await supabaseAdmin!.rpc('deduct_credits', {
-        user_id: userId,
-        amount: 1,
-      });
-
-      if (deductError) {
-        // Fail closed: don't send if we couldn't charge for it.
-        console.error(`send-sms: could not deduct credits for user ${userId} — refusing to send:`, deductError);
-        return NextResponse.json({ error: 'Could not process credits' }, { status: 500 });
-      }
-
-      // Record the charge (#137).
-      //
-      // deduct_credits moves the balance and writes nothing else, so a credit
-      // spent on this route vanished from the ledger. /points showed Flow
-      // creations, AI responses and uploads but only the SMS sent through
-      // /api/sms/send — while THIS route carries the composer, bulk send, the
-      // receptionist and both drip crons. A customer reconciling "where did my
-      // credits go" against their balance could not.
-      //
       // Labelled by origin: an unattended auto-reply reads differently from a
       // message someone typed, and the after-hours case is exactly where
       // "why was I charged?" gets asked.
@@ -456,19 +436,24 @@ export async function POST(req: NextRequest) {
         ? `Automated SMS (${automationSource || 'receptionist'})`
         : 'SMS sent (1x)';
 
-      const { error: txnError } = await supabaseAdmin!
-        .from('points_transactions')
-        .insert({
-          user_id: userId,
-          action_type: 'spend',
-          points_amount: -1,
-          description: spendLabel,
-          created_at: new Date().toISOString(),
-        });
+      // The ledger row is written by deduct_credits itself, in the same
+      // transaction as the charge (#137) — passing `reason` is the whole of it.
+      //
+      // This route used to charge and then insert its own row. That is now a
+      // double-count: the balance would move by 1 and the ledger would record 2,
+      // so every "points used" figure would read double for the composer, bulk
+      // send, the receptionist and both drip crons.
+      const { error: deductError } = await supabaseAdmin!.rpc('deduct_credits', {
+        user_id: userId,
+        amount: 1,
+        reason: spendLabel,
+      });
 
-      // Log-only: the charge succeeded and the message is about to go out. A
-      // missing ledger row must not fail a send that was already paid for.
-      if (txnError) console.error('send-sms: could not record the points transaction:', txnError);
+      if (deductError) {
+        // Fail closed: don't send if we couldn't charge for it.
+        console.error(`send-sms: could not deduct credits for user ${userId} — refusing to send:`, deductError);
+        return NextResponse.json({ error: 'Could not process credits' }, { status: 500 });
+      }
       }
     }
 

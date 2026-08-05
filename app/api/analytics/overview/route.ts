@@ -75,14 +75,40 @@ export async function GET(req: NextRequest) {
       ? parseFloat(((soldLeads || 0) / totalLeads * 100).toFixed(1))
       : 0;
 
-    // Get user's credit usage
+    // Credits used this cycle, from what was actually spent.
+    //
+    // This was `monthly_credits - credits`, which is not a usage figure at all —
+    // it is "how far below your monthly grant is your balance". Any account
+    // holding more than its grant (a point pack, a top-up, a rollover) makes it
+    // negative: the live account showed **-49,568 credits used** against a real
+    // spend of 31. It also silently counts purchased points as if they had been
+    // consumed.
+    //
+    // The ledger is now authoritative — deduct_credits writes a row for every
+    // charge in the same transaction as the charge (#137) — so summing spend
+    // rows since the cycle started is both correct and reconcilable with the
+    // balance.
     const { data: userData } = await supabase
       .from('users')
-      .select('credits, monthly_credits')
+      .select('credits, monthly_credits, last_renewal_date')
       .eq('id', user.id)
       .single();
 
-    const totalCreditsUsed = (userData?.monthly_credits || 0) - (userData?.credits || 0);
+    const cycleStart = userData?.last_renewal_date
+      ? new Date(userData.last_renewal_date).toISOString()
+      // No renewal recorded yet (never subscribed, or a legacy row): fall back to
+      // the last 30 days rather than reporting all-time usage as "this cycle".
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: spendRows } = await supabase
+      .from('points_transactions')
+      .select('points_amount')
+      .eq('user_id', user.id)
+      .eq('action_type', 'spend')
+      .gte('created_at', cycleStart);
+
+    const totalCreditsUsed = (spendRows || [])
+      .reduce((sum, row: { points_amount: number | null }) => sum + Math.abs(row.points_amount || 0), 0);
 
     // Average response time calculation (from threads data)
     let avgResponseTimeHours = 0;

@@ -142,21 +142,30 @@ export default function PointsPage() {
       console.error('points: failed to load plan value', err);
     }
 
-    // Fetch transactions from Supabase
-    const txns = await getRecentTransactionsSupabase(20);
+    // 200, not 20. These rows feed the seven-day figures below, and an active
+    // account can easily send more than twenty messages in a week — capping at
+    // 20 silently understated every stat on this page.
+    const txns = await getRecentTransactionsSupabase(200);
     setTransactions(txns as PointTransaction[]);
 
     // Calculate stats from transactions
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 7);
 
+    // `action_type` and `points_amount` are the real column names.
+    //
+    // This read `t.type` and `t.amount`, which do not exist on
+    // points_transactions. `undefined === 'spend'` is false for every row, so
+    // "This Week" has shown a hard 0 to every user since it was written — along
+    // with a 0.0 daily average and a literal 999 days remaining. The figures
+    // were not wrong because the data was missing; they were never computed.
     const recentTxns = txns.filter((t: any) => new Date(t.created_at) > cutoff);
     const totalSpent = recentTxns
-      .filter((t: any) => t.type === 'spend')
-      .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+      .filter((t: any) => t.action_type === 'spend')
+      .reduce((sum: number, t: any) => sum + Math.abs(t.points_amount), 0);
     const totalEarned = recentTxns
-      .filter((t: any) => t.type === 'earn' || t.type === 'purchase')
-      .reduce((sum: number, t: any) => sum + t.amount, 0);
+      .filter((t: any) => t.action_type === 'earn' || t.action_type === 'purchase')
+      .reduce((sum: number, t: any) => sum + t.points_amount, 0);
     const avgDailySpend = totalSpent / 7;
     const daysRemaining = avgDailySpend > 0 ? Math.floor((loadedCredits ?? 0) / avgDailySpend) : 999;
 

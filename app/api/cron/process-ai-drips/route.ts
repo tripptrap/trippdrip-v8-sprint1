@@ -309,6 +309,7 @@ async function handleCron(req: NextRequest) {
         const { error: deductError } = await supabaseAdmin.rpc('deduct_credits', {
           user_id: drip.user_id,
           amount: 2,
+          reason: 'AI drip follow-up',
         });
 
         if (deductError) {

@@ -244,7 +244,12 @@ export default function Dashboard(){
       if (data) {
         setUserCredits({
           credits: data.credits || 0,
-          monthly_credits: data.monthly_credits || 0,
+          // `monthlyCredits`, camelCase — that is the key /api/user/credits
+          // actually returns (app/api/user/credits/route.ts:34). Reading
+          // `monthly_credits` got undefined, so this fell through to 0 and the
+          // dashboard has always said "of 0 monthly" with the bar pinned at
+          // 100%.
+          monthly_credits: data.monthlyCredits || 0,
         });
       }
     } catch (error) {

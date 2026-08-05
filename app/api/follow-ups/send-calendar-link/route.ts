@@ -222,6 +222,7 @@ export async function POST(req: NextRequest) {
     const { error: deductError } = await createServiceRoleClient().rpc('deduct_credits', {
       user_id: user.id,
       amount: creditsCost,
+      reason: 'Calendar booking link sent',
     });
     if (deductError) {
       console.error(`❌ Calendar link sent to lead ${leadId} but ${creditsCost} credits NOT deducted for user ${user.id}:`, deductError);

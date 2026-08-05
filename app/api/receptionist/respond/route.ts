@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         success: false,
         error: 'Receptionist mode not enabled or configured',
       }, { status: 400 });
+    }
 
     // ── The AI must not ask what business it works for ────────────────────
     //
@@ -105,7 +106,6 @@ export async function POST(req: NextRequest) {
       // Operator-set values last, so they override the inferred ones.
       ...(settings.identity || {}),
     };
-    }
 
     // Check user has premium subscription
     const { data: userData } = await supabase
@@ -453,7 +453,8 @@ export async function POST(req: NextRequest) {
     if (result.pointsUsed && result.pointsUsed > 0) {
       const { error: deductError } = await supabase.rpc('deduct_credits', {
         user_id: userId,
-        amount: result.pointsUsed
+        amount: result.pointsUsed,
+        reason: `Receptionist AI reply (${result.responseType || 'reply'})`
       });
       if (deductError) {
         console.error('Sent the reply but could not deduct credits:', deductError);

@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
     const { data: balanceAfterCharge, error: deductError } = await createServiceRoleClient().rpc('deduct_credits', {
       user_id: user.id,
       amount: requiredCredits,
+      reason: `Phone number: ${phoneNumber}`,
     });
 
     if (deductError) {

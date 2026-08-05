@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -320,8 +320,21 @@ Important:
       // so concurrent generations cannot lose an update or drive the balance
       // negative. It RAISEs on insufficient funds, which supabase-js surfaces as
       // { error } — it does not throw.
-      const { data: newBalance, error: chargeError } = await supabase
-        .rpc('deduct_credits', { user_id: user.id, amount: FLOW_CREATION_COST });
+      //
+      // **Service-role client, not the session client.** EXECUTE on
+      // deduct_credits is granted to service_role and postgres only; calling it
+      // as `authenticated` fails with "permission denied for function
+      // deduct_credits" (verified against the live database with an anon-key
+      // client). With the charge placed after the insert, that denial would look
+      // like a failed charge and delete the flow the user just waited for. The
+      // user id still comes from the verified session above — same pattern as
+      // number-pool/purchase-with-credits.
+      const { data: newBalance, error: chargeError } = await createServiceRoleClient()
+        .rpc('deduct_credits', {
+          user_id: user.id,
+          amount: FLOW_CREATION_COST,
+          reason: `Flow created: ${flowName}`,
+        });
 
       if (chargeError) {
         // The balance moved between the affordability check and here. Undo the
@@ -343,26 +356,10 @@ Important:
         }, { status: 402 });
       }
 
-      // deduct_credits does not write a ledger row (#137), so the caller owns
-      // the history. This insert was previously unchecked, which is how a charge
-      // could land with no record of it — exactly the "where did my points go"
-      // question this route could not answer.
-      const { error: ledgerError } = await supabase
-        .from('points_transactions')
-        .insert({
-          user_id: user.id,
-          action_type: 'spend',
-          points_amount: -FLOW_CREATION_COST,
-          description: `Flow created: ${flowName}`,
-          created_at: new Date().toISOString()
-        });
-
-      if (ledgerError) {
-        // Not worth failing the request over — the flow exists and is paid for.
-        // But an untracked charge is the bug that made this route suspect, so it
-        // must be loud rather than swallowed.
-        console.error('POINTS LEDGER WRITE FAILED for flow creation — charge is untracked:', ledgerError.message);
-      }
+      // No ledger insert here on purpose. deduct_credits now writes the
+      // points_transactions row itself, inside the same transaction as the
+      // charge (#137) — a second insert would double-count this flow in every
+      // "points used" figure in the app.
 
       return NextResponse.json({
         ...flowData,

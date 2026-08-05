@@ -190,7 +190,7 @@ export default function CreditHistoryPage() {
               <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Total Spent</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Spent all time</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.totalSpent.toLocaleString()}</p>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function CreditHistoryPage() {
               <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Total Earned</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Earned all time</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.totalEarned.toLocaleString()}</p>
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function CreditHistoryPage() {
               <ShoppingCart className="w-5 h-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Total Purchased</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Purchased all time</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.totalPurchased.toLocaleString()}</p>
             </div>
           </div>
