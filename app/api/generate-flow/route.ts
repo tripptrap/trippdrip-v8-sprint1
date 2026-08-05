@@ -21,10 +21,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check and deduct points BEFORE generating flow (15 points for flow creation)
     const FLOW_CREATION_COST = 15;
 
-    // Get current balance
+    // ── Affordability check only. The charge itself happens after the flow row
+    // exists — see the bottom of this route.
+    //
+    // This used to deduct here, before the OpenAI call. That charged for the
+    // ATTEMPT, not the flow: a model error, an unparseable response, or a failed
+    // insert all took 15 points and produced nothing, with no refund anywhere on
+    // the path (the document-upload route refunds; this one never did).
+    //
+    // The read-modify-write it used was also a lost update. Two generations at
+    // once both read the same balance and both wrote balance-15, so one of the
+    // two charges silently disappeared.
+    //
+    // This check is advisory — it exists so nobody burns a model call they cannot
+    // pay for. The authoritative check is inside deduct_credits, which will not
+    // let the balance go negative.
     const { data: userData, error: fetchError } = await supabase
       .from('users')
       .select('credits')
@@ -35,37 +48,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user data' }, { status: 500 });
     }
 
-    const currentBalance = userData.credits || 0;
-
-    if (currentBalance < FLOW_CREATION_COST) {
+    if ((userData.credits || 0) < FLOW_CREATION_COST) {
       return NextResponse.json({
-        error: `Insufficient points. You need ${FLOW_CREATION_COST} points to generate a flow.`,
+        error: `Insufficient points. You need ${FLOW_CREATION_COST} points to create a flow.`,
         pointsNeeded: FLOW_CREATION_COST
       }, { status: 402 });
     }
-
-    // Deduct points
-    const newBalance = currentBalance - FLOW_CREATION_COST;
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ credits: newBalance, updated_at: new Date().toISOString() })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 });
-    }
-
-    // Record transaction
-    await supabase
-      .from('points_transactions')
-      .insert({
-        user_id: user.id,
-        action_type: 'spend',
-        points_amount: -FLOW_CREATION_COST,
-        description: 'Flow creation',
-        created_at: new Date().toISOString()
-      });
 
     // Build required questions section for prompt
     const requiredQuestionsText = requiredQuestions && requiredQuestions.length > 0
@@ -320,6 +308,61 @@ Important:
       }
 
       console.log("✅ Flow saved to database:", savedFlow.id);
+
+      // ── Charge, now that a flow demonstrably exists ────────────────────────
+      //
+      // Everything that can fail has already failed by this point: the model
+      // call, the JSON parse, and the insert. Reaching here means the user has a
+      // flow, so this is the only place a charge is honest.
+      //
+      // deduct_credits rather than a read-modify-write on users.credits: it does
+      // the decrement in one atomic UPDATE with `credits >= amount` in the WHERE,
+      // so concurrent generations cannot lose an update or drive the balance
+      // negative. It RAISEs on insufficient funds, which supabase-js surfaces as
+      // { error } — it does not throw.
+      const { data: newBalance, error: chargeError } = await supabase
+        .rpc('deduct_credits', { user_id: user.id, amount: FLOW_CREATION_COST });
+
+      if (chargeError) {
+        // The balance moved between the affordability check and here. Undo the
+        // flow rather than hand out a free one — and say so plainly, because a
+        // flow appearing and then vanishing with no explanation is worse than
+        // the error.
+        console.error('Flow charge failed, removing the flow:', chargeError.message);
+        const { error: rollbackError } = await supabase
+          .from('conversation_flows')
+          .delete()
+          .eq('id', savedFlow.id)
+          .eq('user_id', user.id);
+        if (rollbackError) {
+          console.error('Could not remove the uncharged flow:', rollbackError.message);
+        }
+        return NextResponse.json({
+          error: `Insufficient points. You need ${FLOW_CREATION_COST} points to create a flow.`,
+          pointsNeeded: FLOW_CREATION_COST
+        }, { status: 402 });
+      }
+
+      // deduct_credits does not write a ledger row (#137), so the caller owns
+      // the history. This insert was previously unchecked, which is how a charge
+      // could land with no record of it — exactly the "where did my points go"
+      // question this route could not answer.
+      const { error: ledgerError } = await supabase
+        .from('points_transactions')
+        .insert({
+          user_id: user.id,
+          action_type: 'spend',
+          points_amount: -FLOW_CREATION_COST,
+          description: `Flow created: ${flowName}`,
+          created_at: new Date().toISOString()
+        });
+
+      if (ledgerError) {
+        // Not worth failing the request over — the flow exists and is paid for.
+        // But an untracked charge is the bug that made this route suspect, so it
+        // must be loud rather than swallowed.
+        console.error('POINTS LEDGER WRITE FAILED for flow creation — charge is untracked:', ledgerError.message);
+      }
 
       return NextResponse.json({
         ...flowData,
