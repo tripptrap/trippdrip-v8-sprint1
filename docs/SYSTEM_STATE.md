@@ -3506,8 +3506,28 @@ instant. Do not read the times off this doc; they are per-account rows
 
 Quiet hours does **not** protect the after-hours message. `isReply: true` disarms the
 quiet-hours branch (`lib/smsGuard.ts:396`) and `send-sms` skips its own guard for internal
-callers (`send-sms/route.ts:381`), so a contact texting at 3am gets an automated "we're closed"
-— and gets one for *every* message, since nothing suppresses a repeat. #138.
+callers (`send-sms/route.ts:381`), so a contact texting at 3am gets an automated "we're closed".
+
+**It is now said once per closed period, not once per text** (#138, fixed). Three real sends on
+2026-08-04 at 18:00, 18:30 and 19:05 ET were three separate answers to three separate messages;
+under the fix only the first goes out. `closedPeriodStart()` in
+`lib/receptionist/businessHours.ts` returns the instant the current closed stretch began, and
+the route suppresses if a `receptionist_logs` row with `response_type = 'after_hours'` already
+exists for that thread since then. Keyed on logs rather than a new column, so it reflects what
+was actually **sent** — a reply that failed to send does not silence the next attempt.
+
+A boundary, not a cooldown, deliberately: a fixed cooldown sends a second "we're closed" in the
+middle of the same night, and re-arming only after the business has genuinely reopened is what
+"once per closed period" means. It walks backwards to find the previous open day, so a Sunday
+text on a weekdays-only schedule reaches past Saturday to Friday's close. Verified across both
+DST transitions.
+
+**Gating it on quiet hours was considered and rejected.** On this account both windows are
+08:00–20:00 (see above) — identical — so "after hours" and "quiet hours" are the same span, and
+gating one on the other would mean the after-hours message *never sends at all*. It would look
+like the feature was removed. It is also a direct answer to a message the contact just sent, not
+unsolicited outbound, which is the distinction `isReply` exists to draw. The repetition was the
+real harm and that is what was fixed.
 
 Verified by executing the real `checkSmsAllowed` against the live settings at 20:11 ET:
 `isReply: true` → allowed; `isReply: false` → `quiet_hours`. It is the only thing standing

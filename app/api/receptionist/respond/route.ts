@@ -8,6 +8,7 @@ import { ReceptionistSettings, ContactType, ReceptionistResponseParams } from '@
 import { isInternalCaller } from '@/lib/cronAuth';
 import { checkSmsAllowed } from '@/lib/smsGuard';
 import { createNotification } from '@/lib/createNotification';
+import { closedPeriodStart } from '@/lib/receptionist/businessHours';
 
 // Use service role client for internal operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -271,6 +272,49 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
+    // ── "We're closed" is said once, not once per text (#138) ────────────────
+    //
+    // Outside business hours every inbound produced its own canned reply: three
+    // separate messages on 2026-08-04 at 18:00, 18:30 and 19:05 ET each got the
+    // same text back, and a contact sending five in a row got five. There was no
+    // suppression of any kind and no setting to turn it off.
+    //
+    // The boundary is the start of the current closed period, not a fixed
+    // cooldown. A cooldown sends a second "we're closed" in the middle of the
+    // same night; the period boundary says it once per stretch of closed time and
+    // re-arms only after the business has actually been open again.
+    //
+    // receptionist_logs already records thread_id and response_type, so the check
+    // needs no new column — and it is keyed on what was actually SENT, so a reply
+    // that failed to send does not suppress the next attempt.
+    if (result.responseType === 'after_hours' && threadId) {
+      const closedSince = closedPeriodStart(settings as ReceptionistSettings);
+
+      if (closedSince) {
+        const { data: alreadyTold, error: alreadyToldError } = await supabase
+          .from('receptionist_logs')
+          .select('id')
+          .eq('thread_id', threadId)
+          .eq('user_id', userId)
+          .eq('response_type', 'after_hours')
+          .gte('created_at', closedSince.toISOString())
+          .limit(1);
+
+        // supabase-js returns { error }; it does not throw. On a read failure,
+        // send — a missed "we're closed" is worse than a duplicate one.
+        if (alreadyToldError) {
+          console.error('Receptionist: could not check after-hours history, sending anyway:', alreadyToldError.message);
+        } else if (alreadyTold && alreadyTold.length > 0) {
+          console.log('🤖 Receptionist: already sent the after-hours message this closed period — staying quiet');
+          return NextResponse.json({
+            success: true,
+            skipped: 'after_hours_already_sent',
+            responseType: 'after_hours',
+          });
+        }
+      }
+    }
+
     // HIGH-8: Apply guardrails BEFORE deducting credits — user should not be
     // charged for AI responses that are blocked and never sent.
     const guardrailResult = applyGuardrails(result.response || '', DEFAULT_GUARDRAILS);
@@ -461,8 +505,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log the interaction
-    await supabase
+    // Log the interaction.
+    //
+    // Checked, because this row is no longer only a record — the after-hours
+    // suppression above reads it to decide whether "we're closed" has already
+    // been said this closed period (#138). A silently failed insert here brings
+    // the duplicate replies straight back, and supabase-js reports failures via
+    // { error } rather than throwing, so an unchecked call hides it completely.
+    const { error: logError } = await supabase
       .from('receptionist_logs')
       .insert({
         user_id: userId,
@@ -475,6 +525,10 @@ export async function POST(req: NextRequest) {
         response_type: result.responseType,
         points_used: result.pointsUsed || 0,
       });
+
+    if (logError) {
+      console.error('Receptionist: could not write receptionist_logs — after-hours suppression will not hold:', logError.message);
+    }
 
     return NextResponse.json({
       success: true,
