@@ -569,6 +569,38 @@ description, and **must not write a row of their own** — `telnyx/send-sms` and
 **This is not retroactive.** Charges made before 2026-08-05 00:52 UTC were never recorded and
 cannot be reconstructed. Any all-time total is a floor, not a figure.
 
+### The invariant, and the three ways to break it
+
+Every change to `users.credits` goes through `deduct_credits` or `add_credits`. Both are
+`SECURITY DEFINER`, both are `EXECUTE`-granted to `service_role` only, and both write their
+`points_transactions` row **inside the same transaction** as the balance change. Nothing else
+writes the ledger: `authenticated` has `SELECT` and nothing else on that table (#144), including
+no `TRUNCATE` — which ignores RLS and would have emptied it for every account at once.
+
+Three specific ways a future change breaks this, all found by adversarially auditing the fix:
+
+1. **Calling an RPC and also inserting a row.** That is a double count, and every points figure
+   reads the ledger. The three Stripe webhook branches pass `write_ledger => false` *because*
+   they insert first — their row is the `stripe_session_id` idempotency claim. That flag is the
+   only thing keeping plan grants, point packs and renewals at one row. Deleting it as
+   "redundant now" doubles the three highest-value paths in the product.
+2. **Adding a hand-written insert next to `add_credits`.** Recommended by two of the three audit
+   agents for `stripe/change-plan` and the number-pool refund; both already get their row from
+   the RPC. Acting on stale advice is how this regresses.
+3. **A session client.** `EXECUTE` is `service_role` only, and column grants let `authenticated`
+   write just `business_hours`, `business_name`, `timezone`, `updated_at`. A route using
+   `createClient()` gets *"permission denied for function"* — silently, if the error is not
+   checked, which is exactly how AI rewrites and step generation were free for months.
+
+**`amount_paid` is integer cents.** It was declared `numeric` for a few minutes on 2026-08-05;
+passing 12.7 stored 13, silently. Money that rounds without saying so surfaces as an
+unexplainable discrepancy much later. It is now `integer`, so a fractional value is a hard error
+at the call.
+
+`deduct_credits` also carries `write_ledger` purely for symmetry. Nothing passes it. It exists so
+the first debit path that needs a pre-written guard row has the correct option available, rather
+than hand-inserting alongside the RPC — which would be an automatic double count.
+
 ### "How did I use over 300 points?" — nobody did
 
 Worth keeping because the investigation was longer than the answer. Real spend that day was
