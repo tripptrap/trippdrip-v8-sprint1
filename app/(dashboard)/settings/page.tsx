@@ -24,6 +24,7 @@ import NotificationSettings from '@/components/NotificationSettings';
 import TenDLCRegistration from '@/components/settings/TenDLCRegistration';
 import TollFreeStatus from '@/components/settings/TollFreeStatus';
 import { POINT_PACKS, priceFor, scaleSavingsVsGrowthPct, scaleSavingsRangeLabel, packForPointsAmount } from '@/lib/pointPacks';
+import ApiKeysSettings from '@/components/ApiKeysSettings';
 
 export default function Page() {
   const { theme, setTheme } = useTheme();
@@ -1536,7 +1537,13 @@ export default function Page() {
       {activeTab === 'refund' && <RefundPolicyPage />}
 
       {/* Integrations Tab */}
-      {activeTab === 'integrations' && <IntegrationsPage />}
+      {activeTab === 'integrations' && (
+        <div className="space-y-6">
+          <IntegrationsPage />
+          {/* The extension connects with one of these (#148). */}
+          <ApiKeysSettings />
+        </div>
+      )}
 
       {/* DNC List Tab */}
       {activeTab === 'dnc' && (

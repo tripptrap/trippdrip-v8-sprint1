@@ -28,15 +28,18 @@
 // hashed, revocable, non-expiring keys and a settings screen to mint them —
 // filed separately. This closes the gap between "nothing works" and that.
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { looksLikeApiKey, resolveApiKey } from '@/lib/apiKeys';
 
 export interface AuthenticatedCaller {
   /** The verified user id. Never taken from the request body. */
   id: string;
   email: string | null;
   /** How they proved it — useful in logs when a client misbehaves. */
-  via: 'session' | 'bearer';
+  via: 'session' | 'bearer' | 'api_key';
+  /** Set only for via: 'api_key' — which key, so use can be traced or revoked. */
+  apiKeyId?: string;
 }
 
 /**
@@ -61,10 +64,22 @@ export async function authenticateRequest(
     // No cookie store (a non-request context) — fall through to the header.
   }
 
-  // 2. Bearer token, for the extension and anything else without cookies.
+  // 2. Bearer credential, for the extension and anything else without cookies.
   const header = req.headers.get('authorization') || req.headers.get('Authorization');
   const token = header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!token) return null;
+
+  // 2a. A durable API key (#148). Checked by prefix first so a Supabase access
+  //     token is never hashed and looked up, and a key is never sent to the auth
+  //     server. Keys do not expire; revoking one is what ends it.
+  if (looksLikeApiKey(token)) {
+    const resolved = await resolveApiKey(createServiceRoleClient(), token);
+    if (!resolved) return null;
+
+    // The email is not needed to authorise anything and costs a query, so it is
+    // left null rather than fetched. Nothing downstream reads it.
+    return { id: resolved.userId, email: null, via: 'api_key', apiKeyId: resolved.keyId };
+  }
 
   // A bare anon-key client purely to verify the token. It carries no session of
   // its own, so the only identity in play is the one the token proves.

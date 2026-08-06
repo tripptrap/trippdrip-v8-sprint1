@@ -510,6 +510,20 @@ async function sendChatMessage() {
 
     hideTypingIndicator();
 
+    // 401 means the key is wrong, revoked or expired. Falling back to canned
+    // text here is what made a dead credential look like a working assistant
+    // (#148) — say it plainly instead and send the user to the key screen.
+    if (response.status === 401) {
+      addChatMessage('assistant', 'Your API key was rejected. It may have been revoked. Create a new one in HyveWyre under Settings > Integrations > API Keys, then paste it below.');
+      apiKeySection?.classList.remove('hidden');
+      return;
+    }
+
+    if (response.status === 402) {
+      addChatMessage('assistant', 'You are out of points, so the AI could not respond. Buy a point pack in HyveWyre to continue.');
+      return;
+    }
+
     if (response.ok) {
       const data = await response.json();
       addChatMessage('assistant', data.response || 'I apologize, but I could not generate a response.');
@@ -663,6 +677,14 @@ async function generateSuggestions() {
       })
     });
 
+    if (response.status === 401) {
+      // Templates are a reasonable fallback for a transient error, but not for a
+      // rejected credential — the user needs to know the key is dead (#148).
+      displayFallbackSuggestions(tone, length);
+      showKeyRejectedNotice();
+      return;
+    }
+
     if (response.ok) {
       const data = await response.json();
       displaySuggestions(data.suggestions || []);
@@ -673,6 +695,14 @@ async function generateSuggestions() {
     console.error('Suggestions error:', error);
     displayFallbackSuggestions(tone, length);
   }
+}
+
+// Surface a rejected key wherever a fallback would otherwise hide it (#148).
+// The extension used to degrade silently into template text, so an expired or
+// revoked credential was indistinguishable from a working one.
+function showKeyRejectedNotice() {
+  apiKeySection?.classList.remove('hidden');
+  showMessage('API key rejected — create a new one in HyveWyre under Settings > Integrations > API Keys', 'error');
 }
 
 function displayFallbackSuggestions(tone, length) {
