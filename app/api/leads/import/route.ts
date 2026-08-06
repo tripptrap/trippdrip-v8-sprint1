@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { consentFields, isAttested } from "@/lib/leadConsent";
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,14 @@ export async function POST(req: NextRequest) {
   try {
     // Authentication check
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Session OR Bearer token (#147). The browser extension sends
+    // `Authorization: Bearer <token>` and carries no cookies, so the
+    // cookie-only check answered 401 to every request it ever made.
+    // authenticateRequest tries the session first, so dashboard behaviour
+    // is unchanged.
+    const caller = await authenticateRequest(req);
+    const user = caller ? { id: caller.id, email: caller.email } : null;
+    const authError = caller ? null : new Error('Not authenticated');
 
     if (authError || !user) {
       return NextResponse.json(

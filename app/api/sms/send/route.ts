@@ -9,6 +9,7 @@ import { checkSmsAllowed } from '@/lib/smsGuard';
 import { moderateOutbound } from '@/lib/smsModeration';
 import { resolveFromNumber, ownsNumber } from '@/lib/resolveFromNumber';
 import { isFirstContact, appendOptOut } from '@/lib/optOutFooter';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -44,10 +45,14 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
 
     // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    // Session OR Bearer token (#147). The browser extension sends
+    // `Authorization: Bearer <token>` and carries no cookies, so the
+    // cookie-only check answered 401 to every request it ever made.
+    // authenticateRequest tries the session first, so dashboard behaviour
+    // is unchanged.
+    const caller = await authenticateRequest(req);
+    const user = caller ? { id: caller.id, email: caller.email } : null;
+    const authError = caller ? null : new Error('Not authenticated');
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
