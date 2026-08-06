@@ -36,155 +36,29 @@ export async function getPointsBalance(): Promise<number> {
 }
 
 // Spend points for a specific action
-export async function spendPointsForAction(
-  actionType: ActionType,
-  count: number = 1
-): Promise<{ success: boolean; balance?: number; error?: string }> {
-  const costPerAction = POINT_COSTS[actionType];
-  const totalCost = costPerAction * count;
+// The browser-side WRITERS were removed here (#143): spendPointsForAction(),
+// spendPoints() and addPoints().
+//
+// All three did a read-then-write UPDATE of users.credits straight from the
+// browser and then inserted their own points_transactions row. None of it could
+// work: column grants let `authenticated` write only business_hours,
+// business_name, timezone and updated_at on public.users, and #144 revoked
+// INSERT on points_transactions as well. Verified live with an anon-key client —
+// both writes are refused.
+//
+// They were also the wrong shape regardless. addPoints() was a credit-minting
+// primitive reachable from a page: /points offered to "simulate" a purchase and
+// grant the pack whenever Stripe was unconfigured or the checkout call threw, so
+// a payment FAILURE offered free credits. Real purchases have always been granted
+// server-side by the Stripe webhook, which writes its ledger row first as an
+// idempotency claim and then calls add_credits — 7 purchases totalling 188,000
+// points went through it.
+//
+// Spending server-side goes through lib/pointsSupabaseServer, which derives cost
+// from POINT_COSTS and charges via the deduct_credits RPC (#137). Granting goes
+// through the Stripe webhook or an admin grant. There is no legitimate reason for
+// a browser to move a balance, so this file is read-only now.
 
-  const actionDescriptions: Record<ActionType, string> = {
-    sms_sent: `SMS sent (${count}x)`,
-    ai_response: `AI response generated (${count}x)`,
-    document_upload: `Document uploaded with AI processing (${count}x)`,
-    bulk_message: `Bulk message sent to ${count} contact(s)`,
-    flow_creation: `Flow created (${count}x)`
-  };
-
-  return await spendPoints(totalCost, actionDescriptions[actionType], actionType);
-}
-
-// Spend points
-export async function spendPoints(
-  amount: number,
-  description: string,
-  actionType?: ActionType
-): Promise<{ success: boolean; balance?: number; error?: string }> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-
-  // Get current balance
-  const { data: userData, error: fetchError } = await supabase
-    .from('users')
-    .select('credits')
-    .eq('id', user.id)
-    .single();
-
-  if (fetchError || !userData) {
-    return { success: false, error: 'Failed to fetch user data' };
-  }
-
-  const currentBalance = userData.credits || 0;
-
-  if (currentBalance < amount) {
-    return { success: false, error: 'Insufficient points' };
-  }
-
-  // Deduct points
-  const newBalance = currentBalance - amount;
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ credits: newBalance, updated_at: new Date().toISOString() })
-    .eq('id', user.id);
-
-  if (updateError) {
-    console.error('Error updating balance:', updateError);
-    return { success: false, error: 'Failed to update balance' };
-  }
-
-  // Record transaction
-  const { error: transactionError } = await supabase
-    .from('points_transactions')
-    .insert({
-      user_id: user.id,
-      action_type: 'spend',
-      points_amount: -amount,
-      description,
-      created_at: new Date().toISOString()
-    });
-
-  if (transactionError) {
-    console.error('Error recording transaction:', transactionError);
-  }
-
-  // Dispatch event for UI updates
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('pointsUpdated', {
-      detail: { balance: newBalance }
-    }));
-  }
-
-  return { success: true, balance: newBalance };
-}
-
-// Add points (for purchases)
-export async function addPoints(
-  amount: number,
-  description: string,
-  type: 'earn' | 'purchase' = 'purchase'
-): Promise<{ success: boolean; balance?: number; error?: string }> {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: 'Not authenticated' };
-  }
-
-  // Get current balance
-  const { data: userData, error: fetchError } = await supabase
-    .from('users')
-    .select('credits')
-    .eq('id', user.id)
-    .single();
-
-  if (fetchError || !userData) {
-    return { success: false, error: 'Failed to fetch user data' };
-  }
-
-  const currentBalance = userData.credits || 0;
-  const newBalance = currentBalance + amount;
-
-  // Add points
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ credits: newBalance, updated_at: new Date().toISOString() })
-    .eq('id', user.id);
-
-  if (updateError) {
-    console.error('Error updating balance:', updateError);
-    return { success: false, error: 'Failed to update balance' };
-  }
-
-  // Record transaction
-  const { error: transactionError } = await supabase
-    .from('points_transactions')
-    .insert({
-      user_id: user.id,
-      action_type: type,
-      points_amount: amount,
-      description,
-      created_at: new Date().toISOString()
-    });
-
-  if (transactionError) {
-    console.error('Error recording transaction:', transactionError);
-  }
-
-  // Dispatch event for UI updates
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('pointsUpdated', {
-      detail: { balance: newBalance }
-    }));
-  }
-
-  return { success: true, balance: newBalance };
-}
-
-// Check if user can afford an action
 export async function canAffordAction(actionType: ActionType, count: number = 1): Promise<boolean> {
   const cost = POINT_COSTS[actionType] * count;
   const balance = await getPointsBalance();

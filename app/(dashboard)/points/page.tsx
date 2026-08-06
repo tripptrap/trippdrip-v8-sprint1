@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { addPoints as addPointsSupabase, getRecentTransactions as getRecentTransactionsSupabase } from "@/lib/pointsSupabase";
+import { getRecentTransactions as getRecentTransactionsSupabase } from "@/lib/pointsSupabase";
 import { type PointTransaction } from "@/lib/pointsStore";
 import { getDaysUntilRenewal } from "@/lib/renewalSystem";
 import { SUBSCRIPTION_FEATURES, type SubscriptionTier } from "@/lib/subscriptionFeatures";
@@ -79,25 +79,11 @@ export default function PointsPage() {
     return () => window.removeEventListener('pointsUpdated', handleUpdate);
   }, []);
 
-  async function handlePurchaseComplete(points: number, packName: string) {
-    try {
-      // Add points to Supabase
-      const result = await addPointsSupabase(points, `${packName} purchased`, 'purchase');
+  // handlePurchaseComplete() removed (#143). Nothing referenced it — verified by
+  // grep — and it granted the pack through the browser-side addPoints(), which
+  // could not work and should not have existed. The Stripe webhook is the grant
+  // path for a real purchase.
 
-      if (result.success) {
-        setModal({isOpen: true, type: 'success', title: 'Payment Successful', message: `Payment successful! ${points.toLocaleString()} points added to your account.`});
-        await refreshData();
-      } else {
-        setModal({isOpen: true, type: 'error', title: 'Error Adding Points', message: `Error adding points: ${result.error}`});
-      }
-    } catch (error) {
-      console.error('Error completing purchase:', error);
-      setModal({isOpen: true, type: 'error', title: 'Purchase Error', message: 'Error completing purchase. Please contact support.'});
-    }
-
-    // Clean URL
-    window.history.replaceState({}, '', '/points');
-  }
 
   async function refreshData() {
     // Balance and tier come from /api/user/credits — the same authenticated
@@ -341,18 +327,16 @@ export default function PointsPage() {
 
       if (result.setup) {
         // Stripe not configured - fallback to simulated purchase
+        // No "simulate this purchase" offer (#143). It called a browser-side
+        // addPoints() that granted the pack outright — a credit-minting button
+        // behind a payment failure. It has not worked since column grants locked
+        // users.credits, so the button silently did nothing, which is its own
+        // kind of bad. Real purchases are granted by the Stripe webhook.
         setModal({
           isOpen: true,
-          type: 'confirm',
-          title: 'Stripe Not Configured',
-          message: `Stripe not configured yet. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`,
-          onConfirm: async () => {
-            const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
-            if (addResult.success) {
-              setModal({isOpen: true, type: 'success', title: 'Purchase Simulated', message: `Successfully added ${pack.points.toLocaleString()} points! (Simulated - Set up Stripe for real payments)`});
-              await refreshData();
-            }
-          }
+          type: 'error',
+          title: 'Payments Not Set Up',
+          message: 'Card payments are not configured on this account yet, so points cannot be purchased. Contact support and we will sort it out.',
         });
         return;
       }
@@ -368,18 +352,13 @@ export default function PointsPage() {
     } catch (error) {
       console.error('Purchase error:', error);
       // Fallback to simulated purchase
+      // A failure to reach the payment processor is a failure, not an
+      // invitation to hand out the pack for free (#143).
       setModal({
         isOpen: true,
-        type: 'confirm',
+        type: 'error',
         title: 'Payment Error',
-        message: `Error connecting to payment processor. Simulate purchase of ${pack.points.toLocaleString()} points for $${price}?`,
-        onConfirm: async () => {
-          const addResult = await addPointsSupabase(pack.points, `${pack.name} purchased ($${price}) - SIMULATED`, 'purchase');
-          if (addResult.success) {
-            setModal({isOpen: true, type: 'success', title: 'Purchase Simulated', message: `Successfully added ${pack.points.toLocaleString()} points! (Simulated)`});
-            await refreshData();
-          }
-        }
+        message: 'Could not reach the payment processor. No card was charged and no points were added — please try again in a moment.',
       });
     }
   }

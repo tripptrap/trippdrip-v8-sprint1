@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getPointsBalance, spendPointsForAction, addPoints } from "@/lib/pointsSupabase";
+import { getPointsBalance, POINT_COSTS, type ActionType } from "@/lib/pointsSupabase";
 import toast from "react-hot-toast";
 
 export default function TestPointsPage() {
@@ -39,43 +39,17 @@ export default function TestPointsPage() {
     }
   }
 
-  async function testAction(actionType: 'sms_sent' | 'ai_response' | 'document_upload' | 'bulk_message' | 'flow_creation', count: number = 1) {
-    setLoading(true);
-    try {
-      const result = await spendPointsForAction(actionType, count);
+  // The point-spending and point-adding buttons were removed here (#143).
+  //
+  // Both went through the browser-side writers in lib/pointsSupabase, which did
+  // a read-then-write UPDATE of users.credits straight from the page. Neither
+  // could work — column grants let `authenticated` write only business_hours,
+  // business_name, timezone and updated_at — so the buttons had been silently
+  // failing, and "Add 100 Points" was a credit-minting control shipped to
+  // production. Spending is exercised by using the real features, all of which
+  // charge through deduct_credits (#137); this page keeps the read-only view of
+  // the balance, the ledger and the cost table.
 
-      if (result.success) {
-        toast.success(`✅ Successfully spent points! New balance: ${result.balance}`);
-        setBalance(result.balance || 0);
-        await loadData(); // Reload to show new transaction
-      } else {
-        toast.error(`❌ ${result.error}`);
-      }
-    } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function testAddPoints() {
-    setLoading(true);
-    try {
-      const result = await addPoints(100, "Test purchase", "purchase");
-
-      if (result.success) {
-        toast.success(`✅ Added 100 points! New balance: ${result.balance}`);
-        setBalance(result.balance || 0);
-        await loadData();
-      } else {
-        toast.error(`❌ ${result.error}`);
-      }
-    } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   if (!user) {
     return (
@@ -110,63 +84,26 @@ export default function TestPointsPage() {
         </div>
       </div>
 
-      {/* Test Actions */}
+      {/* What each action costs — the reference this page is actually useful for. */}
       <div className="card">
-        <h2 className="text-lg font-semibold mb-4">Test Point Deductions</h2>
+        <h2 className="text-lg font-semibold mb-1">What actions cost</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+          Read-only. Spending is exercised by using the real features — every one of them charges
+          server-side through <code className="text-xs">deduct_credits</code>, which also writes the
+          ledger row below.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button
-            onClick={() => testAction('sms_sent')}
-            disabled={loading}
-            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold">Send SMS (1-to-1)</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 1 point</div>
-          </button>
-
-          <button
-            onClick={() => testAction('ai_response')}
-            disabled={loading}
-            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold">AI Response</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 2 points</div>
-          </button>
-
-          <button
-            onClick={() => testAction('document_upload')}
-            disabled={loading}
-            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold">Document Upload w/ AI</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 5 points</div>
-          </button>
-
-          <button
-            onClick={() => testAction('bulk_message')}
-            disabled={loading}
-            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold">Bulk Message (per contact)</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 2 points</div>
-          </button>
-
-          <button
-            onClick={() => testAction('flow_creation')}
-            disabled={loading}
-            className="p-4 bg-white hover:bg-slate-50 dark:bg-slate-800 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold">Flow Creation</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Costs: 15 points</div>
-          </button>
-
-          <button
-            onClick={testAddPoints}
-            disabled={loading}
-            className="p-4 bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 rounded-lg text-left transition disabled:opacity-50"
-          >
-            <div className="font-semibold text-sky-600">Add 100 Points (Test)</div>
-            <div className="text-sm text-slate-600 dark:text-slate-400">Test point addition</div>
-          </button>
+          {(Object.keys(POINT_COSTS) as ActionType[]).map((action) => (
+            <div
+              key={action}
+              className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+            >
+              <div className="font-semibold capitalize">{action.replace(/_/g, ' ')}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                Costs: {POINT_COSTS[action]} {POINT_COSTS[action] === 1 ? 'point' : 'points'}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -202,8 +139,7 @@ export default function TestPointsPage() {
         <h3 className="font-semibold mb-2">📝 How to Test:</h3>
         <ol className="text-sm space-y-2 text-slate-700 dark:text-slate-300 list-decimal list-inside">
           <li>Check your current balance at the top</li>
-          <li>Click any action button to test point deduction</li>
-          <li>Watch the balance update in real-time</li>
+          <li>Watch the balance update after a real send or AI call</li>
           <li>Check the transactions list to see the deduction recorded</li>
           <li>Verify in Supabase database:
             <ul className="ml-8 mt-1 space-y-1 list-disc list-inside">
@@ -211,8 +147,16 @@ export default function TestPointsPage() {
               <li>Check <code className="bg-black/30 px-1 rounded">points_transactions</code> table for all records</li>
             </ul>
           </li>
-          <li>Try the "Add 100 Points" button to test point additions</li>
-          <li>Try an action when balance is low to test insufficient points error</li>
+          <li>
+            To exercise a spend, use a real feature — send a text, run a flow, upload a document.
+            Every path charges through <code className="bg-black/30 px-1 rounded">deduct_credits</code>,
+            which writes the ledger row in the same transaction, so the balance and the list below
+            can never disagree.
+          </li>
+          <li>
+            There is deliberately no &quot;add points&quot; button here (#143). Credits are granted
+            only by the Stripe webhook or an admin grant, both server-side.
+          </li>
         </ol>
       </div>
 

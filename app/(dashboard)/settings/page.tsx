@@ -10,7 +10,6 @@ import {
   type Settings,
   type EmailConfig
 } from '@/lib/settingsStore';
-import { addPoints } from '@/lib/pointsSupabase';
 import toast from 'react-hot-toast';
 import PrivacyPolicyPage from '../../(public)/privacy/page';
 import TermsOfServicePage from '../../(public)/terms/page';
