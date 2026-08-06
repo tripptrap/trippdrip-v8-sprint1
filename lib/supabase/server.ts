@@ -32,6 +32,21 @@ export async function createClient() {
           }
         },
       },
+      global: {
+        // Uncached, for the same reason createServiceRoleClient is — Next patches
+        // global fetch and a supabase-js SELECT is a GET, so a route handler keeps
+        // serving the FIRST response it ever got for a given query.
+        //
+        // Only the service-role client was fixed initially, which left this one
+        // live. Caught on 2026-08-06: PATCH /api/leads/[id] computes added tags by
+        // diffing against the lead it just read, and a cached read of that lead
+        // made the diff EMPTY — so a tag that was genuinely added fired no
+        // drip trigger, returned 200, and logged nothing. Half a fix is its own
+        // trap: the failure moved from the cron to the dashboard rather than going
+        // away.
+        fetch: (input: any, init?: any) =>
+          fetch(input, { ...init, cache: 'no-store' as RequestCache }),
+      },
     }
   )
 }

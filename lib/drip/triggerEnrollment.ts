@@ -109,8 +109,22 @@ export async function checkAndEnrollDripTriggers(
           next_send_at: nextSendAt,
           enrolled_at: now.toISOString(),
         }, {
+          // `campaign_id,lead_id` is a real unique index
+          // (drip_campaign_enrollments_campaign_id_lead_id_key) — checked, because
+          // supabase-js does not validate onConflict and Postgres only complains
+          // at runtime with 42P10.
           onConflict: 'campaign_id,lead_id',
-          ignoreDuplicates: true,
+          // NOT ignoreDuplicates. That constraint does not include `status`, so a
+          // lead who finished or was paused by a reply already has a row — and
+          // ignoring the conflict returned NOTHING, so this function fell straight
+          // through `if (!enrollment) continue`. Re-tagging a lead to restart a
+          // drip did nothing at all, for ever, with a 200 and no error (#61).
+          //
+          // Overwriting is safe here precisely because the active/paused check
+          // above already returned: anything reaching this line is completed,
+          // cancelled or paused_reply, and resetting those to a fresh run is what
+          // re-tagging is asking for.
+          ignoreDuplicates: false,
         })
         .select('id')
         .maybeSingle();
@@ -119,7 +133,7 @@ export async function checkAndEnrollDripTriggers(
         console.error(`Drip: failed to enroll lead ${leadId} in campaign ${campaign.id}:`, enrollError);
         continue;
       }
-      if (!enrollment) continue; // ignoreDuplicates swallowed it — already enrolled
+      if (!enrollment) continue; // no row came back — nothing to materialise
 
       console.log(`📧 Drip: Auto-enrolled lead ${leadId} in campaign ${campaign.id} (trigger: ${triggerType})`);
 
