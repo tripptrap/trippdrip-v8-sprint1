@@ -434,6 +434,13 @@ never is.
 
 ### The 10DLC campaign is approved; the number cannot attach to it (#105, 2026-07-30)
 
+**Do not use campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` (CJFUY00) as the reference — it is
+a superseded failed attempt.** Eight campaigns exist under this brand and six are dead. Reading
+that old id sent a session down an appeal-and-resubmit path for a campaign that was already
+approved. Always list with `GET /10dlc/campaign?brandId=<id>` and take the one whose
+`campaignStatus` is `MNO_PROVISIONED`. Full rejection history:
+[`docs/10DLC_REJECTION_HISTORY.md`](10DLC_REJECTION_HISTORY.md).
+
 Campaign `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` is `MNO_PROVISIONED`, T-Mobile
 registered, no failure reasons, all seven MNOs APPROVED. Assigning `+18134972176` fails:
 

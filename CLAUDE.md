@@ -587,129 +587,36 @@ a query — see the comment in `threads/bulk-ai-toggle/route.ts`.
 
 ---
 
-## TODO (Persistent — update as tasks are completed or added)
-**ALL items below are PRE-LAUNCH requirements unless marked as "Roadmap".**
+## Where the work is tracked
 
-### Completed
-- [x] Remove unused files from project (backup files, images, components, lib files, markdown docs)
-- [x] Archive SQL migrations to `migrations/archive/`
-- [x] Update `.gitignore` (tsconfig.tsbuildinfo, *.backup, *.bak)
-- [x] Remove `tsconfig.tsbuildinfo` from git tracking
-- [x] Document project context in CLAUDE.md
-- [x] Standardize tier naming: rename all basic/starter → "growth", all premium/professional → "scale"
-- [x] Fix inconsistent subscription tier type
-- [x] Remove "preview"/"free" tier references — replace with "unpaid" state
-- [x] Enforce payment at signup (card required during onboarding)
-- [x] Show Scale tier point pack discount clearly on pricing/preview pages
-- [x] Auto-buy feature: user enables auto-purchase, picks which pack to auto-buy at zero credits
-- [x] Plan management (upgrade/downgrade) inside Settings page
-- [x] Settings: Profile info section (name, email, business info)
-- [x] Settings: Plan management section (current plan, upgrade/downgrade, billing)
-- [x] Settings: Spam protection settings
-- [x] Settings: DNC list management
-- [x] Settings: Auto-buy configuration (enable/disable, pick pack size)
-- [x] Onboarding: Add demographic questions (industry, business type)
-- [x] Onboarding: Auto-provision one free local number
-- [x] Onboarding: Guide user to set up AI Flows based on industry
-- [x] Onboarding: Show industry-specific preset pipeline stages (customizable)
-- [x] Onboarding: Add optional Google Calendar connection step
-- [x] Create Clients concept — separate from Leads
-- [x] Add "mark as sold" action on leads to convert to client
-- [x] Create `/clients` page for managing sold/active customers
-- [x] Split messages view into Lead conversations and Client conversations (tabs)
-- [x] Route Leads → Flows AI, Clients → Receptionist AI
-- [x] Build Flow system — AI templates that gather info before booking appointments
-- [x] Industry-specific flow presets (insurance, real estate, solar, etc.)
-- [x] Custom flow builder (user can create from scratch)
-- [x] Configurable required fields per flow
-- [x] User can take over conversation at any time (AI stops or switches to suggest mode)
-- [x] Dashboard: Scrollable sections layout (appointments → unread → pipeline)
-- [x] Dashboard: Upcoming appointments section (Flows + Google Calendar)
-- [x] Dashboard: Unread messages section (leads + clients)
-- [x] Dashboard: Pipeline overview — lead counts by stage (visual)
-- [x] Dashboard: Separate lead and client sections
-- [x] Industry-specific preset tags loaded during onboarding
-- [x] User can customize their own pipeline stages
-- [x] Pipeline stages shown on dashboard
-- [x] Redefine campaigns as lead type categories (health, life, auto, solar, etc.)
-- [x] Campaigns independent from tags
-- [x] Campaign determines which Flow presets are available
-- [x] Opt-out (STOP) = permanent DNC, completely blocked from all future messaging
-- [x] Lead record stays but is permanently locked — no ability to message again
-- [x] Verify current DNC implementation matches this behavior
-- [x] One free number provisioned with plan during onboarding (shared toll-free from the pool; local requires 10DLC first — see Onboarding Flow above)
-- [x] Build `/analytics` page with full reporting
-- [x] Message delivery rates and response rates
-- [x] Campaign performance breakdowns
-- [x] Credits usage over time
-- [x] Charts and data visualization
-- [x] Export functionality
-- [x] Industry-specific default tone presets
-- [x] User-customizable system prompt / AI personality
-- [x] AI guardrails (no promises, no legal/medical advice, no pricing unless configured)
-- [x] Clearly show Scale tier point pack discount as key differentiator
-- [x] Browser extension: Scrape contact info from any platform
-- [x] Browser extension: Import captured info into HyveWyre as a lead/client
-- [x] User-configurable notification preferences (per notification type)
-- [x] In-app notifications (bell/badge in dashboard)
-- [x] Notification types: new messages, appointments, low credits, opt-outs, AI handoff requests
-- [x] Google Calendar integration for appointment booking from Flows
-- [x] Inbound lead handling: Receptionist greets → user assigns as lead or client
-- [x] Opt-in page as generic compliance proof
+**Open work lives in GitHub Issues, not here.** This section used to carry the full
+backlog and grew to a third of the file — which mattered, because CLAUDE.md is
+loaded into every turn of every session and Claude Code warns past 40k characters.
 
-- [x] Out-of-credits blocker: stop all SMS/AI features, prompt user to buy a point pack
-- [x] AI autonomy settings per flow (full auto, suggest replies, manual)
-- [x] Flow completion → auto-book appointment → auto-tag "appointment set"
-- [x] Flow trigger config: user chooses auto-on-reply or manual assignment per campaign
-- [x] Support multiple tags per lead with one primary tag
-- [x] Number porting (bring your own number)
-- [x] Full landing page: hero, features section, pricing table (Growth vs Scale), testimonials, CTA
-- [x] Browser extension: Quick-send a message from the extension
-- [x] Email alerts (notifications)
-- [x] SMS alerts to user's personal phone (notifications)
-- [x] AI suggest-reply mode (AI drafts, user reviews and sends)
-- [x] Admin panel updates to reflect new tier names and lead/client separation
-- [x] Deep audit: API routes, database schema, Telnyx integration — all findings fixed
-- [x] Fix missing `capabilities` on `user_telnyx_numbers` rows (2026-07-28, commit `40c0320`) — crash on Phone Numbers page for +18134972176 was actually two bugs: (1) `GET /api/telnyx/numbers` rebuilt each row into a narrow object that dropped `id`/`capabilities`/`created_at` even though the DB query already selected them, so capabilities was `undefined` for every row regardless of DB state; (2) none of the 5 insert/upsert paths into `user_telnyx_numbers` ever set `capabilities`, so new rows were always null. Fixed both, plus added `supabase/migrations/fix_user_telnyx_numbers_capabilities.sql` to backfill existing null rows and add a column default — **this migration still needs to be run against the live DB** (no linked Supabase project in the sandbox that made the fix).
+```bash
+gh issue list --repo tripptrap/trippdrip-v8-sprint1
+gh issue list --repo tripptrap/trippdrip-v8-sprint1 --label compliance
+```
 
-### In Progress
-- [x] ~~**Number-purchase checkout session never fulfills after payment**~~ — **FIXED 2026-07-28, commit `b28e8cb`.** The webhook's `checkout.session.completed` handler had no branch for `phone_number` metadata at all, so the customer was charged and the number never ordered. Worse, that checkout uses `mode: 'subscription'`, so it fell through into the plan branch and would have been treated as a **Growth plan purchase** (granting 3000 credits). A fix had been written in worktree `priceless-kowalevski-e9b46d` but was left **uncommitted and never merged** — it was ported to main, and a real bug in it corrected (its `onConflict` named a constraint that doesn't exist; see next item). The new branch runs *before* the `session.mode` check — do not reorder it. Tested with signed Stripe events: unverified toll-free blocked before ordering, no plan-credit leak, idempotent on redelivery, won't reassign another user's number. See `docs/SYSTEM_STATE.md` → Phone Numbers.
-- [x] ~~**STOP opt-outs were never persisted to the DNC list**~~ — **FIXED 2026-07-28, commit `b28e8cb`, GitHub #34.** TCPA-level: `dnc_list` had **0 rows in production** — no opt-out had ever been recorded, and leads who texted STOP kept receiving messages. Detection worked; both persistence writes failed silently (bad `onConflict` target + missing NOT NULL columns + unchecked error returns, so it logged success on every failure). The only surviving effect, `leads.sms_opt_in = false`, is read by **no send path**. Now uses the `add_to_dnc` RPC with a loud error check. Full mechanism and the rules it leaves behind are in `docs/SYSTEM_STATE.md` → SMS / Telnyx / 10DLC.
-- [ ] **Verify the live Telnyx number-order leg of the checkout fix** — everything around it is tested, but the actual `POST /v2/number_orders` call in the `phoneNumberPurchase` branch of `app/api/stripe/webhook/route.ts` has **never been executed against real Telnyx**, because doing so places a real, billable number order. To verify: buy a **local** number (not toll-free — toll-free is correctly blocked while TFV is missing, see `docs/SYSTEM_STATE.md`) through the checkout path as a user with no active subscription, then confirm the number appears in `user_telnyx_numbers` with `status: 'pending'` and on the Telnyx account. **Requires the user's explicit go-ahead — this spends money and orders a real number.**
-- [x] ~~Telnyx local number orders being denied~~ — **RESOLVED 2026-07-26**: root cause was the negative account balance (-$23.91), not a code or compliance issue. User added funds (balance now positive, ~$76 before test orders). Confirmed via live test: 1 local number (+18134972176, area code 813) and 3 toll-free numbers ordered successfully once balance was positive. Local orders are not gated by 10DLC campaign status at the ordering stage (only affects message throughput later).
-- [x] ~~Add funds to Telnyx account balance~~ — done by user 2026-07-26.
-- [ ] **10DLC campaign is APPROVED — one step left: assign the number.** The live campaign is
-  `CAAP953` / `4b30019f-a9aa-5d53-15ff-8fab24597ea8` (brand `4b20019b-eba4-6bfd-8723-dca9058142e8`,
-  VERIFIED). Verified 2026-07-30: `campaignStatus: MNO_PROVISIONED`, `isTMobileRegistered: true`,
-  `isTMobileSuspended: false`, `failureReasons: null`, all seven MNOs APPROVED.
-  **Corrected 2026-08-03: it is NOT true that "0 numbers are assigned".** Checked against
-  `GET /10dlc/phone_number_campaigns/<number>`:
-  - `+18135187997` **is** assigned to CAAP953 and can send.
-  - `+18134972176` is assigned to nothing — this is the number #105 is about.
-  - `+18887062631` (toll-free) is TFV **Verified** and can send.
-  So the account has two numbers that can legitimately send. What is blocked is assigning
-  **that one specific number**, not messaging as a whole.
-  **Blocked as of 2026-07-30 (#105):** the assignment fails — AT&T and T-Mobile report
-  *"Longcode cannot be added/deleted as it is already associated with another campaign"* while
-  non-T-Mobile carriers accept it. One of the five dead campaigns still holds the number at
-  carrier level, invisible through the API. Needs Telnyx support to clear it; the exact request
-  to send is in #105. **Do not keep retrying** — tried twice with a full delete between, same
-  result.
-  **Do not use campaign `4b30019f-a63a-3fb0-9c87-1ff6d84e7ac6` (CJFUY00) as the reference — it is
-  a superseded failed attempt.** Eight campaigns exist under this brand; six are dead. Reading the
-  old id from this file sent a session down an appeal-and-resubmit path for a campaign that was
-  already approved. Always list with
-  `GET /10dlc/campaign?brandId=<id>` and take the one whose `campaignStatus` is `MNO_PROVISIONED`.
-  History of every rejection and fix: [`docs/10DLC_REJECTION_HISTORY.md`](docs/10DLC_REJECTION_HISTORY.md).
-- [x] Per-user branded opt-in pages (#21) — built as a hard prerequisite for per-agent 10DLC (see above), not post-launch roadmap. Live at `/opt-in/<slug>`. See `docs/10DLC_REJECTION_HISTORY.md` and `lib/optInConsent.ts`.
+Milestones: **Pre-Launch** blocks shipping; **Post-Launch Roadmap** does not.
+Useful labels: `compliance`, `billing`, `bug`, `retention`, `dark-mode`, `ux`.
 
-### Open Work — tracked in GitHub Issues
-All open pre-launch bugs, compliance work, retention/pricing decisions, and roadmap items moved to GitHub Issues (2026-07-26) — this file was becoming too long to track against reliably. See https://github.com/tripptrap/trippdrip-v8-sprint1/issues, or `gh issue list --repo tripptrap/trippdrip-v8-sprint1`.
+**For how the system actually behaves right now** — what is confirmed working,
+what is confirmed broken, and the traps that have already cost real time — read
+[`docs/SYSTEM_STATE.md`](docs/SYSTEM_STATE.md). That is the file to check before
+non-trivial work, and the one to update afterwards. This file describes what the
+product is *supposed* to be; SYSTEM_STATE describes what it *is*.
 
-For *how things currently actually behave* (as opposed to a list of open tickets), see `docs/SYSTEM_STATE.md` — required reading before non-trivial work, see the top of this file.
+**For a fast read on whether anything is broken right now:**
 
-- **Launch blocker, decided 2026-07-27**: rotate **all** production secrets before launch (#29) — Vercel flags many env vars "Needs Attention", most likely fallout from the April 2026 incident where non-"sensitive" variables were exposed. Deliberately deferred until launch prep. **Ordering constraint:** rotate `ENCRYPTION_KEY` *before* the first real number-port order exists, or the stored `account_pin` needs a decrypt/re-encrypt migration. Note the app running normally is not evidence the secrets are safe — leaked credentials keep working.
-- **Pre-Launch milestone**: everything blocking launch — 10DLC per-agent restructuring (#1) and its dependents (#2, #3, #11), end-to-end QA (#17), and production verification (#18). Landing page accuracy pass (#33) — audit `/preview` against what the product actually does today. (#4 billing bug, #5 dark-mode pass, #6 /points balance, #7 floating button, #8 sidebar breakpoint, #9 analytics nav, #10 number-order webhook, #12-#15 downgrade/retention flow, and #16 email API key encryption are all closed — see issue history for what changed.)
-- **Post-Launch Roadmap milestone**: native mobile app (#19), browser extension polish (#20), team/role-based admin access (#22). (#21, per-user branded opt-in pages, was pulled forward and completed 2026-07-27 — see "In Progress" above.)
+```bash
+npm run health
+```
 
-Filter with `gh issue list --repo tripptrap/trippdrip-v8-sprint1 --label compliance` (or `billing`, `bug`, `retention`, `dark-mode`, `ux`) to narrow by category.
+Eleven assertions over the live system — cron freshness, number-pool inventory,
+delivery receipts, charge/ledger reconciliation, DNC integrity, RLS coverage,
+credit-RPC exposure, SECURITY DEFINER search_path hygiene, Telnyx balance and TFV
+status. Exits non-zero on failure. Most bugs found here were silent, so these are
+assertions rather than things somebody remembers to check.
+
+The completed history that used to live here is in git and in the closed issues.
