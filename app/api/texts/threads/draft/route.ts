@@ -78,10 +78,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'No primary phone number configured' }, { status: 400 });
     }
 
-    // Send the SMS
+    // Send the SMS.
+    //
+    // The session is forwarded (#146). This is a server-to-server fetch, which
+    // carries no cookies of its own, and /api/sms/send authenticates with
+    // supabase.auth.getUser() — cookie-based, and unlike /api/telnyx/send-sms it
+    // has no internal-secret path. So this request arrived anonymous and the
+    // route answered 401: approving a draft has never once sent a message.
+    //
+    // Forwarding the caller's cookie rather than adding an internal-secret path
+    // is deliberate. /api/telnyx/send-sms wraps its ENTIRE credit block in
+    // `if (!internalCaller)`, so an internal caller is not charged — and this is
+    // a user pressing send on a message they reviewed. It must cost a credit and
+    // must be subject to every guard a typed message is. Running it as the user
+    // gets both for free.
+    const cookieHeader = req.headers.get('cookie');
     const sendRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sms/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      },
       body: JSON.stringify({
         leadId: thread.lead_id,
         to: thread.phone_number,
@@ -92,9 +109,21 @@ export async function POST(req: NextRequest) {
       }),
     });
 
-    const sendData = await sendRes.json();
-    if (!sendData.ok && !sendData.success) {
-      return NextResponse.json({ ok: false, error: sendData.error || 'Failed to send message' }, { status: 500 });
+    // Read the status as well as the body. /api/sms/send answers 401 with
+    // `{ error }` and no `ok`/`success` key, so the old check happened to catch
+    // it — but a route that returned an empty body or a differently-shaped error
+    // would have read as a success and cleared the draft on a message that never
+    // went out.
+    const sendData = await sendRes.json().catch(() => ({} as any));
+    if (!sendRes.ok || (!sendData.ok && !sendData.success)) {
+      console.error(
+        `Draft approve: send failed for thread ${threadId} (HTTP ${sendRes.status}):`,
+        sendData.error || '(no error body)'
+      );
+      return NextResponse.json(
+        { ok: false, error: sendData.error || `Failed to send message (HTTP ${sendRes.status})` },
+        { status: 500 }
+      );
     }
 
     // Clear the draft
