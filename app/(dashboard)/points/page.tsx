@@ -315,12 +315,11 @@ export default function PointsPage() {
       const response = await fetch('/api/stripe/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          points: pack.points,
-          price: price,
-          packName: pack.name,
-          planType: currentPlan
-        })
+        // Only the pack name. The server resolves the size and the tier price
+        // itself — sending points/price/planType from here was a self-service
+        // discount and an unbounded credit grant, since the webhook grants
+        // whatever `points` the session metadata carries.
+        body: JSON.stringify({ packName: pack.name })
       });
 
       const result = await response.json();

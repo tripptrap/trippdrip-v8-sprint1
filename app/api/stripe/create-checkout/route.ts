@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
+import { POINT_PACKS } from '@/lib/pointPacks';
 
 // LOW-1: Stripe Price IDs loaded from env vars — not hardcoded in source.
 // Set these in your .env.local / Vercel environment variables:
@@ -40,15 +41,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { points, price, packName, planType, subscriptionType } = await req.json();
+    // `points`, `price` and `planType` are deliberately NOT read from the body.
+    //
+    // They used to be, and all three reached something that costs money:
+    // `planType` chose which price to charge, and `points` was copied into the
+    // checkout session's metadata, which is the ONLY thing the webhook reads to
+    // decide how many credits to grant. So this was enough to buy 9,999,999
+    // points for the price of the cheapest pack:
+    //
+    //   { packName: 'Starter', planType: 'scale', points: 9999999 }
+    //
+    // Same shape as #141 — a caller-supplied number reaching a charge — but on
+    // the real-money path rather than the credits one. Everything that decides a
+    // price or a quantity is now derived server-side.
+    const { packName, subscriptionType } = await req.json();
 
     // Validate inputs for point packs
-    if (!subscriptionType && (!points || !price || !packName)) {
+    if (!subscriptionType && !packName) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
+
+    // The tier comes from the database, never the request. It selects which of
+    // the two prices on a pack the customer is charged — Enterprise is $510 on
+    // Growth and $382.50 on Scale, so a body-supplied tier was a $127.50
+    // self-service discount.
+    const { data: accountRow } = await supabase
+      .from('users')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .single();
+    const userPlan: 'growth' | 'scale' =
+      accountRow?.subscription_tier === 'scale' ? 'scale' : 'growth';
 
     // Check for Stripe API key
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
@@ -70,6 +96,7 @@ export async function POST(req: NextRequest) {
 
     // Determine which Price ID to use
     let priceId: string | null = null;
+    let resolvedPack: (typeof POINT_PACKS)[number] | null = null;
     let mode: 'subscription' | 'payment' = 'payment';
     let successUrl = `${baseUrl}/points?success=true&session_id={CHECKOUT_SESSION_ID}`;
 
@@ -81,19 +108,18 @@ export async function POST(req: NextRequest) {
         ? STRIPE_PRICES.subscriptions.scale
         : STRIPE_PRICES.subscriptions.growth;
     } else {
-      // Handle point pack checkout
-      const userPlan = planType === 'scale' ? 'scale' : 'growth';
-      const packType = packName.toLowerCase();
+      // Handle point pack checkout. The pack is resolved against the server-side
+      // catalogue, so `points` below is the pack's real size — not a number the
+      // caller chose.
+      const packType = String(packName).toLowerCase();
+      resolvedPack = POINT_PACKS.find(p => packType.includes(p.name.toLowerCase())) ?? null;
 
-      if (packType.includes('starter')) {
-        priceId = STRIPE_PRICES.pointPacks[userPlan].starter;
-      } else if (packType.includes('pro')) {
-        priceId = STRIPE_PRICES.pointPacks[userPlan].pro;
-      } else if (packType.includes('business')) {
-        priceId = STRIPE_PRICES.pointPacks[userPlan].business;
-      } else if (packType.includes('enterprise')) {
-        priceId = STRIPE_PRICES.pointPacks[userPlan].enterprise;
+      if (!resolvedPack) {
+        return NextResponse.json({ error: 'Unknown pack' }, { status: 400 });
       }
+
+      const packKey = resolvedPack.name.toLowerCase() as 'starter' | 'pro' | 'business' | 'enterprise';
+      priceId = STRIPE_PRICES.pointPacks[userPlan][packKey];
 
       // MED-4: Don't put pack details in URL — they appear in logs/analytics and expose purchase info.
       // The success page looks up the session from Stripe to display purchase details.
@@ -123,9 +149,11 @@ export async function POST(req: NextRequest) {
       customer_email: user.email,
       metadata: {
         user_id: user.id,
-        points: points?.toString() || '0',
-        packName: packName || subscriptionType,
-        planType: planType || subscriptionType || 'growth'
+        // The pack's own size, from POINT_PACKS. The webhook grants whatever
+        // this says, so it must never be caller-supplied.
+        points: resolvedPack ? String(resolvedPack.points) : '0',
+        packName: resolvedPack?.name || subscriptionType,
+        planType: subscriptionType || userPlan
       }
     });
 
