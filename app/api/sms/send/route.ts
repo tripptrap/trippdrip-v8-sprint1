@@ -9,7 +9,7 @@ import { checkSmsAllowed } from '@/lib/smsGuard';
 import { moderateOutbound } from '@/lib/smsModeration';
 import { resolveFromNumber, ownsNumber } from '@/lib/resolveFromNumber';
 import { isFirstContact, appendOptOut } from '@/lib/optOutFooter';
-import { authenticateRequest } from '@/lib/apiAuth';
+import { authenticateRequest, dbFor } from '@/lib/apiAuth';
 
 // Admin client to bypass RLS for phone number lookup
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -42,7 +42,7 @@ interface SendSMSRequest {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    let supabase = await createClient();
 
     // Get current user
     // Session OR Bearer token (#147). The browser extension sends
@@ -53,6 +53,12 @@ export async function POST(req: NextRequest) {
     const caller = await authenticateRequest(req);
     const user = caller ? { id: caller.id, email: caller.email } : null;
     const authError = caller ? null : new Error('Not authenticated');
+
+    // A Bearer caller has no database session, so the cookie-backed client
+    // would run their queries as `anon` — reads come back empty and writes
+    // fail RLS. dbFor() hands them the service-role client instead; the
+    // route's own user_id filters are then the tenant boundary (#132).
+    if (caller) supabase = await dbFor(caller);
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }

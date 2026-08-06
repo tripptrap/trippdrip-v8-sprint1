@@ -25,6 +25,8 @@ const messageContainer = document.getElementById('messageContainer');
 const leadPreview = document.getElementById('leadPreview');
 const leadFields = document.getElementById('leadFields');
 const importLeadBtn = document.getElementById('importLead');
+const consentAttestSection = document.getElementById('consentAttestSection');
+const consentAttestBox = document.getElementById('consentAttest');
 const openHyveWyreBtn = document.getElementById('openHyveWyre');
 const refreshPageBtn = document.getElementById('refreshPage');
 const getApiKeyLink = document.getElementById('getApiKey');
@@ -262,6 +264,11 @@ async function loadCurrentLead() {
       currentLead = response.lead;
       displayLeadPreview(response.lead);
       importLeadBtn?.classList.remove('hidden');
+      // Shown with the import button, and deliberately NOT remembered between
+      // leads — attesting to consent is a per-contact statement, and a sticky
+      // checkbox would turn it into a setting somebody ticked once (#132).
+      consentAttestSection?.classList.remove('hidden');
+      if (consentAttestBox) consentAttestBox.checked = false;
       refreshPageBtn?.classList.remove('hidden');
 
       // Show Quick SMS and suggestions when lead is available
@@ -325,7 +332,15 @@ async function importLead() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        leads: [{
+        // Same field the CSV import and manual entry send. The server treats
+        // anything other than boolean true as "not attested" (lib/leadConsent.ts
+        // isAttested), so a checkbox that serialises oddly cannot become an
+        // accidental attestation.
+        consentAttested: consentAttestBox?.checked === true,
+        // `items`, not `leads`. /api/leads/import reads body.items / body.rows,
+        // so every scraped contact this extension ever sent was answered with
+        // "No leads to import" (#132).
+        items: [{
           first_name: sanitizeString(currentLead.firstName),
           last_name: sanitizeString(currentLead.lastName),
           phone: sanitizePhone(currentLead.phone),

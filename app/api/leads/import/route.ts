@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { consentFields, isAttested } from "@/lib/leadConsent";
-import { authenticateRequest } from '@/lib/apiAuth';
+import { authenticateRequest, dbFor } from '@/lib/apiAuth';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ function uniq<T>(a: T[]) {
 export async function POST(req: NextRequest) {
   try {
     // Authentication check
-    const supabase = await createClient();
+    let supabase = await createClient();
     // Session OR Bearer token (#147). The browser extension sends
     // `Authorization: Bearer <token>` and carries no cookies, so the
     // cookie-only check answered 401 to every request it ever made.
@@ -22,6 +22,12 @@ export async function POST(req: NextRequest) {
     const caller = await authenticateRequest(req);
     const user = caller ? { id: caller.id, email: caller.email } : null;
     const authError = caller ? null : new Error('Not authenticated');
+
+    // A Bearer caller has no database session, so the cookie-backed client
+    // would run their queries as `anon` — reads come back empty and writes
+    // fail RLS. dbFor() hands them the service-role client instead; the
+    // route's own user_id filters are then the tenant boundary (#132).
+    if (caller) supabase = await dbFor(caller);
 
     if (authError || !user) {
       return NextResponse.json(
@@ -33,7 +39,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log(`[Import] Received body keys:`, Object.keys(body || {}));
     console.log(`[Import] body.campaignName raw:`, body?.campaignName);
-    const incoming = Array.isArray(body?.items) ? body.items : (Array.isArray(body?.rows) ? body.rows : []);
+    // `leads` is accepted alongside `items`/`rows` because the browser extension
+    // has always sent that key (browser-extension/popup.js) — so its import
+    // returned "No leads to import" for every contact anyone ever scraped. The
+    // extension now sends `items`, but an already-installed copy keeps sending
+    // `leads` until the user updates it, and silently dropping their imports is
+    // the worse outcome (#132).
+    const incoming = Array.isArray(body?.items)
+      ? body.items
+      : Array.isArray(body?.rows)
+        ? body.rows
+        : Array.isArray(body?.leads)
+          ? body.leads
+          : [];
     const addTags = Array.isArray(body?.addTags) ? body.addTags.map((t: any)=>String(t).trim()).filter(Boolean) : [];
     // Consent attestation (#130). Imported contacts consented — if they did —
     // on the business's own form, before the data reached us, so the platform

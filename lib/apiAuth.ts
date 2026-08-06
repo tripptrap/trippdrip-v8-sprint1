@@ -97,3 +97,35 @@ export async function authenticateRequest(
 
   return { id: data.user.id, email: data.user.email ?? null, via: 'bearer' };
 }
+
+/**
+ * The Supabase client a route should use for this caller's data.
+ *
+ * ── Why authenticating the caller was not enough ────────────────────────────
+ *
+ * `authenticateRequest` resolves WHO is calling. It does not give a Bearer caller
+ * a database session, and every route here queries through `createClient()` —
+ * cookie-backed. For an extension request there are no cookies, so those queries
+ * run as `anon`, and RLS does the rest:
+ *
+ *   - reads return an EMPTY set, with a 200 and no error
+ *   - writes fail with 42501, new row violates row-level security policy
+ *
+ * Measured on 2026-08-06: an account with 209 leads returned 0 to a valid API
+ * key, and a lead import failed RLS outright. The read case is the dangerous one
+ * — it looks exactly like an empty account.
+ *
+ * So a session caller keeps the session client, where RLS stays on as a second
+ * fence behind the route's own filters. A Bearer or API-key caller gets the
+ * service-role client, because there is no session to carry their identity into
+ * the database.
+ *
+ * **That makes the route's own `user_id` filter the only tenant boundary for
+ * those callers.** Every query on this path must scope by `caller.id` explicitly
+ * — verified for leads/list, leads/import and sms/send before switching them
+ * over. Do not use this in a route that relies on RLS to do that scoping.
+ */
+export async function dbFor(caller: AuthenticatedCaller) {
+  if (caller.via === 'session') return await createClient();
+  return createServiceRoleClient();
+}

@@ -213,6 +213,28 @@
       transition: all 0.2s;
     }
 
+    .consent-attest {
+      margin: 8px 0 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+    }
+    .consent-attest label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .consent-attest input[type="checkbox"] {
+      margin-top: 2px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
     .btn-primary {
       background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
       color: #fff;
@@ -728,6 +750,26 @@
           <button class="btn-small btn-secondary" id="copyLeadBtn" title="Copy lead data">📋</button>
         </h3>
         <div id="leadFields"></div>
+      </div>
+
+      <!--
+        Consent attestation, same as CSV import and manual entry (#132).
+
+        A contact scraped from a profile has had no interaction with the business
+        at all — no form, no inbound text. Every other intake path records WHO
+        vouched for the consent; without this the lead lands with consent unknown
+        and nothing says why it was safe to message them. This does not change
+        what anyone can do; it changes what the record says.
+      -->
+      <div class="consent-attest hidden" id="consentAttestSection">
+        <label for="consentAttest">
+          <input type="checkbox" id="consentAttest">
+          <span>
+            I confirm this contact has given prior express written consent to receive SMS
+            from my business, that I can produce evidence of it on request, and that I am
+            responsible for the lawful basis on which they are messaged.
+          </span>
+        </label>
       </div>
 
       <!-- Actions -->
