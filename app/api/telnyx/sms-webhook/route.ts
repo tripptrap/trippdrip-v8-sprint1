@@ -1183,11 +1183,37 @@ async function checkAndTriggerReceptionist(
     ]);
 
     if (ownedNumber || pooledNumber) {
-      console.warn(
-        `🤖 Receptionist: ${phoneNumber} is one of our own numbers — not auto-replying. ` +
-        `Answering it would send the reply straight back into this webhook and loop.`
+      // Owning the sender is not itself a reason to stay silent — an operator
+      // texting their own line from another of their numbers deserves an answer,
+      // and it is the only way to exercise the receptionist without a handset.
+      //
+      // What must never happen is answering our OWN output. So: suppress only if
+      // this inbound is a message we just sent automatically from that number to
+      // this one. That cuts the cycle at exactly one exchange while leaving a
+      // genuine message through.
+      const { data: echo } = await supabaseAdmin
+        .from('messages')
+        .select('id')
+        .eq('direction', 'outbound')
+        .eq('is_automated', true)
+        .eq('from_phone', phoneNumber)
+        .eq('to_phone', toPhoneNumber)
+        .eq('body', messageBody)
+        .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      if (echo) {
+        console.warn(
+          `🤖 Receptionist: ${phoneNumber} -> ${toPhoneNumber} is our own automated reply coming back. ` +
+          `Not answering it; that is the loop.`
+        );
+        return;
+      }
+
+      console.log(
+        `🤖 Receptionist: ${phoneNumber} is one of our own numbers but this is not an echo — replying once.`
       );
-      return;
     }
 
     // Get user's receptionist settings
