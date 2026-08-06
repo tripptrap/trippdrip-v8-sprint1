@@ -1191,11 +1191,21 @@ async function checkAndTriggerReceptionist(
       // this inbound is a message we just sent automatically from that number to
       // this one. That cuts the cycle at exactly one exchange while leaving a
       // genuine message through.
+      // Deliberately NOT filtered on is_automated. System messages do not all
+      // carry that flag — the opt-out confirmation does not — and the first
+      // version of this guard missed it, so a STOP produced: confirmation sent,
+      // confirmation arrives on the other owned number, receptionist answers it
+      // with "It seems you might have received an error. I'm here to help", and
+      // that answer recreated the lead the opt-out had just erased.
+      //
+      // Any outbound WE sent from that number to this one with the same text is
+      // ours, however it was flagged. A real person re-sending our exact wording
+      // inside ten minutes is vanishingly rare, and the cost of being wrong is
+      // one unanswered message.
       const { data: echo } = await supabaseAdmin
         .from('messages')
         .select('id')
         .eq('direction', 'outbound')
-        .eq('is_automated', true)
         .eq('from_phone', phoneNumber)
         .eq('to_phone', toPhoneNumber)
         .eq('body', messageBody)
