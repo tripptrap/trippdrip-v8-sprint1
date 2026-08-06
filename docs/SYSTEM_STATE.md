@@ -134,9 +134,31 @@ charge included a prorated first month. Auto-recharge is still off.
 
 TFV request `9b2c5fb3-69b6-5dfb-a7b8-0867ec18281d`, status `Waiting For Telnyx`, covering all
 ten. Its payload was **copied field-for-field from the approved request** `6723e639` — every
-value except `phoneNumbers` is byte-identical, read back from the API rather than retyped.
-That is deliberate: two earlier TFV attempts here were Rejected before `6723e639` passed, and
-the ISV/1:1 framing in that one is what the carriers accepted.
+value except `phoneNumbers` and `messageVolume` is byte-identical, read back from the API
+rather than retyped. That is deliberate: two earlier TFV attempts here were Rejected before
+`6723e639` passed, and the ISV/1:1 framing in that one is what the carriers accepted.
+
+**The justification for holding more than a handful of numbers lives in that copied text**, and
+it is deliberately count-free, so it scales without contradicting itself:
+
+> "We are requesting verification for **multiple numbers** because we onboard multiple client
+> businesses, each requiring their own dedicated number. No single business uses more than one
+> number."
+
+**`messageVolume` was raised 10,000 -> 100,000** (owner's decision, 2026-08-05). The approved
+filing declared 10,000 when it covered 5 numbers; verified, this account will hold 13 toll-free
+numbers = 13 client businesses under the declared 1:1 model, and traffic beyond the verified
+volume is what carriers filter.
+
+**`messageVolume` is an ENUM, not a free-text number.** `"10,000"` and `"100,000"` are accepted;
+`"50,000"` and `"50000"` are both rejected with a bare *"The request failed because it was not
+well-formed"* (code 10015) and **no field pointer** — so the error does not tell you which field
+is wrong. Discovered by bisecting values against a live PATCH.
+
+**PATCH requires the FULL payload**, not the changed field. Sending only `messageVolume` returns
+a missing-parameter error for all ~18 required fields. The working shape is: GET the request,
+drop `id` / `verificationStatus` / `reason` / `createdAt` / `updatedAt` / `ticketNumber`, reduce
+`phoneNumbers` to `[{phoneNumber}]`, change what you need, PATCH that back.
 
 **The ten are in `number_pool` with `is_verified = false`, so they are NOT claimable yet.**
 `/api/number-pool/available` requires `is_verified = true`, and an unverified toll-free number
