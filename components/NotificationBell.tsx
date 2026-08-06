@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCheck, MessageSquare, Zap, UserMinus, Calendar, Bot, Megaphone, AlertTriangle } from 'lucide-react';
+import { Bell, CheckCheck, MessageSquare, Zap, UserMinus, Calendar, Bot, Megaphone, AlertTriangle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface AppNotification {
@@ -24,6 +24,8 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   ai_handoff: Bot,
   // Operator alert — a customer paid and we failed to deliver (#78).
   fulfillment_failed: AlertTriangle,
+  // The account's texting registration is going idle (#136).
+  registration_idle: Clock,
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -35,6 +37,7 @@ const TYPE_COLOR: Record<string, string> = {
   campaign_done: 'text-violet-400',
   ai_handoff: 'text-violet-400',
   fulfillment_failed: 'text-red-400',
+  registration_idle: 'text-amber-400',
 };
 
 export default function NotificationBell() {

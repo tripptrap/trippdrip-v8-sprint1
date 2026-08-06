@@ -45,7 +45,32 @@ export function createServiceRoleClient() {
       auth: {
         autoRefreshToken: false,
         persistSession: false
-      }
+      },
+      global: {
+        // ── Next.js caches these reads, and it is very hard to see ───────────
+        //
+        // A supabase-js SELECT is an HTTP GET, and Next patches global fetch so
+        // GETs are cached by default. A route handler therefore keeps serving the
+        // FIRST response it ever got for a given query, for as long as the server
+        // lives. `export const dynamic = 'force-dynamic'` does NOT save you — the
+        // idle-campaign cron had it and still read stale rows.
+        //
+        // Caught on 2026-08-05 while testing that cron: it kept reporting
+        // idle_warned_at as null after the column had been written, PostgREST
+        // returned the real value to curl and to a fresh Node process, and adding
+        // one column to the .select() — a different cache key — made the same code
+        // work immediately. That is a cache, not a query bug.
+        //
+        // The failure mode is nasty precisely because it is invisible: no error,
+        // no warning, just a job acting on the world as it was the first time it
+        // looked. For crons that decide whether to charge, send or deactivate,
+        // that is the difference between correct and dangerous.
+        //
+        // Every read through this client is now explicitly uncached. Writes are
+        // unaffected (POST/PATCH were never cached).
+        fetch: (input: any, init?: any) =>
+          fetch(input, { ...init, cache: 'no-store' as RequestCache }),
+      },
     }
   )
 }

@@ -14,7 +14,9 @@ export type NotificationType =
   | 'campaign_done'
   | 'ai_handoff'
   /** Operator alert: a customer paid and we failed to deliver (#78). */
-  | 'fulfillment_failed';
+  | 'fulfillment_failed'
+  /** The account's 10DLC campaign is going unused and risks carrier dormancy (#136). */
+  | 'registration_idle';
 
 export async function createNotification(
   userId: string,
