@@ -5,6 +5,7 @@ import { checkNumberEligibility } from '@/lib/numberEligibility';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 import { evaluateClaim } from '@/lib/numberPool';
+import { warnIfPoolLow } from '@/lib/numberPoolInventory';
 
 // Admin client to bypass RLS for database operations
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -200,6 +201,17 @@ export async function POST(req: NextRequest) {
       `✅ Number ${poolNumber.phone_number} claimed by user ${user.id}` +
         (decision.recycled ? ' (recycled from an exhausted pool — see #38)' : '')
     );
+
+    // Check what is left, now that one has gone. Day-one signups are served
+    // entirely from this pool — local numbers require the agent's own 10DLC
+    // registration — so the remaining count is a hard cap on how many more
+    // people can onboard (#120).
+    //
+    // Checked here rather than only on a nightly job because a burst of signups
+    // can drain the pool between runs. Awaited but non-fatal: the alert is
+    // throttled and the helper swallows its own failures, so this cannot cost
+    // the customer the number they just claimed.
+    await warnIfPoolLow(supabaseAdmin, { trigger: 'claim' });
 
     return NextResponse.json({
       success: true,

@@ -78,7 +78,12 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 ## Onboarding Flow
 1. User creates account (no free option — paid plans only)
 2. Asked demographic questions (industry, business type, etc.)
-3. Given a free local phone number with their plan
+3. Given a free **shared toll-free** number from the pool. **Not local** — a local
+   number requires the agent's own 10DLC brand and campaign to be submitted and
+   approved first, so it cannot be a day-one thing (#1, #18, #120). This said
+   "local" for a long time while the product gave toll-free; onboarding inventory
+   is therefore a hard cap on signups, and `lib/numberPoolInventory.ts` alerts
+   before the pool runs dry.
 4. Guided to set up their AI Flows and Receptionist based on their industry
 5. Shown industry-specific preset pipeline stages (user can customize)
 6. Optionally connect Google Calendar
@@ -632,7 +637,7 @@ a query — see the comment in `threads/bulk-ai-toggle/route.ts`.
 - [x] Opt-out (STOP) = permanent DNC, completely blocked from all future messaging
 - [x] Lead record stays but is permanently locked — no ability to message again
 - [x] Verify current DNC implementation matches this behavior
-- [x] One free number provisioned with plan during onboarding
+- [x] One free number provisioned with plan during onboarding (shared toll-free from the pool; local requires 10DLC first — see Onboarding Flow above)
 - [x] Build `/analytics` page with full reporting
 - [x] Message delivery rates and response rates
 - [x] Campaign performance breakdowns

@@ -31,6 +31,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { requireCronAuth } from '@/lib/cronAuth';
 import { createNotification } from '@/lib/createNotification';
 import { alertAdminsThrottled } from '@/lib/alerting';
+import { warnIfPoolLow } from '@/lib/numberPoolInventory';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -77,7 +78,9 @@ export async function GET(req: NextRequest) {
 
     const rows = (registrations ?? []) as Registration[];
     if (rows.length === 0) {
-      return NextResponse.json({ ok: true, checked: 0, warned: 0, flagged: 0 });
+      // Still check the pool — no registrations does not mean no signups coming.
+      const inv = await warnIfPoolLow(admin, { trigger: 'nightly' });
+      return NextResponse.json({ ok: true, checked: 0, warned: 0, flagged: 0, poolAvailable: inv?.available ?? null });
     }
 
     const userIds = rows.map(r => r.user_id);
@@ -223,8 +226,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Same nightly pass, separate concern: is the toll-free pool running dry?
+    // Claim-time checks catch a drain; this catches the case where nobody claims
+    // but stock was already low (#120).
+    const inventory = await warnIfPoolLow(admin, { trigger: 'nightly' });
+
     return NextResponse.json({
       ok: true,
+      poolAvailable: inventory?.available ?? null,
       checked: rows.length,
       warned,
       flagged,

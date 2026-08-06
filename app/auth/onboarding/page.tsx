@@ -1072,11 +1072,33 @@ function OnboardingContent() {
                         </div>
                       </button>
                     ))}
+                    {/*
+                      An empty pool is a hard stop, not a minor inconvenience
+                      (#120). Day-one signups are served entirely from the shared
+                      toll-free pool — a local number needs the agent's own 10DLC
+                      registration first — so "add one later from Phone Numbers"
+                      was pointing at a page that would also have nothing to give
+                      them, and the person has already paid.
+
+                      The copy now says what is true and what happens next, and
+                      /api/number-pool/available raises an escalating alert when it
+                      is asked for numbers and has none, so we hear about it at the
+                      same moment they do.
+                    */}
                     {poolNumbers.length === 0 && telnyxNumbers.length === 0 && !numbersLoading && (
-                      <div className="text-center py-8">
-                        <Phone className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">No numbers available right now.</p>
-                        <p className="text-sm text-gray-400">You can add one later from Phone Numbers settings.</p>
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-5 text-center">
+                        <Phone className="w-10 h-10 text-amber-500 dark:text-amber-400 mx-auto mb-3" />
+                        <p className="font-medium text-amber-900 dark:text-amber-200">
+                          We&apos;re out of numbers this second
+                        </p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300 mt-2">
+                          Our team has been alerted and will assign you one shortly — usually within a
+                          few hours. You can finish setting up now; everything else works, and we&apos;ll
+                          email you the moment your number is live.
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-3">
+                          Need it urgently? Reply to your welcome email and we&apos;ll prioritise you.
+                        </p>
                       </div>
                     )}
                   </div>

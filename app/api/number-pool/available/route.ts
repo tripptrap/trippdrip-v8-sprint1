@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
 import { isQuarantined, QUARANTINE_DAYS } from '@/lib/numberPool';
+import { warnIfPoolLow } from '@/lib/numberPoolInventory';
 
 const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createAdminClient(
@@ -86,6 +87,15 @@ export async function GET(req: NextRequest) {
       console.warn(
         `⚠️ Every available pool number is inside its ${QUARANTINE_DAYS}-day cooldown; offering ${resting.length} recycled number(s).`
       );
+    }
+
+    // Asked for numbers and had none. That is a paying signup stuck mid-flow, so
+    // it escalates immediately rather than waiting for the nightly check — we
+    // should hear about it at the same moment they do (#120).
+    // supabaseAdmin is null when the service-role key is absent (build/preview
+    // environments). No client, no check — and no crash on the customer's path.
+    if (offered.length === 0 && supabaseAdmin) {
+      await warnIfPoolLow(supabaseAdmin, { trigger: 'onboarding_empty' });
     }
 
     return NextResponse.json({
