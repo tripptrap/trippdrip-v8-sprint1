@@ -3786,3 +3786,64 @@ Everything else from the audit is closed — see #57 for the index and what each
   stored vs. live side by side for admins and highlights disagreement (#43). What remains is
   the scheduled reconciliation that writes the live value back to `number_pool.is_verified`;
   until then the flag is merely *visible*, not self-correcting.
+
+## Production logs are a historical record, not current state (runtime audit, 2026-08-06)
+
+The Vercel, Supabase and Stripe MCP connections make it possible, for the first time, to
+audit what production is *actually doing* rather than what the code implies it does. The
+first pass found real bugs — and three false ones, all from the same mistake.
+
+**`get_runtime_errors` returns a 7-day window. A cluster in it may already be fixed.**
+Three issues were filed off error clusters and closed within the hour:
+
+| Filed | Error window | Fixed by | Gap |
+|---|---|---|---|
+| Upload refund fails, "user was charged for nothing" | 2026-08-03 23:50:41Z | `3c5df8a`, 23:53Z | **3 minutes** |
+| `user_telnyx_numbers` RLS violation on pool purchase | 2026-07-31 04:27Z | now uses `createServiceRoleClient()` | — |
+| Telnyx "Failed to read asymmetric key" x26 | 2026-07-31 04:57–05:40Z | #108, same day | — |
+
+The last one is the sharpest: that exact openssl error text is already documented in this
+file (see "Inbound was dead for six months"), with its root cause and its fix. It was
+re-filed anyway, because the log was read and this file was not.
+
+**Before filing anything found in a log: check the error's last-seen timestamp against
+`git log` for the relevant file, and grep this document for the error text.** Verify the
+behaviour is still broken *now* — for the Telnyx one, the definitive check took a single
+query (28 inbound messages in 7 days, most recent that afternoon; inbound is alive).
+
+### Confirmed live, 2026-08-06
+
+- **All six crons run.** `cron_runs`: process-scheduled 833, process-drips 415,
+  process-ai-drips 416, auto-buy 69, send-appointment-reminders 35, check-idle-campaigns 13.
+  `SELECT * FROM find_overdue_crons()` returns zero rows. Roughly 700 alert lines claiming
+  `auto-buy: has never run; send-appointment-reminders: has never run` were true only at
+  2026-08-03 21:45 — before those jobs' first run at 22:01 — and the repeat-suppression path
+  then echoed the original wording for two more days (#182). **Do not read a `🔁 still
+  failing` alert as current state; query `cron_runs`.**
+- **`scheduled_messages_status_check` permits `sending`.** The 282 `23514` failures on the
+  #61 drip test are from before that constraint was widened, and the queue is now clean:
+  0 stuck in `sending`, 0 failed.
+- **Zero DNC violations.** No outbound message exists whose `created_at` is later than a
+  matching `dnc_list` row. This is the query with TCPA consequences and it comes back empty.
+- **Live Stripe is empty.** `acct_1SPlV5FmPAhggcMQ`, livemode: 0 customers, 0 products,
+  no charges ever. Every paying user is on the sandbox `acct_1SPlVzFyk0lZUopF`, so #153 and
+  #154 (free credits, free numbers) have cost nothing real — they become real the moment the
+  keys are switched. This closes the "is the live account activated?" question that
+  `docs/STRIPE_LIVE_CATALOGUE.md` recorded as unverified.
+
+### Still broken
+
+- **Quiet hours never save (#178).** `app/api/settings/quiet-hours/route.ts:73` writes
+  `users` through the session client; `authenticated` may UPDATE only `business_hours`,
+  `business_name`, `timezone`, `updated_at`. Postgres returns `42501` and the route reports
+  success. That file was last touched 2025-11-17 — it has never worked. The user sets quiet
+  hours and messages can still send inside them.
+- **Balances do not reconcile with the ledger (#183).** 4 of 7 users, ~110,000 points of
+  drift. `rios.healthcaresolutions@gmail.com`: balance 29,784 against a ledger sum of
+  **-216** — only the spends were ever recorded. The write path was fixed earlier
+  (`add_credits`/`deduct_credits` now write the ledger row in the same transaction), but the
+  **historical drift was never reconciled**, so every points display and analytics figure
+  still reads from a ledger that disagrees with the balance.
+- **PDF import fails two ways (#181)**, both *after* the commit meant to fix it: the
+  `pdfjs-dist` worker is not in the Vercel bundle, and `DOMMatrix` does not exist in the
+  Node runtime.
