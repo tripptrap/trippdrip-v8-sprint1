@@ -1159,6 +1159,37 @@ async function checkAndTriggerReceptionist(
   if (!supabaseAdmin) return;
 
   try {
+    // ── Never auto-reply to a number this platform owns ────────────────────
+    //
+    // The reply goes to the sender. If the sender is one of OUR numbers, that
+    // reply arrives as a fresh inbound, the receptionist answers it, and the two
+    // numbers talk to each other until a rate limit intervenes.
+    //
+    // Demonstrated accidentally on 2026-08-06 by texting one of the account's own
+    // numbers from another to test the receptionist without a handset: 9 messages
+    // and 8 points in about 70 seconds, and it only stopped because the
+    // receptionist was switched off by hand.
+    //
+    // The real-world triggers are not exotic — an operator texting their own
+    // business line from their second line, or two HyveWyre accounts messaging
+    // each other, where the per-account limits are separate so each side happily
+    // funds its own half of the loop.
+    //
+    // Checked against BOTH tables: user_telnyx_numbers covers assigned numbers,
+    // number_pool covers unassigned and pooled ones, and either can be a sender.
+    const [{ data: ownedNumber }, { data: pooledNumber }] = await Promise.all([
+      supabaseAdmin.from('user_telnyx_numbers').select('phone_number').eq('phone_number', phoneNumber).maybeSingle(),
+      supabaseAdmin.from('number_pool').select('phone_number').eq('phone_number', phoneNumber).maybeSingle(),
+    ]);
+
+    if (ownedNumber || pooledNumber) {
+      console.warn(
+        `🤖 Receptionist: ${phoneNumber} is one of our own numbers — not auto-replying. ` +
+        `Answering it would send the reply straight back into this webhook and loop.`
+      );
+      return;
+    }
+
     // Get user's receptionist settings
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('receptionist_settings')
