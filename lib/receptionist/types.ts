@@ -52,6 +52,12 @@ export interface ReceptionistSettings {
 
   // Calendar
   calendar_enabled: boolean;
+  /** May the receptionist offer to EMAIL documents? Default false = offer a call (#132-adjacent, see migration). */
+  can_send_info_by_email: boolean;
+  /** May it offer to TEXT information or a link? */
+  can_send_info_by_sms: boolean;
+  /** Optional free text naming what this business can and cannot send. */
+  info_delivery_note: string | null;
 
   // Timestamps
   created_at: string;
@@ -71,6 +77,9 @@ export interface ReceptionistSettingsInput {
   business_hours_timezone?: string;
   business_days?: number[];
   after_hours_message?: string | null;
+  can_send_info_by_email?: boolean;
+  can_send_info_by_sms?: boolean;
+  info_delivery_note?: string | null;
   respond_to_sold_clients?: boolean;
   respond_to_new_contacts?: boolean;
   auto_create_leads?: boolean;
@@ -185,6 +194,11 @@ export const DEFAULT_RECEPTIONIST_SETTINGS: Omit<ReceptionistSettings, 'id' | 'u
   respond_to_new_contacts: true,
   auto_create_leads: true,
   calendar_enabled: false,
+  // Default off, so the receptionist keeps offering a call until the operator
+  // says the business can actually send things. Matches the column defaults.
+  can_send_info_by_email: false,
+  can_send_info_by_sms: false,
+  info_delivery_note: null,
 };
 
 // Default system prompt template

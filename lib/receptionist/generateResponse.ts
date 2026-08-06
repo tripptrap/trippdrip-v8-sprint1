@@ -291,9 +291,10 @@ INSTRUCTIONS:
 
 - SERVE FIRST. If they have asked for something concrete that a person at this
   business could act on — a document, a card, a copy of something, a correction,
-  a callback — say it is being handled and that someone will follow up. Do that
-  BEFORE anything else. Never keep asking qualifying questions at someone who has
-  made a clear request; that reads as being stonewalled by a form.
+  a callback — deal with it BEFORE anything else, using HOW INFORMATION REACHES
+  PEOPLE below to say what will actually happen. Never keep asking qualifying
+  questions at someone who has made a clear request; that reads as being
+  stonewalled by a form.
 - The step instruction is a GOAL, not a script. If the current step's question
   makes no sense for this particular person — asking someone about their company
   when they are asking about their own policy — do not ask it. Say something
@@ -305,6 +306,48 @@ INSTRUCTIONS:
   forward, stop asking. Either state what you will do, or offer to have someone
   call.`;
     }
+  }
+
+  // ── What this business can actually offer to DO ──────────────────────────
+  //
+  // Without this the AI's only move for "send me my insurance cards" was a
+  // callback, because nothing told it whether the business could email a PDF.
+  // Observed live: a client asked for a brochure by email and was offered a call.
+  //
+  // The AI offers; a person delivers. It must never claim something has been
+  // sent — nothing in this path can attach a file — so the wording below is
+  // deliberately "I'll get that emailed over", and the handoff still creates the
+  // dashboard todo that someone acts on.
+  const channels: string[] = [];
+  if (settings.can_send_info_by_email) channels.push('email');
+  if (settings.can_send_info_by_sms) channels.push('text message');
+
+  prompt += `
+
+HOW INFORMATION REACHES PEOPLE:
+`;
+  if (channels.length === 0) {
+    prompt += `This business does NOT send documents or information by email or text. When
+someone asks for a brochure, a card, a copy of a policy or anything similar, do
+not offer to send it. Offer a call instead — say someone will call them, and ask
+when suits. Then emit the handoff marker.`;
+  } else {
+    prompt += `This business CAN send information by ${channels.join(' or ')}. When someone asks
+for a document, a brochure, a card or a copy of something:
+- Say it will be sent by ${channels.join(' or ')} — for example "I'll get that emailed over to you".
+- Ask for whatever you still need to send it${settings.can_send_info_by_email ? ' (the best email address, if you do not already have it)' : ''}.
+- Do NOT say it has already been sent, or that it is attached. You are arranging
+  it, not doing it.
+- Then emit the handoff marker so a person actually sends it.
+Offer a call as well only if they ask for one, or if what they want genuinely
+cannot be written down.`;
+  }
+  if (settings.info_delivery_note) {
+    prompt += `
+
+WHAT THIS BUSINESS WILL AND WILL NOT SEND — follow this exactly, it overrides the
+general rule above:
+${settings.info_delivery_note}`;
   }
 
   prompt += `

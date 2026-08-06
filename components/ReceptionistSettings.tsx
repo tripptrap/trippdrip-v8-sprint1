@@ -11,7 +11,7 @@ import {
 import {
   Headphones, MessageSquare, Clock, Users, Calendar, Zap,
   Shield, Bot, Building2, Phone, Globe, MapPin, Sparkles,
-  CheckCircle2, AlertCircle, Info,
+  CheckCircle2, AlertCircle, Info, Send,
 } from 'lucide-react';
 
 // ─── constants ───────────────────────────────────────────────────────────────
@@ -166,6 +166,9 @@ export default function ReceptionistSettings() {
   const [respondClients, setRespondClients]   = useState(true);
   const [respondNew, setRespondNew]           = useState(true);
   const [autoCreate, setAutoCreate]           = useState(true);
+  const [canEmailInfo, setCanEmailInfo]       = useState(false);
+  const [canTextInfo, setCanTextInfo]         = useState(false);
+  const [deliveryNote, setDeliveryNote]       = useState('');
 
   // calendar
   const [calendarEnabled, setCalendarEnabled] = useState(false);
@@ -205,6 +208,9 @@ export default function ReceptionistSettings() {
         setRespondClients(s.respond_to_sold_clients ?? true);
         setRespondNew(s.respond_to_new_contacts ?? true);
         setAutoCreate(s.auto_create_leads ?? true);
+        setCanEmailInfo(s.can_send_info_by_email ?? false);
+        setCanTextInfo(s.can_send_info_by_sms ?? false);
+        setDeliveryNote(s.info_delivery_note ?? '');
         setCalendarEnabled(s.calendar_enabled ?? false);
         setIndustry(s.industry ?? '');
         setUsePreset(s.use_industry_preset ?? true);
@@ -256,6 +262,9 @@ export default function ReceptionistSettings() {
           respond_to_sold_clients: respondClients,
           respond_to_new_contacts: respondNew,
           auto_create_leads: autoCreate,
+          can_send_info_by_email: canEmailInfo,
+          can_send_info_by_sms: canTextInfo,
+          info_delivery_note: deliveryNote.trim() || null,
           calendar_enabled: calendarEnabled,
           industry: industry || null,
           use_industry_preset: useIndustryPreset,
@@ -659,6 +668,64 @@ export default function ReceptionistSettings() {
             </Field>
           </div>
         )}
+      </Card>
+
+      {/* ── What it can send ── */}
+      <Card>
+        <CardHeader
+          icon={<Send className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+          iconBg="bg-emerald-100 dark:bg-emerald-900/40"
+          title="What it can offer to send"
+          subtitle="Whether a call is the only option, or information can go by email or text"
+        />
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            When someone asks for a brochure, an ID card or a copy of something, the receptionist
+            offers whatever you allow here. With both off it offers a call — which is right if you
+            have to read things out, and wrong if you could have emailed the PDF.
+            <strong className="text-slate-600 dark:text-slate-300"> It only ever offers;</strong> you
+            still send the thing from the dashboard to-do it creates.
+          </p>
+
+          {[
+            {
+              label: 'Can email documents',
+              desc: 'It will say the document will be emailed and ask for the best address',
+              val: canEmailInfo, set: (v: boolean) => markDirty(() => setCanEmailInfo(v)),
+            },
+            {
+              label: 'Can text information',
+              desc: 'It will offer to text details or a link back to the same number',
+              val: canTextInfo, set: (v: boolean) => markDirty(() => setCanTextInfo(v)),
+            },
+          ].map(row => (
+            <div key={row.label} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{row.label}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{row.desc}</p>
+              </div>
+              <Toggle size="sm" checked={row.val} onChange={row.set} />
+            </div>
+          ))}
+
+          {(canEmailInfo || canTextInfo) && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Anything it must not send (optional)
+              </label>
+              <textarea
+                value={deliveryNote}
+                onChange={e => markDirty(() => setDeliveryNote(e.target.value))}
+                rows={2}
+                placeholder="e.g. Brochures and quotes by email. Never policy documents or ID cards — those need a call."
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                This overrides the toggles above, so the AI never promises something you can&apos;t deliver.
+              </p>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* ── Response Rules ── */}
