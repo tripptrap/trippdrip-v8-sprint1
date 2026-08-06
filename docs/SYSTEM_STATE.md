@@ -126,6 +126,24 @@ route (`app/api/number-pool/claim/route.ts`) enforces exactly that — a guarded
 the pool to share a single number across concurrent businesses; that would contradict the
 approved filing.
 
+**10 more toll-free numbers ordered and submitted for TFV, 2026-08-05.** Order
+`0a40bcce-840c-477c-98a1-455443af3032` completed with `requirements_met: true` — **ordering
+toll-free needed no support request or justification**, contrary to the assumption that batches
+above 5 required one. $1 upfront + $1/month each; the account went 49.23 -> 30.84 USD, so the
+charge included a prorated first month. Auto-recharge is still off.
+
+TFV request `9b2c5fb3-69b6-5dfb-a7b8-0867ec18281d`, status `Waiting For Telnyx`, covering all
+ten. Its payload was **copied field-for-field from the approved request** `6723e639` — every
+value except `phoneNumbers` is byte-identical, read back from the API rather than retyped.
+That is deliberate: two earlier TFV attempts here were Rejected before `6723e639` passed, and
+the ISV/1:1 framing in that one is what the carriers accepted.
+
+**The ten are in `number_pool` with `is_verified = false`, so they are NOT claimable yet.**
+`/api/number-pool/available` requires `is_verified = true`, and an unverified toll-free number
+cannot carry traffic — offering one would hand a new agent a number that silently fails to
+send. Claimable inventory is still **2** until TFV comes back, and the low-stock alert is
+correctly still firing. Flip `is_verified` only when the request reads `Verified`.
+
 **Real capacity ceiling: 3 verified numbers = 3 client businesses**, given the declared 1:1
 model. Past that, or for anyone who searches a specific area code instead of taking a pool
 number, onboarding falls back to the local-number path that's still gated on 10DLC. That's
