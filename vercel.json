@@ -28,6 +28,10 @@
     {
       "schedule": "0 9 * * *",
       "path": "/api/cron/check-idle-campaigns"
+    },
+    {
+      "path": "/api/cron/refresh-10dlc",
+      "schedule": "0 * * * *"
     }
   ],
   "headers": [

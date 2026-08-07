@@ -4852,3 +4852,56 @@ a 301 there would fail every event silently.
 against `acct_1SPlV5FmPAhggcMQ`). Creating one, and setting the **new** signing
 secret, is a required step of the #81/#63 cutover — the secret is per-endpoint, so
 reusing the sandbox value makes every live webhook fail verification.
+
+## 10DLC status now syncs on a cron (#1, 2026-08-07)
+
+`#1` listed *"status refresh is manual (a button), not on a cron"* as open, and the
+consequence was visible in the data: the single registration on this account sat
+**seven days stale** while its campaign had already gone ACTIVE. Nobody knew,
+because knowing required someone to open Settings and click.
+
+That staleness is not cosmetic. When a campaign becomes active, numbers the user
+already owns must be attached to it — until they are, carriers filter their A2P
+traffic and it presents as "sending is broken" (#107). Noticing the transition
+sooner shortens that window.
+
+`/api/cron/refresh-10dlc`, hourly. Carrier review takes days, so faster is noise
+and slower leaves someone unable to send for longer than necessary after approval.
+
+**The sync itself moved to `lib/tenDlcSync.ts`** and both the Settings button and
+the cron call it. Third instance of the same rule tonight, after
+`confirmOverdueAgainstTable` (#182) and the DNC gate (#17 run): a hand-rolled copy
+of shared logic drifts, and the copy is always the one that rots.
+
+### Settled is not done
+
+Rows with `brand_status = verified` and `campaign_status = active` are still
+re-checked every 24 hours. Approval is **not permanent** — a campaign can be
+revoked, and this account has already lost toll-free verification once. Never
+checking again would leave the app asserting a registration the carrier has
+withdrawn. Unsettled rows are checked every run.
+
+### Verified by running it
+
+```
+GET /api/cron/refresh-10dlc            401   (unauthenticated, refused)
+GET /api/cron/refresh-10dlc + secret   200   {"total":1,"due":1,"synced":1,
+                                              "activated":0,"adopted":0,"failures":[]}
+```
+
+`due: 1` because the row was seven days old. Afterwards `updated_at` was current
+and Telnyx confirmed what was stored — brand `verified`, campaign `active`, same
+campaign id. The state was right; nothing had checked it in a week.
+
+Added to `find_overdue_crons` at 60/90 in the same change, so it ships watched
+rather than joining `check-idle-campaigns` in running unmonitored for a day.
+
+### Still needs money and a human
+
+- **A real end-user registration has never run.** `$4.50` brand + `$15` campaign,
+  and the account's own registration is the only one that exists. This is the
+  single biggest unknown left in the flow — everything downstream of `createBrand`
+  is inferred from one submission made under HyveWyre's own identity.
+- **`vertical` is free text in the UI.** Only `TECHNOLOGY` is confirmed against
+  Telnyx's live API. An insurance or real-estate agent's real value has never been
+  tested, and a wrong one means a rejected filing at $15 a resubmission.
