@@ -76,6 +76,96 @@ function jobNameFromPath(pathname: string): string {
  *
  * Never throws. Monitoring must not be able to take down the thing it monitors.
  */
+export interface OverdueJob {
+  job: string;
+  expected_minutes: number;
+  /** Returned by find_overdue_crons since #182. Older callers approximated it. */
+  grace_minutes?: number;
+  last_ran_at: string | null;
+  minutes_since: number | null;
+}
+
+/**
+ * Confirm the RPC's overdue list against cron_runs before waking anyone, and
+ * describe each survivor from the reading that was actually verified.
+ *
+ * Shared by both alert paths on purpose. `recordRunAndCheckPeers` had a copy of
+ * this and `/api/cron/heartbeat` had none at all — it relayed the RPC verbatim —
+ * so the same false claim could arrive by either route. A hand-rolled copy of a
+ * shared gate drifts; this is the gate.
+ *
+ * Returns `null` when the confirming read itself failed. That is NOT "nothing is
+ * overdue" and NOT "everything is overdue" — it is "I cannot tell", and the only
+ * safe response is to stay quiet. Treating an unreadable table as "never ran" is
+ * what fired ~700 false alarms over three days (#182).
+ */
+export async function confirmOverdueAgainstTable(
+  admin: any,
+  candidates: OverdueJob[]
+): Promise<{ jobs: OverdueJob[]; detail: string } | null> {
+  if (!candidates.length) return { jobs: [], detail: '' };
+
+  const { data: actualRuns, error } = await admin
+    .from('cron_runs')
+    .select('job, ran_at')
+    .in('job', candidates.map(o => o.job))
+    .order('ran_at', { ascending: false });
+
+  if (error) {
+    console.error('Could not confirm overdue crons against cron_runs — not alerting:', error);
+    return null;
+  }
+
+  const lastSeen = new Map<string, string>();
+  for (const r of (actualRuns || []) as { job: string; ran_at: string }[]) {
+    if (!lastSeen.has(r.job)) lastSeen.set(r.job, r.ran_at);
+  }
+
+  const jobs = candidates.filter(o => {
+    const seen = lastSeen.get(o.job);
+    if (!seen) return true; // table agrees there is no recorded run
+
+    const minutesSince = (Date.now() - Date.parse(seen)) / 60000;
+    // The RPC returns its own grace now. This used to approximate it as
+    // `expected_minutes * 1.5 + 20`, which is WIDER than the real value for both
+    // low-frequency jobs — 110 vs 90 for auto-buy, 200 vs 180 for
+    // send-appointment-reminders — so in that gap a genuinely dead job was flagged
+    // by the RPC and then silenced here. Two schedules that disagree are worse
+    // than one that is slightly wrong.
+    const graceMinutes = o.grace_minutes ?? (o.expected_minutes * 1.5 + 20);
+    if (minutesSince <= graceMinutes) {
+      console.error(
+        `⚠️ find_overdue_crons disagrees with cron_runs for "${o.job}": RPC said ` +
+          `last_ran_at=${o.last_ran_at ?? 'null'}, table says ${seen} ` +
+          `(${Math.round(minutesSince)}m ago, grace ${graceMinutes}m). Alert suppressed.`
+      );
+      return false;
+    }
+    return true;
+  });
+
+  // Describe from the TABLE, falling back to the RPC only where the table has
+  // nothing. This is the whole of #182: the message was built from `o.last_ran_at`
+  // — the RPC value this function has just decided not to trust — so it announced
+  // "has never run" for jobs with hundreds of rows, every two hours, for days
+  // after they had recovered. Report the reading you verified.
+  const detail = jobs
+    .map(o => {
+      const seen = lastSeen.get(o.job);
+      if (seen) {
+        const mins = Math.round((Date.now() - Date.parse(seen)) / 60000);
+        return `${o.job}: last ran ${mins} minutes ago (expected every ${o.expected_minutes})`;
+      }
+      if (o.last_ran_at) {
+        return `${o.job}: last ran ${o.minutes_since} minutes ago (expected every ${o.expected_minutes})`;
+      }
+      return `${o.job}: has no recorded run`;
+    })
+    .join('; ');
+
+  return { jobs, detail };
+}
+
 async function recordRunAndCheckPeers(job: string, source: string): Promise<void> {
   try {
     const admin = createServiceRoleClient();
@@ -115,46 +205,12 @@ async function recordRunAndCheckPeers(job: string, source: string): Promise<void
     // The direct read is also the diagnostic: when the two disagree, that gets
     // logged with both values, so the next occurrence explains itself instead of
     // requiring another investigation.
-    const { data: actualRuns } = await admin
-      .from('cron_runs')
-      .select('job, ran_at')
-      .in('job', candidates.map((o: any) => o.job))
-      .order('ran_at', { ascending: false });
+    const confirmed = await confirmOverdueAgainstTable(admin, candidates);
+    if (!confirmed) return; // could not confirm — never alert on a reading we could not check
+    if (!confirmed.jobs.length) return;
 
-    const lastSeen = new Map<string, string>();
-    for (const r of (actualRuns || []) as any[]) {
-      if (!lastSeen.has(r.job)) lastSeen.set(r.job, r.ran_at);
-    }
-
-    const others = candidates.filter((o: any) => {
-      const seen = lastSeen.get(o.job);
-      if (!seen) return true; // table agrees it has never run
-
-      const minutesSince = (Date.now() - Date.parse(seen)) / 60000;
-      // grace is not returned by the RPC; expected_minutes * 1.5 + 20 mirrors the
-      // migration's grace values closely enough to decide "is this really late",
-      // and the 20 covers the ~20-minute Vercel Cron pause around a deploy.
-      const graceMinutes = o.expected_minutes * 1.5 + 20;
-      if (minutesSince <= graceMinutes) {
-        console.error(
-          `⚠️ find_overdue_crons disagrees with cron_runs for "${o.job}": RPC said ` +
-            `last_ran_at=${o.last_ran_at ?? 'null'}, table says ${seen} ` +
-            `(${Math.round(minutesSince)}m ago, grace ${graceMinutes}m). Alert suppressed.`
-        );
-        return false;
-      }
-      return true;
-    });
-
-    if (!others.length) return;
-
-    const detail = others
-      .map((o: any) =>
-        o.last_ran_at
-          ? `${o.job}: last ran ${o.minutes_since} minutes ago (expected every ${o.expected_minutes})`
-          : `${o.job}: has never run`
-      )
-      .join('; ');
+    const others = confirmed.jobs;
+    const detail = confirmed.detail;
 
     await alertAdminsThrottled({
       key: `cron_overdue:${others.map((o: any) => o.job).sort().join(',')}`,

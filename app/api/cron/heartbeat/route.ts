@@ -21,7 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
-import { requireCronAuth } from '@/lib/cronAuth';
+import { requireCronAuth , confirmOverdueAgainstTable, type OverdueJob } from '@/lib/cronAuth';
 import { alertAdminsThrottled } from '@/lib/alerting';
 
 export const dynamic = 'force-dynamic';
@@ -42,30 +42,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    const jobs = (overdue || []) as {
-      job: string;
-      expected_minutes: number;
-      last_ran_at: string | null;
-      minutes_since: number | null;
-    }[];
+    const jobs = (overdue || []) as OverdueJob[];
 
-    // The heartbeat watches the five scheduled jobs, not itself. It runs on the
+    // The heartbeat watches the scheduled jobs, not itself. It runs on the
     // backup workflow's cadence, which GitHub throttles unpredictably, so
     // holding it to an interval would produce noise rather than signal.
-    const others = jobs.filter(j => j.job !== 'heartbeat');
+    const candidates = jobs.filter(j => j.job !== 'heartbeat');
+
+    // Confirm against cron_runs before alerting. This path had NO cross-check at
+    // all — it relayed the RPC verbatim — so it would announce "has never run" for
+    // a job with hundreds of rows, by a different route from the in-app monitor
+    // that was fixed for exactly that (#182). Same helper, so they cannot drift.
+    const confirmed = await confirmOverdueAgainstTable(createServiceRoleClient(), candidates);
+    if (!confirmed) {
+      // Could not read cron_runs. Not "nothing is wrong", and not a reason to page.
+      return NextResponse.json({ ok: false, error: 'could not confirm against cron_runs' }, { status: 503 });
+    }
+
+    const others = confirmed.jobs;
 
     if (others.length) {
       await alertAdminsThrottled({
         key: `cron_overdue_external:${others.map(j => j.job).sort().join(',')}`,
         title: 'Scheduled jobs have stopped — seen from outside',
         body:
-          others
-            .map(j =>
-              j.last_ran_at
-                ? `${j.job}: last ran ${j.minutes_since} minutes ago (expected every ${j.expected_minutes})`
-                : `${j.job}: has never run`
-            )
-            .join('; ') +
+          confirmed.detail +
           `. This was noticed by the external heartbeat rather than by another cron, which means ` +
           `either those jobs alone are stopped, or nothing inside the app is running at all. ` +
           `Thresholds already allow for the ~20 minute pause after a production deploy.`,

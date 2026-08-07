@@ -4648,3 +4648,65 @@ format. A single PDF upload would settle it.
 
 Also worth knowing: the route **returns parsed leads for confirmation and inserts
 nothing**. Absence of `leads` rows after an upload is not evidence of failure.
+
+## The cron monitor cried wolf for three days (#182, 2026-08-07)
+
+~700 log lines over three days claiming `auto-buy: has never run;
+send-appointment-reminders: has never run`, while both had hundreds of rows in
+`cron_runs`. Four separate defects, in the monitor rather than the crons.
+
+**First, what it was NOT.** Those lines were `console.error` from the *throttled*
+path in `alertAdminsThrottled` — suppressed repeats, not 700 emails. And the text
+was recomputed on every call, not replayed from a stored payload. Both worth
+stating because either would have led the fix somewhere useless.
+
+### 1. The message was built from the value the guard had just distrusted
+
+`recordRunAndCheckPeers` confirms the RPC against `cron_runs` before alerting —
+then built its message from `o.last_ran_at`, the **RPC's** field. So a job the
+guard had verified as running could still be announced as "has never run". The
+description now comes from the table, falling back to the RPC only where the table
+has nothing. **Report the reading you verified.**
+
+### 2. The confirming read swallowed its error
+
+```ts
+const { data: actualRuns } = await admin.from('cron_runs')...   // no `error`
+...
+if (!seen) return true;   // "table agrees it has never run"
+```
+
+A failed read left `actualRuns` null, so every candidate fell through as
+never-ran and the guard fired the exact alert it was written to prevent. "I could
+not read `cron_runs`" is a third state, distinct from both "running" and
+"stopped", and the only safe response is silence.
+
+### 3. Two schedules that disagreed, with a silence window between them
+
+The RPC did not return its grace, so the caller approximated it as
+`expected_minutes * 1.5 + 20`:
+
+| job | caller's guess | real grace |
+|---|---|---|
+| auto-buy | 110 | **90** |
+| send-appointment-reminders | 200 | **180** |
+
+Between 90 and 110 minutes, `auto-buy` was correctly flagged by the RPC and then
+**actively suppressed by its own caller**. The RPC returns `grace_minutes` now and
+the caller uses it. A monitor with two schedules silences real outages in the gap.
+
+### 4. The external heartbeat had no cross-check at all
+
+`/api/cron/heartbeat` relayed the RPC verbatim, so the same false claim could
+arrive by a second route regardless of what was fixed in the first. The
+confirmation is now `confirmOverdueAgainstTable()` in `lib/cronAuth.ts`, used by
+both. Same lesson as the DNC pre-checks: **a hand-rolled copy of a shared gate is
+worse than no copy.**
+
+### Also: check-idle-campaigns was unwatched
+
+Running on a Vercel cron and writing `cron_runs` since 2026-08-06, but absent from
+the RPC's expected list — so nothing would ever have reported it stopped. Added at
+1440/1560. `heartbeat` is deliberately left out: it is the external backstop on a
+cadence GitHub throttles unpredictably, and paging because the out-of-app monitor
+paused says nothing about the product.
