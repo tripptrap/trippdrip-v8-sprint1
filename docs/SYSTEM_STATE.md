@@ -5057,3 +5057,47 @@ must not be "fixed":
 A client conversation legitimately has no lead either. So `npm run health` asserts
 the **disagreement** — a thread that knows its lead and a message on it that does
 not — rather than the absence of nulls.
+
+## Public dark mode: enabled where it works, refused where it does not (#134, 2026-08-07)
+
+Tailwind is on `darkMode: 'class'`, and `lib/ThemeContext` — the only thing that
+sets that class — is mounted **only in the dashboard layout**, reading a saved
+preference from localStorage and the user's DB row. A public visitor has neither,
+so every `dark:` class across `app/(public)` was inert.
+
+The public layout now applies the class before first paint from
+`prefers-color-scheme`, with a saved preference still winning where one exists.
+Inline `<script>`, not `next/script` or an effect: both of those run after paint,
+and a flash of light that then switches is worse than no dark mode at all.
+
+### Not all public pages, and the measurement is the point
+
+The issue described these pages as "written as if they support dark mode". That is
+true of the page it was filed from, and **false of the landing page**:
+
+| page | `dark:` classNames / total |
+|---|---|
+| compliance | 50 / 74 |
+| terms | 30 / 49 |
+| team pages | 32 / 78, 27 / 58 |
+| refund | 24 / 36 |
+| privacy | 20 / 34 |
+| **opt-in** | **0 / 52** |
+| **preview** | **2 / 594** |
+
+Enabling dark on `/preview` produced **32 low-contrast elements**: near-black
+headings on a near-black background, because **174** of its light-text classes
+have no dark counterpart. That is a design pass on the primary marketing surface,
+not a missing class — so `/preview` and `/opt-in` are excluded and stay light.
+
+`/opt-in` staying light is incidentally useful: it is the consent evidence carriers
+screenshot during verification, and stability there beats theme support.
+
+### How the wrong answer was avoided
+
+An early contrast scan reported only **5** problems on `/preview` and nearly led to
+shipping it. That number was wrong twice over — it counted container elements
+whose text colour is not what renders, and it ran while the background was still
+light. Re-running against leaf text nodes with the background actually dark gave
+32. **Screenshot first, then measure leaf nodes; a passing aggregate over the
+wrong elements is worse than no check.**
