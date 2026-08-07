@@ -4487,3 +4487,64 @@ every matching customer is cancelled.
 Terminal statuses — `canceled`, `incomplete_expired` — are skipped. Everything else
 can still produce a charge, so it is safer to enumerate what cannot bill than to
 guess what can.
+
+## Cancelling never revoked access, and pausing was unlimited (#167, #168, #169, 2026-08-07)
+
+### subscription_status is not a gate. account_status is.
+
+`customer.subscription.deleted` wrote **only** `subscription_status: 'canceled'`,
+and nothing reads that column to decide whether someone may send.
+`lib/smsGuard.ts:324-351` gates on `account_status` and `suspended_until`. So
+cancelling through the billing portal left `account_status` at `'active'` and the
+user kept sending, kept their credit balance, kept their numbers, and could keep
+buying point packs — with no subscription at all.
+
+`subscription_status` was never usable as a gate anyway: it **defaults to
+`'active'` and is barely written**. All 7 accounts read `'active'` today, including
+the two on the `unpaid` tier. Do not gate anything on it.
+
+The handler now also writes `account_status: 'cancelled'` — **two Ls**;
+`users_account_status_check` allows `active | suspended | trial | cancelled`, and
+`'canceled'` would fail the constraint. `smsGuard`'s `SENDING_STATUSES` is
+`['active','trial']`, so `cancelled` blocks sending immediately. Re-subscribing
+restores it: `webhook/route.ts:333` and `:368` set `account_status: 'active'` on
+checkout completion, so cancellation is not a dead end.
+
+### A zero-row update is not an error (#169)
+
+`.eq('stripe_subscription_id', canceledSub.id)` matched **nothing** for an
+additional-phone-number subscription, because that id lives on
+`user_telnyx_numbers`, not `users`. supabase-js returns no error for a zero-row
+update, so the handler logged "Recorded cancellation" and did nothing. It now
+checks the returned rows and falls through to deactivating the number.
+
+`user_telnyx_numbers.status` has **no CHECK constraint** (free text), and
+`lib/resolveFromNumber.ts:157,188` both filter on `status = 'active'` — so writing
+`'inactive'` genuinely removes the number from the sending pool. Verified before
+relying on it.
+
+### Pause was indefinite free service (#167)
+
+Nothing checked whether the subscription was already paused. `behavior: 'void'`
+keeps the subscription advancing through periods while every invoice is created and
+voided, so `item.current_period_end` moves forward each cycle — and each new call
+recomputed `resumesAt` from the **current** period end and pushed it further out.
+Calling this once per cycle was free service for ever.
+
+Two guards now: a **409 if already paused**, and a cap of **2 pause cycles per
+rolling 12 months**.
+
+The counter lives in **Stripe subscription metadata** (`pause_cycles_used`,
+`pause_window_start`), not a new column — it travels with the subscription,
+survives anything done to the `users` row, and the customer cannot reset it. The
+window is stamped only when a new one opens, so the 12 months run from the *first*
+pause rather than sliding forward with each one.
+
+**Resuming deliberately does not give cycles back.** The cap counts cycles
+*granted*, not consumed — refunding on resume would make pause / resume / pause the
+same indefinite loop the cap exists to close.
+
+**Still inconsistent, deliberately left:** the UI offers pause only to Scale
+(`points/page.tsx:406`) while the API accepts any account holding a
+`stripe_subscription_id`. Whether pause is a Scale perk is a product decision, not
+a bug fix.

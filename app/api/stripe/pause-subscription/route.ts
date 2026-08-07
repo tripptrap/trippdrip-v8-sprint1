@@ -70,6 +70,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subscription has no billable item' }, { status: 500 });
     }
 
+    // ── Already paused? ───────────────────────────────────────────────────────
+    //
+    // Nothing checked this. `behavior: 'void'` keeps the subscription advancing
+    // through periods while every invoice is created and voided, so
+    // item.current_period_end moves forward each cycle — and each new call
+    // recomputed resumesAt from the CURRENT period end and pushed it further out.
+    // Calling this once per cycle was therefore indefinite free service (#167).
+    if (subscription.pause_collection) {
+      const until = subscription.pause_collection.resumes_at
+        ? new Date(subscription.pause_collection.resumes_at * 1000).toISOString()
+        : null;
+      return NextResponse.json(
+        {
+          error: until
+            ? `Your billing is already paused until ${new Date(until).toLocaleDateString()}.`
+            : 'Your billing is already paused.',
+          alreadyPaused: true,
+          resumesAt: until,
+        },
+        { status: 409 }
+      );
+    }
+
+    // ── Cap total pause per rolling 12 months ─────────────────────────────────
+    //
+    // Counted in Stripe's own subscription metadata rather than a new column: it
+    // travels with the subscription, survives anything we do to the users row, and
+    // cannot be reset by the customer. Resuming early does not refund cycles —
+    // the cap is on cycles GRANTED, otherwise pause/resume/pause is the same loop
+    // by another route.
+    const PAUSE_CYCLE_CAP = 2;
+    const meta = subscription.metadata ?? {};
+    const windowStart = meta.pause_window_start ? Date.parse(meta.pause_window_start) : NaN;
+    const windowExpired = !Number.isFinite(windowStart)
+      || Date.now() - windowStart > 365 * 24 * 60 * 60 * 1000;
+    const usedSoFar = windowExpired ? 0 : Number(meta.pause_cycles_used ?? 0) || 0;
+
+    if (usedSoFar + cycles > PAUSE_CYCLE_CAP) {
+      const remaining = Math.max(0, PAUSE_CYCLE_CAP - usedSoFar);
+      return NextResponse.json(
+        {
+          error: remaining === 0
+            ? `You have used all ${PAUSE_CYCLE_CAP} pause months available in a 12-month period.`
+            : `You have ${remaining} pause month${remaining === 1 ? '' : 's'} left in this 12-month period.`,
+          pauseCyclesRemaining: remaining,
+        },
+        { status: 409 }
+      );
+    }
+
     // Skip `cycles` upcoming renewals: resume at the end of the (cycles)th
     // billing period from now, aligned to the subscription's own renewal
     // date rather than a flat 30/60 days.
@@ -79,6 +129,13 @@ export async function POST(req: NextRequest) {
 
     await stripe.subscriptions.update(subscriptionId, {
       pause_collection: { behavior: 'void', resumes_at: resumesAt },
+      metadata: {
+        ...meta,
+        pause_cycles_used: String(usedSoFar + cycles),
+        // Only stamped when a new window opens, so the 12 months run from the
+        // FIRST pause rather than sliding forward with each one.
+        pause_window_start: windowExpired ? new Date().toISOString() : (meta.pause_window_start as string),
+      },
     });
 
     const { error: updateError } = await createServiceRoleClient()
@@ -127,6 +184,10 @@ export async function DELETE(req: NextRequest) {
     }
     const stripe = new Stripe(stripeSecretKey);
 
+    // Resuming does NOT give the cycles back. `pause_cycles_used` in the
+    // subscription metadata counts what was granted, not what was consumed —
+    // refunding it on resume would make pause / resume / pause the same
+    // indefinite loop the cap exists to close (#167). Leave it alone.
     await stripe.subscriptions.update(subscriptionId, { pause_collection: '' });
 
     const { error: updateError } = await createServiceRoleClient()

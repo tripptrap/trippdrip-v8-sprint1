@@ -655,18 +655,58 @@ export async function POST(req: NextRequest) {
         const canceledSub = event.data.object as Stripe.Subscription;
         if (!supabaseAdmin) break;
 
-        const { error: cancelError } = await supabaseAdmin
+        // account_status, not just subscription_status.
+        //
+        // This wrote ONLY subscription_status, and nothing anywhere reads that
+        // column to decide whether someone may send — lib/smsGuard.ts:324-351 gates
+        // on account_status and suspended_until. So cancelling through the billing
+        // portal left account_status at 'active' and the user kept sending, kept
+        // their credit balance, kept their numbers, and could keep buying point
+        // packs, with no subscription at all (#168).
+        //
+        // subscription_status is not a usable gate anyway: it defaults to 'active'
+        // and is barely written — all 7 accounts read 'active' today, including the
+        // two on the 'unpaid' tier. account_status is the real one, and
+        // users_account_status_check allows active | suspended | trial | cancelled.
+        // Note the two Ls; 'canceled' would fail the constraint.
+        const { data: cancelledRows, error: cancelError } = await supabaseAdmin
           .from('users')
           .update({
             subscription_status: 'canceled',
+            account_status: 'cancelled',
             updated_at: new Date().toISOString(),
           })
-          .eq('stripe_subscription_id', canceledSub.id);
+          .eq('stripe_subscription_id', canceledSub.id)
+          .select('id');
 
         if (cancelError) {
           console.error('Error recording subscription cancellation:', cancelError);
+          await notifyAdmins(
+            'fulfillment_failed',
+            'Subscription cancelled at Stripe but not recorded',
+            `Subscription ${canceledSub.id} was cancelled but the local update failed, so the account may still be able to send with no subscription.`,
+            { reason: 'cancel_record_failed', subscription_id: canceledSub.id, db_error: cancelError.message },
+            { escalate: true }
+          );
+        } else if ((cancelledRows ?? []).length === 0) {
+          // Zero rows matched, and supabase-js reports no error for that — which is
+          // why this logged "Recorded cancellation" for years while doing nothing
+          // (#169). Additional phone numbers bill as their own subscription, stored
+          // on user_telnyx_numbers.stripe_subscription_id, so users.* never matches
+          // and the number is never released.
+          const { data: numberRows } = await supabaseAdmin
+            .from('user_telnyx_numbers')
+            .update({ status: 'inactive', updated_at: new Date().toISOString() })
+            .eq('stripe_subscription_id', canceledSub.id)
+            .select('phone_number');
+
+          if ((numberRows ?? []).length > 0) {
+            console.log(`Deactivated ${numberRows!.map(n => n.phone_number).join(', ')} — their subscription ${canceledSub.id} was cancelled`);
+          } else {
+            console.warn(`Cancellation for ${canceledSub.id} matched no user and no number — nothing recorded`);
+          }
         } else {
-          console.log(`Recorded cancellation for subscription ${canceledSub.id}`);
+          console.log(`Recorded cancellation for subscription ${canceledSub.id}; access revoked`);
         }
         break;
       }
