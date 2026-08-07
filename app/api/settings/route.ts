@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { encrypt, safeDecrypt } from "@/lib/encryption";
 import { validateSpamProtection } from "@/lib/validateSpamProtection";
+import { POINT_PACKS } from "@/lib/pointPacks";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -192,17 +193,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    // Sync autoRefill settings to users table so the auto-buy cron can read them
+    // Sync autoRefill settings to users table so the auto-buy cron can read them.
+    //
+    // SERVICE ROLE, and the error is checked. `authenticated` may UPDATE exactly
+    // four columns of public.users — business_hours, business_name, timezone,
+    // updated_at — so this ran on the session client and Postgres refused it with
+    // 42501 every single time. The result was never destructured, so the route
+    // answered { ok: true } and the Settings UI showed auto-refill ON while
+    // users.auto_topup stayed false. Confirmed total, not intermittent: auto_topup
+    // is false on all 7 accounts and the auto-buy cron has run 70+ times without
+    // ever having a row to act on (#159, #186).
     if (autoRefill !== undefined) {
-      await supabase
+      // The cron resolves this through packForPointsAmount(), which returns the
+      // smallest pack >= amount and otherwise the LARGEST — so an arbitrary number
+      // here does not invent a price, but it can quietly escalate someone to the
+      // $510 Enterprise pack. Pin it to a real pack size.
+      const requested = Number(autoRefill?.amount);
+      const amount = POINT_PACKS.some(p => p.points === requested) ? requested : 4000;
+
+      const threshold = Number(autoRefill?.threshold);
+      const { error: syncError } = await createServiceRoleClient()
         .from('users')
         .update({
-          auto_topup: autoRefill?.enabled ?? false,
-          auto_topup_threshold: autoRefill?.threshold ?? 50,
+          auto_topup: autoRefill?.enabled === true,
+          // A deliberate 0 means "refill only at zero" and must survive; `||`
+          // would coerce it back to the default.
+          auto_topup_threshold: Number.isFinite(threshold) && threshold >= 0 ? threshold : 50,
           // Smallest real pack; 1000 was not a purchasable size (#76).
-          auto_topup_amount: autoRefill?.amount ?? 4000,
+          auto_topup_amount: amount,
         })
         .eq('id', user.id);
+
+      if (syncError) {
+        console.error('Auto-refill sync to users failed:', syncError);
+        return NextResponse.json(
+          { ok: false, error: 'Settings saved, but auto-refill could not be updated.' },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ ok: true, settings: data });

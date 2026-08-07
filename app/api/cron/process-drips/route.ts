@@ -246,23 +246,12 @@ async function handleCron(req: NextRequest) {
           continue;
         }
 
-        // Check DNC list
-        const { data: dncCheck } = await supabaseAdmin.rpc('check_dnc', {
-          p_user_id: enrollment.user_id,
-          p_phone_number: lead.phone,
-        });
-
-        if (dncCheck) {
-          const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
-          if (dncResult.on_dnc_list) {
-            console.log(`📧 Drip: Skipping ${lead.phone} — on DNC list`);
-            await supabaseAdmin
-              .from('drip_campaign_enrollments')
-              .update({ status: 'cancelled' })
-              .eq('id', enrollment.id);
-            continue;
-          }
-        }
+        // No DNC check here on purpose. checkSmsAllowed() below is the gate, and
+        // it is strictly better than the hand-rolled check that used to sit here:
+        // that one dropped the RPC's { error } entirely, so a failed check read as
+        // "not on the list" and fell through to the send, and it marked the
+        // enrollment `cancelled` while leaving next_send_at populated. The guard
+        // blocks on error and sets stopped_opted_out with next_send_at cleared.
 
         // Personalize message content
         let message = step.content || '';

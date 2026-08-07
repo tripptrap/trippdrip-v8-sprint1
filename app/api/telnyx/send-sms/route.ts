@@ -326,24 +326,10 @@ export async function POST(req: NextRequest) {
         ? appendOptOut(message, optOutKeyword)
         : message;
 
-    // HIGH-7: DNC check — block send if recipient is on do-not-contact list
-    if (userId && supabaseAdmin) {
-      const { data: dncCheck, error: dncError } = await supabaseAdmin.rpc('check_dnc', {
-        p_user_id: userId,
-        p_phone_number: to
-      });
-      if (!dncError && dncCheck) {
-        const dncResult = typeof dncCheck === 'string' ? JSON.parse(dncCheck) : dncCheck;
-        if (dncResult.on_dnc_list) {
-          console.log(`🚫 send-sms blocked — ${to} is on DNC list (${dncResult.on_user_list ? 'user' : 'global'} list)`);
-          return NextResponse.json({
-            error: `Message blocked: ${to} is on the Do Not Contact list.`,
-            onDncList: true,
-            reason: dncResult.reason
-          }, { status: 403 });
-        }
-      }
-    }
+    // No DNC check here on purpose. checkSmsAllowed() below is the gate. The
+    // hand-rolled check that used to sit here read `if (!dncError && dncCheck)`,
+    // which skipped the block whenever the RPC errored — a failed DNC lookup
+    // meant the send proceeded. The guard treats a failed lookup as a refusal.
 
     // Build request body
     // When we have a specific 'from' number, send it directly without messaging_profile_id.
