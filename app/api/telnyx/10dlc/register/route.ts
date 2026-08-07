@@ -286,6 +286,48 @@ export async function POST(req: NextRequest) {
       ? ['MARKETING', 'ACCOUNT_NOTIFICATION', 'CUSTOMER_CARE']
       : ['MARKETING', 'ACCOUNT_NOTIFICATION'];
 
+    // ── The campaign cannot be created until the brand is VERIFIED ────────────
+    //
+    // A brand-new brand comes back PENDING, and Telnyx refuses to attach a
+    // campaign to one: "Cannot associate campaign with brand in pending or failed
+    // status." So creating both in a single request fails for every genuinely new
+    // agent — the user pays the $4.50 brand fee and gets a half-finished
+    // registration and a 502.
+    //
+    // It only ever looked like it worked because the one real filing that exists
+    // reused HyveWyre's own brand, created separately and already VERIFIED by the
+    // time a campaign was attempted. Found by the first end-to-end run of this
+    // flow (mock mode, no fees).
+    //
+    // So: store the reviewed content and let /api/cron/refresh-10dlc submit the
+    // campaign once the brand verifies. Vetting is usually quick but is not
+    // synchronous, and nothing is lost by waiting — a campaign is useless without
+    // a verified brand anyway.
+    //
+    // The content is PERSISTED rather than regenerated later because it includes
+    // `whatTheyOffer` and any operator overrides. Regenerating would file
+    // something other than what the user reviewed, and campaign-content accuracy
+    // is precisely what caused the original rejection.
+    if (brandStatus !== 'verified') {
+      await supabaseAdmin.from('user_10dlc_registrations').update({
+        what_they_offer: body.whatTheyOffer?.trim() || null,
+        campaign_content: content,
+        pending_campaign_usecase: usecase,
+        campaign_status: 'not_started',
+        updated_at: new Date().toISOString(),
+      }).eq('id', registrationId);
+
+      return NextResponse.json({
+        ok: true,
+        brandStatus,
+        campaignStatus: 'not_started',
+        campaignDeferred: true,
+        message:
+          'Your business has been submitted for carrier verification. ' +
+          'The messaging campaign is created automatically once that clears — usually within a few minutes, sometimes a few days.',
+      });
+    }
+
     const campaignResult = await createCampaign({
       brandId: brandResult.brandId!,
       usecase,

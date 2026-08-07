@@ -25,7 +25,7 @@ export async function POST() {
 
     const { data: registration } = await supabaseAdmin
       .from('user_10dlc_registrations')
-      .select('id, user_id, brand_id, brand_status, campaign_id, campaign_status')
+      .select('id, user_id, brand_id, brand_status, campaign_id, campaign_status, campaign_content, pending_campaign_usecase, is_mock')
       .eq('user_id', user.id)
       .maybeSingle();
 

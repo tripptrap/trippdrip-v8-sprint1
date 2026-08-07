@@ -4944,3 +4944,69 @@ resubmission. An unvalidated string on this path is billable.
 
 Both are now validated server-side, against `lib/telnyx10dlcEnums.ts`, which the
 form's dropdown is also generated from — one list, so the two cannot drift.
+
+## Per-agent 10DLC registration could never have worked (#1, 2026-08-07)
+
+`/api/telnyx/10dlc/register` created the brand and then created the campaign **in
+the same request**. Telnyx refuses that:
+
+```
+10015  Cannot associate campaign with brand in pending or failed status.
+```
+
+A brand-new brand starts PENDING. So registration failed for **every genuinely new
+agent**: the user pays the $4.50 brand fee, gets a 502, and is left with a brand
+and no campaign.
+
+It only ever looked like it worked because the single real filing that exists
+reused **HyveWyre's own brand**, created separately weeks earlier and already
+VERIFIED by the time a campaign was attempted. #1's open list said "no live user
+has gone through the new flow" — this is what that was hiding.
+
+**Found by the first end-to-end run of the flow, in mock mode, for free.**
+
+### Mock mode is the reason this was findable
+
+Telnyx accepts `mock: true` on brands and campaigns: the flow runs, returns
+real-shaped objects, contacts no carriers and charges no fees. The route already
+supported it via `TELNYX_10DLC_MOCK`; nothing had ever exercised it.
+`scripts/e2e-10dlc-mock.js` now does, and refuses to run unless that variable is
+`true` — otherwise it would file a real, billable registration.
+
+### The fix: defer the campaign
+
+Registration stores the reviewed content and returns success-with-pending.
+`/api/cron/refresh-10dlc` submits the campaign the moment the brand verifies.
+Content is **persisted, not regenerated** — it carries `whatTheyOffer` and any
+operator overrides, and filing something other than what the user approved is
+exactly how the original submission got rejected.
+
+### Brand verification is not instant, and not slow either
+
+Mock brands take **about 10 seconds** to go from PENDING to `identityStatus:
+VERIFIED`. Long enough that an immediate campaign attempt always fails; short
+enough that the hourly cron closes it quickly. Do not "fix" this by retrying
+inside the registration request — the delay is real and unbounded for genuine
+carrier vetting.
+
+Note also that `getBrandStatus` must read **`identityStatus`**, not `status`: the
+GET returns `status: OK` alongside `identityStatus: VERIFIED`, and mapping the
+wrong one leaves a verified brand looking pending for ever.
+
+### Result
+
+```
+signup -> register -> defer -> brand verifies -> campaign submitted -> status
+20/20 checks passed
+```
+
+with a real agent identity (`Cedar Ridge Insurance Group LLC`, vertical
+`INSURANCE`) rather than HyveWyre's own — the first time any identity other than
+ours has gone through this flow.
+
+### Litter, honestly
+
+The run created three mock brands. Two deleted cleanly; the third returns
+`10007 Unexpected error` on DELETE and is stuck, joining the ones in #118. Mock
+brands appear to be undeletable once a campaign has been attached. Worth knowing
+before running this repeatedly — it leaves a trace each time.

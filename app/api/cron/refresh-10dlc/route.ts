@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     const { data: registrations, error } = await admin
       .from('user_10dlc_registrations')
-      .select('id, user_id, brand_id, brand_status, campaign_id, campaign_status, updated_at')
+      .select('id, user_id, brand_id, brand_status, campaign_id, campaign_status, updated_at, campaign_content, pending_campaign_usecase, is_mock')
       .eq('is_mock', false);
 
     if (error) {

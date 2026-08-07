@@ -12,7 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   getBrandStatus, getCampaignStatus, mapBrandStatus, mapCampaignStatus,
-  listCampaignsForBrand, pickUsableCampaign,
+  listCampaignsForBrand, pickUsableCampaign, createCampaign, type CampaignUseCase,
 } from '@/lib/telnyx10dlc';
 import { assignAllUserNumbersToCampaign } from '@/lib/autoAssignCampaignNumber';
 
@@ -23,6 +23,17 @@ export interface TenDlcRegistrationRow {
   brand_status: string;
   campaign_id: string | null;
   campaign_status: string;
+  /** Reviewed campaign content, held from registration until the brand verifies. */
+  campaign_content?: Record<string, any> | null;
+  pending_campaign_usecase?: string | null;
+  is_mock?: boolean | null;
+}
+
+/** Telnyx requires 1–5 sub-use-cases for LOW_VOLUME and 2–5 for MIXED. */
+function subUsecasesFor(usecase: string): string[] {
+  return usecase === 'MIXED'
+    ? ['MARKETING', 'ACCOUNT_NOTIFICATION', 'CUSTOMER_CARE']
+    : ['MARKETING', 'ACCOUNT_NOTIFICATION'];
 }
 
 export interface TenDlcSyncOutcome {
@@ -67,6 +78,68 @@ export async function syncTenDlcRegistration(
     if (campaignResult.success) {
       updates.campaign_status = mapCampaignStatus(campaignResult.status);
       updates.campaign_failure_reason = campaignResult.failureReasons?.join(' | ') || null;
+    }
+  }
+
+  // ── Submit the campaign the brand was not verified enough to take ──────────
+  //
+  // Registration cannot create both at once: a brand-new brand is PENDING and
+  // Telnyx refuses "Cannot associate campaign with brand in pending or failed
+  // status". So /api/telnyx/10dlc/register stores the reviewed content and stops,
+  // and this finishes the job the moment the brand clears (#1).
+  //
+  // Uses the STORED content, not a fresh generation — it carries whatTheyOffer
+  // and any operator overrides, and filing something other than what the user
+  // reviewed is how the original submission got rejected.
+  const brandNowVerified = (updates.brand_status ?? registration.brand_status) === 'verified';
+  if (brandNowVerified && !registration.campaign_id && registration.campaign_content) {
+    const content = registration.campaign_content as Record<string, any>;
+    // Narrowed rather than cast: the column is free text, and a value Telnyx does
+    // not accept would fail the submission after the brand has already been paid
+    // for. LOW_VOLUME is the safe default — it is the cheaper tier and can be
+    // upgraded, whereas MIXED bills more per month (#11).
+    const stored = registration.pending_campaign_usecase;
+    const usecase: CampaignUseCase = stored === 'MIXED' ? 'MIXED' : 'LOW_VOLUME';
+
+    const campaignResult = await createCampaign({
+      brandId: registration.brand_id!,
+      usecase,
+      subUsecases: subUsecasesFor(usecase),
+      description: content.description,
+      sample1: content.sample1,
+      sample2: content.sample2,
+      messageFlow: content.messageFlow,
+      helpMessage: content.helpMessage,
+      optinMessage: content.optinMessage,
+      optoutMessage: content.optoutMessage,
+      optinKeywords: content.optinKeywords,
+      optoutKeywords: content.optoutKeywords,
+      helpKeywords: content.helpKeywords,
+      subscriberOptin: true,
+      subscriberOptout: true,
+      subscriberHelp: true,
+      numberPool: false,
+      embeddedLink: false,
+      embeddedPhone: false,
+      ageGated: false,
+      directLending: false,
+      privacyPolicyLink: 'https://hyvewyre.com/privacy',
+      termsAndConditionsLink: 'https://hyvewyre.com/terms',
+      mock: registration.is_mock === true,
+    });
+
+    if (campaignResult.success) {
+      updates.campaign_id = campaignResult.campaignId;
+      updates.campaign_use_case = usecase;
+      updates.campaign_status = mapCampaignStatus(campaignResult.status);
+      updates.campaign_failure_reason = campaignResult.failureReasons?.join(' | ') || null;
+      console.log(`📇 Brand verified for user ${registration.user_id} — campaign ${campaignResult.campaignId} submitted`);
+    } else {
+      // Recorded, not thrown: the brand is genuinely verified and that progress
+      // must not be lost because the campaign call failed. The next run retries.
+      updates.campaign_status = 'failed';
+      updates.campaign_failure_reason = campaignResult.error || 'Campaign submission failed';
+      console.error(`10DLC: campaign submission failed for user ${registration.user_id}:`, campaignResult.error);
     }
   }
 
