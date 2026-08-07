@@ -227,6 +227,37 @@ async function telnyxBalance(): Promise<Result> {
   return { name, level: 'PASS', detail };
 }
 
+// A paid tier is supposed to be the shadow of a Stripe subscription: the webhook
+// sets subscription_tier on checkout and re-grants credits on each invoice.paid.
+// An account holding `growth` or `scale` with no stripe_subscription_id therefore
+// gets the tier's allowance and its pack discount with nothing billing it, and its
+// next_renewal_date is frozen at whatever signup wrote — which is what made #185
+// look like a missing renewal cron when the renewal path was working correctly for
+// the one account that actually had a subscription.
+//
+// Do NOT "fix" a stale next_renewal_date by granting credits from a cron. That is
+// precisely what lib/renewalSystem.ts documents as removed: it treated a null date
+// as "renewal overdue" and handed every new signup a free month on first page load.
+async function paidTiersAreBilled(db: SupabaseClient): Promise<Result> {
+  const name = 'paid tiers have a subscription';
+  const { data, error } = await db
+    .from('users')
+    .select('email, subscription_tier, stripe_subscription_id')
+    .in('subscription_tier', ['growth', 'scale']);
+
+  if (error) return { name, level: 'WARN', detail: error.message };
+
+  const unbilled = (data ?? []).filter(u => !u.stripe_subscription_id);
+  if (unbilled.length > 0) {
+    return {
+      name, level: 'WARN',
+      detail: `${unbilled.length} of ${data?.length ?? 0}: ${unbilled.map(u => u.email).join(', ')}`,
+      because: 'A paid tier with no subscription bills nobody and never renews — the credits are free (#185).',
+    };
+  }
+  return { name, level: 'PASS', detail: `all ${data?.length ?? 0} backed by a subscription` };
+}
+
 // A Telnyx number with no messaging profile cannot send, and its inbound is
 // delivered nowhere — silently, with the number still reading `active`. All ten
 // numbers ordered on 2026-08-06 landed this way (#184): the four in-app order
@@ -305,6 +336,7 @@ async function main() {
   await check('DNC entries are usable', () => dncIntegrity(db));
   for (const r of await catalogHygiene(db)) add(r);
   await check('Telnyx balance', telnyxBalance);
+  await check('paid tiers are billed', () => paidTiersAreBilled(db));
   await check('messaging profiles', messagingProfiles);
   await check('toll-free verification', tollFreeVerification);
 

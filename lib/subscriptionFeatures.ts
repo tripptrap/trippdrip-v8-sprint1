@@ -7,6 +7,7 @@
 // lib/pointPacks.ts, computed from the actual prices. Don't reintroduce a
 // standalone discount number here.
 import { createClient } from "@/lib/supabase/client";
+import { renewalDaysFrom } from "@/lib/renewalSystem";
 
 export type SubscriptionTier = 'unpaid' | 'growth' | 'scale';
 
@@ -232,19 +233,21 @@ export async function getUserSubscription(): Promise<{
 
   const { data: userData } = await supabase
     .from('users')
-    .select('subscription_tier, next_renewal_date')
+    .select('subscription_tier, next_renewal_date, stripe_subscription_id')
     .eq('id', user.id)
     .single();
 
   const tier = (userData?.subscription_tier as SubscriptionTier) || 'unpaid';
 
-  let daysUntilRenewal = null;
-  if (userData?.next_renewal_date) {
-    const now = new Date();
-    const nextRenewal = new Date(userData.next_renewal_date);
-    const diffTime = nextRenewal.getTime() - now.getTime();
-    daysUntilRenewal = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }
+  // Only a Stripe subscription can cause a renewal — the webhook rewrites
+  // next_renewal_date from the real billing period on each invoice.paid. Without
+  // one, the stored date is a fossil from signup and this returned a NEGATIVE day
+  // count (currently as low as -238) straight to the UI. Null means "no renewal
+  // scheduled", which is the truth (#185).
+  const daysUntilRenewal = renewalDaysFrom(
+    userData?.next_renewal_date,
+    userData?.stripe_subscription_id
+  );
 
   return {
     tier,

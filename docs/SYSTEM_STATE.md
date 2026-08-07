@@ -3903,3 +3903,53 @@ The guard also handles the enrollment better than the code removed: it sets
 **The general rule this is an instance of:** a hand-rolled copy of a shared gate is
 worse than no copy. It drifts, it gets the error handling wrong, and it makes the
 real gate harder to find. `lib/smsGuard.ts` is the gate; do not re-implement it.
+
+## Renewals work; the accounts don't have subscriptions (#185, 2026-08-06)
+
+Six of seven accounts were past `next_renewal_date`, the oldest by eight months,
+and this was filed as "no monthly credit-renewal job exists". **That diagnosis was
+wrong, and acting on it would have shipped a serious bug.**
+
+The renewal path is correct and works. `invoice.paid` with `billing_reason
+'subscription_cycle'` grants the monthly credits and rewrites `next_renewal_date`
+from Stripe's real billing period (`webhook/route.ts:542-560`). Credits follow money
+actually collected.
+
+What the data actually says:
+
+| account | tier | stripe_subscription_id | next_renewal_date |
+|---|---|---|---|
+| tripped620@ | scale | **present** | 2026-08-24 — *future* |
+| elementp293@ | growth | none | 2025-12-12 |
+| trippbrowning620@ | growth | none | 2026-03-04 |
+| trippebrowning@ | growth | none | 2026-03-03 |
+| rios.healthcaresolutions@ | scale | none | 2026-02-24 |
+| 2 unpaid accounts | unpaid | none | past |
+
+**The one account with a subscription is the one account that is not past due.**
+The other six have no `stripe_customer_id` and no `stripe_subscription_id` at all —
+they never subscribed, so no `invoice.paid` ever fires, so nothing renews. Their
+`next_renewal_date` is a fossil written at signup and never touched since.
+
+### Do not add a renewal cron
+
+`lib/renewalSystem.ts:1-7` documents this exact thing being removed: a client-side
+function that treated a stale or null `next_renewal_date` as "renewal overdue" and
+**granted a bonus month of credits to every new signup on first page load**,
+disconnected from whether Stripe had charged them. A cron granting credits from
+`next_renewal_date` is that same bug on a schedule, and it would hand free months to
+the four accounts holding a paid tier with nothing billing them.
+
+### What was actually wrong
+
+1. **Four accounts hold `growth`/`scale` with no subscription** — full tier
+   allowance and the Scale pack discount, billed to nobody. `npm run health` now
+   warns on it (`paid tiers have a subscription`). Whether those are comped accounts
+   or bad data is a business decision, not a code fix.
+2. **`daysUntilRenewal` returned a negative number to the UI** — as low as -238 —
+   because both `getDaysUntilRenewal()` and `getSubscriptionInfo()` computed a
+   difference against the fossil date. They now return `null` unless a
+   `stripe_subscription_id` exists, via one shared `renewalDaysFrom()` helper.
+   Callers already handled null; it was the no-date case.
+3. **`subscription_status` is `'active'` on all seven accounts**, including the two
+   `unpaid` ones. It is defaulted and never meaningfully written — do not gate on it.

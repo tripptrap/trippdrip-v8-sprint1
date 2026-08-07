@@ -7,6 +7,29 @@
 // disconnected from whether Stripe had actually charged them. Removed.
 import { createClient } from "@/lib/supabase/client";
 
+// Days until the next renewal, or null when no renewal is scheduled.
+//
+// `next_renewal_date` is only meaningful when a Stripe subscription exists — the
+// webhook rewrites it from the real billing period on each invoice.paid. Without a
+// subscription it is a fossil written at signup, and computing a difference
+// against it returned a NEGATIVE day count (as low as -238 on this database)
+// straight into the UI. Four accounts are in exactly that state: a paid tier with
+// no subscription behind it (#185).
+//
+// Returning null is the honest answer — nothing is going to renew. Callers already
+// handle null, since it was the no-date case.
+export function renewalDaysFrom(
+  nextRenewalDate: string | null | undefined,
+  stripeSubscriptionId: string | null | undefined
+): number | null {
+  if (!nextRenewalDate || !stripeSubscriptionId) return null;
+
+  const diffMs = new Date(nextRenewalDate).getTime() - Date.now();
+  if (!Number.isFinite(diffMs)) return null;
+
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
 // Get days until next renewal
 export async function getDaysUntilRenewal(): Promise<number | null> {
   const supabase = createClient();
@@ -16,16 +39,9 @@ export async function getDaysUntilRenewal(): Promise<number | null> {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('next_renewal_date')
+    .select('next_renewal_date, stripe_subscription_id')
     .eq('id', user.id)
     .single();
 
-  if (!userData?.next_renewal_date) return null;
-
-  const now = new Date();
-  const nextRenewal = new Date(userData.next_renewal_date);
-  const diffTime = nextRenewal.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  return diffDays;
+  return renewalDaysFrom(userData?.next_renewal_date, userData?.stripe_subscription_id);
 }
