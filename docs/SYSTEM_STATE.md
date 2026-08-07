@@ -3847,3 +3847,59 @@ query (28 inbound messages in 7 days, most recent that afternoon; inbound is ali
 - **PDF import fails two ways (#181)**, both *after* the commit meant to fix it: the
   `pdfjs-dist` worker is not in the Vercel bundle, and `DOMMatrix` does not exist in the
   Node runtime.
+
+## Auto-refill had never once worked (#159, #186, 2026-08-06)
+
+`/api/settings` wrote `auto_topup`, `auto_topup_threshold` and `auto_topup_amount`
+through the **session client**. `authenticated` may UPDATE exactly four columns of
+`public.users`, and none of these are among them, so Postgres refused every write
+with `42501`. The result was never destructured, so the route returned `{ ok: true }`
+and the Settings UI showed auto-refill **ON** while the column stayed `false`.
+
+Verified live, with `timezone` as a control to prove the query discriminates:
+
+| column | `authenticated` | `service_role` |
+|---|---|---|
+| `auto_topup` | **false** | true |
+| `auto_topup_threshold` | **false** | true |
+| `auto_topup_amount` | **false** | true |
+| `timezone` (control) | true | true |
+
+**The failure was total, not intermittent.** `auto_topup` is `false` on all 7
+accounts, and `/api/cron/auto-buy` has executed 70+ times since 2026-08-03 without
+ever having a row to act on. A cron running successfully and doing nothing looks
+identical to a cron with no work.
+
+Two smaller things fixed alongside:
+
+- **`auto_topup_amount` is now pinned to a real pack size.** `packForPointsAmount()`
+  returns the smallest pack `>= amount` and otherwise the **largest**, so an
+  arbitrary value could never invent a price — but it could silently escalate
+  someone from the $40 Starter pack to the $510 Enterprise pack.
+- **A threshold of `0` survives.** It means "refill only when I hit zero", and `||`
+  on both sides (settings *and* `auto-buy:71`) turned it into 100 — charging a card
+  100 credits early, against an explicit instruction. Both are `??` now.
+
+### The two DNC checks that were not the DNC gate
+
+Deleted from `process-drips` and `send-sms`. Both read like the gate and were not:
+
+```ts
+send-sms       if (!dncError && dncCheck)   // skipped the block when the lookup failed
+process-drips  const { data: dncCheck }     // dropped { error } entirely
+```
+
+**Neither was load-bearing**, which is worth stating precisely because the audit
+that found them called this "the DNC gate fails open" — the highest-severity claim
+of the night, and wrong. `checkSmsAllowed()` runs before the send in both paths
+(drips 350 → send 402; send-sms 393 → send 461) and `lib/smsGuard.ts:432` returns
+`{ allowed: false, reason: 'check_failed' }` on an RPC error. Drips are guarded
+twice, since they send *through* `/api/telnyx/send-sms`.
+
+The guard also handles the enrollment better than the code removed: it sets
+`stopped_opted_out` with `next_send_at` cleared, where the deleted check set
+`cancelled` and left `next_send_at` populated.
+
+**The general rule this is an instance of:** a hand-rolled copy of a shared gate is
+worse than no copy. It drifts, it gets the error handling wrong, and it makes the
+real gate harder to find. `lib/smsGuard.ts` is the gate; do not re-implement it.

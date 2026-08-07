@@ -68,7 +68,11 @@ export async function GET(req: NextRequest) {
 
     for (const user of users || []) {
       const currentCredits = user.credits || 0;
-      const threshold = user.auto_topup_threshold || 100;
+      // `??`, not `||`. A deliberate threshold of 0 means "refill only when I
+      // hit zero" and `||` turned that into 100 — charging a card 100 credits
+      // early, against an explicit instruction not to. /api/settings preserves
+      // a 0 (#159); this is the other half of that.
+      const threshold = user.auto_topup_threshold ?? 100;
       // 500 is the legacy default still stored on every row; it isn't a pack
       // size, so packForPointsAmount rounds it up to the smallest real pack.
       const amount = user.auto_topup_amount || 4000;
