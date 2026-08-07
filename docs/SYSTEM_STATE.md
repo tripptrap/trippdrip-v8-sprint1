@@ -4300,3 +4300,48 @@ identifiable and never mistaken for real activity.
 housekeeping; the check is what makes it stay true. New drift means some write path
 is moving credits without going through `add_credits`/`deduct_credits` — the exact
 bug class this project keeps reproducing, and previously nothing would have noticed.
+
+## Every SECURITY DEFINER function pins its search_path (#151, 2026-08-07)
+
+24 of the 49 SECURITY DEFINER functions in `public` had a mutable `search_path`.
+They run as the function **owner**, so with the path unpinned the **caller** picks
+the schema resolution order and a same-named object in an earlier schema is what
+the body actually touches. The affected set included `check_dnc`, `add_to_dnc`,
+`bulk_add_to_dnc`, `remove_from_dnc`, `schedule_message` and
+`is_within_quiet_hours` — the compliance gate and the send scheduler.
+
+All 24 pinned to `public, pg_temp`. `npm run health` now reads
+`SECURITY DEFINER fns pin search_path — all pinned`.
+
+### Why public+pg_temp was safe, and when it would not be
+
+Checked against `pg_proc.prosrc` **before** running:
+
+1. None referenced another schema explicitly (`auth`, `extensions`, `net`,
+   `storage`, `graphql`, `vault`, `pgsodium`, `cron`).
+2. None called an extension function **unqualified**. This is the one that would
+   have bitten: `pgcrypto` and `uuid-ossp` are installed in the `extensions`
+   schema, so a single bare `crypt()`, `gen_salt()` or `uuid_generate_v4()` would
+   have started failing the moment the path was pinned. There were none.
+
+`pg_catalog` is always searched implicitly and never needs naming — which is why
+`gen_random_uuid()` (pg_catalog since PG13) is fine either way.
+
+**If a function does need an extension**, pin it to `public, extensions, pg_temp`
+or schema-qualify the call. Do not leave it unpinned.
+
+### The migration is catalog-driven on purpose
+
+It loops over `pg_proc` and `ALTER`s by identity arguments, so overloads are handled
+correctly and re-running is a no-op — already-pinned functions stop matching the
+filter. A hand-written list of 24 signatures would rot the moment anyone adds a
+function.
+
+### Verified after, not just applied
+
+`ALTER FUNCTION` succeeding proves nothing about whether the bodies still work.
+Exercised afterwards: `check_dnc` still returns `on_dnc_list: true` for the known
+opt-out and `false` for a clean number, and `is_within_quiet_hours`,
+`get_messages_ready_to_send`, `get_ai_drips_ready_to_send`,
+`get_campaigns_ready_for_batch`, `find_overdue_crons` and `get_dnc_stats` all
+return correct results.
