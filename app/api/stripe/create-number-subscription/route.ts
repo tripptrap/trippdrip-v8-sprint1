@@ -14,9 +14,49 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
     )
   : null;
 
-// Price ID for additional phone number ($1/month)
-// TODO: Create this product/price in Stripe Dashboard and update this ID
-const PHONE_NUMBER_PRICE_ID = process.env.STRIPE_PHONE_NUMBER_PRICE_ID || 'price_phone_number_monthly';
+// Price ID for the additional phone number ($1/month).
+//
+// No placeholder fallback. This used to be
+//   process.env.STRIPE_PHONE_NUMBER_PRICE_ID || 'price_phone_number_monthly'
+// and that env var has never been set, so every request fell through to a literal
+// that exists in no Stripe account. Combined with ordering the number from Telnyx
+// BEFORE charging, that made this route give away real numbers on the platform's
+// Telnyx account and never bill for a single one (#154).
+//
+// Undefined now, and the request is refused up front rather than half-completing.
+const PHONE_NUMBER_PRICE_ID = process.env.STRIPE_PHONE_NUMBER_PRICE_ID?.trim() || null;
+
+// Release a number we just ordered but could not bill for. Best-effort: the caller
+// is already returning an error, so this only decides whether the platform keeps
+// paying for a number nobody bought.
+async function releaseOrderedNumber(phoneNumber: string, apiKey: string): Promise<void> {
+  try {
+    const lookup = await fetch(
+      `https://api.telnyx.com/v2/phone_numbers?filter[phone_number]=${encodeURIComponent(phoneNumber)}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!lookup.ok) {
+      console.error(`Could not look up ${phoneNumber} to release it: HTTP ${lookup.status}`);
+      return;
+    }
+    const id = (await lookup.json())?.data?.[0]?.id;
+    if (!id) {
+      console.error(`Could not find ${phoneNumber} at Telnyx to release it — it may still be provisioning`);
+      return;
+    }
+    const del = await fetch(`https://api.telnyx.com/v2/phone_numbers/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!del.ok) {
+      console.error(`Failed to release ${phoneNumber} (id ${id}) after a billing failure: HTTP ${del.status} — this number is now billing with no owner`);
+      return;
+    }
+    console.log(`Released ${phoneNumber} after billing failed`);
+  } catch (e: any) {
+    console.error(`Failed to release ${phoneNumber} after a billing failure:`, e?.message || e);
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,6 +89,43 @@ export async function POST(req: NextRequest) {
 
     // Initialize Stripe
     const stripe = new Stripe(stripeSecretKey);
+
+    // Prove the price exists BEFORE touching Telnyx.
+    //
+    // This is the whole of #154. The route orders the number from Telnyx first and
+    // charges afterwards — a deliberate choice, per the comment further down, so a
+    // customer is never billed for a number Telnyx refused. That reasoning is fine
+    // right up until the charge can NEVER succeed, at which point the ordering
+    // guarantees the opposite failure: real numbers provisioned on the platform's
+    // account, every time, billed to nobody.
+    //
+    // Checking the price here costs one API call and makes the later charge unable
+    // to fail for the reason it always failed. Anything else that goes wrong at
+    // charge time is compensated by releasing the number.
+    if (!PHONE_NUMBER_PRICE_ID) {
+      console.error('STRIPE_PHONE_NUMBER_PRICE_ID is not set — refusing to order a number that cannot be billed');
+      return NextResponse.json(
+        { error: 'Number purchasing is not configured yet. Please contact support.', setup: true },
+        { status: 503 }
+      );
+    }
+
+    try {
+      const price = await stripe.prices.retrieve(PHONE_NUMBER_PRICE_ID);
+      if (!price.active) {
+        console.error(`STRIPE_PHONE_NUMBER_PRICE_ID ${PHONE_NUMBER_PRICE_ID} exists but is archived`);
+        return NextResponse.json(
+          { error: 'Number purchasing is not configured yet. Please contact support.', setup: true },
+          { status: 503 }
+        );
+      }
+    } catch (priceError: any) {
+      console.error(`STRIPE_PHONE_NUMBER_PRICE_ID ${PHONE_NUMBER_PRICE_ID} does not exist on this Stripe account:`, priceError?.message || priceError);
+      return NextResponse.json(
+        { error: 'Number purchasing is not configured yet. Please contact support.', setup: true },
+        { status: 503 }
+      );
+    }
 
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').trim();
 
@@ -178,19 +255,39 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Telnyx confirmed the order — now it's safe to charge.
-      await stripe.subscriptionItems.create({
-        subscription: subscription.id,
-        price: PHONE_NUMBER_PRICE_ID,
-        quantity: 1,
-        metadata: {
-          phone_number: phoneNumber,
-          user_id: user.id
-        }
-      });
+      // Telnyx confirmed the order — now it's safe to charge. The price was proven
+      // to exist before we ordered, so a failure here is a real billing problem
+      // (card, subscription state, Stripe outage) rather than the guaranteed
+      // misconfiguration that made this route give numbers away (#154).
+      try {
+        await stripe.subscriptionItems.create({
+          subscription: subscription.id,
+          price: PHONE_NUMBER_PRICE_ID,
+          quantity: 1,
+          metadata: {
+            phone_number: phoneNumber,
+            user_id: user.id
+          }
+        });
+      } catch (chargeError: any) {
+        // Give the number back. Without this the platform keeps paying Telnyx for
+        // a number nobody bought, and the DB has no row to find it by.
+        console.error(`Billing failed for ${phoneNumber} after Telnyx accepted the order — releasing it:`, chargeError?.message || chargeError);
+        await releaseOrderedNumber(phoneNumber, apiKey);
+        return NextResponse.json(
+          { error: 'We could not bill your subscription for this number, so it was not added. Please check your payment method and try again.' },
+          { status: 402 }
+        );
+      }
 
-      // Mark the number as purchased (pending until webhook confirms provisioning)
-      await supabaseAdmin
+      // Mark the number as purchased (pending until webhook confirms provisioning).
+      //
+      // The error is checked. It used to be a bare await returning { success: true }
+      // regardless, so a failed write left the number ordered and the customer
+      // charged with nothing linking the two — the number would be invisible in the
+      // UI and unreleasable through the app (#165). The webhook's byte-identical
+      // write already escalates on failure; this one at least must not claim success.
+      const { error: linkError } = await supabaseAdmin
         .from('user_telnyx_numbers')
         .upsert({
           user_id: user.id,
@@ -203,6 +300,17 @@ export async function POST(req: NextRequest) {
         }, {
           onConflict: 'phone_number'
         });
+
+      if (linkError) {
+        // Deliberately NOT released here: the customer has been charged and the
+        // number is genuinely theirs. Releasing it would destroy something they
+        // paid for. Escalate so a human reconciles it instead.
+        console.error(`ORPHANED NUMBER — ${phoneNumber} ordered and billed for user ${user.id} but not linked in user_telnyx_numbers:`, linkError);
+        return NextResponse.json(
+          { error: 'Your number was purchased but could not be linked to your account. Please contact support — quote number ' + phoneNumber + '.' },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({
         success: true,

@@ -4128,3 +4128,49 @@ The first attempt at proving the idempotency ran `add_credits` directly and move
 a real user's balance from 29,784 to 30,284 before restoring it. Wrap probes in a
 `DO` block that ends in `RAISE EXCEPTION`: the block is one transaction, the raise
 aborts it, and the result comes back in the error message. Nothing persists.
+
+## Additional numbers were ordered and never billed (#154, 2026-08-06)
+
+`/api/stripe/create-number-subscription` orders the number from Telnyx **before**
+charging. That ordering is deliberate — the comment in the route says not to bill a
+customer for a number Telnyx refused — and the reasoning is sound right up until
+the charge can never succeed. Then it guarantees the opposite failure.
+
+The price id was:
+
+```ts
+process.env.STRIPE_PHONE_NUMBER_PRICE_ID || 'price_phone_number_monthly'
+```
+
+**That env var is not set in production.** Confirmed with `vercel env ls
+production`: the only Stripe variables there are `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. So every request
+fell through to a literal that exists in no Stripe account, `subscriptionItems.
+create` threw, and the route had already provisioned a real number billed to the
+platform's Telnyx account. It is set in `.env.local`, which is why it would have
+looked fine to anyone testing locally.
+
+### What changed
+
+1. **No placeholder fallback.** The constant is `null` when unset.
+2. **The price is proven to exist before Telnyx is touched** — `prices.retrieve`,
+   plus an `active` check so an archived price is caught too. One API call, and it
+   makes the later charge unable to fail for the reason it always failed.
+3. **Charge failure now releases the number.** Anything else going wrong at charge
+   time (card, subscription state, Stripe outage) hands the number back rather than
+   leaving the platform paying for it.
+4. **The `user_telnyx_numbers` upsert error is checked** (#165). It was a bare
+   `await` followed by `{ success: true }` regardless. A number that is ordered and
+   billed but unlinked is invisible in the UI and unreleasable through the app.
+   Deliberately **not** released in that case — the customer paid for it — so it
+   returns a 500 naming the number for manual reconciliation.
+
+### This route now fails closed in production
+
+Until `STRIPE_PHONE_NUMBER_PRICE_ID` is set, buying an additional number returns
+**503 "Number purchasing is not configured yet"**. That is the intended behaviour:
+refusing the sale costs nothing, while the previous behaviour gave away a real
+number on every attempt. `docs/STRIPE_LIVE_CATALOGUE.md` already lists this as one
+of the eleven prices to create — the "Additional Phone Number, $1.00/month" row,
+whose price is flagged there as needing confirmation since Telnyx charges about
+$1/month before any messaging.
