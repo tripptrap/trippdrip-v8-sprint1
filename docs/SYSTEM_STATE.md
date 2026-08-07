@@ -4548,3 +4548,57 @@ same indefinite loop the cap exists to close.
 (`points/page.tsx:406`) while the API accepts any account holding a
 `stripe_subscription_id`. Whether pause is a Scale perk is a product decision, not
 a bug fix.
+
+## The rest of the Stripe audit (#155, #163, #164, #166, #170, #171, #174, #175, 2026-08-07)
+
+- **#155 / #166 — the pre-checks now sit ABOVE the branch.** 10DLC eligibility,
+  ownership and toll-free verification ran only inside the
+  has-an-active-subscription branch of `create-number-subscription`. The checkout
+  branch ran none of them, so a user with no subscription could pay for a number
+  that was already owned or an unverified toll-free, and only *then* would the
+  webhook refuse to order and file a ticket asking a human to refund. And this was
+  the **only** number-acquisition path without `checkNumberEligibility` — the other
+  three all gate. All three checks are hoisted, so both paths get them.
+  (`.maybeSingle()`, not `.single()`: no-rows is the ordinary case here and
+  `.single()` treats it as an error.)
+
+- **#164 — a failed top-up now pages someone.** `add_credits` failing after the
+  plan was repriced logged a console line and returned `ok: true`. The user had
+  been moved to $98 and charged the proration with no credits. Now escalates by
+  email and returns `creditsGranted: false` with a `warning`, so the UI stops
+  celebrating. The webhook has always escalated the byte-identical failure; this
+  route had no alerting import at all.
+
+- **#174 — `subscriptionType` is validated.** Only `=== 'scale'` was ever tested,
+  so any other string fell through to the **Growth price** while being copied
+  verbatim into `metadata.planType` and written straight into `subscription_tier`
+  and `plan_type` — both of which carry CHECK constraints allowing only
+  `unpaid|growth|scale`, so the write failed 23514 *after* the customer paid.
+
+- **#175 — pause no longer resumes on the boundary.** With `cycles=1`, `resumesAt`
+  was exactly `current_period_end` — the same instant Stripe closes the period and
+  raises the renewal invoice, making the skipped charge ordering-dependent inside
+  Stripe. Now steps one day past, which is far inside the next period (the shortest
+  real billing period is 28 days) so it cannot skip an extra renewal.
+
+- **#170 — the monthly false alarm is gone.** `invoice.paid` looked up `users` by
+  `stripe_subscription_id`, but an additional phone number bills as its own
+  subscription whose id lives on `user_telnyx_numbers`. The lookup missed **by
+  design** and fired an escalated "customer charged, nobody got credits" email
+  every month, for every extra number, for ever. It now checks
+  `user_telnyx_numbers` first and logs quietly. An alert that is wrong on a
+  schedule trains people to ignore the channel a real one uses.
+
+- **#171 — auto-buy cannot double-charge.** The grant was already guarded by the
+  PaymentIntent id, but that only helps when the *same* intent is seen twice. The
+  dangerous sequence was the other one: killed mid-loop after a charge succeeded
+  but before `add_credits`, the next run created a **brand new** intent and charged
+  again — different id, nothing deduped it. A deterministic idempotency key makes
+  Stripe return the original intent instead. Also `export const maxDuration = 60`,
+  which every other work-doing cron already had and this one — the one charging
+  cards serially — did not.
+
+  **The trade-off is deliberate:** the key is day-bucketed (Stripe keys live 24h),
+  so a user who genuinely burns a whole pack twice in one day is not auto-refilled
+  the second time and must buy manually. Blocking a rare second refill is far
+  cheaper than double-charging a card.

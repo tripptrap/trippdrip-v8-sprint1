@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
+import { notifyAdmins } from '@/lib/createNotification';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
     const grantKey = `plan-upgrade:${user.id}:${periodKey}`;
 
     let alreadyGranted = false;
+    let topUpFailed = false;
 
     if (!updateError && planType === 'scale' && oldPlan === 'growth') {
       const { error: topUpError } = await admin.rpc('add_credits', {
@@ -165,8 +167,20 @@ export async function POST(req: NextRequest) {
         console.log(`Plan upgrade for ${user.id}: credits already granted for this period (${grantKey})`);
       } else if (topUpError) {
         // The plan is already switched with Stripe and locally; refusing here
-        // would misreport a change that did happen. Make it loud instead.
+        // would misreport a change that did happen. Make it loud instead — and
+        // loud means paging someone, not a console line nobody reads. The user has
+        // been repriced to $98 and charged the proration with no credits to show
+        // for it. The webhook escalates the byte-identical failure
+        // (webhook/route.ts:354-371); this route had no alerting at all (#164).
         console.error(`Plan upgraded for ${user.id} but the ${newMonthlyCredits}-credit top-up failed:`, topUpError);
+        await notifyAdmins(
+          'fulfillment_failed',
+          'URGENT: plan upgraded and charged but no credits granted',
+          `${user.id} was upgraded to Scale and charged the proration, but the ${newMonthlyCredits}-credit top-up failed. They have paid for credits they did not receive.`,
+          { reason: 'change_plan_topup_failed', user_id: user.id, plan: planType, credits: newMonthlyCredits, db_error: topUpError.message, db_code: topUpError.code },
+          { escalate: true }
+        );
+        topUpFailed = true;
       }
     }
 
@@ -184,7 +198,10 @@ export async function POST(req: NextRequest) {
       ok: true,
       planType,
       monthlyCredits: newMonthlyCredits,
-      creditsGranted: planType === 'scale' && oldPlan === 'growth' && !alreadyGranted,
+      creditsGranted: planType === 'scale' && oldPlan === 'growth' && !alreadyGranted && !topUpFailed,
+      // The plan change DID happen, so this is not an error response — but the UI
+      // must not claim credits arrived when they did not (#164).
+      ...(topUpFailed ? { warning: 'Your plan was changed, but the credit top-up failed. Support has been notified.' } : {}),
     });
   } catch (error: any) {
     console.error('Error in POST /api/stripe/change-plan:', error);

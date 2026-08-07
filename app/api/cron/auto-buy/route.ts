@@ -12,6 +12,10 @@ import { requireCronAuth } from '@/lib/cronAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// Every other work-doing cron sets this; auto-buy was the only one that didn't,
+// and it is the one charging cards serially at 1-3s each. At the platform default
+// it was the most likely of all of them to be killed mid-loop (#171).
+export const maxDuration = 60;
 
 // Timing-safe comparison to prevent timing attacks
 
@@ -100,7 +104,27 @@ export async function GET(req: NextRequest) {
       const finalPrice = Math.round(priceFor(pack, tier) * 100); // cents
 
       try {
-        // Charge the customer's default payment method
+        // ── Stripe-side idempotency ────────────────────────────────────────────
+        //
+        // The grant below is already guarded by the PaymentIntent id, but that
+        // only helps if the SAME intent is seen twice. The dangerous sequence is
+        // the other one: this route charges every eligible user serially, each
+        // create() is a 1-3s synchronous card charge, and it was the only cron
+        // without `maxDuration`. Killed mid-loop after a charge succeeded but
+        // before add_credits, the next run saw the same low balance, created a
+        // BRAND NEW intent, and charged the card a second time — a different id,
+        // so nothing deduped it (#171).
+        //
+        // A deterministic key makes Stripe return the original intent instead of
+        // charging again; add_credits then hits its unique index, and the grant
+        // completes without a second charge.
+        //
+        // Day-bucketed because Stripe keys live 24h. The trade-off is explicit: a
+        // user who genuinely burns through a whole pack twice in one day will not
+        // be auto-refilled the second time and must buy manually. Blocking a rare
+        // second refill is much cheaper than double-charging a card.
+        const idempotencyKey = `autobuy:${user.id}:${pack.name}:${new Date().toISOString().slice(0, 10)}`;
+
         const paymentIntent = await stripe.paymentIntents.create({
           amount: finalPrice,
           currency: 'usd',
@@ -115,7 +139,7 @@ export async function GET(req: NextRequest) {
             pack: pack.name,
             tier,
           }
-        });
+        }, { idempotencyKey });
 
         if (paymentIntent.status === 'succeeded') {
           // add_credits (#92). Re-reading immediately before the write narrowed

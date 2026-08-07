@@ -64,6 +64,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // subscriptionType was never validated. Only `=== 'scale'` was ever tested, so
+    // any other string — 'Scale', 'enterprise', anything — silently fell through to
+    // the GROWTH price, while line 156 copied it verbatim into metadata.planType
+    // and the webhook wrote it straight into subscription_tier and plan_type. Both
+    // carry live CHECK constraints allowing only unpaid|growth|scale, so the write
+    // failed 23514 AFTER the customer had paid (#174).
+    if (subscriptionType && subscriptionType !== 'growth' && subscriptionType !== 'scale') {
+      return NextResponse.json(
+        { error: 'Invalid subscription type' },
+        { status: 400 }
+      );
+    }
+
     // The tier comes from the database, never the request. It selects which of
     // the two prices on a pack the customer is charged — Enterprise is $510 on
     // Growth and $382.50 on Scale, so a body-supplied tier was a $127.50

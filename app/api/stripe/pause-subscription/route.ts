@@ -123,8 +123,19 @@ export async function POST(req: NextRequest) {
     // Skip `cycles` upcoming renewals: resume at the end of the (cycles)th
     // billing period from now, aligned to the subscription's own renewal
     // date rather than a flat 30/60 days.
+    //
+    // Then step one day PAST that boundary. With cycles=1 this landed resumesAt on
+    // exactly `current_period_end` — the same instant Stripe closes the period and
+    // raises the renewal invoice. Whether collection had already resumed when that
+    // invoice was finalized was ordering-dependent inside Stripe, so the charge the
+    // customer was told would be skipped was a coin flip, against a UI already
+    // showing the plan as paused (#175).
+    //
+    // A day is far inside the next period (the shortest real billing period is 28
+    // days), so it cannot accidentally skip an extra renewal.
     const resumeDate = new Date(item.current_period_end * 1000);
     resumeDate.setMonth(resumeDate.getMonth() + (cycles - 1));
+    resumeDate.setDate(resumeDate.getDate() + 1);
     const resumesAt = Math.floor(resumeDate.getTime() / 1000);
 
     await stripe.subscriptions.update(subscriptionId, {

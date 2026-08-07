@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { isTollFreeNumber, getVerifiedTollFreeNumbers } from '@/lib/telnyx';
+import { checkNumberEligibility } from '@/lib/numberEligibility';
 import Stripe from 'stripe';
 
 // Admin client to bypass RLS for cross-user ownership checks
@@ -127,6 +128,65 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Pre-checks, ABOVE the branch so BOTH paths get them ───────────────────
+    //
+    // These used to live only inside the has-an-active-subscription branch. The
+    // checkout branch below ran none of them, so a user with no subscription could
+    // pay for a number that was already owned or an unverified toll-free, and only
+    // then would the webhook discover the problem, refuse to order, and file an
+    // admin ticket asking a human to issue a refund. The customer was charged for a
+    // condition fully knowable beforehand (#166).
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    // 10DLC eligibility. This was the ONLY number-acquisition path without it —
+    // number-pool/claim, number-pool/purchase-with-credits and
+    // telnyx/purchase-number all gate here (#155). An unregistered user getting a
+    // local long code is what lib/numberEligibility.ts describes as the worst
+    // outcome: traffic on an unregistered campaign, which is what gets a brand
+    // suspended rather than merely blocked.
+    const gate = await checkNumberEligibility(supabaseAdmin, user.id, {
+      numberType: isTollFreeNumber(phoneNumber) ? 'tollfree' : 'local',
+    });
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: gate.reason, code: gate.code, registrationRequired: true },
+        { status: 403 }
+      );
+    }
+
+    // Ownership — before charging or ordering anything. maybeSingle(), because
+    // .single() treats "no rows" as an error, which is the ordinary case here.
+    const { data: existingNumber } = await supabaseAdmin
+      .from('user_telnyx_numbers')
+      .select('id, user_id')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+
+    if (existingNumber) {
+      return NextResponse.json(
+        {
+          error: existingNumber.user_id === user.id
+            ? 'You already own this number'
+            : 'This number is already owned by another user',
+        },
+        { status: 400 }
+      );
+    }
+
+    // An unverified toll-free number cannot send, so selling one is selling
+    // nothing.
+    if (isTollFreeNumber(phoneNumber)) {
+      const verifiedNumbers = await getVerifiedTollFreeNumbers();
+      if (!verifiedNumbers.has(phoneNumber)) {
+        return NextResponse.json(
+          { error: 'This toll-free number is not verified for messaging. Please choose a verified number from the available pool.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000').trim();
 
     // Get or create customer
@@ -194,34 +254,8 @@ export async function POST(req: NextRequest) {
     if (subscriptions.data.length > 0) {
       const subscription = subscriptions.data[0];
 
-      if (!supabaseAdmin) {
-        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-      }
-
-      // Check ownership before charging or ordering anything
-      const { data: existingNumber } = await supabaseAdmin
-        .from('user_telnyx_numbers')
-        .select('id, user_id')
-        .eq('phone_number', phoneNumber)
-        .single();
-
-      if (existingNumber) {
-        const error = existingNumber.user_id === user.id
-          ? 'You already own this number'
-          : 'This number is already owned by another user';
-        return NextResponse.json({ error }, { status: 400 });
-      }
-
-      // Block unverified toll-free numbers before charging
-      if (isTollFreeNumber(phoneNumber)) {
-        const verifiedNumbers = await getVerifiedTollFreeNumbers();
-        if (!verifiedNumbers.has(phoneNumber)) {
-          return NextResponse.json(
-            { error: 'This toll-free number is not verified for messaging. Please choose a verified number from the available pool.' },
-            { status: 400 }
-          );
-        }
-      }
+      // Eligibility, ownership and toll-free verification are all checked above
+      // the branch now, so both this path and the checkout path get them (#155, #166).
 
       const apiKey = process.env.TELNYX_API_KEY;
       const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;

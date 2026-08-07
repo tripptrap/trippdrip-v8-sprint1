@@ -527,11 +527,29 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (renewingUserError || !renewingUser) {
+          // Not every renewal is a PLAN renewal. An additional phone number bills
+          // as its own subscription, and that id is stored on
+          // user_telnyx_numbers.stripe_subscription_id — never on users. So this
+          // lookup missed by design and fired an escalated "customer charged,
+          // nobody got credits" email every month, for every extra number anyone
+          // owned, for ever. An alert that is wrong on a schedule trains people to
+          // ignore the channel a real one uses (#170).
+          const { data: numberSub } = await supabaseAdmin
+            .from('user_telnyx_numbers')
+            .select('phone_number, user_id')
+            .eq('stripe_subscription_id', subId)
+            .maybeSingle();
+
+          if (numberSub) {
+            console.log(`invoice.paid: $1/mo renewal for number ${numberSub.phone_number} (user ${numberSub.user_id}) — no credits due`);
+            break;
+          }
+
           console.error(`invoice.paid: no user found for subscription ${subId}`);
           await notifyAdmins(
             'fulfillment_failed',
             'Renewal charged but no matching account',
-            `Stripe charged a renewal for subscription ${subId} (invoice ${invoice.id}) but no user has that stripe_subscription_id, so no credits were applied to anyone.`,
+            `Stripe charged a renewal for subscription ${subId} (invoice ${invoice.id}) but no user has that stripe_subscription_id, and it is not an additional-number subscription either, so no credits were applied to anyone.`,
             { reason: 'renewal_user_not_found', stripe_subscription_id: subId, invoice_id: invoice.id, amount_paid: invoice.amount_paid }
           ,
             // Delay compounds this one: escalate by email, don't wait for a login (#79).
