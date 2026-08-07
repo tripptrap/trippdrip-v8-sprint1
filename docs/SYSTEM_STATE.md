@@ -4762,3 +4762,86 @@ i.e. failed OPEN on precisely the lookup that counts.
   valid NANP, so the request died on validation and the check "failed" for a reason
   unrelated to DNC. The harness now prints the response body on failure, which is
   how this was untangled at all.
+
+## Production wiring verified (#18, 2026-08-07)
+
+All three systems checked against live infrastructure rather than config files.
+
+### Telnyx — wired correctly, with one latent trap
+
+| | |
+|---|---|
+| Inbound webhook | `https://hyvewyre.com/api/telnyx/sms-webhook`, api_version 2 |
+| Reachable | POST returns **401 Missing signature** — live and refusing unsigned requests |
+| Numbers on the profile carrying that webhook | **15 of 15** |
+| `TELNYX_MESSAGING_PROFILE_ID` | points at that profile |
+| Inbound actually arriving | 28 messages in 7 days |
+
+**The trap: there are TWO messaging profiles, both named `HyveWyre LLC`.**
+
+```
+40019b32-c576-4908-95f3-08efbd6d07a3   webhook: NONE
+40019b38-c8eb-4a0d-ba6e-3a4174db4ad2   webhook: .../api/telnyx/sms-webhook
+```
+
+Nothing uses the first one today. Any number that lands on it has its inbound
+delivered nowhere, silently, while the number still reports `active` — the same
+shape as #184. Identical names make picking the wrong one in the Telnyx UI easy.
+Neither profile has a **failover URL** set, so a deploy blip drops inbound rather
+than retrying it.
+
+### Vercel cron — every job at exactly its configured rate
+
+Over 26 hours, actual runs against `vercel.json`:
+
+| job | schedule | expected | actual |
+|---|---|---|---|
+| process-scheduled | `*/5` | 312 | **312** |
+| process-drips | `*/10` | 156 | **156** |
+| process-ai-drips | `*/10` | 156 | **156** |
+| auto-buy | `0 *` | 26 | **26** |
+| send-appointment-reminders | `0 */2` | 13 | **13** |
+| check-idle-campaigns | `0 9` | 1 | **1** |
+
+Exact on all six. The GitHub-Actions backup is the known exception: 13 runs in 26h
+against a declared `*/5`, roughly 4% — GitHub throttles shared-runner schedules,
+which is why that path is an alarm and not a trigger.
+
+### Delivery receipts — the concern this issue was opened for is resolved
+
+`messages` by status, outbound:
+
+| status | total | last 7 days | window |
+|---|---|---|---|
+| delivered | 26 | **23** | 2026-07-31 → 08-06 |
+| sent | 57 | **0** | 2026-01-20 → 01-29 |
+| queued | 4 | **0** | 2026-02-05 → 02-16 |
+
+**Every outbound message in the last 7 days reached `delivered`.** The 61 stuck at
+`sent`/`queued` all predate the fix that made the webhook handle `message.finalized`
+(#135); 55 of them are test fixtures. Receipts are landing.
+
+### Stripe — wired, but on the sandbox
+
+The endpoint production actually uses is on the **test** account:
+
+```
+url:      https://www.hyvewyre.com/api/stripe/webhook
+status:   enabled       livemode: false
+events:   checkout.session.completed, customer.subscription.deleted,
+          customer.subscription.updated, invoice.paid,
+          payment_intent.payment_failed, payment_intent.succeeded
+```
+
+All six are handled by the route. Reachable: POST returns **400** from the
+signature verifier.
+
+Note it uses **`www.`** while Telnyx uses the bare domain. Both serve directly —
+verified with `--max-redirs 0`, `num_redirects=0` on each — so this is cosmetic.
+It would not have been: Stripe does not follow redirects on webhook delivery, and
+a 301 there would fail every event silently.
+
+**The live account has ZERO webhook endpoints** (confirmed via the Stripe MCP
+against `acct_1SPlV5FmPAhggcMQ`). Creating one, and setting the **new** signing
+secret, is a required step of the #81/#63 cutover — the secret is per-endpoint, so
+reusing the sandbox value makes every live webhook fail verification.
