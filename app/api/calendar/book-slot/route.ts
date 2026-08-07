@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from 'googleapis';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = "force-dynamic";
 
@@ -29,24 +29,38 @@ async function getAuthClient(userId: string) {
     expiry_date: userData.google_calendar_token_expiry ? new Date(userData.google_calendar_token_expiry).getTime() : undefined
   });
 
+  // Token rotation. SERVICE ROLE — none of the three google_calendar_* columns is
+  // writable by `authenticated` (verified live; public.users accepts only
+  // business_hours, business_name, timezone, updated_at from that role). These two
+  // writes also discarded their result entirely, so every rotation was refused
+  // with 42501 and silently dropped, leaving the stored access token to go stale
+  // until the refresh token was the only thing still working (#187).
+  //
+  // This handler is fire-and-forget inside the googleapis client — nothing awaits
+  // it and there is no caller to return an error to — so the most it can do is say
+  // so loudly. That is still infinitely better than dropping it on the floor.
   oauth2Client.on('tokens', async (tokens) => {
+    const rotated: Record<string, string | null> = {};
+    if (tokens.access_token) {
+      rotated.google_calendar_access_token = tokens.access_token;
+      rotated.google_calendar_token_expiry = tokens.expiry_date
+        ? new Date(tokens.expiry_date).toISOString()
+        : null;
+    }
+    // Google only re-issues a refresh token occasionally; never overwrite a good
+    // one with undefined, which would disconnect the account outright.
     if (tokens.refresh_token) {
-      await supabase
-        .from('users')
-        .update({
-          google_calendar_access_token: tokens.access_token,
-          google_calendar_refresh_token: tokens.refresh_token,
-          google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
-        })
-        .eq('id', userId);
-    } else if (tokens.access_token) {
-      await supabase
-        .from('users')
-        .update({
-          google_calendar_access_token: tokens.access_token,
-          google_calendar_token_expiry: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null
-        })
-        .eq('id', userId);
+      rotated.google_calendar_refresh_token = tokens.refresh_token;
+    }
+    if (Object.keys(rotated).length === 0) return;
+
+    const { error: rotateError } = await createServiceRoleClient()
+      .from('users')
+      .update(rotated)
+      .eq('id', userId);
+
+    if (rotateError) {
+      console.error(`Google Calendar token rotation failed for user ${userId} — the stored token will go stale:`, rotateError);
     }
   });
 

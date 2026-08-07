@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,8 +63,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?calendar_error=token_error`);
     }
 
-    // Save tokens to Supabase using authenticated user ID
-    const { error: updateError } = await supabase
+    // Save tokens to Supabase using authenticated user ID.
+    //
+    // SERVICE ROLE. None of the three google_calendar_* columns is writable by
+    // `authenticated` — public.users accepts only business_hours, business_name,
+    // timezone and updated_at from that role — so this returned 42501 and
+    // redirected to ?calendar_error=save_error. It failed loudly, at least, but a
+    // user connecting Google Calendar today cannot succeed (#187).
+    //
+    // One account does hold tokens, from before the grants were tightened. That is
+    // why this looked like a working feature.
+    //
+    // user.id comes from the verified session, not from the OAuth `state` param —
+    // state is validated separately and never trusted as identity.
+    const { error: updateError } = await createServiceRoleClient()
       .from('users')
       .update({
         google_calendar_access_token: tokens.access_token,

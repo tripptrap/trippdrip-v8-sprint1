@@ -4032,3 +4032,35 @@ to `users` then turned up **two more** in Google Calendar
 the service-role client. SELECTs are fine on the session client; RLS covers those.
 When a route mutates an external system (Stripe, Telnyx) and then writes locally,
 getting this wrong does not merely fail — it desynchronises the two.
+
+## Google Calendar tokens could not be written (#187, 2026-08-06)
+
+Fifth and sixth instances of the `public.users` column-grant trap, found by
+grepping for session-client writes to `users` after fixing #156/#157 — not by an
+audit. All three token columns are unwritable by `authenticated`
+(`google_calendar_access_token`, `_refresh_token`, `_token_expiry`).
+
+- **`calendar/oauth/callback:67`** — the initial save after OAuth. It *did* check
+  its error, so it failed loudly and redirected to `?calendar_error=save_error`.
+- **`calendar/book-slot:32`** — the `oauth2Client.on('tokens')` rotation handler,
+  two writes, **neither result destructured**. Every rotation was silently dropped
+  and the stored access token went stale.
+
+**One account holds tokens**, written before the grants were tightened, which is
+why this looked like a working feature. Anyone connecting today would fail.
+
+Two things fixed beyond the client:
+
+- The rotation handler **no longer overwrites a good refresh token with
+  `undefined`**. Google re-issues a refresh token only occasionally; the old code
+  had two branches and the `access_token`-only branch was fine, but building the
+  update from whichever fields are actually present is safer than branching, and
+  makes "never clobber the refresh token" explicit.
+- The handler is fire-and-forget inside `googleapis` — nothing awaits it and there
+  is no caller to return an error to — so it now logs loudly naming the user.
+
+**Not a bug, for the next person:** a validation hook flags
+`request.nextUrl.searchParams` in this route as needing `await` for Next 16. That
+is a false positive twice over — this project is on Next **14.2.33**, and the async
+`searchParams` change applies to *page props*, never to `NextRequest.nextUrl` in a
+route handler, which is synchronous in every version. Do not "fix" it.
