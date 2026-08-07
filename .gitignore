@@ -25,3 +25,6 @@ tsconfig.tsbuildinfo
 *.backup
 *.bak
 *.bak2
+
+# Playwright MCP session artifacts
+.playwright-mcp/
