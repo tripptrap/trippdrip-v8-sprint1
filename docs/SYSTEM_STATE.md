@@ -3988,3 +3988,47 @@ list avoids a hand-kept list that would drift.
 `public.users` outside `business_hours`, `business_name`, `timezone`,
 `updated_at` needs `createServiceRoleClient()`. The session client is correct for
 SELECTs — RLS covers those — and wrong for essentially every UPDATE.
+
+## Pause/resume mutated Stripe, then failed the local write (#156, #157, 2026-08-06)
+
+Two more instances of the `public.users` column-grant trap, both on billing paths.
+
+**`/api/stripe/pause-subscription`** wrote `subscription_status` and
+`pause_resumes_at` through the session client, on both POST (pause) and DELETE
+(resume). Its error handling was already *correct*, which is what made this worse
+than a plain breakage: Stripe was mutated **first**, Postgres then refused the
+write with `42501`, and the user got "paused with Stripe but failed to save
+locally, please contact support". So a pause genuinely voided real invoices while
+the app still showed the plan active, and a resume genuinely restarted collection
+while the app still showed it paused.
+
+**`/api/stripe/create-number-subscription`** wrote `stripe_customer_id` with the
+session client and **never destructured the result at all**. This one compounds:
+the id never persists, so the next call takes the same branch and creates *another*
+Stripe customer. Each can carry its own subscription, and the account accumulates
+recurring charges attached to customers no `users` row references — unreachable
+from the billing portal and invisible to cancellation. It now bails with a 500
+before anything is ordered or charged; a stranded customer object with no
+subscription is inert, a live subscription nothing can find is not.
+
+Verified live, `updated_at` as the control:
+
+| column | `authenticated` | `service_role` |
+|---|---|---|
+| `stripe_customer_id` | false | true |
+| `subscription_status` | false | true |
+| `pause_resumes_at` | false | true |
+| `updated_at` (control) | **true** | true |
+
+### The count so far
+
+`#156, #157, #159, #178` — four routes, one bug. A grep for session-client writes
+to `users` then turned up **two more** in Google Calendar
+(`calendar/oauth/callback`, `calendar/book-slot`), where all three
+`google_calendar_*` token columns are equally unwritable. Filed separately.
+
+**The rule:** `public.users` accepts exactly four columns from `authenticated` —
+`business_hours`, `business_name`, `timezone`, `updated_at`. Everything else needs
+the service-role client. SELECTs are fine on the session client; RLS covers those.
+When a route mutates an external system (Stripe, Telnyx) and then writes locally,
+getting this wrong does not merely fail — it desynchronises the two.

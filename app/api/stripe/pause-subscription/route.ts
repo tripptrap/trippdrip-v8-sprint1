@@ -4,11 +4,28 @@
 // intact, since the plan itself never changes. See GitHub issue #14.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// Both writes below go through the service role. `authenticated` may UPDATE
+// exactly four columns of public.users and neither of these is among them —
+// verified live, with updated_at as the control:
+//
+//   subscription_status   authenticated: false   service_role: true
+//   pause_resumes_at      authenticated: false   service_role: true
+//   updated_at            authenticated: TRUE    service_role: true
+//
+// The error handling here was already right, which is what made this bad rather
+// than merely broken: Stripe was mutated FIRST, then Postgres refused the write
+// with 42501, and the user was told to contact support. So a pause genuinely
+// voided real invoices while the app still showed the plan active, and a resume
+// genuinely restarted collection while the app still showed it paused (#157).
+//
+// The SELECT in getSubscription() stays on the session client on purpose — RLS
+// covers reads, and it scopes the row to the caller.
 
 async function getSubscription(supabase: any, userId: string) {
   const { data, error } = await supabase
@@ -64,7 +81,7 @@ export async function POST(req: NextRequest) {
       pause_collection: { behavior: 'void', resumes_at: resumesAt },
     });
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await createServiceRoleClient()
       .from('users')
       .update({
         subscription_status: 'paused',
@@ -112,7 +129,7 @@ export async function DELETE(req: NextRequest) {
 
     await stripe.subscriptions.update(subscriptionId, { pause_collection: '' });
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await createServiceRoleClient()
       .from('users')
       .update({
         subscription_status: 'active',

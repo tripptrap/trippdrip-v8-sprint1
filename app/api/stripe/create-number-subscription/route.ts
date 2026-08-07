@@ -72,11 +72,39 @@ export async function POST(req: NextRequest) {
       });
       customerId = customer.id;
 
-      // Store customer ID
-      await supabase
+      // Store customer ID.
+      //
+      // SERVICE ROLE, and the error is checked. `authenticated` may UPDATE exactly
+      // four columns of public.users and stripe_customer_id is not one of them —
+      // verified live (authenticated: false, service_role: true). The result was
+      // never destructured, so Postgres refused the write with 42501 and nothing
+      // noticed.
+      //
+      // The consequence compounds rather than just failing: the id never persists,
+      // so the next call takes this same branch and creates ANOTHER Stripe customer.
+      // Each one can carry its own subscription, and the account ends up with
+      // recurring charges attached to customers that no users row references — so
+      // the billing portal cannot reach them and cancellation cannot find them (#156).
+      if (!supabaseAdmin) {
+        console.error('Cannot persist stripe_customer_id — service role client unavailable');
+        return NextResponse.json({ error: 'Billing is not configured' }, { status: 500 });
+      }
+
+      const { error: customerIdError } = await supabaseAdmin
         .from('users')
         .update({ stripe_customer_id: customerId })
         .eq('id', user.id);
+
+      if (customerIdError) {
+        // Bail before anything is ordered or charged. A customer now exists in
+        // Stripe with no local reference, which is untidy but inert — far better
+        // than a live subscription nothing can find.
+        console.error('Failed to persist stripe_customer_id:', customerIdError);
+        return NextResponse.json(
+          { error: 'Could not link your billing account. Please try again or contact support.' },
+          { status: 500 }
+        );
+      }
     }
 
     // Check if user already has an active subscription
