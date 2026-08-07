@@ -4449,3 +4449,41 @@ $1/month, a wrongly destroyed one cannot be recovered and takes its TFV with it.
 `npm run health` asserts the aftermath directly:
 `no stranded pool numbers — every assigned row has an owner`. Currently zero, so no
 existing damage to repair.
+
+## Deleting an account did not stop billing (#160, 2026-08-07)
+
+`/api/user/delete-account` cancelled Stripe subscriptions with
+`status: 'active'`. Three silencers were stacked:
+
+1. **`status: 'active'` misses every other billable status.** `past_due` is the
+   one that matters — the card declined, Stripe dunns for roughly three weeks, and
+   that is precisely the user most likely to hit Delete Account. They received
+   `200 {"success":true}` and Stripe's next smart retry charged the card for an
+   account that no longer existed. `unpaid`, `trialing`, `paused` and `incomplete`
+   were skipped too.
+2. **The `users` read did not destructure `error`**, so a failed lookup cancelled
+   nothing and reported nothing.
+3. **The `catch` swallowed everything** and continued to deletion regardless.
+
+### Deletion is now blocked when billing cannot be stopped
+
+This is the deliberate part. Deleting the account destroys `stripe_customer_id` —
+the very reference needed to find and stop the subscription afterwards. So a
+failure here is **unrecoverable in a way that refusing to delete is not**: the user
+keeps their data and can retry, and nobody is charged for an account that is gone.
+A cancellation failure returns 502 and pages an admin.
+
+The tradeoff, stated plainly: if Stripe is unreachable, account deletion is
+unavailable until it recovers. That is the right way round.
+
+### It also searches Stripe by email
+
+`create-checkout` used to mint a fresh Customer per checkout (#162), so historical
+duplicates exist that no `users` row references. Cancelling only
+`users.stripe_customer_id` would leave those billing for ever with the account
+gone. `customers.list({ email })` finds them; every non-terminal subscription on
+every matching customer is cancelled.
+
+Terminal statuses — `canceled`, `incomplete_expired` — are skipped. Everything else
+can still produce a charge, so it is safer to enumerate what cannot bill than to
+guess what can.

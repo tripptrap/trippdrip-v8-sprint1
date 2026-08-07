@@ -23,29 +23,85 @@ export async function DELETE(req: NextRequest) {
     // Create service role client for database operations
     const adminClient = createServiceRoleClient();
 
-    // LOW-8: Cancel Stripe subscription before deleting account so billing stops immediately
-    try {
-      const { data: userRow } = await adminClient
-        .from('users')
-        .select('stripe_customer_id')
-        .eq('id', userId)
-        .single();
+    // ── Stop billing BEFORE deleting anything, and abort if we cannot ──────────
+    //
+    // This had three separate silencers stacked (#160):
+    //
+    //   1. `status: 'active'` — Stripe's other statuses still bill. `past_due` is
+    //      the one that matters: the card declined, Stripe dunns for ~3 weeks, and
+    //      that is exactly the user most likely to hit Delete Account. They got
+    //      200 {"success":true} and the next smart retry charged the card for an
+    //      account that no longer existed. `unpaid`, `trialing`, `paused` and
+    //      `incomplete` were all skipped too.
+    //   2. The userRow read did not destructure `error`, so a failed lookup
+    //      cancelled nothing and said nothing.
+    //   3. The catch swallowed everything and continued to deletion regardless.
+    //
+    // Deletion is now BLOCKED when billing cannot be provably stopped. That
+    // ordering is the whole point: deleting the account destroys the very record
+    // (stripe_customer_id) needed to find and stop the subscription afterwards, so
+    // a failure here is unrecoverable in a way that refusing to delete is not. The
+    // user keeps their data and can retry; nobody gets charged for an account that
+    // is gone.
+    const { data: userRow, error: userRowError } = await adminClient
+      .from('users')
+      .select('stripe_customer_id, email')
+      .eq('id', userId)
+      .single();
 
-      if (userRow?.stripe_customer_id && process.env.STRIPE_SECRET_KEY) {
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY.trim());
-        const subscriptions = await stripe.subscriptions.list({
-          customer: userRow.stripe_customer_id,
-          status: 'active',
-          limit: 10,
-        });
-        for (const sub of subscriptions.data) {
-          await stripe.subscriptions.cancel(sub.id);
-          console.log(`✅ Cancelled Stripe subscription ${sub.id} for user ${userId}`);
+    if (userRowError) {
+      console.error('Could not read billing details before account deletion:', userRowError);
+      return NextResponse.json(
+        { error: 'Could not verify your billing status. Nothing was deleted — please try again or contact support.' },
+        { status: 500 }
+      );
+    }
+
+    const stripeKey = process.env.STRIPE_SECRET_KEY?.trim();
+    if (stripeKey) {
+      const stripe = new Stripe(stripeKey);
+
+      // Every status EXCEPT these can still produce a charge.
+      const TERMINAL = new Set(['canceled', 'incomplete_expired']);
+
+      try {
+        // Collect every customer this person could be billed through. The stored
+        // id is the primary one, but create-checkout used to mint a fresh Customer
+        // per checkout (#162), so historical duplicates exist that no `users` row
+        // references. Searching by email finds those; without it, deleting an
+        // account could leave an orphaned subscription billing for ever.
+        const customerIds = new Set<string>();
+        if (userRow?.stripe_customer_id) customerIds.add(userRow.stripe_customer_id);
+        if (userRow?.email) {
+          const byEmail = await stripe.customers.list({ email: userRow.email, limit: 100 });
+          for (const c of byEmail.data) customerIds.add(c.id);
         }
+
+        for (const customerId of customerIds) {
+          // No status filter — list them all and decide here.
+          const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+          for (const sub of subs.data) {
+            if (TERMINAL.has(sub.status)) continue;
+            await stripe.subscriptions.cancel(sub.id);
+            console.log(`✅ Cancelled Stripe subscription ${sub.id} (was ${sub.status}) for user ${userId}`);
+          }
+        }
+      } catch (stripeErr: any) {
+        // Fatal on purpose. Continuing would delete the account while the
+        // subscription keeps charging, with the reference needed to find it gone.
+        console.error('Could not stop billing during account deletion — aborting:', stripeErr);
+        await notifyAdmins(
+          'fulfillment_failed',
+          'Account deletion aborted — billing could not be stopped',
+          `${userId} (${userRow?.email ?? 'unknown email'}) requested deletion but their Stripe subscriptions could not be cancelled, so nothing was deleted. Cancel manually, then have them retry.`,
+          { reason: 'delete_account_stripe_cancel_failed', user_id: userId, customer_id: userRow?.stripe_customer_id, stripe_error: stripeErr?.message },
+          { escalate: true }
+        );
+        return NextResponse.json(
+          { error: 'We could not stop your billing, so your account was not deleted. Support has been notified — please try again shortly.' },
+          { status: 502 }
+        );
       }
-    } catch (stripeErr) {
-      console.error('Error cancelling Stripe subscription during account deletion:', stripeErr);
-      // Non-fatal — continue with account deletion
     }
 
     // Delete all user data using service role client (bypasses RLS)
