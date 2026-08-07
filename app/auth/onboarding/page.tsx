@@ -835,7 +835,11 @@ function OnboardingContent() {
                 />
               </div>
 
-              {entityType !== 'SOLE_PROPRIETOR' && (
+              {/* Always shown. SOLE_PROPRIETOR is not in this form's entity picker
+                * and the API refuses it (#119), so the old
+                * `entityType !== 'SOLE_PROPRIETOR' &&` guard could never be false —
+                * it just implied an EIN-free path that does not exist. */}
+              {(
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     EIN / Tax ID <span className="font-normal text-gray-400">— optional for now</span>
@@ -847,12 +851,42 @@ function OnboardingContent() {
                     placeholder="12-3456789"
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
                   />
+                  {/* Say where an EIN comes from.
+                    *
+                    * Requiring one reads as "you need an LLC", and most agents in
+                    * these verticals are sole proprietors who would stop here. They
+                    * do not need a company: the IRS issues an EIN to a sole
+                    * proprietor for free, online, in about ten minutes. Saying so is
+                    * the difference between a blocked signup and a five-minute
+                    * detour. Third-party sites charge $75-300 to submit the same
+                    * free form, so the direct link matters too. */}
                   <div className="mt-2 flex gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3">
                     <span aria-hidden="true" className="text-amber-600">⚠</span>
                     <p className="text-sm text-amber-800">
                       You can finish setting up your account without this. <strong>You will not be able
                       to claim or buy a phone number until your EIN is added</strong> — carriers require
                       it before a number can send messages. You can add it later in Settings.
+                    </p>
+                  </div>
+                  <div className="mt-2 rounded-xl bg-teal-50 border border-teal-200 p-3">
+                    <p className="text-sm text-teal-900">
+                      <strong>No company? You still qualify.</strong> The IRS issues an EIN to sole
+                      proprietors too — it&apos;s <strong>free</strong>, online, and usually takes about ten
+                      minutes at{' '}
+                      <a
+                        href="https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium"
+                      >
+                        irs.gov
+                      </a>
+                      . You do not need an LLC, and you should never pay a service to get one.
+                    </p>
+                    <p className="mt-2 text-sm text-teal-900">
+                      Use the <strong>exact legal name the EIN is registered under</strong> above —
+                      carriers check the two against IRS records, and a mismatch is the most common
+                      reason a registration is rejected.
                     </p>
                   </div>
                 </div>

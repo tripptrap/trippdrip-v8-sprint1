@@ -159,8 +159,11 @@ export default function TenDLCRegistration() {
       toast.error('Please fill in all required fields');
       return;
     }
-    if (entityType !== 'SOLE_PROPRIETOR' && !taxId.trim()) {
-      toast.error('EIN is required unless you are a sole proprietor');
+    // Unconditional. SOLE_PROPRIETOR was withdrawn (#119), so "unless you are a
+    // sole proprietor" described an option that no longer exists and told the
+    // user an exemption was available when none is.
+    if (!taxId.trim()) {
+      toast.error('An EIN is required. Sole proprietors can get one free from the IRS in about ten minutes.');
       return;
     }
     // Same check the onboarding form and the API route make (#1) — carriers
@@ -349,12 +352,27 @@ export default function TenDLCRegistration() {
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Display name</label>
               <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Acme Insurance" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100" />
             </div>
-            {entityType !== 'SOLE_PROPRIETOR' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">EIN</label>
-                <input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="XX-XXXXXXX" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100" />
-              </div>
-            )}
+            {/* Unconditional now. SOLE_PROPRIETOR was withdrawn (#119) — it is gone
+              * from the picker and the API refuses it — so gating this field on it
+              * only hid the EIN box behind a value nobody can select. */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">EIN</label>
+              <input value={taxId} onChange={e => setTaxId(e.target.value)} placeholder="XX-XXXXXXX" className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100" />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                No company needed — the IRS issues an EIN to sole proprietors too, free, in about ten
+                minutes at{' '}
+                <a
+                  href="https://www.irs.gov/businesses/small-businesses-self-employed/get-an-employer-identification-number"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  irs.gov
+                </a>
+                . Enter the legal name exactly as the EIN is registered — carriers check it against
+                IRS records.
+              </p>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vertical / industry</label>
               <select

@@ -310,3 +310,45 @@ no amount of mock testing reaches it.
 Also worth knowing: **mock brand verification timing is not deterministic.** One
 run went PENDING → VERIFIED in about 10 seconds; another was still unverified
 after 60. Do not build timing assumptions on it.
+
+---
+
+## Sole proprietors do not need an LLC — they need an EIN (2026-08-07)
+
+Worth separating two things that are easy to conflate, because they have opposite
+consequences:
+
+| | TCR `SOLE_PROPRIETOR` entity type | A sole proprietor **with an EIN** |
+|---|---|---|
+| EIN | not used (SSN-based) | required, and free from the IRS |
+| SMS OTP step | **mandatory, not implemented** (#119) | not applicable |
+| Name/website exclusions | finance, healthcare, education barred | none |
+| Campaigns per brand | 1 | normal |
+| Monthly fee | $2 | $1.50 (LOW_VOLUME) |
+| Supported here | **no — API refuses it** | **yes, this is the supported path** |
+
+The finance/healthcare exclusion is what makes the first column unusable
+commercially: a solo insurance agent is the archetypal sole proprietor and the
+archetypal excluded name.
+
+**So the product already supports exactly what a sole proprietor needs.** It
+requires an EIN and refuses the `SOLE_PROPRIETOR` entity type — which is the right
+combination. Nothing in the registration logic needed to change.
+
+What was missing was **saying so**. Requiring an EIN reads as "you need a company",
+and an agent who does not have one would stop there rather than discover that the
+IRS issues EINs to sole proprietors free, online, in about ten minutes. Both the
+onboarding form and Settings now say that, link directly to irs.gov, and warn
+against the third-party services that charge $75–300 to submit the same free form.
+
+Both also now warn: **the legal name must match the IRS record for that EIN.** For
+a sole proprietor the EIN is usually issued under the individual's own name unless
+they have filed a DBA — so an agent typing their trading name into a form whose EIN
+is registered to their personal name is a name-mismatch rejection waiting to
+happen, and that is a vetting failure rather than anything the code can catch.
+
+Two dead guards removed while there: `entityType !== 'SOLE_PROPRIETOR'` wrapped the
+EIN field in both forms, and neither form offers that option any more, so the
+condition could never be false — it only implied an EIN-free path that does not
+exist. The Settings validation message said "EIN is required unless you are a sole
+proprietor", promising an exemption that was withdrawn in #119.
