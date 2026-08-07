@@ -4602,3 +4602,49 @@ a bug fix.
   so a user who genuinely burns a whole pack twice in one day is not auto-refilled
   the second time and must buy manually. Blocking a rare second refill is far
   cheaper than double-charging a card.
+
+## PDF import: the points ledger settles what the logs cannot (#181, 2026-08-07)
+
+Filed as broken from two production errors. **Both predate their own fixes**, by
+one and two minutes respectively:
+
+| error | logged at | fixed by | landed |
+|---|---|---|---|
+| `DOMMatrix is not defined` | 00:09:43Z | `1755082` shim browser globals | **00:11:39Z** |
+| `Cannot find module …/pdf.worker.mjs` | 00:18:06Z | `cd3f2ce` trace the worker file | **00:19:15Z** |
+
+Four commits in 45 minutes, each deploy surfacing the next failure — which is
+exactly what makes a 7-day error window misleading. This is the **second** time
+in one session that a log-derived issue turned out to be already fixed.
+
+### The ledger is a better oracle than the logs
+
+`/api/leads/upload-document` charges 5 points up front and **always refunds on a
+parse failure**. So a spend with no matching refund is positive proof the parse
+succeeded — a signal the logs cannot give, because success writes nothing.
+
+```
+00:09:44  -5  then +5   "Refund — DOMMatrix is not defined"
+00:18:07  -5  then +5   "Refund — Cannot find module …pdf.worker.mjs"
+00:25:43  -5            no refund  ← parse succeeded, after cd3f2ce deployed
+00:30:15  -5  then +5   "Refund — Corrupted zip ?"   (a genuinely bad xlsx)
+```
+
+Where a route charges before doing work and refunds on failure, `points_transactions`
+is an audit trail of what actually worked. Reach for it before concluding anything
+from an absence of errors.
+
+### What is and is not established
+
+Established: no runtime errors on that route in 3 days; the fixes deployed before
+the last successful upload; `pdfjs-dist` is hoisted to top-level `node_modules` so
+the `outputFileTracingIncludes` glob resolves, and `pdf.worker.mjs` exists at
+exactly the path the error named.
+
+**Not established:** that the 00:25:43 upload was specifically a PDF. The
+description column is generic (`Document uploaded with AI processing`) and the
+route returns a preview rather than inserting, so no `leads` row records the
+format. A single PDF upload would settle it.
+
+Also worth knowing: the route **returns parsed leads for confirmation and inserts
+nothing**. Absence of `leads` rows after an upload is not evidence of failure.
