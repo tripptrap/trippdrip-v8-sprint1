@@ -268,7 +268,7 @@ function OnboardingContent() {
       // number gate is what enforces completion, and Settings can finish it.
       await saveCarrierRegistration()
 
-      goToStep(3)
+      goToStep(4)
     } catch (error: any) {
       toast.error(error.message || 'Failed to save business info')
     } finally {
@@ -363,7 +363,7 @@ function OnboardingContent() {
   }, [])
 
   useEffect(() => {
-    if (currentStep === 3 && !hasExistingNumber && poolNumbers.length === 0 && telnyxNumbers.length === 0) {
+    if (currentStep === 2 && !hasExistingNumber && poolNumbers.length === 0 && telnyxNumbers.length === 0) {
       fetchAvailableNumbers()
     }
   }, [currentStep, hasExistingNumber, poolNumbers.length, telnyxNumbers.length, fetchAvailableNumbers])
@@ -372,7 +372,7 @@ function OnboardingContent() {
   // what happened earlier in this session — someone can land on step 3 directly
   // from a link, or come back days later to finish (#1).
   useEffect(() => {
-    if (currentStep !== 3) return
+    if (currentStep !== 2) return
     let cancelled = false
     fetch('/api/number-eligibility')
       .then(r => r.json())
@@ -730,8 +730,165 @@ function OnboardingContent() {
           </>
         )}
 
-        {/* ═══ STEP 2: Business Setup ═══ */}
+        {/* ═══ STEP 2: Phone Number ═══ */}
         {currentStep === 2 && (
+          <div className="max-w-xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20 onb-pop-in">
+                <Phone className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold mb-2 text-gray-900 onb-fade-up-d1">Your Free Phone Number</h1>
+              <p className="text-gray-500 onb-fade-up-d2">A number has been reserved for you — included free with your plan</p>
+            </div>
+
+            {/* Say why the number is unavailable, at the moment they expect to
+                get one — rather than letting the claim fail with a bare error (#1). */}
+            {numberGate && !numberGate.allowed && !claimedNumber && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 onb-fade-up-d2">
+                <h2 className="font-semibold text-amber-900">Phone numbers aren&apos;t available yet</h2>
+                <p className="text-sm text-amber-800 mt-1">{numberGate.reason}</p>
+                <button
+                  onClick={() => goToStep(3)}
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-900 hover:text-amber-950 underline underline-offset-2"
+                >
+                  Continue and add your business details →
+                </button>
+                <p className="text-xs text-amber-700 mt-3">
+                  A shared toll-free number needs none of this — only a local number does. You can
+                  add your EIN here or in Settings whenever you have it.
+                </p>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm onb-fade-up-d2">
+              {hasExistingNumber && claimedNumber ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-8 h-8 text-green-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Number Ready!</h3>
+                  <p className="text-gray-600 text-lg">{formatPhone(claimedNumber)}</p>
+                </div>
+              ) : numbersLoading ? (
+                <div className="flex flex-col items-center py-12">
+                  <Loader2 className="w-8 h-8 text-teal-500 animate-spin mb-3" />
+                  <p className="text-sm text-gray-400">Searching for available numbers...</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-500 mb-4 text-center text-sm">We&apos;ve pre-selected a number for you. You can swap it below if you prefer a different one.</p>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {numberSource === 'pool' ? poolNumbers.map(num => (
+                      <button
+                        key={num.id}
+                        onClick={() => { setSelectedPoolNumber(num); setSelectedTelnyxNumber(null) }}
+                        className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                          selectedPoolNumber?.id === num.id
+                            ? 'border-teal-500 bg-teal-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900">{formatPhone(num.phone_number)}</div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                              {num.region && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{num.region}</span>}
+                              <span className="px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">{num.number_type || 'Toll-Free'}</span>
+                            </div>
+                          </div>
+                          {selectedPoolNumber?.id === num.id && <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>}
+                        </div>
+                      </button>
+                    )) : telnyxNumbers.map(num => (
+                      <button
+                        key={num.phoneNumber}
+                        onClick={() => { setSelectedTelnyxNumber(num); setSelectedPoolNumber(null) }}
+                        className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                          selectedTelnyxNumber?.phoneNumber === num.phoneNumber
+                            ? 'border-teal-500 bg-teal-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900">{formatPhone(num.phoneNumber)}</div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                              {num.region && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{num.region}</span>}
+                              <span className="px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">Toll-Free</span>
+                            </div>
+                          </div>
+                          {selectedTelnyxNumber?.phoneNumber === num.phoneNumber && <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>}
+                        </div>
+                      </button>
+                    ))}
+                    {/*
+                      An empty pool is a hard stop, not a minor inconvenience
+                      (#120). Day-one signups are served entirely from the shared
+                      toll-free pool — a local number needs the agent's own 10DLC
+                      registration first — so "add one later from Phone Numbers"
+                      was pointing at a page that would also have nothing to give
+                      them, and the person has already paid.
+
+                      The copy now says what is true and what happens next, and
+                      /api/number-pool/available raises an escalating alert when it
+                      is asked for numbers and has none, so we hear about it at the
+                      same moment they do.
+                    */}
+                    {poolNumbers.length === 0 && telnyxNumbers.length === 0 && !numbersLoading && (
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-5 text-center">
+                        <Phone className="w-10 h-10 text-amber-500 dark:text-amber-400 mx-auto mb-3" />
+                        <p className="font-medium text-amber-900 dark:text-amber-200">
+                          We&apos;re out of numbers this second
+                        </p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300 mt-2">
+                          Our team has been alerted and will assign you one shortly — usually within a
+                          few hours. You can finish setting up now; everything else works, and we&apos;ll
+                          email you the moment your number is live.
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-3">
+                          Need it urgently? Reply to your welcome email and we&apos;ll prioritise you.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {(selectedPoolNumber || selectedTelnyxNumber) && (
+                    <button
+                      onClick={handleClaimNumber}
+                      // Also disabled when registration is incomplete. The claim
+                      // would be refused server-side anyway, and letting someone
+                      // press a live button to receive an error they were just
+                      // warned about is the worse of the two experiences (#1).
+                      disabled={claiming || (numberGate !== null && !numberGate.allowed)}
+                      title={numberGate && !numberGate.allowed ? numberGate.reason : undefined}
+                      className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {claiming ? <><Loader2 className="w-5 h-5 animate-spin" />Reserving your number...</> : <>Confirm This Number <ArrowRight className="w-5 h-5" /></>}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => goToStep(1)}
+                className="px-6 py-3 border border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                onClick={() => goToStep(3)}
+                className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2"
+              >
+                {hasExistingNumber ? 'Continue' : 'Skip for Now'} <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ STEP 3: Business Setup ═══ */}
+        {currentStep === 3 && (
           <div className="max-w-xl mx-auto">
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20 onb-pop-in">
@@ -1024,167 +1181,10 @@ function OnboardingContent() {
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Continue <ArrowRight className="w-5 h-5" /></>}
               </button>
               <button
-                onClick={() => goToStep(3)}
+                onClick={() => goToStep(4)}
                 className="px-6 py-3 border border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-all"
               >
                 Skip
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ STEP 3: Phone Number ═══ */}
-        {currentStep === 3 && (
-          <div className="max-w-xl mx-auto">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/20 onb-pop-in">
-                <Phone className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-3xl font-bold mb-2 text-gray-900 onb-fade-up-d1">Your Free Phone Number</h1>
-              <p className="text-gray-500 onb-fade-up-d2">A number has been reserved for you — included free with your plan</p>
-            </div>
-
-            {/* Say why the number is unavailable, at the moment they expect to
-                get one — rather than letting the claim fail with a bare error (#1). */}
-            {numberGate && !numberGate.allowed && !claimedNumber && (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 onb-fade-up-d2">
-                <h2 className="font-semibold text-amber-900">Phone numbers aren&apos;t available yet</h2>
-                <p className="text-sm text-amber-800 mt-1">{numberGate.reason}</p>
-                <button
-                  onClick={() => goToStep(2)}
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-900 hover:text-amber-950 underline underline-offset-2"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Go back and finish business registration
-                </button>
-                <p className="text-xs text-amber-700 mt-3">
-                  You can skip this for now and finish setting up your account — everything else
-                  works. Add your EIN in Settings whenever you have it.
-                </p>
-              </div>
-            )}
-
-            <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm onb-fade-up-d2">
-              {hasExistingNumber && claimedNumber ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="w-8 h-8 text-green-500" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Number Ready!</h3>
-                  <p className="text-gray-600 text-lg">{formatPhone(claimedNumber)}</p>
-                </div>
-              ) : numbersLoading ? (
-                <div className="flex flex-col items-center py-12">
-                  <Loader2 className="w-8 h-8 text-teal-500 animate-spin mb-3" />
-                  <p className="text-sm text-gray-400">Searching for available numbers...</p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-gray-500 mb-4 text-center text-sm">We&apos;ve pre-selected a number for you. You can swap it below if you prefer a different one.</p>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {numberSource === 'pool' ? poolNumbers.map(num => (
-                      <button
-                        key={num.id}
-                        onClick={() => { setSelectedPoolNumber(num); setSelectedTelnyxNumber(null) }}
-                        className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                          selectedPoolNumber?.id === num.id
-                            ? 'border-teal-500 bg-teal-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-gray-900">{formatPhone(num.phone_number)}</div>
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              {num.region && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{num.region}</span>}
-                              <span className="px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">{num.number_type || 'Toll-Free'}</span>
-                            </div>
-                          </div>
-                          {selectedPoolNumber?.id === num.id && <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>}
-                        </div>
-                      </button>
-                    )) : telnyxNumbers.map(num => (
-                      <button
-                        key={num.phoneNumber}
-                        onClick={() => { setSelectedTelnyxNumber(num); setSelectedPoolNumber(null) }}
-                        className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                          selectedTelnyxNumber?.phoneNumber === num.phoneNumber
-                            ? 'border-teal-500 bg-teal-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-gray-900">{formatPhone(num.phoneNumber)}</div>
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                              {num.region && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{num.region}</span>}
-                              <span className="px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded text-xs font-medium">Toll-Free</span>
-                            </div>
-                          </div>
-                          {selectedTelnyxNumber?.phoneNumber === num.phoneNumber && <div className="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center"><CheckCircle className="w-4 h-4 text-white" /></div>}
-                        </div>
-                      </button>
-                    ))}
-                    {/*
-                      An empty pool is a hard stop, not a minor inconvenience
-                      (#120). Day-one signups are served entirely from the shared
-                      toll-free pool — a local number needs the agent's own 10DLC
-                      registration first — so "add one later from Phone Numbers"
-                      was pointing at a page that would also have nothing to give
-                      them, and the person has already paid.
-
-                      The copy now says what is true and what happens next, and
-                      /api/number-pool/available raises an escalating alert when it
-                      is asked for numbers and has none, so we hear about it at the
-                      same moment they do.
-                    */}
-                    {poolNumbers.length === 0 && telnyxNumbers.length === 0 && !numbersLoading && (
-                      <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-5 text-center">
-                        <Phone className="w-10 h-10 text-amber-500 dark:text-amber-400 mx-auto mb-3" />
-                        <p className="font-medium text-amber-900 dark:text-amber-200">
-                          We&apos;re out of numbers this second
-                        </p>
-                        <p className="text-sm text-amber-800 dark:text-amber-300 mt-2">
-                          Our team has been alerted and will assign you one shortly — usually within a
-                          few hours. You can finish setting up now; everything else works, and we&apos;ll
-                          email you the moment your number is live.
-                        </p>
-                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-3">
-                          Need it urgently? Reply to your welcome email and we&apos;ll prioritise you.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {(selectedPoolNumber || selectedTelnyxNumber) && (
-                    <button
-                      onClick={handleClaimNumber}
-                      // Also disabled when registration is incomplete. The claim
-                      // would be refused server-side anyway, and letting someone
-                      // press a live button to receive an error they were just
-                      // warned about is the worse of the two experiences (#1).
-                      disabled={claiming || (numberGate !== null && !numberGate.allowed)}
-                      title={numberGate && !numberGate.allowed ? numberGate.reason : undefined}
-                      className="w-full mt-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {claiming ? <><Loader2 className="w-5 h-5 animate-spin" />Reserving your number...</> : <>Confirm This Number <ArrowRight className="w-5 h-5" /></>}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => goToStep(2)}
-                className="px-6 py-3 border border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
-              <button
-                onClick={() => goToStep(4)}
-                className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2"
-              >
-                {hasExistingNumber ? 'Continue' : 'Skip for Now'} <ArrowRight className="w-5 h-5" />
               </button>
             </div>
           </div>
