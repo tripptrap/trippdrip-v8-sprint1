@@ -76,6 +76,21 @@ export interface CampaignDefaults {
   description: string;
   sample1: string;
   sample2: string;
+  /**
+   * A promotional sample. Required in practice, not by the API.
+   *
+   * Both LOW_VOLUME and MIXED registrations declare MARKETING in `subUsecases`
+   * (see /api/telnyx/10dlc/register), and a reviewer checks that the declared
+   * use cases are actually demonstrated. The approved campaign CAAP953 carries
+   * exactly three samples — follow-up, appointment reminder, and a promotional
+   * one — while this generator produced only the first two.
+   *
+   * That mismatch is a known rejection shape here: campaign 4b30019f was denied
+   * on 2026-07-28 partly for omitting marketing/promotional from the opt-in
+   * message while MARKETING was a selected sub-use-case. Declaring MARKETING and
+   * showing no marketing message is the same inconsistency in a different field.
+   */
+  sample3: string;
   messageFlow: string;
   helpMessage: string;
   optinMessage: string;
@@ -98,9 +113,18 @@ export function generateCampaignDefaults(input: CampaignDefaultsInput): Campaign
     : `${business}'s website lead form`;
 
   return {
-    description: `${business} uses HyveWyre, a third-party SMS platform, to text their own leads and customers about ${offer}. Messages include lead follow-up, appointment scheduling, and customer service — sent only to people who have opted in through ${business}'s own web form.`,
+    // Every declared sub-use-case must appear here. The registration declares
+    // MARKETING for both LOW_VOLUME and MIXED, and this used to describe only
+    // "lead follow-up, appointment scheduling, and customer service" — a
+    // description that contradicts its own campaign. The approved campaign names
+    // promotional messages explicitly.
+    description: `${business} uses HyveWyre, a third-party SMS platform, to text their own leads and customers about ${offer}. Messages include lead follow-up, appointment scheduling, customer service, account notifications, and promotional offers about ${business}'s own services — sent only to people who have opted in through ${business}'s own web form.`,
     sample1: `Hi {name}, this is ${business}! Thanks for reaching out about ${offer}. Do you have a few minutes to chat about your options? Reply STOP to opt out.`,
     sample2: `Hi {name}, this is a reminder from ${business} about your upcoming appointment on {date} at {time}. Reply YES to confirm or call us to reschedule. Reply STOP to opt out.`,
+    // The MARKETING sample. Mirrors the approved campaign's third sample: names
+    // the brand first, makes a plainly promotional offer, and carries both STOP
+    // and HELP.
+    sample3: `${business}: New ${offer} options are available this month — reply YES and we'll send you a personalized quote. Reply STOP to opt out, HELP for help.`,
     messageFlow: `Consumers opt in through ${optInLocation}. The form includes a phone number field and a separate, unchecked SMS consent checkbox reading verbatim: "${buildConsentText(business)}" The checkbox links to the Privacy Policy and Terms of Service, is separate from any terms-of-service agreement, and the form can be submitted without opting in to SMS. ${business} then uses HyveWyre to follow up by SMS only with consumers who checked that box.`,
     helpMessage: helpContact
       ? `${business}: For help, contact ${helpContact}. Reply STOP to unsubscribe. Msg&data rates may apply.`

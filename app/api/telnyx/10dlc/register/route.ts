@@ -335,6 +335,7 @@ export async function POST(req: NextRequest) {
       description: content.description,
       sample1: content.sample1,
       sample2: content.sample2,
+      sample3: content.sample3,
       messageFlow: content.messageFlow,
       helpMessage: content.helpMessage,
       optinMessage: content.optinMessage,

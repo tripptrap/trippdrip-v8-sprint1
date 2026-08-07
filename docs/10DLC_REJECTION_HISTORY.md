@@ -257,3 +257,56 @@ cheap and shouldn't be over-thought.
 Account balance held at $71.23 across all 5 submissions — no charge observed despite
 `billedDate` being populated on rejected campaigns. Billing timing is **not confirmed**;
 watch the balance when a campaign actually resolves to ACTIVE.
+
+
+---
+
+## Cross-check: the approved campaign vs what a USER submits (2026-08-07)
+
+Compared CAAP953's live content, field by field, against
+`generateCampaignDefaults()` output for a real agent. Everything matched except
+one thing, and it is the same inconsistency that caused a rejection before.
+
+| field | approved (CAAP953) | generated for a user | verdict |
+|---|---|---|---|
+| `messageFlow` | opt-in URL + verbatim checkbox text | same generator, per-business slug | match |
+| `optinMessage` | 305 chars, names promotional/marketing | 273 chars, names promotional/marketing | match |
+| `optoutMessage` / `helpMessage` | brand + no-further-messages / brand + real contact | same | match |
+| keywords, `subscriber*` flags | comma-joined, all `true` | same | match |
+| `sample1` / `sample2` | follow-up, appointment reminder | same shape | match |
+| **`sample3`** | **promotional message** | **absent** | **MISMATCH** |
+| **`description`** | names promotional offers | listed only follow-up, scheduling, customer service | **MISMATCH** |
+
+Both registration paths declare `MARKETING` in `subUsecases` — LOW_VOLUME gets
+`['MARKETING','ACCOUNT_NOTIFICATION']`, MIXED adds `CUSTOMER_CARE`. So every user
+campaign declared marketing while showing no marketing message and describing no
+marketing activity.
+
+**That is the exact shape of a previous rejection**: campaign 4b30019f was denied
+on 2026-07-28 partly for omitting marketing/promotional from `optinMessage` while
+MARKETING was a selected sub-use-case. The same contradiction had simply moved to
+`description` and the samples.
+
+Fixed: `sample3` is generated and submitted by both paths, and the description
+names account notifications and promotional offers. Verified against the live API
+— `POST /v2/10dlc/campaignBuilder` with the new payload returned **200**,
+`failureReasons: null`, and stored `sample3`.
+
+### Verified working for a user, not just for us
+
+- `/opt-in/<slug>` resolves in production (200) and renders consent text
+  **byte-identical** to what `messageFlow` quotes — the reviewer visits that URL
+  and compares, and drift there is a documented rejection cause.
+- The generated `description` makes the AGENT the sender and HyveWyre the vendor,
+  which is the framing that fixed rejections #1 and #3.
+
+### Still unproven, and only a real filing settles it
+
+Mock brands and campaigns skip carrier review entirely. Everything above shows the
+payload is well-formed and consistent with the one that passed. Whether TCR
+*approves* a given agent's content is a human judgement about that business, and
+no amount of mock testing reaches it.
+
+Also worth knowing: **mock brand verification timing is not deterministic.** One
+run went PENDING → VERIFIED in about 10 seconds; another was still unverified
+after 60. Do not build timing assumptions on it.
