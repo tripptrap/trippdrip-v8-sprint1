@@ -70,6 +70,10 @@ export default function TenDLCRegistration() {
   const [legalBusinessName, setLegalBusinessName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [taxId, setTaxId] = useState('');
+  const [einIssuedOn, setEinIssuedOn] = useState('');
+  const [legalNameAttested, setLegalNameAttested] = useState(false);
+  const [einDoc, setEinDoc] = useState<{ name: string; url: string | null } | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -83,6 +87,7 @@ export default function TenDLCRegistration() {
   useEffect(() => {
     loadStatus();
     loadOptInLink();
+    loadEinDoc();
   }, []);
 
   async function loadOptInLink() {
@@ -109,6 +114,12 @@ export default function TenDLCRegistration() {
           setLegalBusinessName(data.registration.legal_business_name || '');
           setDisplayName(data.registration.display_name || '');
           setVertical(data.registration.vertical || '');
+          setEinIssuedOn(data.registration.ein_issued_on || '');
+          // Deliberately NOT restored from `legal_name_attested_at`. The
+          // attestation is about the name in the box right now, and the name is
+          // editable — carrying a tick over from a previous save would let an
+          // edited name inherit a confirmation nobody gave it.
+          setLegalNameAttested(false);
         }
       }
     } catch {
@@ -154,6 +165,83 @@ export default function TenDLCRegistration() {
     }
   }
 
+  // Re-posts the same payload with the fresh-EIN guard waived. Kept separate
+  // rather than threading a flag through handleSubmit, so the ordinary path
+  // cannot accidentally carry the override.
+  async function submitOverridingFreshEin() {
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/telnyx/10dlc/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entityType, legalBusinessName, displayName, taxId, contactPhone, contactEmail,
+          website, vertical, whatTheyOffer, street, city, state, postalCode,
+          optInUrl,
+          einIssuedOn: einIssuedOn || undefined,
+          legalNameAttested,
+          acknowledgeFreshEin: true,
+          campaignOverrides: overrides,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success('Registration submitted');
+        loadStatus();
+      } else {
+        toast.error(data.error || 'Registration failed');
+      }
+    } catch {
+      toast.error('Registration failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function uploadEinDoc(file: File) {
+    setUploadingDoc(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/telnyx/10dlc/ein-document', { method: 'POST', body });
+      const data = await res.json();
+      if (!data.ok) {
+        toast.error(data.error || 'Upload failed');
+        return;
+      }
+      toast.success('EIN letter saved');
+      await loadEinDoc();
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setUploadingDoc(false);
+    }
+  }
+
+  async function loadEinDoc() {
+    try {
+      const res = await fetch('/api/telnyx/10dlc/ein-document');
+      const data = await res.json();
+      setEinDoc(data.ok && data.document ? { name: data.document.name, url: data.document.url } : null);
+    } catch {
+      /* the document is supplementary — a failed read must not block the form */
+    }
+  }
+
+  async function removeEinDoc() {
+    try {
+      const res = await fetch('/api/telnyx/10dlc/ein-document', { method: 'DELETE' });
+      const data = await res.json();
+      if (!data.ok) {
+        toast.error(data.error || 'Could not remove the file');
+        return;
+      }
+      setEinDoc(null);
+    } catch {
+      toast.error('Could not remove the file');
+    }
+  }
+
   async function handleSubmit() {
     if (!legalBusinessName.trim() || !displayName.trim() || !contactPhone.trim() || !contactEmail.trim() || !vertical.trim() || !street.trim() || !city.trim() || !state.trim() || !postalCode.trim()) {
       toast.error('Please fill in all required fields');
@@ -184,6 +272,8 @@ export default function TenDLCRegistration() {
           entityType, legalBusinessName, displayName, taxId, contactPhone, contactEmail,
           website, vertical, whatTheyOffer, street, city, state, postalCode,
           optInUrl,
+          einIssuedOn: einIssuedOn || undefined,
+          legalNameAttested,
           campaignOverrides: overrides,
         }),
       });
@@ -191,6 +281,13 @@ export default function TenDLCRegistration() {
       if (data.ok) {
         toast.success('Registration submitted');
         loadStatus();
+      } else if (data.canOverride) {
+        // The fresh-EIN block is a judgement call, not a carrier rule, so it is
+        // the user's to overrule — but only after being told what it costs.
+        toast.error(data.error, { duration: 12000 });
+        if (window.confirm(`${data.error}\n\nRegister anyway? The fee is charged even if it fails.`)) {
+          await submitOverridingFreshEin();
+        }
       } else {
         toast.error(data.error || 'Registration failed');
       }
@@ -373,6 +470,99 @@ export default function TenDLCRegistration() {
                 IRS records.
               </p>
             </div>
+
+            {/* The date on the CP 575.
+              *
+              * Carriers verify against IRS records that take weeks to propagate, so a
+              * brand filed on a fresh EIN cannot match and the fee is charged anyway.
+              * This is the field the API uses to stop that (#193). */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                Date your EIN was issued
+              </label>
+              <input
+                type="date"
+                value={einIssuedOn}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={e => setEinIssuedOn(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Printed at the top of your IRS letter. A brand-new EIN has not reached the carriers
+                yet — registering too early fails and still costs the fee.
+              </p>
+            </div>
+
+            {/* Supporting document.
+              *
+              * Not sent to Telnyx — their brand API has no document field. Kept so that
+              * when a registration needs a human to resolve it, the proof of the
+              * EIN-to-name pairing is already here. */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                IRS EIN letter (CP 575) <span className="font-normal text-slate-400">— optional</span>
+              </label>
+              {einDoc ? (
+                <div className="flex items-center gap-3 rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2">
+                  <span className="text-sm text-slate-700 dark:text-slate-200 truncate flex-1">
+                    {einDoc.name}
+                  </span>
+                  {einDoc.url && (
+                    <a href={einDoc.url} target="_blank" rel="noopener noreferrer" className="text-xs underline text-slate-600 dark:text-slate-300">
+                      View
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={removeEinDoc}
+                    className="text-xs underline text-red-600 dark:text-red-400"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <input
+                  type="file"
+                  accept="application/pdf,image/png,image/jpeg,image/heic"
+                  disabled={uploadingDoc}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadEinDoc(f);
+                    e.target.value = '';
+                  }}
+                  className="w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 dark:file:bg-slate-700 file:px-3 file:py-2 file:text-sm file:text-slate-700 dark:file:text-slate-200"
+                />
+              )}
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {uploadingDoc
+                  ? 'Uploading…'
+                  : 'Stored privately. Carriers cannot be sent documents automatically, but if your registration needs review this is the proof that resolves it fastest.'}
+              </p>
+            </div>
+
+            {/* The attestation.
+              *
+              * The advice to match the EIN letter was already on this form and was
+              * still not followed — a shortened legal name was filed and rejected. An
+              * explicit confirmation makes someone look at the letter before the fee
+              * is charged. */}
+            <div className="sm:col-span-2">
+              <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={legalNameAttested}
+                  onChange={e => setLegalNameAttested(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  I confirm <strong className="text-slate-800 dark:text-slate-100">{legalBusinessName || 'the legal business name above'}</strong>{' '}
+                  matches my IRS EIN letter exactly — including middle initials, punctuation and
+                  suffixes. Carriers compare it character-for-character and reject a near-match
+                  after charging the fee.
+                </span>
+              </label>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Vertical / industry</label>
               <select

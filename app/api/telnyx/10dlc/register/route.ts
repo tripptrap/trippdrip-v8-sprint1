@@ -128,6 +128,64 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // ── The legal name has to MATCH the EIN letter, not merely resemble it ────
+    //
+    // TCR matches `companyName` against IRS records. The onboarding form has
+    // told users to "use the exact legal name the EIN is registered under" for
+    // months — advice, with nothing enforcing it, which is the same shape as the
+    // consent-text drift that got campaigns rejected.
+    //
+    // It cost a real filing on 2026-08-07: submitted as `Tripp Browning` while
+    // the CP 575 reads `TRIPP E BROWNING`. Brand accepted, $4.50 charged,
+    // identityStatus UNVERIFIED, qualify:false at every carrier.
+    //
+    // We cannot check the name against the IRS ourselves, so this asks for an
+    // explicit attestation instead of quietly accepting whatever was typed. The
+    // point is to make the user look at the letter before we spend their money.
+    const attested = body.legalNameAttested === true;
+    if (body.taxId?.trim() && !attested) {
+      return NextResponse.json({
+        ok: false,
+        error:
+          'Confirm the legal business name matches your IRS EIN letter exactly — including middle ' +
+          'initials, punctuation and suffixes. Carriers match it character-for-character, and a ' +
+          'near-match is rejected after the registration fee is charged.',
+        field: 'legalNameAttested',
+      }, { status: 400 });
+    }
+
+    // ── An EIN too new to have reached the carriers ──────────────────────────
+    //
+    // TCR verifies a brand against IRS data that takes weeks to propagate. A
+    // brand filed on a days-old EIN cannot match anything, so it registers,
+    // charges $4.50, and lands UNVERIFIED — which is a state this product has no
+    // automatic exit from (#190).
+    //
+    // That is exactly what happened on 2026-08-07: EIN issued that same morning,
+    // brand filed hours later, UNVERIFIED with no carrier qualifying it.
+    //
+    // Overridable, not absolute. 30 days is a reasonable read of "allow two
+    // weeks, plus the third-party lag", not a documented carrier threshold, and
+    // someone who understands the risk may still want to try.
+    const einIssuedOn = body.einIssuedOn ? new Date(body.einIssuedOn) : null;
+    if (einIssuedOn && !Number.isNaN(einIssuedOn.getTime()) && body.acknowledgeFreshEin !== true) {
+      const ageDays = Math.floor((Date.now() - einIssuedOn.getTime()) / 86_400_000);
+      if (ageDays < 30) {
+        const readyOn = new Date(einIssuedOn.getTime() + 30 * 86_400_000);
+        return NextResponse.json({
+          ok: false,
+          error:
+            `That EIN was issued ${ageDays === 0 ? 'today' : `${ageDays} day${ageDays === 1 ? '' : 's'} ago`}. ` +
+            'Carriers check it against IRS records that take a few weeks to update, so registering now ' +
+            'would almost certainly fail — and the fee is charged either way. Your details are saved; ' +
+            `come back on or after ${readyOn.toISOString().slice(0, 10)}.`,
+          field: 'einIssuedOn',
+          canOverride: true,
+          readyOn: readyOn.toISOString().slice(0, 10),
+        }, { status: 400 });
+      }
+    }
+
     const canSubmit = !!body.taxId?.trim();
 
     // ── Mock mode (free, no carriers, no fees) ──────────────────────────────
@@ -189,6 +247,8 @@ export async function POST(req: NextRequest) {
       state: body.state.trim(),
       postal_code: body.postalCode.trim(),
       country,
+      ein_issued_on: body.einIssuedOn?.trim() || null,
+      legal_name_attested_at: attested ? new Date().toISOString() : null,
       is_mock: mock,
       brand_status: 'pending',
       brand_failure_reason: null,
