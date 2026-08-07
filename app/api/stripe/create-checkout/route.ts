@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     // self-service discount.
     const { data: accountRow } = await supabase
       .from('users')
-      .select('subscription_tier')
+      .select('subscription_tier, stripe_customer_id, stripe_subscription_id')
       .eq('id', user.id)
       .single();
     const userPlan: 'growth' | 'scale' =
@@ -101,7 +101,45 @@ export async function POST(req: NextRequest) {
     let successUrl = `${baseUrl}/points?success=true&session_id={CHECKOUT_SESSION_ID}`;
 
     if (subscriptionType) {
-      // Handle subscription checkout
+      // Handle subscription checkout.
+      //
+      // ── Refuse if they already have one ──────────────────────────────────────
+      //
+      // This route never looked at stripe_subscription_id, so "Upgrade to Scale"
+      // in Settings created a SECOND live subscription. In mode:'subscription'
+      // Stripe mints a brand-new Customer for a session that passes only
+      // customer_email, and the webhook then overwrites stripe_customer_id and
+      // stripe_subscription_id with the new pair — leaving the original $30 Growth
+      // subscription referenced by nothing, still billing, invisible to the
+      // billing portal and to cancellation. The customer pays $30 AND $98 (#162).
+      //
+      // Changing an existing plan is /api/stripe/change-plan, which repoints the
+      // price on the subscription that already exists.
+      //
+      // Checked against Stripe rather than the column, because the column can be
+      // stale — a cancellation made in the portal writes subscription_status but
+      // leaves stripe_subscription_id in place (#168).
+      if (accountRow?.stripe_subscription_id) {
+        try {
+          const existing = await stripe.subscriptions.retrieve(accountRow.stripe_subscription_id);
+          const LIVE = ['active', 'trialing', 'past_due', 'unpaid', 'paused'];
+          if (LIVE.includes(existing.status)) {
+            return NextResponse.json(
+              {
+                error: 'You already have an active subscription. Use Change Plan to switch tiers.',
+                code: 'subscription_exists',
+                currentPlan: userPlan,
+              },
+              { status: 409 }
+            );
+          }
+        } catch {
+          // The stored id does not resolve at Stripe — it belongs to another
+          // account, or was deleted. Fall through and let them subscribe.
+          console.warn(`Stored subscription ${accountRow.stripe_subscription_id} for ${user.id} could not be retrieved; allowing new checkout`);
+        }
+      }
+
       mode = 'subscription';
       successUrl = `${baseUrl}/auth/onboarding?step=2&success=true&session_id={CHECKOUT_SESSION_ID}`;
       priceId = subscriptionType === 'scale'
@@ -146,7 +184,15 @@ export async function POST(req: NextRequest) {
       success_url: successUrl,
       cancel_url: `${baseUrl}/points?canceled=true`,
       client_reference_id: user.id,
-      customer_email: user.email,
+      // Reuse the known customer rather than handing Stripe an email and letting
+      // it mint a new one. Every point-pack purchase used to create a fresh
+      // Customer, so a user's charges scattered across several of them and the
+      // billing portal — which opens on stripe_customer_id — showed only whichever
+      // was written last. Stripe rejects `customer` and `customer_email` together,
+      // so it is one or the other.
+      ...(accountRow?.stripe_customer_id
+        ? { customer: accountRow.stripe_customer_id }
+        : { customer_email: user.email }),
       metadata: {
         user_id: user.id,
         // The pack's own size, from POINT_PACKS. The webhook grants whatever
@@ -165,10 +211,14 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Stripe checkout error:', error);
+    // `details: error` used to be here. The serialized Stripe error carries `raw`,
+    // `code`, `param`, `requestId`, the price id that was attempted, and — on an
+    // auth failure — a message of the form "Invalid API Key provided: sk_test_***…"
+    // that leaks the key's mode and last characters. None of that belongs in a
+    // client response; the console.error above keeps it for us (#176).
     return NextResponse.json(
       {
-        error: error.message || 'Failed to create checkout session',
-        details: error
+        error: 'Could not start checkout. Please try again or contact support.',
       },
       { status: 500 }
     );

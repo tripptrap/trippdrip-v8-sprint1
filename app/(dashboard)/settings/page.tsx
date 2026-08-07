@@ -399,17 +399,45 @@ export default function Page() {
 
   const handleUpgradePlan = async () => {
     try {
+      // Checkout is for someone who has no subscription yet. An existing
+      // subscriber must go through change-plan, which repoints the price on the
+      // subscription they already have — checkout would create a SECOND live
+      // subscription on a new Stripe customer and orphan the first, billing them
+      // for both (#162). The API returns 409 rather than trusting the client to
+      // know which case it is in.
       const res = await fetch('/api/stripe/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscriptionType: 'scale' }),
       });
       const data = await res.json();
+
       if (data.url) {
         window.location.href = data.url;
-      } else {
-        toast.error(data.error || 'Failed to start upgrade');
+        return;
       }
+
+      if (res.status === 409 && data.code === 'subscription_exists') {
+        const changed = await fetch('/api/stripe/change-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planType: 'scale' }),
+        });
+        const changeData = await changed.json();
+        if (!changed.ok) {
+          toast.error(changeData.error || 'Failed to switch to Scale');
+          return;
+        }
+        toast.success(
+          changeData.creditsGranted
+            ? `You're on Scale — ${Number(changeData.monthlyCredits ?? 0).toLocaleString()} credits added.`
+            : `You're on Scale. Your credits for this billing period have already been applied.`
+        );
+        window.location.reload();
+        return;
+      }
+
+      toast.error(data.error || 'Failed to start upgrade');
     } catch (err: any) {
       toast.error(err.message || 'Failed to start upgrade');
     }

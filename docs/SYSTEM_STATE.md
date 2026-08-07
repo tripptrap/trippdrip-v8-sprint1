@@ -4216,3 +4216,42 @@ saying so. Worth remembering as a shape: **an idempotency claim that treats ever
 error as "already done" converts every transient failure into silent data loss**,
 and if the claim has a foreign key, it also silently disables whatever repair path
 sits downstream of it.
+
+## "Upgrade to Scale" created a second subscription (#162, #176, 2026-08-06)
+
+`/api/stripe/create-checkout` never read `stripe_subscription_id`, so Settings →
+**Upgrade to Scale** ran a fresh checkout for someone who already had a plan. In
+`mode: 'subscription'` a session carrying only `customer_email` makes Stripe mint a
+**brand-new Customer**, and the webhook then overwrites `stripe_customer_id` and
+`stripe_subscription_id` with the new pair. The original $30 Growth subscription
+ends up referenced by nothing: still billing, unreachable from the billing portal
+(which opens on `stripe_customer_id`), and invisible to cancellation. The customer
+pays $30 **and** $98.
+
+The route now returns **409 `subscription_exists`** when a live subscription is
+found, and the Settings button routes that to `/api/stripe/change-plan`, which
+repoints the price on the subscription that already exists. Onboarding's caller
+needed no change — it already surfaces `result.error` on a non-OK response, and
+"You already have an active subscription" is the right message there.
+
+**Checked against Stripe, not the column.** `stripe_subscription_id` can be stale:
+cancelling through the billing portal writes `subscription_status` but leaves the
+id in place (#168). So the guard retrieves the subscription and only refuses on a
+genuinely live status — `active`, `trialing`, `past_due`, `unpaid`, `paused`. If
+the id does not resolve at Stripe at all, it falls through and lets them subscribe.
+
+### The same bug was quietly costing point-pack buyers too
+
+The session passed `customer_email` on **every** path, so each point-pack purchase
+also minted a new Customer. A user's charges scattered across several of them, and
+the portal showed only whichever was written last. It now passes
+`customer: stripe_customer_id` when one is known. Stripe rejects `customer` and
+`customer_email` together, so it is strictly one or the other.
+
+### Also fixed: the 500 handler leaked Stripe internals (#176)
+
+The catch block returned `details: error` — the serialized Stripe error, carrying
+`raw`, `code`, `param`, `requestId`, the attempted price id, and on an auth failure
+a message of the form `Invalid API Key provided: sk_test_***…` that leaks the key's
+mode and last characters. Any authenticated caller could force it. The response is
+now a fixed string; `console.error` still keeps the detail server-side.
