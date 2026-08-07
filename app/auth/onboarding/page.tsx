@@ -101,7 +101,7 @@ function OnboardingContent() {
   const [postalCode, setPostalCode] = useState('')
   const [contactEmailError, setContactEmailError] = useState<string | null>(null)
   const [registrationSubmitted, setRegistrationSubmitted] = useState<boolean | null>(null)
-  const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string } | null>(null)
+  const [numberGate, setNumberGate] = useState<{ allowed: boolean; reason?: string; provisional?: boolean } | null>(null)
   const [businessHours, setBusinessHours] = useState<Record<string, { open: string; close: string; enabled: boolean }>>(() => {
     const hours: Record<string, { open: string; close: string; enabled: boolean }> = {}
     DAYS.forEach(day => {
@@ -378,11 +378,29 @@ function OnboardingContent() {
       .then(r => r.json())
       .then(d => {
         if (cancelled || !d?.ok) return
-        setNumberGate({ allowed: d.allowed, reason: d.reason ?? undefined })
+        // `allowed` is the LOCAL / 10DLC answer. This step hands out a shared
+        // TOLL-FREE number, which is gated entirely differently — toll-free runs
+        // on HyveWyre's own Toll-Free Verification, so checkNumberEligibility
+        // returns allowed unconditionally for it.
+        //
+        // Reading `allowed` here told every new user "phone numbers aren't
+        // available yet, go back and finish business registration" and disabled
+        // Confirm — for a number that needed no registration at all. The free
+        // toll-free number is the whole first-run promise, and it was withheld
+        // for a reason that does not apply to it.
+        //
+        // The API has returned `tollFreeAllowed` all along; this just never read it.
+        setNumberGate({
+          allowed: numberSource === 'pool' ? !!d.tollFreeAllowed : !!d.allowed,
+          reason: numberSource === 'pool' ? undefined : (d.reason ?? undefined),
+          provisional: !!d.provisional,
+        })
       })
       .catch(() => { /* the claim itself still enforces this — don't block the step */ })
     return () => { cancelled = true }
-  }, [currentStep, registrationSubmitted])
+    // numberSource matters: the gate answer differs between a shared toll-free
+    // number and a purchased local one, so switching source has to re-ask.
+  }, [currentStep, registrationSubmitted, numberSource])
 
   const handleClaimNumber = async () => {
     setClaiming(true)

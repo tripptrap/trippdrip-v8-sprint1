@@ -8,6 +8,7 @@ import { createBrand, createCampaign, EntityType, mapBrandStatus, mapCampaignSta
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
 import { validateBusinessEmail, explainBrandError } from '@/lib/validateBusinessEmail';
 import { alertAdminsThrottled } from '@/lib/alerting';
+import { normalizePhone } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,6 +77,23 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // Telnyx requires the contact phone in E.164 and says so only after the
+    // registration row is written: `phone must be in +e164 format`. A user typing
+    // their own number the way anyone types a phone number — 4079513717, or
+    // (407) 951-3717, matching this form's own "+1 555 123 4567" placeholder —
+    // got that error with no idea which field it meant.
+    //
+    // Normalised rather than rejected. The same rule already governs every lead
+    // phone in the product (lib/phone), and refusing a correct number for its
+    // punctuation is a worse answer than formatting it.
+    const normalizedPhone = normalizePhone(body.contactPhone);
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { ok: false, error: 'Enter a valid US phone number, e.g. (407) 555-0142.', field: 'contactPhone' },
+        { status: 400 }
+      );
+    }
+
     // Carriers reject an unreachable contact address, and Telnyx's own error
     // (`10019 Invalid email address`) arrives only after the registration row is
     // written — and does not say which field it means (#1). Checked here as well
@@ -162,7 +180,7 @@ export async function POST(req: NextRequest) {
       legal_business_name: body.legalBusinessName.trim(),
       display_name: body.displayName.trim(),
       tax_id: body.taxId?.trim() || null,
-      contact_phone: body.contactPhone.trim(),
+      contact_phone: normalizedPhone,
       contact_email: body.contactEmail.trim(),
       website: body.website?.trim() || null,
       vertical: body.vertical,
@@ -214,7 +232,7 @@ export async function POST(req: NextRequest) {
       displayName: body.displayName.trim(),
       companyName: body.legalBusinessName.trim(),
       ein: body.taxId?.trim(),
-      phone: body.contactPhone.trim(),
+      phone: normalizedPhone,
       street: body.street.trim(),
       city: body.city.trim(),
       state: body.state.trim(),
