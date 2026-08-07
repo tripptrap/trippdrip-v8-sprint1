@@ -161,6 +161,7 @@ async function catalogHygiene(db: SupabaseClient): Promise<Result[]> {
     rls_disabled: string[];
     secdef_mutable_search_path: string[];
     unfenced_grants: string[];
+    anon_dml: string[];
     credit_rpc_overexposed: string[];
   };
 
@@ -170,7 +171,19 @@ async function catalogHygiene(db: SupabaseClient): Promise<Result[]> {
     ? { name: 'RLS on every table', level: 'PASS', detail: 'all tables protected' }
     : {
         name: 'RLS on every table', level: 'FAIL', detail: c.rls_disabled.join(', '),
-        because: 'anon holds INSERT/UPDATE/DELETE on most tables. RLS is the only fence — a table without it is world-writable (#149).',
+        because: 'RLS is the row filter behind every policy. A table without it exposes every row to any role holding a grant.',
+      });
+
+  // anon lost INSERT/UPDATE/DELETE on 2026-08-07 (#149). It can come back on its
+  // own: Supabase's default privileges re-grant DML to anon on tables created by
+  // postgres/supabase_admin, and ALTER DEFAULT PRIVILEGES FOR ROLE is not grantable
+  // from the migration role — so the revoke cannot be made permanent, only checked.
+  out.push(c.anon_dml.length === 0
+    ? { name: 'anon cannot write', level: 'PASS', detail: 'no INSERT/UPDATE/DELETE granted' }
+    : {
+        name: 'anon cannot write', level: 'FAIL',
+        detail: `${c.anon_dml.length} grant(s): ${c.anon_dml.slice(0, 6).join(', ')}${c.anon_dml.length > 6 ? ', …' : ''}`,
+        because: 'RLS is a row filter, not an authorisation boundary — one table with a grant and no policy is world-writable (#149).',
       });
 
   out.push(c.credit_rpc_overexposed.length === 0

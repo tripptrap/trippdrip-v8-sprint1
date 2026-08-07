@@ -4345,3 +4345,59 @@ opt-out and `false` for a clean number, and `is_within_quiet_hours`,
 `get_messages_ready_to_send`, `get_ai_drips_ready_to_send`,
 `get_campaigns_ready_for_batch`, `find_overdue_crons` and `get_dnc_stats` all
 return correct results.
+
+## anon can no longer write (#149, 2026-08-07)
+
+`anon` held INSERT, UPDATE and DELETE on **58 of 63** public tables, leaving RLS as
+the only thing between an unauthenticated request and a write. The 2026-08-06 audit
+found **41 (table, command) pairs with a DML grant and no matching policy at all**,
+so the fence was not uniform — and RLS is a row filter, not an authorisation
+boundary.
+
+Revoked. `anon` now holds SELECT only.
+
+### Verified by executing, both directions
+
+**Before**, that nothing needs it: `/api/opt-in/submit` (the only public write path)
+uses the service role; `app/auth/register` does no table writes, since the
+`handle_new_user` trigger creates the `public.users` row; `app/auth/onboarding`
+writes only after sign-in, so it acts as `authenticated`. The browser client uses
+the anon *key*, but with a session PostgREST resolves the role to `authenticated` —
+revoking from `anon` does not touch signed-in users.
+
+**After**, with the real anon key against PostgREST — every one `401 permission
+denied`:
+
+```
+INSERT leads, dnc_list, campaigns, messages, user_telnyx_numbers, points_transactions
+PATCH  leads
+DELETE leads
+SELECT leads -> 200 []          (RLS filters it; intended)
+```
+
+`points_transactions` is the one to notice: anon could previously have inserted
+credit ledger rows.
+
+### The revoke cannot be made permanent, only monitored
+
+`ALTER DEFAULT PRIVILEGES IN SCHEMA public` covers tables created by the migration
+role. `ALTER DEFAULT PRIVILEGES FOR ROLE postgres` and `... FOR ROLE supabase_admin`
+fail with `42501` from here — not grantable. So Supabase can still re-grant DML to
+`anon` on tables created by those roles, and **this will silently come back the next
+time a table is created that way**.
+
+That is why `npm run health` now asserts the live grant state on every run:
+
+```
+ok   anon cannot write            no INSERT/UPDATE/DELETE granted
+```
+
+It FAILS and names the offending `table:privilege` pairs otherwise. The check is the
+durable part; the revoke is just today's state.
+
+### SELECT deliberately left alone
+
+RLS is enabled on every table and the policies key on `auth.uid()`, so anon reads
+return nothing — confirmed above. Revoking SELECT as well risks breaking public
+pages for no protection gained today. Worth its own investigation rather than a
+drive-by change.
