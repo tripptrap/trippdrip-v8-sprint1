@@ -366,7 +366,32 @@ async function messagingProfiles(): Promise<Result> {
       because: 'Without a profile a number cannot send and its inbound goes nowhere, while still reporting active.',
     };
   }
-  return { name, level: 'PASS', detail: `all ${numbers.length} attached` };
+
+  // Having a profile is not enough — the profile has to carry a webhook, or
+  // inbound to those numbers is delivered nowhere just as silently. The account
+  // had two profiles with the SAME name and only one with a webhook, so choosing
+  // the wrong one in the Telnyx UI was a coin flip nothing would have caught
+  // (#188). Checked per number rather than per profile: what matters is whether a
+  // number the product actually uses can receive.
+  const profRes = await fetch('https://api.telnyx.com/v2/messaging_profiles?page%5Bsize%5D=100', {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!profRes.ok) {
+    return { name, level: 'WARN', detail: `all ${numbers.length} attached; profile check failed HTTP ${profRes.status}` };
+  }
+  const profiles: any[] = (await profRes.json())?.data ?? [];
+  const webhookless = new Set(profiles.filter(p => !p.webhook_url).map(p => p.id));
+  const deaf = numbers.filter(n => webhookless.has(n.messaging_profile_id));
+
+  if (deaf.length > 0) {
+    return {
+      name, level: 'FAIL',
+      detail: `${deaf.length} on a profile with no webhook: ${deaf.map(n => n.phone_number).join(', ')}`,
+      because: 'The number sends fine but its inbound is delivered nowhere — the six-month silent failure in #108, by a different route.',
+    };
+  }
+
+  return { name, level: 'PASS', detail: `all ${numbers.length} attached, profiles have webhooks` };
 }
 
 async function tollFreeVerification(): Promise<Result> {

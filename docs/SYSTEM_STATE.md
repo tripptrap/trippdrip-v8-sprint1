@@ -4777,18 +4777,25 @@ All three systems checked against live infrastructure rather than config files.
 | `TELNYX_MESSAGING_PROFILE_ID` | points at that profile |
 | Inbound actually arriving | 28 messages in 7 days |
 
-**The trap: there are TWO messaging profiles, both named `HyveWyre LLC`.**
+**The trap: there were TWO messaging profiles, both named `HyveWyre LLC`**, and
+only one had a webhook. Fixed 2026-08-07 (#188) — the unused one now carries the
+same webhook and is renamed `HyveWyre LLC (UNUSED — do not assign numbers)`, so
+picking it by mistake no longer silences inbound.
 
 ```
-40019b32-c576-4908-95f3-08efbd6d07a3   webhook: NONE
-40019b38-c8eb-4a0d-ba6e-3a4174db4ad2   webhook: .../api/telnyx/sms-webhook
+40019b32-…  webhook: NONE  ->  .../api/telnyx/sms-webhook   (0 numbers, unused)
+40019b38-…  webhook: .../api/telnyx/sms-webhook             (all 15 numbers)
 ```
 
-Nothing uses the first one today. Any number that lands on it has its inbound
-delivered nowhere, silently, while the number still reports `active` — the same
-shape as #184. Identical names make picking the wrong one in the Telnyx UI easy.
-Neither profile has a **failover URL** set, so a deploy blip drops inbound rather
-than retrying it.
+`npm run health` now asserts it per number: every number must sit on a profile
+that has a webhook, not merely on *a* profile. A number with a profile but no
+webhook sends fine and receives nothing — the six-month silent failure of #108 by
+a different route.
+
+**No failover URL on either, deliberately.** Telnyx's failover fires when the
+primary returns non-2xx, and pointing it at the same endpoint risks processing an
+inbound message twice for a slow-but-successful response. Duplicate leads and
+duplicate AI replies are worse than one retry, and Telnyx already retries.
 
 ### Vercel cron — every job at exactly its configured rate
 
