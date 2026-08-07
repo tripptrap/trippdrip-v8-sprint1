@@ -253,8 +253,43 @@ export async function POST(req: NextRequest) {
           });
 
           if (txInsertError) {
-            console.log(`⚠️ Subscription session ${sessionId} already processed — skipping duplicate webhook`);
-            break;
+            if (txInsertError.code === PG_UNIQUE_VIOLATION) {
+              // Routine: Stripe redelivered an event we already fulfilled.
+              console.log(`⚠️ Subscription session ${sessionId} already processed — skipping duplicate webhook`);
+              break;
+            }
+            // Not a duplicate. This used to `break` on ANY error, so a constraint
+            // violation, a type mismatch or a connection blip all read as "already
+            // processed" — and everything below is skipped: the tier update, the
+            // add_credits grant, and the user-creation fallback. The handler then
+            // returns 200, so Stripe never retries, and notifyAdmins is never
+            // called. A customer pays $30 or $98 and gets no tier, no credits and
+            // no alert to anyone (#158).
+            //
+            // The sharpest case is a first-time subscriber with no `users` row.
+            // points_transactions carries
+            //   points_transactions_user_id_fkey FOREIGN KEY (user_id)
+            //     REFERENCES users(id) ON DELETE CASCADE
+            // so that insert fails 23503, the old code called it a duplicate and
+            // broke — which made the `if (!existingUser)` branch below, the entire
+            // first-subscription account-creation path, UNREACHABLE BY
+            // CONSTRUCTION. It could only ever run if the row it creates already
+            // existed. Now the FK violation escalates instead of being swallowed.
+            //
+            // The pack branch (:400) and the renewal branch (:523) have always
+            // checked the code and escalated otherwise; this branch was the one
+            // exception, contradicting the file's own comment at the top.
+            console.error(`❌ Subscription transaction insert failed for session ${sessionId}:`, txInsertError);
+            await notifyAdmins(
+              'fulfillment_failed',
+              'URGENT: subscription paid for but not fulfilled',
+              `${userId} paid for a ${planType} subscription (session ${sessionId}) but the transaction insert failed, so the tier was never set and no credits were granted.`,
+              { reason: 'subscription_transaction_insert_failed', user_id: userId, plan: planType, credits: monthlyCredits, session_id: sessionId, db_error: txInsertError.message, db_code: txInsertError.code }
+            ,
+              // Delay compounds this one: escalate by email, don't wait for a login (#79).
+              { escalate: true }
+            );
+            return NextResponse.json({ received: true, error: 'subscription transaction insert failed' });
           }
 
           // Anchor next_renewal_date to the real Stripe billing period rather

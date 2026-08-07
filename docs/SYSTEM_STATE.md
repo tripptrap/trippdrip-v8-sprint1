@@ -4174,3 +4174,45 @@ number on every attempt. `docs/STRIPE_LIVE_CATALOGUE.md` already lists this as o
 of the eleven prices to create — the "Additional Phone Number, $1.00/month" row,
 whose price is flagged there as needing confirmation since Telnyx charges about
 $1/month before any messaging.
+
+## The webhook branch that called every failure a duplicate (#158, 2026-08-06)
+
+`webhook/route.ts` fulfils a subscription by inserting the `points_transactions`
+row **first**, using `stripe_session_id` as the idempotency claim, then setting the
+tier and granting credits. The claim check was:
+
+```ts
+if (txInsertError) {
+  console.log('already processed — skipping duplicate webhook');
+  break;
+}
+```
+
+It never looked at the error code. **Any** failure read as "already processed", and
+everything after it was skipped: the tier update, the `add_credits` grant, and the
+user-creation fallback. The handler then returned 200, so Stripe never retried, and
+`notifyAdmins` was never called. A customer pays $30 or $98 and receives no tier,
+no credits, and nobody is told.
+
+The pack branch (`:400`) and the renewal branch (`:523`) have always checked
+`PG_UNIQUE_VIOLATION` and escalated otherwise. This branch was the lone exception.
+
+### The part that is worse than it looks
+
+`points_transactions` has no CHECK constraints, but it does have:
+
+```
+points_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+```
+
+So for a first-time subscriber with no `users` row, that insert fails **23503**,
+which the old code called a duplicate. That made the `if (!existingUser)` branch
+below it — the entire first-subscription account-creation path, complete with its
+own escalating `notifyAdmins` — **unreachable by construction**. It could only run
+in the case where the row it creates already existed.
+
+The fix checks the code, escalates anything that is not `23505`, and returns a body
+saying so. Worth remembering as a shape: **an idempotency claim that treats every
+error as "already done" converts every transient failure into silent data loss**,
+and if the claim has a foreign key, it also silently disables whatever repair path
+sits downstream of it.
