@@ -5135,12 +5135,18 @@ T-Mobile, Verizon, US Cellular, Interop, ClearSky, Liberty.
 
 Two things fall out of that table.
 
-**1. Mock mode auto-verifies, so it never could have caught this.** Every
-`TELNYX_10DLC_MOCK=true` brand returns VERIFIED. Mock mode does validate payload
-shape, enum values and field limits — it caught the 343-character `optinMessage`
-that would have failed every campaign — but the identity check is stubbed to
-always pass. It is therefore not evidence that registration works for a customer,
-which is exactly the question it looks like it answers.
+**1. Mock auto-verifies `PRIVATE_PROFIT`, so it never could have caught this.**
+Mock validates payload shape, enum values and field limits — it caught the
+343-character `optinMessage` that would have failed every campaign — but the
+identity check is stubbed to pass for `PRIVATE_PROFIT`. It is therefore not
+evidence that registration works for a customer, which is exactly the question it
+looks like it answers.
+
+Narrower than first recorded: mock does **not** pass everything. A mock
+`SOLE_PROPRIETOR` brand comes back UNVERIFIED and stays there, faithfully
+reproducing the real dead end. But every registration this product actually files
+is `PRIVATE_PROFIT` — `SOLE_PROPRIETOR` is refused outright (#119) — so on the
+only path a customer can take, mock does auto-pass.
 
 **2. The only real brand that verified is an actual registered LLC.** TCR matches
 against business registration records. Whether an EIN issued to an individual can
@@ -5194,3 +5200,45 @@ reviewer compares byte-for-byte against the campaign's `messageFlow`. The name h
 just been changed to match the EIN's legal name, and the live page kept serving
 the old one. Verified after the fix — the rendered checkbox and
 `buildConsentText('Tripp Browning')` are the same 460 characters.
+
+### Why the brand could never carry a person's name (#193, 2026-08-07)
+
+An EIN issued to an individual is matched by TCR against a **person**, so the
+brand needs `firstName`/`lastName`. Telnyx's brand object has both. On the real
+brand both are `null`, and setting them is not possible:
+
+```
+PUT /v2/10dlc/brand/{id}   firstName: Tripp, lastName: Browning
+  -> HTTP 200, updatedAt advances, no error
+  -> GET shows firstName: null, lastName: null
+```
+
+Not a PUT quirk. A **fresh** `PRIVATE_PROFIT` brand created with the names
+included returns them in the POST response, then reads back null 15 seconds
+later. A `SOLE_PROPRIETOR` brand created identically **keeps** them.
+
+**The fields are accepted, echoed back, and then discarded for every entity type
+except `SOLE_PROPRIETOR`, with nothing in the response saying so.** Do not trust
+the create response as proof a brand field persisted — re-read it.
+
+That closes the loop on the UNVERIFIED result: the entity type that fits an
+individual with an EIN is the one path the product refuses, and the brand it does
+file structurally cannot hold the name TCR needs.
+
+### The sole-proprietor OTP step has no endpoint to call
+
+#119 recorded that sole-prop registration needs an SMS OTP step "we do not
+support", which read as unimplemented. It is stronger than that — probed against
+a live brand:
+
+```
+/10dlc/brand/{id}/2faEmail       404
+/10dlc/brand/{id}/otp            404
+/10dlc/brand/{id}/verification   404
+/10dlc/brand/{id}/revet          404
+/10dlc/brand/{id}/externalVetting 200
+```
+
+There is nothing in the v2 API to call. Completing a sole-proprietor registration
+requires the Telnyx portal or Telnyx support; the only programmatic route to
+verifying a brand that failed automated matching is paid external vetting.
