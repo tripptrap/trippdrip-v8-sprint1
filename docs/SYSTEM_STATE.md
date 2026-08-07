@@ -4255,3 +4255,48 @@ The catch block returned `details: error` — the serialized Stripe error, carry
 a message of the form `Invalid API Key provided: sk_test_***…` that leaks the key's
 mode and last characters. Any authenticated caller could force it. The response is
 now a fixed string; `console.error` still keeps the detail server-side.
+
+## The ledger now reconciles, and stays that way (#183, 2026-08-07)
+
+`users.credits` and `SUM(points_transactions.points_amount)` disagreed by **109,968
+points across 4 of 7 accounts**, because `add_credits` and `deduct_credits` used to
+move the balance without writing a ledger row.
+
+| account | balance | ledger | drift |
+|---|---|---|---|
+| tripped620@ | 59,547 | 2,579 | **+56,968** |
+| rios.healthcaresolutions@ | 29,784 | **-216** | **+30,000** |
+| trippebrowning@ | 209,400 | 187,400 | **+22,000** |
+| trippbrowning620@ | 4,000 | 3,000 | **+1,000** |
+
+`rios` is the clearest case: a **negative** ledger against a 29,784 balance means
+only the spends were ever recorded — the 30,000-credit grant has no row at all.
+
+**Owner's decision: balances win.** Users have been spending against them, so the
+balance is the number with real-world consequences; the ledger is the record that
+failed to keep up. Closed with one `reconciliation` row per drifted account,
+changing no balance. Migration: `supabase/migrations/20260807_ledger_reconciliation.sql`,
+already applied.
+
+### Why writing to points_transactions was safe
+
+**There are no triggers on `points_transactions`** — checked against `pg_trigger`
+before running. That is the entire safety argument: had a trigger updated
+`users.credits` on insert, this reconciliation would have *doubled* every drifted
+balance instead of recording it. Check that before ever writing to a ledger table.
+
+Idempotent, because `stripe_session_id` carries two partial unique indexes and the
+key is `ledger-reconciliation-2026-08-07:<user_id>`. Verified by running it twice —
+0 rows the second time. Reversible with
+`DELETE FROM points_transactions WHERE action_type = 'reconciliation'`.
+
+`reconciliation` is a new `action_type`, deliberately distinct from the four in use
+(`spend`, `purchase`, `earn`, `subscription`) so these rows are trivially
+identifiable and never mistaken for real activity.
+
+### The assertion is the actual deliverable
+
+`npm run health` now **FAILS** on any per-user drift. Reconciling once is
+housekeeping; the check is what makes it stay true. New drift means some write path
+is moving credits without going through `add_credits`/`deduct_credits` — the exact
+bug class this project keeps reproducing, and previously nothing would have noticed.

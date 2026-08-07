@@ -227,6 +227,48 @@ async function telnyxBalance(): Promise<Result> {
   return { name, level: 'PASS', detail };
 }
 
+// users.credits must equal SUM(points_transactions.points_amount) per user.
+//
+// It did not, for four of seven accounts and 109,968 points, because add_credits
+// and deduct_credits used to move the balance without writing a ledger row. That
+// is fixed (both now do the balance write and the ledger insert inside one plpgsql
+// function), and the historical gap was closed on 2026-08-07 with one
+// `reconciliation` row per account — balance authoritative, per the owner's call
+// (#183).
+//
+// This assertion is the point of that work: drift is only meaningful once it is
+// zero, and any NEW drift means another write path is moving credits without
+// recording them. That is the exact bug class this project keeps producing.
+async function ledgerReconciles(db: SupabaseClient): Promise<Result> {
+  const name = 'balances match the ledger';
+  const { data: users, error: uErr } = await db.from('users').select('id, email, credits');
+  if (uErr) return { name, level: 'WARN', detail: uErr.message };
+
+  const { data: tx, error: tErr } = await db
+    .from('points_transactions')
+    .select('user_id, points_amount');
+  if (tErr) return { name, level: 'WARN', detail: tErr.message };
+
+  const ledger = new Map<string, number>();
+  for (const t of tx ?? []) {
+    ledger.set(t.user_id, (ledger.get(t.user_id) ?? 0) + (t.points_amount ?? 0));
+  }
+
+  const drifted = (users ?? [])
+    .map(u => ({ email: u.email, drift: (u.credits ?? 0) - (ledger.get(u.id) ?? 0) }))
+    .filter(u => u.drift !== 0);
+
+  if (drifted.length > 0) {
+    const worst = drifted.sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift)).slice(0, 5);
+    return {
+      name, level: 'FAIL',
+      detail: worst.map(d => `${d.email} ${d.drift > 0 ? '+' : ''}${d.drift}`).join(', '),
+      because: 'A balance moved without a ledger row — some write path is not going through add_credits/deduct_credits (#183).',
+    };
+  }
+  return { name, level: 'PASS', detail: `all ${users?.length ?? 0} accounts reconcile` };
+}
+
 // A paid tier is supposed to be the shadow of a Stripe subscription: the webhook
 // sets subscription_tier on checkout and re-grants credits on each invoice.paid.
 // An account holding `growth` or `scale` with no stripe_subscription_id therefore
@@ -336,6 +378,7 @@ async function main() {
   await check('DNC entries are usable', () => dncIntegrity(db));
   for (const r of await catalogHygiene(db)) add(r);
   await check('Telnyx balance', telnyxBalance);
+  await check('balances match the ledger', () => ledgerReconciles(db));
   await check('paid tiers are billed', () => paidTiersAreBilled(db));
   await check('messaging profiles', messagingProfiles);
   await check('toll-free verification', tollFreeVerification);
