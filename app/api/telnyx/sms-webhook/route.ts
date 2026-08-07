@@ -1250,22 +1250,57 @@ async function checkAndTriggerReceptionist(
       return;
     }
 
-    // Get lead info for this phone number
-    const { data: lead } = await supabaseAdmin
-      .from('leads')
-      // `leads` has NO `name` column — first_name / last_name are the real ones.
-      // Selecting it made PostgREST return 42703, and because the result is
-      // destructured as `const { data: lead }` with no error check, `lead` was
-      // ALWAYS null. Every inbound was therefore classified 'new_contact': no
-      // flow ever ran, no qualification question was ever asked, and the
-      // clients-table routing added today could never be reached.
-      //
-      // This same file warns about exactly this column 300 lines further down.
-      // Only the other copy had been fixed.
-      .select('id, first_name, last_name, status, disposition, converted')
-      .eq('user_id', userId)
-      .eq('phone', phoneNumber)
-      .single();
+    // Get lead info for this phone number.
+    //
+    // ── Resolved the same way as everywhere else, for two reasons (#150) ──────
+    //
+    // 1. `.eq('phone', phoneNumber)` is an EXACT match, and this file already
+    //    warns 300 lines down that it misses leads whose number was imported in a
+    //    non-E.164 format. `find_lead_by_phone` compares normalised forms, which
+    //    is what the main inbound handler and `check_dnc` both use.
+    // 2. `.single()` raises when it matches no rows, and the error was discarded,
+    //    so a miss was indistinguishable from "no lead".
+    //
+    // The consequence was not that the receptionist stayed quiet — it replied
+    // anyway, as `new_contact`, and every one of those replies was written with
+    // `lead_id = NULL`. 26 outbound rows are in that state. Any query shaped
+    // `WHERE lead_id = ?` returns the customer's messages with nothing answering
+    // them, which is a conversation that reads as though the AI never responded.
+    //
+    // The thread is the final fallback: it carries `lead_id` and is how the
+    // existing rows are recoverable at all.
+    const { data: foundLeadId } = await supabaseAdmin
+      .rpc('find_lead_by_phone', { p_user_id: userId, p_phone: phoneNumber });
+
+    let resolvedLeadId: string | null = (foundLeadId as string | null) ?? null;
+
+    if (!resolvedLeadId) {
+      const { data: threadLead } = await supabaseAdmin
+        .from('threads')
+        .select('lead_id')
+        .eq('id', threadId)
+        .maybeSingle();
+      resolvedLeadId = threadLead?.lead_id ?? null;
+    }
+
+    // `leads` has NO `name` column — first_name / last_name are the real ones.
+    // Selecting it made PostgREST return 42703, and because the result was
+    // destructured with no error check, `lead` was ALWAYS null. Every inbound was
+    // therefore classified 'new_contact': no flow ever ran, no qualification
+    // question was ever asked, and the clients-table routing could never be
+    // reached.
+    const { data: lead, error: leadError } = resolvedLeadId
+      ? await supabaseAdmin
+          .from('leads')
+          .select('id, first_name, last_name, status, disposition, converted')
+          .eq('user_id', userId)
+          .eq('id', resolvedLeadId)
+          .maybeSingle()
+      : { data: null, error: null };
+
+    if (leadError) {
+      console.error(`🤖 Receptionist: lead lookup failed for ${phoneNumber}:`, leadError);
+    }
 
     // Determine contact type
     let contactType: ContactType;

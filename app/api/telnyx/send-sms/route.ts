@@ -608,9 +608,37 @@ export async function POST(req: NextRequest) {
       // Save the message with spam score
       if (finalThreadId) {
         console.log('💾 Saving message to thread:', finalThreadId);
+        // lead_id, resolved from the thread when the caller did not supply one.
+        //
+        // This insert simply omitted the column. Inbound messages and drip sends
+        // carry lead_id; receptionist replies did not, so any query shaped
+        // `WHERE lead_id = ?` returned the customer's messages with nothing
+        // answering them — a conversation that reads as though the AI never
+        // replied. 26 outbound rows were in that state, and I drew exactly that
+        // false conclusion from one of them while investigating something else
+        // (#150).
+        //
+        // The thread is the authority when `leadId` is absent: it is set when the
+        // thread is created and is how the existing rows are recoverable at all.
+        // A client conversation legitimately has no lead, so null stays valid.
+        // Looked up here rather than reused from the thread-creation block above:
+        // that block is skipped entirely when the caller passes a threadId, which
+        // is exactly what the receptionist path does — so a variable from it would
+        // miss the case this fix is for.
+        let resolvedLeadIdForMessage: string | null = leadId || null;
+        if (!resolvedLeadIdForMessage) {
+          const { data: threadRow } = await supabaseAdmin
+            .from('threads')
+            .select('lead_id')
+            .eq('id', finalThreadId)
+            .maybeSingle();
+          resolvedLeadIdForMessage = threadRow?.lead_id ?? null;
+        }
+
         const { error: insertError } = await supabaseAdmin.from('messages').insert({
           user_id: userId, // Required for RLS
           thread_id: finalThreadId,
+          lead_id: resolvedLeadIdForMessage,
           from_phone: data.data?.from?.phone_number || from,
           to_phone: to,
           body: message,

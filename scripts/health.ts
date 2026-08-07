@@ -240,6 +240,40 @@ async function telnyxBalance(): Promise<Result> {
   return { name, level: 'PASS', detail };
 }
 
+// A message whose thread knows the lead, but which does not.
+//
+// /api/telnyx/send-sms omitted lead_id from its insert, so receptionist replies
+// were stored with only a thread_id. Any query shaped `WHERE lead_id = ?` then
+// returned the customer's messages with nothing answering them — a conversation
+// that reads as though the AI never replied, which is a conclusion I drew from one
+// of these before finding the cause (#150).
+//
+// Null is legitimate on its own: a client conversation has no lead, and opt-out
+// erases the lead while keeping the message (#109). The defect is specifically the
+// DISAGREEMENT — the thread has a lead and the message on it does not.
+async function messagesCarryLead(db: SupabaseClient): Promise<Result> {
+  const name = 'messages carry their lead';
+  const { data: threads, error: tErr } = await db
+    .from('threads').select('id, lead_id').not('lead_id', 'is', null);
+  if (tErr) return { name, level: 'WARN', detail: tErr.message };
+
+  const withLead = new Set((threads ?? []).map(t => t.id));
+  if (withLead.size === 0) return { name, level: 'PASS', detail: 'no lead-bearing threads yet' };
+
+  const { data: orphans, error: mErr } = await db
+    .from('messages').select('id, thread_id').is('lead_id', null).not('thread_id', 'is', null);
+  if (mErr) return { name, level: 'WARN', detail: mErr.message };
+
+  const mismatched = (orphans ?? []).filter(m => withLead.has(m.thread_id));
+  if (mismatched.length > 0) {
+    return {
+      name, level: 'FAIL', detail: `${mismatched.length} message(s) on a lead-bearing thread with no lead_id`,
+      because: 'Per-lead queries silently drop these, so a conversation reads as though nobody replied (#150).',
+    };
+  }
+  return { name, level: 'PASS', detail: 'every message on a lead thread has its lead' };
+}
+
 // A pool row marked assigned with no owner can never be claimed or reclaimed.
 //
 // number_pool.assigned_to_user_id is a FK to users with ON DELETE SET NULL, so if
@@ -438,6 +472,7 @@ async function main() {
 
   await check('crons are running', () => cronFreshness(db));
   await check('toll-free pool has stock', () => poolInventory(db));
+  await check('messages carry their lead', () => messagesCarryLead(db));
   await check('no stranded pool numbers', () => strandedPoolNumbers(db));
   await check('delivery receipts are landing', () => stuckDeliveries(db));
   await check('charges write ledger rows', () => chargesAreLedgered(db));

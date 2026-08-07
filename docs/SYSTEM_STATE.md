@@ -5010,3 +5010,50 @@ The run created three mock brands. Two deleted cleanly; the third returns
 `10007 Unexpected error` on DELETE and is stuck, joining the ones in #118. Mock
 brands appear to be undeletable once a campaign has been attached. Worth knowing
 before running this repeatedly — it leaves a trace each time.
+
+## Receptionist replies had no lead_id (#150, 2026-08-07)
+
+`/api/telnyx/send-sms` simply **omitted `lead_id`** from its message insert.
+Inbound messages and drip sends carried it; AI replies did not. So any query
+shaped `WHERE lead_id = ?` returned the customer's messages with nothing
+answering them — a conversation that reads as though the AI never replied. I drew
+exactly that false conclusion from one of these while investigating something
+else, and reported that replies were missing from the database. They were not.
+
+26 outbound rows were affected, all `automation_source: receptionist`.
+
+### Two wrong diagnoses on the way, both worth recording
+
+**The receptionist's lead lookup was not the cause.** It uses
+`.eq('phone', phoneNumber).single()`, and this file's own comment 300 lines away
+warns that exact matching misses non-E.164 imports — so it looked like the
+culprit. It was not: the affected lead is stored as `+14079513717`, matches
+exactly, is unique, and predates the messages by a month. The lead *was* found.
+
+**The lookup is still worth hardening**, and that change was kept: it now uses
+`find_lead_by_phone` (normalised, the same RPC the main inbound handler and
+`check_dnc` use) with the thread as a fallback, and checks its error rather than
+letting `.single()`'s no-rows failure read as "no lead". Verified against every
+thread first — the RPC agrees with `threads.lead_id` on all of them, so no
+behaviour changed. **It is hardening, not the fix.**
+
+### The fix
+
+`lead_id` added to the insert, resolved from the thread when the caller does not
+supply one. Looked up at insert time rather than reusing the thread-creation
+block's variable, because that block is skipped entirely when the caller passes a
+`threadId` — which is exactly what the receptionist path does, so a variable from
+it would have missed the case being fixed.
+
+### Null is not the defect; disagreement is
+
+25 of 26 were backfilled from their thread. The 3 that remain null are correct and
+must not be "fixed":
+
+- one message to a contact whose lead was erased by opt-out (#109) — the
+  suppression outlives the lead by design;
+- two manual sends into a thread that has no lead.
+
+A client conversation legitimately has no lead either. So `npm run health` asserts
+the **disagreement** — a thread that knows its lead and a message on it that does
+not — rather than the absence of nulls.
