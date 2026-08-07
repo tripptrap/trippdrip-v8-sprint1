@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import {
+  isValidVertical, isValidEntityType, SELF_SERVE_VERTICALS, TELNYX_ENTITY_TYPES,
+} from '@/lib/telnyx10dlcEnums';
 import { createBrand, createCampaign, EntityType, mapBrandStatus, mapCampaignStatus } from '@/lib/telnyx10dlc';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
 import { validateBusinessEmail, explainBrandError } from '@/lib/validateBusinessEmail';
@@ -37,6 +40,41 @@ export async function POST(req: NextRequest) {
       if (!body[field] || !String(body[field]).trim()) {
         return NextResponse.json({ ok: false, error: `${field} is required` }, { status: 400 });
       }
+    }
+
+    // Validate against Telnyx's own enums before spending anything.
+    //
+    // The form has offered a dropdown since 2026-07-27, but this route accepted
+    // any string — the same shape as #174, where the UI constrained a value and
+    // the route did not. A stale client, a direct POST, or a renamed option gets
+    // through, and the failure is not a 400 from us: it is a REJECTED CARRIER
+    // FILING. Brand registration costs $4.50 and campaign review $15, and the
+    // review fee recurs on every resubmission, so an unvalidated string here is
+    // billable.
+    //
+    // Lists come from GET /10dlc/enum/vertical and /10dlc/enum/entityType,
+    // verified live rather than taken from docs (#1 had recorded the vertical
+    // list as an open question for Telnyx support; the API answers it).
+    if (!isValidVertical(body.vertical)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `"${body.vertical}" is not a vertical Telnyx accepts.`,
+          validVerticals: SELF_SERVE_VERTICALS,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEntityType(body.entityType)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `"${body.entityType}" is not an entity type Telnyx accepts.`,
+          validEntityTypes: TELNYX_ENTITY_TYPES,
+        },
+        { status: 400 }
+      );
     }
     // Carriers reject an unreachable contact address, and Telnyx's own error
     // (`10019 Invalid email address`) arrives only after the registration row is

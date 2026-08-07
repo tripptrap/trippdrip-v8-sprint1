@@ -4905,3 +4905,42 @@ rather than joining `check-idle-campaigns` in running unmonitored for a day.
 - **`vertical` is free text in the UI.** Only `TECHNOLOGY` is confirmed against
   Telnyx's live API. An insurance or real-estate agent's real value has never been
   tested, and a wrong one means a rejected filing at $15 a resubmission.
+
+## The 10DLC vertical list came from the API, not support (#1, 2026-08-07)
+
+`#1` recorded "confirm the valid vertical list with Telnyx support" as an open
+question. **Telnyx exposes it as an enum endpoint**, which is faster and more
+authoritative than a support reply:
+
+```
+GET https://api.telnyx.com/10dlc/enum/vertical      -> 23 values
+GET https://api.telnyx.com/10dlc/enum/entityType    -> 5 values
+GET https://api.telnyx.com/10dlc/enum/usecase       -> use cases, same shape
+```
+
+Worth remembering generally: **check `/10dlc/enum/<field>` before asking anyone**.
+It is how `LOW_VOLUME_MIXED` was found not to exist during Phase 1.
+
+### What the check found
+
+The UI has been a dropdown since 2026-07-27, so "vertical is free text" in #1's
+open list was **stale**. Verified against the live enum:
+
+- all 21 options offered are valid — none invented;
+- `GAMBLING` and `POLITICAL` are the two omitted, both carrying extra carrier
+  vetting, which is a reasonable exclusion rather than an oversight;
+- every value in `INDUSTRY_TO_VERTICAL` is valid, so the industry→vertical
+  mapping used at onboarding cannot produce a rejected filing.
+
+### The real gap was the server, not the UI
+
+`/api/telnyx/10dlc/register` validated **neither** `vertical` nor `entityType`. The
+same shape as #174: the form constrains a value and the route does not, so a stale
+client, a renamed option, or a direct POST gets through.
+
+That failure is not a 400 from us — it is a **rejected carrier filing**, at $4.50
+for a brand and $15 per campaign review, and the review fee recurs on every
+resubmission. An unvalidated string on this path is billable.
+
+Both are now validated server-side, against `lib/telnyx10dlcEnums.ts`, which the
+form's dropdown is also generated from — one list, so the two cannot drift.

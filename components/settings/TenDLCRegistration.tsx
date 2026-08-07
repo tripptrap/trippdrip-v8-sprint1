@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { ShieldCheck, Loader2, AlertTriangle, CheckCircle2, RefreshCw, Link2, Link as LinkIcon } from 'lucide-react';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
 import { validateBusinessEmail } from '@/lib/validateBusinessEmail';
+import { SELF_SERVE_VERTICALS, TELNYX_VERTICALS, type TelnyxVertical } from '@/lib/telnyx10dlcEnums';
 
 type EntityType = 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NON_PROFIT' | 'GOVERNMENT' | 'SOLE_PROPRIETOR';
 
@@ -23,31 +24,11 @@ type Registration = {
   assigned_phone_number: string | null;
 };
 
-// Confirmed against Telnyx's live enum endpoint (GET /v2/10dlc/enum/vertical,
-// 2026-07-27) — free-text here caused avoidable risk of invalid submissions.
-const VERTICAL_OPTIONS: { value: string; label: string }[] = [
-  { value: 'INSURANCE', label: 'Insurance' },
-  { value: 'REAL_ESTATE', label: 'Real Estate' },
-  { value: 'FINANCIAL', label: 'Financial Services' },
-  { value: 'HEALTHCARE', label: 'Healthcare and Life Sciences' },
-  { value: 'CONSTRUCTION', label: 'Construction, Materials & Trade Services' },
-  { value: 'ENERGY', label: 'Energy and Utilities' },
-  { value: 'RETAIL', label: 'Retail and Consumer Products' },
-  { value: 'PROFESSIONAL', label: 'Professional Services' },
-  { value: 'TECHNOLOGY', label: 'Information Technology Services' },
-  { value: 'HOSPITALITY', label: 'Hospitality and Travel' },
-  { value: 'TRANSPORTATION', label: 'Transportation or Logistics' },
-  { value: 'AGRICULTURE', label: 'Agriculture' },
-  { value: 'MANUFACTURING', label: 'Manufacturing' },
-  { value: 'EDUCATION', label: 'Education' },
-  { value: 'LEGAL', label: 'Legal' },
-  { value: 'COMMUNICATION', label: 'Media and Communication' },
-  { value: 'ENTERTAINMENT', label: 'Entertainment' },
-  { value: 'HUMAN_RESOURCES', label: 'HR, Staffing or Recruitment' },
-  { value: 'POSTAL', label: 'Postal and Delivery' },
-  { value: 'NGO', label: 'Non-profit Organization' },
-  { value: 'GOVERNMENT', label: 'Government Services and Agencies' },
-];
+// Vertical options come from lib/telnyx10dlcEnums, which is generated from
+// Telnyx's own live enum endpoint and is what the register route validates
+// against. Keeping a second copy here is how the two drift.
+const VERTICAL_OPTIONS: { value: TelnyxVertical; label: string }[] =
+  SELF_SERVE_VERTICALS.map((v: TelnyxVertical) => ({ value: v, label: TELNYX_VERTICALS[v] }));
 
 const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'PRIVATE_PROFIT', label: 'Private for-profit company' },
