@@ -5101,3 +5101,96 @@ whose text colour is not what renders, and it ran while the background was still
 light. Re-running against leaf text nodes with the background actually dark gave
 32. **Screenshot first, then measure leaf nodes; a passing aggregate over the
 wrong elements is worse than no check.**
+
+## A real 10DLC brand came back UNVERIFIED (#190–#193, 2026-08-07)
+
+The first per-agent 10DLC registration ever filed for a real, non-LLC business
+was submitted on 2026-08-07 to answer one question: can a user get an EIN as a
+sole proprietor, register as `PRIVATE_PROFIT`, and skip forming an LLC? That was
+the plan the onboarding copy had been written around.
+
+**The answer, paid for rather than assumed: no — not with a fresh EIN and no
+registered entity.**
+
+Brand `4b20019f-dd73-2059-a66d-c691487c5656` (TCR `BVFEPN2`), real EIN under an
+individual's name:
+
+```
+status:         OK          ← the submission itself was accepted
+failureReasons: null        ← nothing was malformed
+identityStatus: UNVERIFIED  ← TCR could not match the business identity
+```
+
+$4.50 was charged for the brand. `GET /v2/10dlc/campaignBuilder/brand/{id}/usecase/LOW_VOLUME`
+— a **free** check — then returned `qualify: false` for **every** carrier: AT&T,
+T-Mobile, Verizon, US Cellular, Interop, ClearSky, Liberty.
+
+### The comparison that isolates the cause
+
+| brand | real? | identityStatus |
+|---|---|---|
+| HyveWyre LLC — registered LLC, established EIN | yes | **VERIFIED** |
+| Tripp Browning — new EIN, no entity | yes | **UNVERIFIED** |
+| Cedar Ridge / Redwood / Mockrun / Test Agent | **mock** | VERIFIED |
+
+Two things fall out of that table.
+
+**1. Mock mode auto-verifies, so it never could have caught this.** Every
+`TELNYX_10DLC_MOCK=true` brand returns VERIFIED. Mock mode does validate payload
+shape, enum values and field limits — it caught the 343-character `optinMessage`
+that would have failed every campaign — but the identity check is stubbed to
+always pass. It is therefore not evidence that registration works for a customer,
+which is exactly the question it looks like it answers.
+
+**2. The only real brand that verified is an actual registered LLC.** TCR matches
+against business registration records. Whether an EIN issued to an individual can
+ever match is still open, and two causes are not yet separated:
+
+- the EIN is days old and IRS data takes weeks to reach TCR's sources; or
+- there is no registered entity for TCR to match at all.
+
+Re-checking this same brand's `identityStatus` in 2–4 weeks distinguishes them
+for free. Cause (1) resolves itself by waiting; cause (2) does not, and would
+mean every user without a registered entity hits the same wall.
+
+### What the code does with UNVERIFIED, and why that is wrong
+
+`mapBrandStatus` (`lib/telnyx10dlc.ts`) maps anything that is not `VERIFIED` and
+does not contain `FAILED` to `pending`. That fallback is deliberate — an earlier
+`includes('VERIFIED')` test matched `UNVERIFIED` and marked failed brands good.
+That fix stands.
+
+But `UNVERIFIED` is **not transient**, and folding it in with pending states
+produces a dead end:
+
+- `lib/tenDlcSync.ts` gates campaign submission on `brand_status === 'verified'`,
+  so **the deferred campaign is never filed** — ever.
+- the refresh cron re-polls forever and nothing changes.
+- the user was told *"usually within a few minutes, sometimes a few days"*. That
+  is now false and never becomes true.
+- their numbers stay gated behind a registration that cannot complete.
+
+`UNVERIFIED` needs its own status, its own message, and an actual next step
+(external vetting, corrected details, or resubmission once the EIN propagates).
+
+### Do not file the campaign for this brand
+
+No carrier qualifies it, and the campaign fee recurs on every resubmission —
+`docs/10DLC_REJECTION_HISTORY.md` records eight submissions for the one campaign
+that eventually passed. Run the free qualification check before spending.
+
+### Also fixed on the way to this
+
+The opt-in page served a **stale business name** for the life of the server. It
+built its own supabase client with a bare `createClient` instead of
+`createServiceRoleClient`, so it missed the `cache: 'no-store'` fetch — and
+`export const dynamic = 'force-dynamic'`, which that page has, does **not**
+prevent Next from caching supabase-js SELECTs. Third instance of this trap, every
+one in a file that hand-rolled a client. The helper exists so this cannot happen;
+use it.
+
+That was load-bearing rather than cosmetic: the page is the consent evidence a
+reviewer compares byte-for-byte against the campaign's `messageFlow`. The name had
+just been changed to match the EIN's legal name, and the live page kept serving
+the old one. Verified after the fix — the rendered checkbox and
+`buildConsentText('Tripp Browning')` are the same 460 characters.
