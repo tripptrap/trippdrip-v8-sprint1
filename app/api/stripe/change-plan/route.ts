@@ -61,6 +61,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subscription has no billable item' }, { status: 500 });
     }
 
+    // A subscription that is not currently being paid must not buy an upgrade.
+    // subscriptions.update() succeeds for past_due, unpaid and incomplete, so
+    // without this a card that has been declining for months could still take the
+    // Scale top-up. Downgrades stay allowed from any status — never trap someone
+    // on the expensive plan because their card is failing (#163).
+    const BILLABLE = ['active', 'trialing'];
+    if (planType === 'scale' && !BILLABLE.includes(subscription.status)) {
+      return NextResponse.json(
+        { error: `Your subscription is ${subscription.status}. Please update your payment method before upgrading.` },
+        { status: 402 }
+      );
+    }
+
     const newPriceId = planType === 'scale' ? STRIPE_PRICE_SCALE : STRIPE_PRICE_GROWTH;
 
     // Actually change what the customer is billed. create_prorations credits/
@@ -99,15 +112,58 @@ export async function POST(req: NextRequest) {
       .update(updateData)
       .eq('id', user.id);
 
-    // Preserve balance on downgrade; top up immediately on upgrade.
+    // Preserve balance on downgrade; top up ONCE PER BILLING PERIOD on upgrade.
+    //
+    // ── Why the idempotency key ────────────────────────────────────────────────
+    //
+    // This granted a full 10,000 credits on every growth->scale transition, with
+    // nothing recording that it had done so. Because a downgrade deliberately
+    // preserves the balance (the comment above), the pair was a money printer:
+    //
+    //   for (;;) { POST {planType:'scale'}; POST {planType:'growth'} }
+    //
+    // Each iteration saw oldPlan === 'growth' again and granted another 10,000 —
+    // a full $98 Scale month per lap. proration_behavior 'create_prorations' only
+    // writes proration lines onto the NEXT invoice, and an up-then-immediately-down
+    // pair nets to about zero, so the laps were free. No rate limit applies:
+    // middleware.ts excludes /api, and nothing under app/api/stripe/ imports
+    // lib/rateLimit (#153).
+    //
+    // The fix is a deterministic stripe_session_id. points_transactions carries two
+    // partial unique indexes on it — (stripe_session_id) and (user_id,
+    // stripe_session_id), both WHERE stripe_session_id IS NOT NULL — and
+    // add_credits does its UPDATE and its ledger INSERT inside one plpgsql
+    // function. So a duplicate key raises 23505 and rolls the credit grant back
+    // with it. The idempotency is atomic rather than checked-then-acted.
+    //
+    // Keyed on the billing period, so a genuine upgrade next cycle still tops up.
+    const periodStart =
+      (subscriptionItem as any).current_period_start ??
+      (subscription as any).current_period_start ??
+      null;
+    // Never fall back to something that varies per request — that would restore
+    // the unlimited loop. A month bucket is the coarsest safe fallback.
+    const periodKey = periodStart ?? `month-${new Date().toISOString().slice(0, 7)}`;
+    const grantKey = `plan-upgrade:${user.id}:${periodKey}`;
+
+    let alreadyGranted = false;
+
     if (!updateError && planType === 'scale' && oldPlan === 'growth') {
       const { error: topUpError } = await admin.rpc('add_credits', {
         user_id: user.id,
         amount: newMonthlyCredits,
         action_type: 'subscription',
         reason: `Upgrade to Scale — ${newMonthlyCredits.toLocaleString()} credits`,
+        stripe_session_id: grantKey,
       });
-      if (topUpError) {
+
+      if (topUpError?.code === '23505') {
+        // Already topped up this billing period. Not an error: the plan change
+        // itself is legitimate and has gone through, so report success without
+        // granting again.
+        alreadyGranted = true;
+        console.log(`Plan upgrade for ${user.id}: credits already granted for this period (${grantKey})`);
+      } else if (topUpError) {
         // The plan is already switched with Stripe and locally; refusing here
         // would misreport a change that did happen. Make it loud instead.
         console.error(`Plan upgraded for ${user.id} but the ${newMonthlyCredits}-credit top-up failed:`, topUpError);
@@ -122,7 +178,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ ok: true, planType, monthlyCredits: newMonthlyCredits });
+    // creditsGranted lets the UI stop celebrating a top-up that did not happen —
+    // /points fires its animation off this response (#164).
+    return NextResponse.json({
+      ok: true,
+      planType,
+      monthlyCredits: newMonthlyCredits,
+      creditsGranted: planType === 'scale' && oldPlan === 'growth' && !alreadyGranted,
+    });
   } catch (error: any) {
     console.error('Error in POST /api/stripe/change-plan:', error);
     return NextResponse.json({ error: error.message || 'Failed to change plan' }, { status: 500 });

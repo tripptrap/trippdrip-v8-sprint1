@@ -4064,3 +4064,67 @@ Two things fixed beyond the client:
 is a false positive twice over — this project is on Next **14.2.33**, and the async
 `searchParams` change applies to *page props*, never to `NextRequest.nextUrl` in a
 route handler, which is synchronous in every version. Do not "fix" it.
+
+## The plan-change credit printer (#153, 2026-08-06)
+
+`/api/stripe/change-plan` granted a full 10,000 credits on every growth→scale
+transition and recorded nothing saying it had. Because a downgrade **deliberately
+preserves the balance**, the pair was a money printer:
+
+```js
+for (;;) { POST {planType:'scale'}; POST {planType:'growth'} }
+```
+
+Each lap saw `oldPlan === 'growth'` again and granted another 10,000 — one full
+$98 Scale month per iteration. `proration_behavior: 'create_prorations'` only
+writes proration lines onto the *next* invoice, and an up-then-immediately-down
+pair nets to roughly zero, so the laps were free. Nothing throttled it:
+`middleware.ts` excludes `/api`, and no route under `app/api/stripe/` imports
+`lib/rateLimit`.
+
+### The fix, and why it is atomic
+
+A deterministic `stripe_session_id` passed to `add_credits`:
+`plan-upgrade:<user_id>:<billing_period_start>`.
+
+`points_transactions` carries two partial unique indexes on that column —
+`(stripe_session_id)` and `(user_id, stripe_session_id)`, both
+`WHERE stripe_session_id IS NOT NULL`. And `add_credits` does its `UPDATE users`
+and its ledger `INSERT` **inside one plpgsql function**, so a duplicate key raises
+`23505` and rolls the credit grant back with it. This is real atomic idempotency,
+not check-then-act — there is no window between the two.
+
+Proven against the live database inside an aborting `DO` block:
+
+```
+before=29784  after_first=30284  after_repeat=30284
+repeat raised 23505 and granted nothing
+```
+
+`23505` from this call is therefore **not an error** — it means "already granted
+this period" and the route reports success without granting again.
+
+**The fallback key must never vary per request.** If the billing period cannot be
+read it falls back to a month bucket (`month-YYYY-MM`), never a timestamp — a
+per-request key would restore the unlimited loop exactly.
+
+### Residual, deliberately not closed here
+
+Credits are still granted **before** the money is collected: the proration lands on
+the next invoice. The durable fix is to grant on `invoice.paid` the way renewals
+already do (`webhook/route.ts:542-560`). What remains after this change is one
+grant per billing period rather than unlimited, which is a rate limit rather than a
+correctness guarantee.
+
+Also added: an upgrade now requires subscription status `active` or `trialing`
+(#163). `subscriptions.update()` succeeds for `past_due`, `unpaid` and
+`incomplete`, so a card that had been declining for months could still buy the
+Scale top-up. **Downgrades stay allowed from any status** — never trap someone on
+the expensive plan because their card is failing.
+
+### Never probe with a bare mutation
+
+The first attempt at proving the idempotency ran `add_credits` directly and moved
+a real user's balance from 29,784 to 30,284 before restoring it. Wrap probes in a
+`DO` block that ends in `RAISE EXCEPTION`: the block is one transaction, the raise
+aborts it, and the result comes back in the error message. Nothing persists.

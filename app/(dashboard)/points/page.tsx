@@ -240,13 +240,25 @@ export default function PointsPage() {
     // Refresh data
     await refreshData();
 
-    // Show celebration if upgrading to scale
-    if (planType === 'scale' && oldPlan === 'growth') {
+    // Celebrate the CREDITS, not the tier. The server reports whether the top-up
+    // actually happened — it is granted at most once per billing period, so an
+    // upgrade that re-upgrades within the same cycle switches the plan without
+    // granting again (#153). Firing the animation off the tier alone celebrated a
+    // grant that never occurred (#164).
+    if (data.creditsGranted) {
       setShowCelebration(true);
       setTimeout(() => setShowCelebration(false), 5000);
     }
 
-    setModal({isOpen: true, type: 'success', title: 'Plan Changed', message: `Successfully switched to ${planType === 'scale' ? 'Scale' : 'Growth'} plan!`});
+    const planName = planType === 'scale' ? 'Scale' : 'Growth';
+    setModal({
+      isOpen: true,
+      type: 'success',
+      title: 'Plan Changed',
+      message: data.creditsGranted
+        ? `Successfully switched to ${planName} — ${Number(data.monthlyCredits ?? 0).toLocaleString()} credits added.`
+        : `Successfully switched to ${planName}. Your credits for this billing period have already been applied.`,
+    });
   }
 
   function confirmPauseBilling(cycles: 1 | 2) {
