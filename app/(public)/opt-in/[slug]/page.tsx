@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { buildConsentText } from '@/lib/optInConsent';
@@ -17,10 +17,19 @@ export const dynamic = 'force-dynamic';
 
 // Service-role client: this page is public, but the users table is RLS-locked.
 // Only non-sensitive display fields are ever selected below.
-const supabaseAdmin =
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
-    : null;
+// createServiceRoleClient, not a bare createClient.
+//
+// This page built its own client, which meant it missed the `cache: 'no-store'`
+// fetch that lib/supabase/server puts on the shared one. supabase-js SELECTs are
+// HTTP GETs and Next caches them; `export const dynamic = 'force-dynamic'` above
+// does NOT prevent it. So this page served whatever business_name it read first,
+// for the life of the server.
+//
+// That is load-bearing here rather than cosmetic: this page is the consent
+// evidence a carrier reviewer opens and compares, byte for byte, against the
+// messageFlow text in the 10DLC campaign. A stale name on this page is a
+// mismatch with the filing, which is a documented rejection cause.
+const supabaseAdmin = createServiceRoleClient();
 
 async function getBusiness(slug: string) {
   if (!supabaseAdmin) return null;
