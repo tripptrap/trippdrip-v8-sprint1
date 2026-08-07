@@ -227,6 +227,35 @@ async function telnyxBalance(): Promise<Result> {
   return { name, level: 'PASS', detail };
 }
 
+// A Telnyx number with no messaging profile cannot send, and its inbound is
+// delivered nowhere — silently, with the number still reading `active`. All ten
+// numbers ordered on 2026-08-06 landed this way (#184): the four in-app order
+// paths all pass `messaging_profile_id`, but an ad-hoc `number_orders` call
+// omitted it, and nothing anywhere noticed for a day. The order response does
+// not echo the profile per number, so the only way to know is to ask afterwards.
+async function messagingProfiles(): Promise<Result> {
+  const name = 'numbers have a messaging profile';
+  const key = process.env.TELNYX_API_KEY?.trim();
+  if (!key) return { name, level: 'SKIP', detail: 'TELNYX_API_KEY not set' };
+
+  const res = await fetch('https://api.telnyx.com/v2/phone_numbers?page%5Bsize%5D=100', {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!res.ok) return { name, level: 'WARN', detail: `Telnyx returned HTTP ${res.status}` };
+
+  const numbers: any[] = (await res.json())?.data ?? [];
+  const orphaned = numbers.filter(n => !n.messaging_profile_id);
+
+  if (orphaned.length > 0) {
+    return {
+      name, level: 'FAIL',
+      detail: `${orphaned.length} of ${numbers.length}: ${orphaned.map(n => n.phone_number).join(', ')}`,
+      because: 'Without a profile a number cannot send and its inbound goes nowhere, while still reporting active.',
+    };
+  }
+  return { name, level: 'PASS', detail: `all ${numbers.length} attached` };
+}
+
 async function tollFreeVerification(): Promise<Result> {
   const name = 'toll-free verification';
   const key = process.env.TELNYX_API_KEY?.trim();
@@ -276,6 +305,7 @@ async function main() {
   await check('DNC entries are usable', () => dncIntegrity(db));
   for (const r of await catalogHygiene(db)) add(r);
   await check('Telnyx balance', telnyxBalance);
+  await check('messaging profiles', messagingProfiles);
   await check('toll-free verification', tollFreeVerification);
 
   const failed = results.filter(r => r.level === 'FAIL');
