@@ -59,22 +59,74 @@ export async function DELETE(req: NextRequest) {
 
     if (userNumbers && userNumbers.length > 0) {
       const apiKey = process.env.TELNYX_API_KEY;
+      const numbers = userNumbers.map(n => n.phone_number);
+
+      // ── Which of these does the PLATFORM own? ─────────────────────────────────
+      //
+      // This loop used to hard-DELETE every number from Telnyx and then call
+      // releasePoolNumber() on it. For a shared-pool number that is both halves of
+      // a disaster: the number is destroyed at the carrier, AND number_pool marks
+      // it assignable again. /api/number-pool/claim does not re-purchase — it just
+      // flips is_assigned and inserts the string into user_telnyx_numbers — so the
+      // next user to claim it gets a number the platform no longer owns. Their
+      // sends fail and their inbound goes nowhere, with nothing indicating why
+      // (#161).
+      //
+      // Ownership is decided by number_pool membership, not by releasePoolNumber's
+      // return value: that function reports { pooled: false } on ERROR as well as
+      // for a non-pool number, and treating an error as "user-owned" would destroy
+      // exactly the number we were trying to protect.
+      const { data: poolRows, error: poolLookupError } = await adminClient
+        .from('number_pool')
+        .select('phone_number')
+        .in('phone_number', numbers);
+
+      // Fail safe. If we cannot establish ownership, release NOTHING at Telnyx —
+      // an orphaned number costs ~$1/month, a wrongly destroyed one cannot be
+      // recovered and takes a TFV with it.
+      const ownershipUnknown = !!poolLookupError;
+      if (ownershipUnknown) {
+        console.error('Could not read number_pool during account deletion — skipping all Telnyx releases:', poolLookupError);
+        await notifyAdmins(
+          'fulfillment_failed',
+          'Account deleted without releasing its numbers',
+          `Deleting ${userId} could not determine which of ${numbers.join(', ')} are pool-owned, so none were released at Telnyx. They may now be billing with no owner.`,
+          { reason: 'delete_account_pool_lookup_failed', user_id: userId, numbers, db_error: poolLookupError.message },
+          { escalate: true }
+        );
+      }
+
+      const poolOwned = new Set((poolRows ?? []).map(r => r.phone_number));
 
       for (const num of userNumbers) {
-        // Release from Telnyx API
-        if (apiKey) {
+        const isPoolNumber = ownershipUnknown || poolOwned.has(num.phone_number);
+
+        // Only a number the USER bought gets destroyed at the carrier. Pool
+        // numbers belong to the platform and are recycled, never released.
+        if (!isPoolNumber && apiKey) {
           try {
             const listRes = await fetch(
               `https://api.telnyx.com/v2/phone_numbers?filter[phone_number]=${encodeURIComponent(num.phone_number)}`,
               { headers: { 'Authorization': `Bearer ${apiKey}` } }
             );
-            const listData = await listRes.json();
-            const telnyxId = listData.data?.[0]?.id;
-            if (telnyxId) {
-              await fetch(`https://api.telnyx.com/v2/phone_numbers/${telnyxId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${apiKey}` },
-              });
+            if (!listRes.ok) {
+              // Unchecked before, so a rate limit or a rotated key looked exactly
+              // like "no such number" and the release was skipped in silence (#172).
+              console.error(`Telnyx lookup for ${num.phone_number} failed: HTTP ${listRes.status} — not released, it may still be billing`);
+            } else {
+              const listData = await listRes.json();
+              const telnyxId = listData.data?.[0]?.id;
+              if (!telnyxId) {
+                console.error(`${num.phone_number} not found at Telnyx — nothing to release`);
+              } else {
+                const delRes = await fetch(`https://api.telnyx.com/v2/phone_numbers/${telnyxId}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `Bearer ${apiKey}` },
+                });
+                if (!delRes.ok && delRes.status !== 404) {
+                  console.error(`Failed to release ${num.phone_number} (id ${telnyxId}): HTTP ${delRes.status} — this number is now billing with no owner`);
+                }
+              }
             }
           } catch (e) {
             console.error('Error releasing number from Telnyx:', num.phone_number, e);
@@ -86,7 +138,25 @@ export async function DELETE(req: NextRequest) {
         // history has to outlive the account: once this user is gone, it is the
         // only way to answer "who had this number, and was it already in
         // trouble" for whoever inherits it (#38).
-        await releasePoolNumber(adminClient, num.phone_number, userId, 'account_deleted');
+        //
+        // The result is checked now. It was discarded, and releasePoolNumber
+        // swallows its own RPC error and returns { pooled: false } rather than
+        // throwing — so a failed release left number_pool reading
+        // is_assigned = true with assigned_to_user_id pointing at a user about to
+        // be deleted. The FK is ON DELETE SET NULL, so the owner became NULL while
+        // is_assigned stayed true: a row no query can ever claim or reclaim (#173).
+        const released = await releasePoolNumber(adminClient, num.phone_number, userId, 'account_deleted');
+
+        if (isPoolNumber && !released.pooled && !ownershipUnknown) {
+          console.error(`Pool number ${num.phone_number} failed to release for deleted user ${userId} — it will be stranded as assigned with a null owner`);
+          await notifyAdmins(
+            'fulfillment_failed',
+            'Pool number stranded by an account deletion',
+            `${num.phone_number} is a pool number but releasing it during deletion of ${userId} failed. number_pool still marks it assigned, and the owner is about to become NULL, so nothing can claim it. Reset is_assigned manually.`,
+            { reason: 'delete_account_pool_release_failed', user_id: userId, phone_number: num.phone_number },
+            { escalate: true }
+          );
+        }
       }
 
       // Delete from user_telnyx_numbers

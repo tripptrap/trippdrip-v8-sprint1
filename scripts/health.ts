@@ -240,6 +240,33 @@ async function telnyxBalance(): Promise<Result> {
   return { name, level: 'PASS', detail };
 }
 
+// A pool row marked assigned with no owner can never be claimed or reclaimed.
+//
+// number_pool.assigned_to_user_id is a FK to users with ON DELETE SET NULL, so if
+// releasePoolNumber() fails during an account deletion the owner is nulled while
+// is_assigned stays true — and releasePoolNumber swallows its own RPC error and
+// returns { pooled: false } rather than throwing, so nothing noticed (#173).
+// Claim queries filter on is_assigned = false, so the row is permanently invisible.
+// Against 2 claimable numbers, losing one this way is a third of onboarding.
+async function strandedPoolNumbers(db: SupabaseClient): Promise<Result> {
+  const name = 'no stranded pool numbers';
+  const { data, error } = await db
+    .from('number_pool')
+    .select('phone_number')
+    .eq('is_assigned', true)
+    .is('assigned_to_user_id', null);
+
+  if (error) return { name, level: 'WARN', detail: error.message };
+  if ((data ?? []).length > 0) {
+    return {
+      name, level: 'FAIL',
+      detail: data!.map(r => r.phone_number).join(', '),
+      because: 'Assigned with a null owner — no claim query can ever see these again; reset is_assigned (#173).',
+    };
+  }
+  return { name, level: 'PASS', detail: 'every assigned row has an owner' };
+}
+
 // users.credits must equal SUM(points_transactions.points_amount) per user.
 //
 // It did not, for four of seven accounts and 109,968 points, because add_credits
@@ -386,6 +413,7 @@ async function main() {
 
   await check('crons are running', () => cronFreshness(db));
   await check('toll-free pool has stock', () => poolInventory(db));
+  await check('no stranded pool numbers', () => strandedPoolNumbers(db));
   await check('delivery receipts are landing', () => stuckDeliveries(db));
   await check('charges write ledger rows', () => chargesAreLedgered(db));
   await check('DNC entries are usable', () => dncIntegrity(db));

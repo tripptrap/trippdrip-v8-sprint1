@@ -4401,3 +4401,51 @@ RLS is enabled on every table and the policies key on `auth.uid()`, so anon read
 return nothing — confirmed above. Revoking SELECT as well risks breaking public
 pages for no protection gained today. Worth its own investigation rather than a
 drive-by change.
+
+## Deleting an account destroyed pool numbers and re-issued them (#161, #172, #173, 2026-08-07)
+
+`/api/user/delete-account` selected only `phone_number` from
+`user_telnyx_numbers`, so its loop could not tell a number the **user bought** from
+a shared-pool number the **platform owns**. It then did both of these to every one
+of them:
+
+1. `DELETE https://api.telnyx.com/v2/phone_numbers/{id}` — destroying it at the
+   carrier;
+2. `releasePoolNumber(...)` — which sets `is_assigned = false` and marks it
+   claimable again.
+
+`/api/number-pool/claim` does not re-purchase. It flips `is_assigned` and inserts
+the string into `user_telnyx_numbers`. **So the next signup would be handed a
+number the platform no longer owns** — sends fail, inbound goes nowhere, and
+nothing indicates why.
+
+This was live, not theoretical. `tripped620@gmail.com` currently holds three
+numbers and **`+18887062631` is pool-owned**. Deleting that account would have
+destroyed a TFV-verified number and re-issued it — against 2 claimable numbers,
+a third of remaining onboarding inventory, and TFV takes days to replace.
+
+### Ownership comes from number_pool, never from releasePoolNumber's return
+
+`releasePoolNumber` reports `{ pooled: false }` on **error** as well as for a
+genuine non-pool number (`lib/numberPool.ts:76-79` logs and returns rather than
+throwing). Branching on it would destroy exactly the number the check exists to
+protect. Ownership is now a `number_pool` membership lookup, and **if that lookup
+fails, nothing is released at Telnyx at all** — an orphaned number costs about
+$1/month, a wrongly destroyed one cannot be recovered and takes its TFV with it.
+
+### Two silent failures in the same loop, fixed alongside
+
+- **#172** — neither Telnyx call was checked. `listRes` was parsed straight into
+  `listData.data?.[0]?.id`, so a rate limit or a rotated key looked identical to
+  "no such number" and the release was skipped in silence; the DELETE's status was
+  never inspected either, so a 409 on a number locked in a porting order vanished.
+- **#173** — `releasePoolNumber`'s return value was discarded. On failure,
+  `number_pool` kept `is_assigned = true` while the users row was deleted
+  underneath it; `assigned_to_user_id` is a FK with **ON DELETE SET NULL**, so the
+  owner became NULL and `is_assigned` stayed true. Claim queries filter on
+  `is_assigned = false`, making that row permanently unclaimable. Both now escalate
+  by email.
+
+`npm run health` asserts the aftermath directly:
+`no stranded pool numbers — every assigned row has an owner`. Currently zero, so no
+existing damage to repair.
