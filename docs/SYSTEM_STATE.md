@@ -3953,3 +3953,38 @@ the four accounts holding a paid tier with nothing billing them.
    Callers already handled null; it was the no-date case.
 3. **`subscription_status` is `'active'` on all seven accounts**, including the two
    `unpaid` ones. It is defaulted and never meaningfully written — do not gate on it.
+
+## Quiet hours could never be saved (#178, 2026-08-06)
+
+`/api/settings/quiet-hours` wrote `quiet_hours_enabled`, `quiet_hours_start` and
+`quiet_hours_end` through the **session client**. Verified live, with `timezone` as
+a control that proves the difference is per-column and not per-table:
+
+| column | `authenticated` | `service_role` |
+|---|---|---|
+| `quiet_hours_enabled` | **false** | true |
+| `quiet_hours_start` | **false** | true |
+| `quiet_hours_end` | **false** | true |
+| `timezone` (control) | **true** | true |
+
+Every save failed with `42501` except a timezone-only one, and a *mixed* update
+failed wholesale because the statement named a column the role could not write.
+The proof it never worked: **all 7 accounts hold byte-identical defaults** —
+`enabled: true, 08:00:00–20:00:00, America/New_York`. Not one has ever been changed.
+
+**This one failed loudly.** Unlike #159 the route checked its error and returned
+500, so nobody was told a save had succeeded. But the effect on sending is the
+same: `lib/smsGuard.ts:399` reads all four columns on every send, so the window
+being enforced was always the stored default and a user could neither widen it,
+narrow it, nor switch it off.
+
+Also added: the timezone is now validated by constructing an
+`Intl.DateTimeFormat` with it. An unrecognised zone is not cosmetic —
+`is_within_quiet_hours()` resolves the window in that zone, so a bad string means
+the window cannot be evaluated at all. Validating against the runtime's own zone
+list avoids a hand-kept list that would drift.
+
+**The pattern, now four routes deep** (#156, #157, #159, #178): any write to
+`public.users` outside `business_hours`, `business_name`, `timezone`,
+`updated_at` needs `createServiceRoleClient()`. The session client is correct for
+SELECTs — RLS covers those — and wrong for essentially every UPDATE.
