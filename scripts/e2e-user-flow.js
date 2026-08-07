@@ -172,21 +172,32 @@ async function main() {
     step('opt-out: number lands on the DNC list', dncR?.on_dnc_list === true, `reason=${dncR?.reason || 'n/a'}`);
 
     // ── 6. The send gate refuses an opted-out number ────────────────────────
-    const { data: guardLead } = await db.from('leads').select('id').eq('user_id', userId).eq('phone', LEAD_PHONE).maybeSingle();
-    if (!guardLead) {
-      // Report rather than pass silently — a check that quietly does not run is
-      // exactly the failure mode this harness exists to catch.
-      step('send gate: refuses an opted-out number', false, 'SKIPPED — no lead exists for the inbound number');
-    }
-    if (guardLead) {
-      const sendRes = await fetch(`${BASE}/api/telnyx/send-sms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-secret': (process.env.CRON_SECRET || '').trim() },
-        body: JSON.stringify({ to: LEAD_PHONE, message: 'should never send', userId, leadId: guardLead.id }),
-      });
-      const blocked = sendRes.status === 403 || sendRes.status === 429;
-      step('send gate: refuses an opted-out number', blocked, `HTTP ${sendRes.status}`);
-    }
+    //
+    // Keyed on the PHONE NUMBER, with no lead involved. This used to look the
+    // lead up first and report SKIPPED when it was missing — which it always is
+    // by now, because opt-out deliberately erases the lead and keeps only the
+    // suppression (#109). So the check could never run.
+    //
+    // Testing it without a lead is also more faithful: `leadId` is optional on
+    // this route, and the DNC gate matches on normalized_phone. The surviving
+    // suppression is the entire point of #109, and this is what verifies it.
+    const sendRes = await fetch(`${BASE}/api/telnyx/send-sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': (process.env.CRON_SECRET || '').trim() },
+      body: JSON.stringify({ to: LEAD_PHONE, message: 'should never send', userId }),
+    });
+    const blocked = sendRes.status === 403 || sendRes.status === 429;
+    // Report the body, not just the status. A 400 and a 403 both mean "did not
+    // send", but only one of them means the DNC gate did its job — and a check
+    // that cannot tell those apart is the kind that passes for the wrong reason.
+    const sendBody = await sendRes.text().catch(() => '');
+    step('send gate: refuses an opted-out number', blocked,
+      `HTTP ${sendRes.status}${blocked ? '' : ' — ' + sendBody.slice(0, 160)}`);
+
+    // The lead being gone is itself the #109 contract, so assert it rather than
+    // treating it as an obstacle.
+    const { data: erasedLead } = await db.from('leads').select('id').eq('user_id', userId).eq('phone', LEAD_PHONE).maybeSingle();
+    step('opt-out: lead erased, suppression kept', !erasedLead, erasedLead ? `lead ${erasedLead.id} still present` : 'lead gone, DNC row remains');
   }
 
   // ── 7. Flow completion books an appointment ───────────────────────────────

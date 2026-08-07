@@ -4710,3 +4710,55 @@ the RPC's expected list — so nothing would ever have reported it stopped. Adde
 1440/1560. `heartbeat` is deliberately left out: it is the external backstop on a
 cadence GitHub throttles unpredictably, and paging because the out-of-app monitor
 paused says nothing about the product.
+
+## send-sms does not DNC-gate internal callers (#17 run, 2026-08-07)
+
+Found by running `scripts/e2e-user-flow.js` as a regression check over a night of
+changes — not by reading the code, which is the point.
+
+`checkSmsAllowed()` in `send-sms` sits inside `if (!internalCaller)`. A caller
+holding `x-internal-secret` therefore skips the **entire** gate, DNC included. The
+harness POSTed there for a number it had just opted out and **the request reached
+the Telnyx API**, which refused it only because the test number was unroutable.
+Nothing in the route stopped it.
+
+Today no path is actually exposed — all three internal callers of this route run
+the guard themselves:
+
+| caller | own gate |
+|---|---|
+| `receptionist/respond` | `checkSmsAllowed` ✓ |
+| `cron/process-drips` | `checkSmsAllowed` ✓ |
+| `cron/process-ai-drips` | `checkSmsAllowed` ✓ |
+
+`sms-webhook` does **not** call this route for replies: it calls
+`receptionist/respond` (gated), and sends canned text like the opt-out
+confirmation through `sendTelnyxSMS()` directly. That last detail is why the
+internal bypass has never broken the STOP confirmation — `checkSmsAllowed` blocks
+DNC numbers unconditionally, so a confirmation routed through this route *would*
+be blocked.
+
+**An unconditional DNC check now runs for every caller**, above the
+`!internalCaller` branch, failing closed on a lookup error. It is the one gate with
+statutory rather than commercial consequences, and route safety should not depend
+on each future internal caller remembering.
+
+### Correcting `751fdc6`
+
+That commit deleted this route's DNC pre-check saying "neither was load-bearing".
+For `process-drips` that was right. For `send-sms` it was **wrong** — the deleted
+check was the only DNC enforcement internal callers ever hit. The replacement
+differs from the original in the way that matters: the old one read
+`if (!dncError && dncCheck)`, which skipped the block whenever the RPC errored,
+i.e. failed OPEN on precisely the lookup that counts.
+
+### Two harness defects fixed while there
+
+- **The send-gate check could never run.** It looked the lead up first and reported
+  SKIPPED when absent — which is always, because opt-out deliberately erases the
+  lead and keeps only the suppression (#109). It now tests the number, which is
+  what the gate keys on, and separately asserts the erase-but-suppress contract.
+- **A `+1555…` destination is rejected before any gate.** Area code 555 is not
+  valid NANP, so the request died on validation and the check "failed" for a reason
+  unrelated to DNC. The harness now prints the response body on failure, which is
+  how this was untangled at all.

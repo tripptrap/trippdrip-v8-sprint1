@@ -326,10 +326,47 @@ export async function POST(req: NextRequest) {
         ? appendOptOut(message, optOutKeyword)
         : message;
 
-    // No DNC check here on purpose. checkSmsAllowed() below is the gate. The
-    // hand-rolled check that used to sit here read `if (!dncError && dncCheck)`,
-    // which skipped the block whenever the RPC errored — a failed DNC lookup
-    // meant the send proceeded. The guard treats a failed lookup as a refusal.
+    // ── DNC, for EVERY caller including internal ones ─────────────────────────
+    //
+    // checkSmsAllowed() below is the full gate, but it sits inside
+    // `if (!internalCaller)`, so a caller holding x-internal-secret skips it
+    // entirely. Today all three internal callers — receptionist/respond,
+    // process-drips, process-ai-drips — run the guard themselves, so nothing is
+    // currently unprotected. But that makes the route's compliance depend on every
+    // future internal caller remembering, and DNC is the one gate with statutory
+    // consequences rather than commercial ones.
+    //
+    // Proven reachable, not theorised: the #17 harness POSTed here with
+    // x-internal-secret for a number it had just opted out, and the request went
+    // all the way to Telnyx — which rejected it only because the test number was
+    // unroutable. Nothing in this route stopped it.
+    //
+    // This replaces an earlier hand-rolled check that read
+    // `if (!dncError && dncCheck)` — skipping the block whenever the RPC errored,
+    // i.e. failing OPEN on exactly the lookup that matters. This one fails closed.
+    if (userId && supabaseAdmin) {
+      const { data: dncRaw, error: dncError } = await supabaseAdmin.rpc('check_dnc', {
+        p_user_id: userId,
+        p_phone_number: to,
+      });
+
+      if (dncError) {
+        console.error(`DNC check failed for ${to} (user ${userId}) — blocking send:`, dncError);
+        return NextResponse.json(
+          { error: 'Could not verify the do-not-contact list. Nothing was sent.', reason: 'check_failed', retryable: true },
+          { status: 503 }
+        );
+      }
+
+      const dnc = typeof dncRaw === 'string' ? JSON.parse(dncRaw) : dncRaw;
+      if (dnc?.on_dnc_list) {
+        console.log(`🚫 send-sms blocked — ${to} is on the ${dnc.on_user_list ? 'user' : 'global'} DNC list`);
+        return NextResponse.json(
+          { error: `Message blocked: ${to} is on the Do Not Contact list.`, onDncList: true, reason: dnc.reason },
+          { status: 403 }
+        );
+      }
+    }
 
     // Build request body
     // When we have a specific 'from' number, send it directly without messaging_profile_id.
