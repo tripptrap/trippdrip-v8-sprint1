@@ -5525,3 +5525,40 @@ no override, forced UNVERIFIED, forced FAILED, override with mock mode off, and
 **override set against a real brand** (untouched, still VERIFIED). Mock
 `SOLE_PROPRIETOR` brands already return UNVERIFIED honestly, so this exists for
 the entity types that do not.
+
+## Two endpoints answer "is this number on a campaign", and one of them lies (2026-08-08)
+
+Both local numbers **are** attached to campaign `CAAP953` and have been:
+
+```
+GET /v2/10dlc/phoneNumberCampaign/+18134972176
+  assignmentStatus              ASSIGNED
+  tmobileNumberMappingStatus    ADDED
+  nonTmobileNumberMappingStatus ADDED
+  attNumberMappingStatus        FAILED     ← the only real problem (#105)
+  failureReasons                null
+```
+
+**Two signals say otherwise and both are wrong:**
+
+1. `GET /v2/phone_number_campaigns/{number}` — plural, snake_case — returns **404**.
+   The real endpoint is `/v2/10dlc/phoneNumberCampaign/{number}`: singular, camelCase,
+   under `/10dlc`. The 404 is indistinguishable from "not attached".
+2. `GET /v2/phone_numbers` reports **`messaging_campaign_id: null`** on both numbers
+   even though they are ASSIGNED. That field is not a reliable attachment check.
+
+A session on 2026-08-08 used (1), got 404 for both numbers, and concluded the full
+10DLC path had never completed end to end — then reasoned from that to "number
+attachment is the blocker for every user". Wrong, and it survived a
+cross-check against (2), because both misleading signals agree with each other.
+
+**To check attachment, use `/v2/10dlc/phoneNumberCampaign/{number}` and read
+`assignmentStatus`.** Nothing else on the numbers API answers this question.
+
+### What is actually outstanding
+
+Not attachment — **AT&T mapping**. `attNumberMappingStatus: FAILED` on both numbers,
+with `failureReasons: null`, while T-Mobile and non-T-Mobile both read ADDED. #105
+records that AT&T delivery appeared to work regardless, so the field may be
+reporting rather than blocking. That is still unproven either way, and the only
+thing that settles it is sending to a real AT&T handset and reading the DLR.
