@@ -278,3 +278,92 @@ export async function relayOtpPin(userId: string, pin: string): Promise<OtpRelay
 
   return { ok: true, sentToTelnyx: toTelnyx, messageId: result.messageId };
 }
+
+/**
+ * Ask the carrier to verify a brand that came back UNVERIFIED, attaching the
+ * customer's IRS CP 575.
+ *
+ * Separate from the sole-proprietor OTP above, and not gated by
+ * `TENDLC_OTP_AUTOSEND`. That switch exists to stop the platform mailing Telnyx
+ * *automatically* before they have confirmed a platform may do so at volume. This
+ * is a person pressing a button about their own registration — one message, on
+ * purpose, about a brand that is stuck. Holding it for review would just mean the
+ * operator forwards it unchanged.
+ *
+ * Works for any entity type. A sole proprietor's route out of UNVERIFIED is the
+ * OTP; everyone else's is this — TCR could not match the name or EIN, and the two
+ * usual causes are a very new EIN and a legal name that differs from the letter.
+ * Both are named up front, because a support agent who has to ask is a support
+ * agent who takes another day.
+ */
+export async function requestBrandVerification(userId: string): Promise<OtpRelayResult> {
+  const admin = createServiceRoleClient();
+  const { data: reg, error } = await admin
+    .from('user_10dlc_registrations')
+    .select('id, legal_business_name, entity_type, tax_id, brand_id, tcr_brand_id, brand_status, mobile_phone, contact_email, ein_document_path, ein_issued_on, otp_consent_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!reg?.brand_id) return { ok: false, error: 'No brand has been created yet' };
+  if (!reg.otp_consent_at) {
+    return { ok: false, error: 'The user has not agreed to their EIN letter being sent to the carrier.' };
+  }
+
+  const tcr = await resolveTcrBrandId(reg as any);
+  const attachment = await loadEinDocument(reg as any);
+
+  // The EIN's age is the first thing a reviewer would ask about, and we know it.
+  const issued = reg.ein_issued_on ? new Date(reg.ein_issued_on) : null;
+  const ageDays = issued ? Math.floor((Date.now() - issued.getTime()) / 86_400_000) : null;
+
+  const body = [
+    'Hello,',
+    '',
+    'Please could you help verify the 10DLC brand below. It returned identityStatus',
+    'UNVERIFIED and no carrier currently qualifies it for a campaign.',
+    '',
+    `  Legal name:   ${reg.legal_business_name}`,
+    `  brandId:      ${reg.brand_id}`,
+    `  tcrBrandId:   ${tcr ?? '(not yet issued)'}`,
+    `  EIN:          ${reg.tax_id ?? '(not on file)'}`,
+    `  Entity type:  ${reg.entity_type}`,
+    `  Mobile:       ${reg.mobile_phone ?? '(not on file)'}`,
+    '  CSP:          SS4XJ6D (HyveWyre LLC)',
+    '',
+    attachment
+      ? 'The IRS CP 575 EIN confirmation letter is attached, with the account holder’s consent.'
+      : 'No CP 575 is on file for this account.',
+    ...(ageDays !== null && ageDays < 45
+      ? ['', `The EIN was issued ${ageDays} day(s) ago, so IRS records may not have reached TCR yet.`]
+      : []),
+    '',
+    'If the brand cannot be matched as filed, please say so — we understand companyName',
+    'and ein are immutable once registered, and would rather file a corrected brand than',
+    'leave this one pending.',
+    '',
+    'Thank you,',
+    'HyveWyre LLC (CSP SS4XJ6D)',
+  ].join('\n');
+
+  const result = await sendEmail({
+    to: TELNYX_10DLC_EMAIL,
+    subject: `10DLC brand verification — ${reg.legal_business_name} (${tcr ?? reg.brand_id})`,
+    text: body,
+    html: `<pre style="font:14px/1.5 ui-monospace,monospace;white-space:pre-wrap">${body.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!))}</pre>`,
+    // The account holder, so Telnyx can reach the person whose identity is in
+    // question rather than a shared support inbox.
+    replyTo: reg.contact_email || undefined,
+    attachments: attachment ? [{ filename: attachment.filename, content: attachment.content }] : undefined,
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const { error: writeError } = await admin
+    .from('user_10dlc_registrations')
+    .update({ otp_requested_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', reg.id);
+  if (writeError) console.error('Brand verification request sent but not recorded:', writeError);
+
+  return { ok: true, sentToTelnyx: true, messageId: result.messageId };
+}
