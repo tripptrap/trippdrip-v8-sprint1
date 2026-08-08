@@ -194,6 +194,10 @@ export default function TenDLCRegistration() {
           einIssuedOn: einIssuedOn || undefined,
           legalNameAttested,
           firstName, lastName, mobilePhone,
+          // Only ever true from this form, and only when a brand already
+          // exists — the API refuses to replace one otherwise, so an
+          // accidental resubmit cannot be charged twice.
+          replaceBrand: !!registration?.brand_id,
           acknowledgeFreshEin: true,
           campaignOverrides: overrides,
         }),
@@ -290,6 +294,14 @@ export default function TenDLCRegistration() {
       toast.error('An EIN is required. Sole proprietors can get one free from the IRS in about ten minutes.');
       return;
     }
+
+    // Caught here as well as in the API, because discovering a required upload
+    // after filling a fifteen-field form is a bad way to learn it. The API is
+    // still the boundary — this is only the earlier, kinder copy of the rule.
+    if (entityType === 'SOLE_PROPRIETOR' && !einDoc) {
+      toast.error('Upload your IRS EIN letter (CP 575) — sole proprietor registrations are reviewed by a person, and they always ask for it.');
+      return;
+    }
     // Same check the onboarding form and the API route make (#1) — carriers
     // reject an unreachable contact address, and this is a real submission that
     // creates a billable brand, so catching it here saves a charge.
@@ -311,6 +323,10 @@ export default function TenDLCRegistration() {
           einIssuedOn: einIssuedOn || undefined,
           legalNameAttested,
           firstName, lastName, mobilePhone,
+          // Only ever true from this form, and only when a brand already
+          // exists — the API refuses to replace one otherwise, so an
+          // accidental resubmit cannot be charged twice.
+          replaceBrand: !!registration?.brand_id,
           campaignOverrides: overrides,
         }),
       });
@@ -653,7 +669,10 @@ export default function TenDLCRegistration() {
               * EIN-to-name pairing is already here. */}
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                IRS EIN letter (CP 575) <span className="font-normal text-slate-400">— optional</span>
+                IRS EIN letter (CP 575){' '}
+                {entityType === 'SOLE_PROPRIETOR'
+                  ? <span className="font-normal text-red-600 dark:text-red-400">— required</span>
+                  : <span className="font-normal text-slate-400">— optional</span>}
               </label>
               {einDoc ? (
                 <div className="flex items-center gap-3 rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2">
@@ -689,7 +708,9 @@ export default function TenDLCRegistration() {
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {uploadingDoc
                   ? 'Uploading…'
-                  : 'Stored privately. Carriers cannot be sent documents automatically, but if your registration needs review this is the proof that resolves it fastest.'}
+                  : entityType === 'SOLE_PROPRIETOR'
+                    ? 'Stored privately. Sole proprietor registrations are verified by a person at the carrier, and that always starts by asking for this — having it on file now is the difference between a day and a fortnight.'
+                    : 'Stored privately. Carriers cannot be sent documents automatically, but if your registration needs review this is the proof that resolves it fastest.'}
               </p>
             </div>
 

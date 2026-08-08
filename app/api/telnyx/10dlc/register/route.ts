@@ -18,6 +18,50 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
   ? createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
+/**
+ * Is the user's EIN letter on file?
+ *
+ * Checks the column first, then storage. Both, because the two can legitimately
+ * disagree: `/api/telnyx/10dlc/ein-document` accepts an upload before any
+ * registration row exists — someone can have the letter to hand before they have
+ * filled the form — and in that case it stores the file but has no row to record
+ * the path on. Trusting the column alone would reject a user who had already
+ * done exactly what was asked.
+ *
+ * The path is deterministic (`<user_id>/10dlc/ein-letter.<ext>`), so the storage
+ * listing is authoritative. When it finds a file the column missed, the column is
+ * backfilled so the next check is a single read.
+ */
+async function soleProprietorDocumentOnFile(userId: string, admin: any): Promise<boolean> {
+  const { data: reg } = await admin
+    .from('user_10dlc_registrations')
+    .select('id, ein_document_path')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (reg?.ein_document_path) return true;
+
+  const { data: files, error } = await admin.storage.from('documents').list(`${userId}/10dlc`);
+  if (error) {
+    // Fail OPEN. A storage outage must not block a registration that is otherwise
+    // complete and paid for — the document is evidence for a human step that
+    // happens days later, not a precondition for the brand itself.
+    console.error('EIN document check failed, allowing submission:', error);
+    return true;
+  }
+
+  const found = (files ?? []).find((f: any) => f.name?.startsWith('ein-letter.'));
+  if (!found) return false;
+
+  if (reg?.id) {
+    await admin
+      .from('user_10dlc_registrations')
+      .update({ ein_document_path: `${userId}/10dlc/${found.name}`, ein_document_name: found.name })
+      .eq('id', reg.id);
+  }
+  return true;
+}
+
 const REQUIRED_FIELDS = [
   'entityType', 'legalBusinessName', 'displayName', 'contactPhone', 'contactEmail',
   'vertical', 'street', 'city', 'state', 'postalCode',
@@ -160,6 +204,35 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
       body.mobilePhone = mobile;
+
+      // ── The EIN letter is REQUIRED for a sole proprietor ────────────────────
+      //
+      // A sole proprietor's brand cannot be verified automatically: TCR matches
+      // it against a person, and the OTP that completes it is a manual email
+      // exchange with Telnyx (#194). Every one of those exchanges opens by asking
+      // for proof of the EIN-to-name pairing, and the person who has to answer is
+      // the user — weeks later, by which time the letter is gone.
+      //
+      // The name is also unrepairable once filed: `companyName` and `ein` freeze
+      // at TCR, so a mismatch means a second $4.50 brand rather than an edit.
+      // Requiring the document is the cheapest moment to catch that, because it
+      // puts the letter in front of them while the name is still editable.
+      //
+      // Required only when actually submitting. Someone saving details without an
+      // EIN has not started the carrier clock and is not asked for it yet.
+      if (body.taxId?.trim()) {
+        const hasDoc = await soleProprietorDocumentOnFile(user.id, supabaseAdmin);
+        if (!hasDoc) {
+          return NextResponse.json({
+            ok: false,
+            error:
+              'Upload your IRS EIN letter (CP 575) before submitting. Sole proprietor registrations ' +
+              'are verified by a person at the carrier, and that always starts by asking for it — ' +
+              'having it on file now is the difference between a day and a fortnight.',
+            field: 'einDocument',
+          }, { status: 400 });
+        }
+      }
     }
 
     // ── The legal name has to MATCH the EIN letter, not merely resemble it ────
@@ -274,11 +347,49 @@ export async function POST(req: NextRequest) {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (existing?.brand_id && (existing.campaign_status === 'active' || existing.brand_status === 'pending' || existing.campaign_status === 'pending')) {
-      return NextResponse.json({
-        ok: false,
-        error: `Registration already ${existing.campaign_status === 'active' ? 'active' : 'in progress'} — cannot resubmit.`,
-      }, { status: 409 });
+    // ── Never charge for a second brand by accident ──────────────────────────
+    //
+    // Brand registration costs $4.50 and Telnyx will happily create a duplicate:
+    // the API has no notion of "this business already has a brand". Nothing here
+    // stopped it either — this guard only refused while a brand was `pending` or a
+    // campaign was pending/active, so a row sitting at `unverified` fell straight
+    // through to createBrand.
+    //
+    // That is not hypothetical. It happened on 2026-08-08: a second brand was
+    // created for an account that already had one, $4.50 charged, for a filing
+    // that would have failed identically because the name was the same. Deleting
+    // the brand afterwards does not refund it.
+    //
+    // Resubmitting IS the remedy for `unverified` and `failed` — `companyName` and
+    // `ein` freeze at TCR, so a corrected filing means a new brand rather than an
+    // edit. But it has to be deliberate. `replaceBrand: true` is what the
+    // "Resubmit registration" button sends; without it, an existing brand is never
+    // silently replaced.
+    if (existing?.brand_id) {
+      const settled = existing.brand_status === 'verified' || existing.campaign_status === 'active';
+      const inFlight = existing.brand_status === 'pending' || existing.campaign_status === 'pending';
+
+      if (settled || inFlight) {
+        return NextResponse.json({
+          ok: false,
+          error: `Registration already ${settled ? 'active' : 'in progress'} — cannot resubmit.`,
+        }, { status: 409 });
+      }
+
+      // unverified / failed — replaceable, but only on purpose.
+      if (body.replaceBrand !== true) {
+        return NextResponse.json({
+          ok: false,
+          error:
+            'You already have a business registered with the carriers. Registering again creates a ' +
+            'second one and is charged again — the existing one cannot be edited, because carriers ' +
+            'freeze the legal name and EIN once filed. Use “Resubmit registration” if that is what ' +
+            'you intend.',
+          code: 'brand_exists',
+          existingBrandId: existing.brand_id,
+          existingBrandStatus: existing.brand_status,
+        }, { status: 409 });
+      }
     }
 
     const country = body.country || 'US';
