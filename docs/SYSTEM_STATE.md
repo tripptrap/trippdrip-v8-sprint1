@@ -5658,3 +5658,50 @@ Three things about how it is built:
 
 `IMAP_HOST` defaults to `SMTP_HOST` and `IMAP_PORT` to 993, which is right for
 privateemail.com and most hosts.
+
+## End-to-end send test, and the delivery-receipt race it exposed (#17, 2026-08-08)
+
+Sent a real SMS between two numbers on this account — `+18134972176` (local) to
+`+18886638510` (toll-free, a different HyveWyre user) — through `/api/sms/send`.
+This is a fuller test than texting a handset, because the reply arrives as a
+genuine carrier-delivered inbound rather than a simulated webhook.
+
+**Everything worked except the delivery receipt.**
+
+Telnyx delivered in **22 milliseconds** (`sent_at` 19:11:46.203, `completed_at`
+19:11:46.225). Its `message.finalized` webhook arrived before `/api/sms/send`
+had inserted the `messages` row — the route calls Telnyx at line 213 and inserts
+at line 313 — so the UPDATE matched nothing:
+
+```
+⚠️ Delivery status for unknown message_sid 40319fe2-… — no row updated
+```
+
+The message then sits at `queued` for ever, because a terminal receipt is sent
+once. The webhook now retries the update over ~3 seconds before declaring a sid
+unknown.
+
+**Consistent with, but not proof of, the historical stuck rows.** 57 rows sit at
+`sent` (January) and 4 at `queued` (February), all with a `message_sid` set,
+which is the signature this race leaves. An earlier commit message said this
+"explains" them — that is stronger than the evidence supports. It is a plausible
+shared cause, not a demonstrated one.
+
+### What the same test also proved
+
+- **Inbound works end to end.** Lead created, thread created, message stored on
+  the receiving user's account, all from a real carrier delivery.
+- **The per-contact cooldown works** — a resend inside the window was refused
+  with 21 minutes remaining.
+- **Telnyx blocks number-to-number sends within one account** for some pairs
+  (`existing block rule`), which limits how often this test can be repeated.
+- **Our own opt-out footer triggers an opt-out when received** (#199). The
+  inbound copy contained `Reply POT to opt out`, `opt out` matched, and the lead
+  was DNC'd and purged. Narrow, but the purge makes it irreversible.
+
+### Re-verification still outstanding
+
+The fix could not be re-tested immediately: the same recipient is inside its
+cooldown and the alternative pair is blocked by Telnyx. The retry path is
+therefore reasoned-correct but not yet demonstrated end to end — worth re-running
+the identical send once the cooldown clears.
