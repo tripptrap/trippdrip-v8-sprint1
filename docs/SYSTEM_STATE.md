@@ -5445,3 +5445,47 @@ submission proceeds. An outage at Telnyx must not block a registration that woul
 have succeeded, and refusing on silence would turn a response-shape change into an
 outage of our own. An empty `mnoMetadata` is treated as "cannot tell" for the same
 reason, never as "nobody qualifies".
+
+## The analytics screen was reading a dead table (#196, 2026-08-08)
+
+Found while reconciling CLAUDE.md, which asserted both "Twilio code exists but is
+legacy, do not remove" and "Twilio has been completely removed" nine sections
+apart. Neither was quite right, and chasing which one was turned up this.
+
+`/api/sms/analytics` queried **`sms_messages`** — a table from the previous
+provider holding **one row from 2025-11-28**, while `messages` holds 118. Nothing
+has written to it since the Telnyx migration. `/analytics` imports that page, so
+the analytics screen showed an empty table to every user and reported a **0%
+delivery rate as though that were a measurement rather than an absence**.
+
+Repointed at `messages`. That is a rename as well as a repoint:
+
+```
+twilio_status → status            cost_points  → points_cost
+twilio_error_message → error_message   message_body → body
+sent_at → created_at
+```
+
+`messages` has **no `delivered_at` or `failed_at`** — `status` is the single
+source, which is why the badge logic lost two arguments that could contradict it.
+
+### Two more faults the verification exposed
+
+**`messages.campaign_id` has no foreign key.** Only `lead_id`, `thread_id`,
+`flow_id` and `user_id` do. So an embedded `campaigns:campaign_id(name)` is not a
+missing field in the response — PostgREST answers `PGRST200` and **fails the
+whole request**. Campaign names are fetched and merged in a second query instead.
+
+**The embed aliases never matched the consumer.** The route returned `leads` and
+`campaigns`; the page reads `msg.lead` and `msg.campaign`. Neither name had ever
+rendered, on either the old table or the new one.
+
+Verified against a user with 32 outbound messages: 81.25% delivery rate, lead
+names populated, status filters correct. Campaign names come back empty because
+none of those messages carry a `campaign_id` — checked against the table rather
+than assumed.
+
+**No Twilio references remain in application code.** The one left in the repo is a
+migration whose purpose is removing Twilio. The `sms_messages` table itself still
+exists and is filed as #196 — dropping it is irreversible and `delete-account`
+still lists it, so the reference must go first.
