@@ -201,7 +201,11 @@ LLC**, and toll-free needs no EIN, brand or entity at all.
 
 ## Opt-Out / DNC (Compliance)
 - When a lead texts STOP → added to DNC list → completely blocked from receiving any future messages
-- Lead record stays in system but is permanently locked from messaging (legal requirement)
+- **The lead record is PURGED, not kept.** `purge_lead_after_opt_out(user_id, phone)`
+  deletes it (#109). CLAUDE.md said the opposite — "stays in system but is
+  permanently locked" — which is what a reasonable reading of the legal
+  requirement suggests, but not what runs. The **DNC entry** is what enforces the
+  block, and it survives the lead.
 - No ability to message them again, ever
 - DNC list is user-specific + global
 - First message to a lead auto-appends opt-out footer; subsequent messages do not

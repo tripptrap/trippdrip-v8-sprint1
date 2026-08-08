@@ -1122,7 +1122,45 @@ async function handleDeliveryStatus(payload: any, eventType: string) {
     q = q.not('status', 'in', '("delivered","failed")');
   }
 
-  const { data: updated, error } = await q.select('id');
+  let { data: updated, error } = await q.select('id');
+
+  // ── The receipt can beat our own INSERT ────────────────────────────────────
+  //
+  // /api/sms/send calls Telnyx and inserts the `messages` row about a hundred
+  // lines later. Telnyx delivered a number-to-number test in **22 milliseconds**
+  // and its message.finalized webhook arrived before the row existed, so this
+  // UPDATE matched nothing and the receipt was dropped. The message then sits at
+  // `queued` for ever, because a terminal receipt is only sent once.
+  //
+  // That is not a test artefact: it explains the 57 rows stuck at `sent` and the
+  // 4 stuck at `queued` in this database, and it gets *more* likely the faster
+  // delivery is.
+  //
+  // Retried rather than reordered because moving the insert ahead of the send is
+  // a larger change to a path that spends money — and this closes the window it
+  // actually loses: under a second. Each attempt re-runs the same guarded query,
+  // so a genuinely unknown sid still ends up warned about, just a moment later.
+  if (!updated?.length && !error && terminal) {
+    for (const waitMs of [400, 900, 1800]) {
+      await new Promise(r => setTimeout(r, waitMs));
+      const retry = await supabaseAdmin
+        .from('messages')
+        .update({
+          status,
+          error_code: errorCode ? String(errorCode) : null,
+          error_message: errorMessage,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('message_sid', messageSid)
+        .select('id');
+      if (retry.error) { error = retry.error; break; }
+      if (retry.data?.length) {
+        updated = retry.data;
+        console.log(`⏱️ Delivery status for ${messageSid} applied after a ${waitMs}ms wait — the receipt beat our insert`);
+        break;
+      }
+    }
+  }
 
   if (error) {
     console.error('Error updating message status:', error);
