@@ -5242,3 +5242,61 @@ a live brand:
 There is nothing in the v2 API to call. Completing a sole-proprietor registration
 requires the Telnyx portal or Telnyx support; the only programmatic route to
 verifying a brand that failed automated matching is paid external vetting.
+
+## Telnyx answered the 10DLC questions (#193, #194, 2026-08-07)
+
+Support reply to the three questions raised by the failed filing. Each answer
+either closes an open question here or overturns something this file recorded.
+
+### Brand core fields are immutable — a wrong name cannot be repaired
+
+> Once a brand is registered with TCR, certain core fields (like companyName and
+> ein) become immutable at the TCR level. The API may accept the request, but TCR
+> will not update those fields.
+
+That is why `PUT /10dlc/brand/{id}` returned 200, advanced `updatedAt`, and
+changed nothing. **Treat `companyName` and `ein` as write-once.** Brand `BVFEPN2`
+is permanently stuck holding `Tripp Browning` against a CP 575 reading
+`TRIPP E BROWNING`; the $4.50 is sunk and a working registration needs a *new*
+brand. Paid external vetting on the existing one would only vet the wrong name.
+
+This is what makes the attestation added in `e3ee9e5` load-bearing rather than
+paperwork: there is no editing your way out of a mistyped legal name.
+
+### Both suspected causes were real, and they compound
+
+Telnyx confirmed same-day EINs have not reached TCR (several business days) *and*
+that the name must match the CP 575 exactly. The filing hit both at once, which is
+why nothing about the submission looked wrong.
+
+### `firstName`/`lastName` are discarded by design
+
+Confirmed intentional — the fields belong to `SOLE_PROPRIETOR`. Telnyx agreed the
+silent drop "is not ideal from an API design perspective". The rule recorded above
+stands: re-read a brand after writing it; the create response is not proof.
+
+### The sole-proprietor OTP exists — it is manual, not missing
+
+The 404s were accurate; the endpoints genuinely do not exist. The process does:
+
+> 1. After creating the Sole Proprietor brand, email `10dlcquestions@telnyx.com`
+>    to request an OTP PIN.
+> 2. Telnyx will send a unique OTP PIN to the mobile phone number on the brand.
+> 3. Reply with the OTP PIN within 24 hours to complete verification.
+
+**This overturns #119's premise.** `SOLE_PROPRIETOR` was withdrawn because the OTP
+step was believed unsupported, leaving users at a silent dead end. It is
+human-mediated, which is a different thing. Refusing it was right on what was
+known then and is wrong now — see #194.
+
+### The two supported paths, per Telnyx
+
+| Entity type | Verification | Throughput |
+|---|---|---|
+| `SOLE_PROPRIETOR` | Manual OTP by email | ~1,000 msgs/day |
+| `PRIVATE_PROFIT` | Automatic TCR/IRS, or paid external vetting | Higher |
+
+1,000 messages/day is well above what a solo agent sends, so the sole-proprietor
+path is a real option for most users rather than a consolation prize. An EIN alone
+**is** enough — the earlier reading of "you need a registered entity" was wrong,
+and no part of this ever required an LLC.
