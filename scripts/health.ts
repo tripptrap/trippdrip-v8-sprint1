@@ -510,6 +510,40 @@ async function poolMatchesTollFreeVerification(sb: any): Promise<Result> {
   return { name, level: 'PASS', detail: `${verified.size} verified at Telnyx, pool agrees` };
 }
 
+async function campaignsAwaitingDeactivation(sb: any): Promise<Result> {
+  const name = 'no campaign left idle at the carrier';
+
+  const { data, error } = await sb
+    .from('user_10dlc_registrations')
+    .select('legal_business_name, campaign_id, deactivation_required_at, deactivation_reason, idle_warned_at')
+    .not('deactivation_required_at', 'is', null);
+
+  if (error) return { name, level: 'WARN', detail: `could not read registrations: ${error.message}` };
+
+  const flagged = data ?? [];
+  if (flagged.length === 0) {
+    return { name, level: 'PASS', detail: 'nothing awaiting deactivation' };
+  }
+
+  // Oldest first — that is the one closest to costing money.
+  flagged.sort((a: any, b: any) =>
+    new Date(a.deactivation_required_at).getTime() - new Date(b.deactivation_required_at).getTime());
+
+  const oldestDays = Math.floor(
+    (Date.now() - new Date(flagged[0].deactivation_required_at).getTime()) / 86_400_000);
+
+  return {
+    name,
+    level: 'FAIL',
+    detail: `${flagged.length} campaign(s) flagged for deactivation, oldest ${oldestDays}d ago: ` +
+      flagged.slice(0, 5).map((r: any) => `${r.legal_business_name} (${r.deactivation_reason})`).join(', '),
+    because:
+      'A verified campaign left idle attracts a carrier penalty in the hundreds of dollars. ' +
+      'check-idle-campaigns flags these for a person because the deactivation API is not known — ' +
+      'so the flag sits until someone acts on it, and nothing else in the product shows it.',
+  };
+}
+
 // ── run ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -535,6 +569,7 @@ async function main() {
   await check('messaging profiles', messagingProfiles);
   await check('toll-free verification', tollFreeVerification);
   await check('pool flags match Telnyx TFV', () => poolMatchesTollFreeVerification(db));
+  await check('no campaign left idle at the carrier', () => campaignsAwaitingDeactivation(db));
 
   const failed = results.filter(r => r.level === 'FAIL');
   const warned = results.filter(r => r.level === 'WARN');
