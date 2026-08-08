@@ -103,7 +103,7 @@ export async function sendEmail(opts: {
    *  a new conversation in the recipient's inbox. */
   inReplyTo?: string;
   attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>;
-}): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+}): Promise<{ ok: boolean; error?: string; messageId?: string; accepted?: string[]; rejected?: string[]; response?: string }> {
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
   if (recipients.length === 0) return { ok: false, error: 'No recipients' };
 
@@ -122,9 +122,29 @@ export async function sendEmail(opts: {
       ...(opts.inReplyTo ? { inReplyTo: opts.inReplyTo, references: [opts.inReplyTo] } : {}),
       ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
     });
+    // `sendMail` resolving is not the same as the server taking the message.
+    // Nodemailer resolves when at least one recipient is accepted, so a partly
+    // or wholly rejected send could return ok:true and nobody would know — and
+    // "did that email actually go?" is then unanswerable after the fact.
+    //
+    // info.response is the SMTP server's own reply, e.g. "250 2.0.0 Ok: queued
+    // as 4X…". That string is the closest thing to proof this side of the
+    // recipient's mailbox, so it is returned rather than discarded.
+    const accepted: string[] = (info?.accepted ?? []).map((a: any) => (typeof a === 'string' ? a : a?.address)).filter(Boolean);
+    const rejected: string[] = (info?.rejected ?? []).map((a: any) => (typeof a === 'string' ? a : a?.address)).filter(Boolean);
+
+    if (accepted.length === 0) {
+      return {
+        ok: false,
+        error: `The mail server accepted no recipients${rejected.length ? ` (rejected: ${rejected.join(', ')})` : ''}. ${info?.response ?? ''}`.trim(),
+        rejected,
+        response: info?.response,
+      };
+    }
+
     // Returned so callers that log deliveries keep their provider reference —
     // service_emails.message_id would otherwise go null.
-    return { ok: true, messageId: info?.messageId };
+    return { ok: true, messageId: info?.messageId, accepted, rejected, response: info?.response };
   } catch (error: any) {
     return { ok: false, error: error?.message || 'Failed to send email' };
   }
