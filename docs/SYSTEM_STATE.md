@@ -5607,3 +5607,38 @@ Verified with autosend off: a `PRIVATE_PROFIT` account is refused, a sole
 proprietor without consent is refused, and a malformed PIN is rejected. PIN format
 validation is deliberately loose — Telnyx have not documented it, and rejecting a
 valid PIN while a 24-hour clock runs is the worse error.
+
+## An empty Sent folder is not evidence the mail did not send (2026-08-08)
+
+`support@hyvewyre.com` shows **no sent items no matter how much mail the app
+sends**, and that is normal. SMTP submission hands the message to
+`mail.privateemail.com:465` and stops there. Filling the Sent folder is a separate
+IMAP `APPEND` that a mail *client* performs; a server-to-server send never does
+it. Confirmed 2026-08-08: a test message reached its recipient's inbox while the
+sending mailbox's Sent folder stayed empty.
+
+**The evidence is the SMTP reply**, which `sendEmail` now returns:
+
+```
+smtpResponse : "250 2.0.0 Ok: queued as 4hHRzG01bnz3hhTs"
+accepted     : ["…"]
+rejected     : []
+```
+
+`250` plus a queue id means the mail server took custody. Beyond that our side
+cannot see — recipient-side spam filtering is invisible either way.
+
+```bash
+curl -X POST https://hyvewyre.com/api/admin/email-check   # admin session required
+```
+
+Sends a test to the first `ADMIN_EMAILS` address and returns the server's reply.
+Before this existed, "did that email send?" was unanswerable: `sendEmail` returned
+`ok: true` whenever nodemailer did not throw and discarded `accepted`, `rejected`
+and `response`. Nodemailer resolves when **at least one** recipient is accepted,
+so a partly rejected send was indistinguishable from a good one.
+
+**Still missing: a record of what was sent.** The product now emails carriers on
+customers' behalf with their tax documents attached, and keeps no copy — only a
+queue id in a log. For compliance correspondence that is a gap worth closing with
+an IMAP `APPEND` to Sent after each successful send.
