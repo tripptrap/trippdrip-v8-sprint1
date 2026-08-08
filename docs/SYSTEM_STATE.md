@@ -5333,3 +5333,40 @@ Not yet built: nothing records that the user has actually emailed Telnyx.
 `otp_requested_at` exists on the table for it, and until something writes it, a
 brand waiting on a PIN is indistinguishable from one waiting on TCR — which is
 the same overloaded-`pending` problem as #190.
+
+### `unverified` is a brand status of its own (#190 closed, 2026-08-07)
+
+`mapBrandStatus` returns `'unverified'` for TCR's UNVERIFIED, and the
+`user_10dlc_registrations_brand_status_check` constraint accepts five values:
+`not_started | pending | unverified | verified | failed`.
+
+It used to fall through the `pending` default, which reads as "TCR is still
+looking" when the truth is the opposite — TCR looked and could not match the
+business. That is why the campaign gate never opened and the user was promised an
+ETA that could not arrive.
+
+**Never branch on this status alone.** The remedy depends entirely on entity type
+and the two have nothing in common:
+
+| entity type | what UNVERIFIED means | what clears it |
+|---|---|---|
+| `SOLE_PROPRIETOR` | expected; the OTP has not been done | user emails Telnyx for a PIN, replies within 24h |
+| everything else | TCR could not match the name/EIN | IRS propagation, paid external vetting, or a **new** brand |
+
+The second row has no repair path on the existing brand — `companyName` and `ein`
+are immutable once TCR holds them. So resubmission is offered there and withheld
+from sole proprietors, where "register again" would sell a second $4.50 brand to
+someone who only needs to answer an email.
+
+**The sync still polls unverified brands, deliberately.** #190 asked to stop, and
+that would have been a worse bug: every route out of `unverified` changes the
+brand *at Telnyx* first, so a brand we stopped polling is one that goes good
+without anyone noticing. `lib/tenDlcSync.ts` re-checks `pending` **and**
+`unverified`. Polling was never the defect — the message was.
+
+`otp_requested_at` is stamped by `/api/telnyx/10dlc/otp-requested`, which the user
+triggers themselves. The request is an email to `10dlcquestions@telnyx.com` that
+nothing here can observe, and Telnyx allow 24 hours to reply once the PIN is sent.
+Self-reported rather than automated on purpose: the PIN arrives on the user's
+phone and only they can send it back, so hiding the step would hide the deadline
+too.
