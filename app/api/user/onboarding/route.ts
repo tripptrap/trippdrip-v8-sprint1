@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +75,25 @@ export async function PATCH(req: NextRequest) {
     const currentState = current?.onboarding_state || DEFAULT_STATE;
     const newState = { ...currentState, ...filtered };
 
-    const { error } = await supabase
+    // Service role for the WRITE, user client for the reads above.
+    //
+    // `authenticated` holds column-level UPDATE on public.users for exactly four
+    // columns — business_hours, business_name, timezone, updated_at. Not
+    // onboarding_state. So every write here failed with "permission denied for
+    // table users", and had done since the column was added.
+    //
+    // Nothing surfaced it. OnboardingContext applies updates optimistically and
+    // only adopts the server's reply when `data.ok` is set, so a failed PATCH
+    // left the browser believing the flag had stuck while the database never
+    // moved. On the next load the state reset to all-false, and the theme picker
+    // and product tour reappeared — permanently, for every user, with no way to
+    // dismiss them for good.
+    //
+    // Still scoped to the caller's own row by `.eq('id', user.id)`: the elevated
+    // client bypasses RLS, so that filter is the only thing standing between this
+    // and someone else's record.
+    const admin = createServiceRoleClient();
+    const { error } = await admin
       .from('users')
       .update({ onboarding_state: newState })
       .eq('id', user.id);

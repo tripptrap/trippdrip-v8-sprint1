@@ -210,8 +210,20 @@ export async function POST(req: NextRequest) {
     // weeks, plus the third-party lag", not a documented carrier threshold, and
     // someone who understands the risk may still want to try.
     const einIssuedOn = body.einIssuedOn ? new Date(body.einIssuedOn) : null;
+    if (einIssuedOn && !Number.isNaN(einIssuedOn.getTime())) {
+      // A date-only string parses as UTC midnight, so someone east of UTC
+      // entering "today" can produce a negative age. Rejected rather than
+      // clamped: a future issue date is a typo, and silently treating it as
+      // fresh would let a wrong date reach the carrier on the retry.
+      if (einIssuedOn.getTime() - Date.now() > 86_400_000) {
+        return NextResponse.json(
+          { ok: false, error: 'That EIN issue date is in the future — check it against your IRS letter.', field: 'einIssuedOn' },
+          { status: 400 }
+        );
+      }
+    }
     if (einIssuedOn && !Number.isNaN(einIssuedOn.getTime()) && body.acknowledgeFreshEin !== true) {
-      const ageDays = Math.floor((Date.now() - einIssuedOn.getTime()) / 86_400_000);
+      const ageDays = Math.max(0, Math.floor((Date.now() - einIssuedOn.getTime()) / 86_400_000));
       if (ageDays < 30) {
         const readyOn = new Date(einIssuedOn.getTime() + 30 * 86_400_000);
         return NextResponse.json({
