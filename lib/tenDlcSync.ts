@@ -62,7 +62,18 @@ export async function syncTenDlcRegistration(
   let adoptedCampaignId: string | null = null;
   let numbersAssigned = 0;
 
-  if (registration.brand_id && registration.brand_status === 'pending') {
+  // `unverified` is re-checked too, not just `pending` (#190).
+  //
+  // It is a settled verdict rather than a stage, but it is not a permanent one,
+  // and both routes out of it change the brand at Telnyx rather than here:
+  //   SOLE_PROPRIETOR — flips to VERIFIED once the user completes the manual OTP.
+  //   everything else — flips once IRS data reaches TCR, or external vetting
+  //                     clears it.
+  // In every one of those cases the news arrives at Telnyx first, so a brand we
+  // stopped polling is a brand that goes good without anyone noticing. Leaving
+  // `unverified` out of this condition would have frozen it forever — a worse
+  // bug than the one #190 describes, introduced while fixing it.
+  if (registration.brand_id && (registration.brand_status === 'pending' || registration.brand_status === 'unverified')) {
     const brandResult = await getBrandStatus(registration.brand_id);
     if (brandResult.success) {
       updates.brand_status = mapBrandStatus(brandResult.status);

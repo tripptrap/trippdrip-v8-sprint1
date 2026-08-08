@@ -16,7 +16,8 @@ type Registration = {
   display_name: string;
   vertical: string;
   brand_id: string | null;
-  brand_status: 'not_started' | 'pending' | 'verified' | 'failed';
+  brand_status: 'not_started' | 'pending' | 'unverified' | 'verified' | 'failed';
+  otp_requested_at: string | null;
   brand_failure_reason: string | null;
   campaign_id: string | null;
   campaign_status: 'not_started' | 'pending' | 'active' | 'failed';
@@ -47,6 +48,9 @@ function statusPill(status: string) {
   const map: Record<string, { label: string; cls: string }> = {
     not_started: { label: 'Not started', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
     pending: { label: 'Pending review', cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+    // Distinct from `pending` on purpose (#190). Nothing is in flight and no
+    // amount of waiting alone resolves it, so it must not read as "in review".
+    unverified: { label: 'Not verified — action needed', cls: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
     verified: { label: 'Verified', cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
     active: { label: 'Active', cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
     failed: { label: 'Rejected', cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
@@ -213,6 +217,23 @@ export default function TenDLCRegistration() {
     }
   }
 
+  // Self-reported, because the request is an email we cannot observe. See the
+  // route for why automating it would be the wrong trade.
+  async function handleOtpRequested() {
+    try {
+      const res = await fetch('/api/telnyx/10dlc/otp-requested', { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) {
+        toast.error(data.error || 'Could not record that');
+        return;
+      }
+      toast.success('Noted — reply to their email with the PIN within 24 hours');
+      loadStatus();
+    } catch {
+      toast.error('Could not record that');
+    }
+  }
+
   async function uploadEinDoc(file: File) {
     setUploadingDoc(true);
     try {
@@ -336,7 +357,17 @@ export default function TenDLCRegistration() {
     );
   }
 
-  const canResubmit = !registration || registration.brand_status === 'failed' || registration.campaign_status === 'failed';
+  const isSoleProp = registration?.entity_type === 'SOLE_PROPRIETOR';
+  const canResubmit =
+    !registration ||
+    registration.brand_status === 'failed' ||
+    registration.campaign_status === 'failed' ||
+    // An unverified NON-sole-prop brand cannot be repaired: companyName and ein
+    // are immutable at TCR once registered, so a corrected filing means a new
+    // brand. Sole props are excluded — theirs clears via the OTP, and offering
+    // "register again" there would sell a second $4.50 brand to someone who
+    // just needs to answer an email.
+    (registration.brand_status === 'unverified' && registration.entity_type !== 'SOLE_PROPRIETOR');
   const canAssignNumber = registration?.campaign_status === 'active' && !registration.assigned_phone_number;
 
   return (
@@ -409,6 +440,54 @@ export default function TenDLCRegistration() {
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {registration.brand_failure_reason}
             </p>
           )}
+
+          {/* An unverified brand needs a next step, not a status.
+            *
+            * This used to render as "Pending review", which told the user to wait
+            * for something that was never coming (#190). The two remedies have
+            * nothing in common, so they are written separately rather than
+            * softened into one message that fits neither. */}
+          {registration.brand_status === 'unverified' && (
+            isSoleProp ? (
+              <div className="rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-3 py-3 space-y-2">
+                <p className="text-xs text-orange-900 dark:text-orange-200">
+                  <strong>One step left, and only you can do it.</strong> Email{' '}
+                  <a href="mailto:10dlcquestions@telnyx.com?subject=10DLC%20OTP%20PIN%20request" className="underline">
+                    10dlcquestions@telnyx.com
+                  </a>{' '}
+                  asking for your 10DLC OTP PIN, quoting your business name. They text the PIN to{' '}
+                  {mobilePhone || 'your mobile'}, and you reply to their email with it{' '}
+                  <strong>within 24 hours</strong>.
+                </p>
+                {registration.otp_requested_at ? (
+                  <p className="text-xs text-orange-800 dark:text-orange-300">
+                    Requested {new Date(registration.otp_requested_at).toLocaleString()}. If no PIN has
+                    arrived, reply to your own email to chase it — the request is theirs to action.
+                  </p>
+                ) : (
+                  <button
+                    onClick={handleOtpRequested}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    I&apos;ve emailed them — start the 24-hour clock
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-3 py-3">
+                <p className="text-xs text-orange-900 dark:text-orange-200">
+                  <strong>Carriers could not match your business.</strong> Usually the legal name does
+                  not match your IRS EIN letter exactly, or the EIN is too new to have reached them —
+                  that takes a few weeks. Waiting is free and often enough.
+                </p>
+                <p className="mt-1.5 text-xs text-orange-900 dark:text-orange-200">
+                  If the name is wrong it cannot be edited: carriers freeze it once registered, so a
+                  correction means registering again from scratch. Check it against your EIN letter
+                  before you do — the fee is charged each time.
+                </p>
+              </div>
+            )
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Campaign registration</span>
             {statusPill(registration.campaign_status)}
@@ -425,7 +504,7 @@ export default function TenDLCRegistration() {
           )}
 
           <div className="flex items-center gap-2 pt-1">
-            {(registration.brand_status === 'pending' || registration.campaign_status === 'pending') && (
+            {(registration.brand_status === 'pending' || registration.brand_status === 'unverified' || registration.campaign_status === 'pending') && (
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}

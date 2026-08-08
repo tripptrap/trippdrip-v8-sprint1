@@ -205,7 +205,7 @@ export interface CampaignResult {
  * Map Telnyx brand state onto the three values `user_10dlc_registrations.brand_status`
  * holds. Fed `identityStatus` (VERIFIED / UNVERIFIED / VETTED_VERIFIED / FAILED).
  */
-export function mapBrandStatus(raw?: string): 'pending' | 'verified' | 'failed' {
+export function mapBrandStatus(raw?: string): 'pending' | 'unverified' | 'verified' | 'failed' {
   const s = (raw || '').toUpperCase();
   // Exact match, not `includes('VERIFIED')` — that substring is also inside
   // **UNVERIFIED**, so a brand that failed identity verification was being
@@ -213,6 +213,23 @@ export function mapBrandStatus(raw?: string): 'pending' | 'verified' | 'failed' 
   // attach numbers as though the brand were good.
   if (s === 'VERIFIED' || s === 'VETTED_VERIFIED') return 'verified';
   if (s.includes('FAILED')) return 'failed';
+
+  // UNVERIFIED is its own outcome, not a stage on the way to one (#190).
+  //
+  // It used to fall through to `pending`, which reads as "TCR is still looking".
+  // It is the opposite: TCR looked and could not match the business. Folding the
+  // two together meant the campaign gate never opened, the cron re-checked
+  // forever, and the user kept being told to expect it "in a few days" — an ETA
+  // that could not arrive, because nothing was in flight.
+  //
+  // What clears it depends entirely on entity type, so callers must branch on
+  // that rather than on this value alone:
+  //   SOLE_PROPRIETOR — expected. Clears when the user completes the manual OTP.
+  //   everything else — TCR could not match the name/EIN. Needs IRS propagation,
+  //                     paid external vetting, or a NEW brand: companyName and
+  //                     ein are immutable once TCR holds them.
+  if (s === 'UNVERIFIED') return 'unverified';
+
   return 'pending';
 }
 
