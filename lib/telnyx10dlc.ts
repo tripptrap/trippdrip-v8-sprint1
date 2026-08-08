@@ -24,8 +24,27 @@ export interface CreateBrandParams {
   entityType: EntityType;
   displayName: string;
   companyName: string;
-  ein?: string; // omitted for SOLE_PROPRIETOR
+  /**
+   * Sole proprietors DO have one, and Telnyx stores it — verified against a live
+   * brand. The IRS issues an EIN to an individual with no company, which is the
+   * whole basis of the sole-proprietor path.
+   */
+  ein?: string;
   phone: string;
+  /**
+   * SOLE_PROPRIETOR only, and required there — TCR matches a sole proprietor
+   * against a person rather than a company.
+   *
+   * Do not send these for any other entity type. Telnyx accepts them, echoes
+   * them back in the create response, and then discards them: a later GET reads
+   * null. Confirmed with Telnyx support, who called the silent drop "not ideal
+   * from an API design perspective" (#193). The create response is not evidence
+   * a brand field persisted.
+   */
+  firstName?: string;
+  lastName?: string;
+  /** Receives the sole-proprietor OTP PIN. Must be SMS-capable. */
+  mobilePhone?: string;
   street: string;
   city: string;
   state: string;
@@ -66,6 +85,17 @@ export async function createBrand(params: CreateBrandParams): Promise<BrandResul
     if (params.ein) requestBody.ein = params.ein;
     if (params.website) requestBody.website = params.website;
     if (params.mock) requestBody.mock = true;
+
+    // Gated on the entity type rather than merely "if supplied". Sending these
+    // for a PRIVATE_PROFIT brand is not harmless-but-ignored from our side: it
+    // makes the request look like it carried a name TCR will match on, and the
+    // discard is invisible until a GET (#193). Only send them where they mean
+    // something.
+    if (params.entityType === 'SOLE_PROPRIETOR') {
+      if (params.firstName) requestBody.firstName = params.firstName;
+      if (params.lastName) requestBody.lastName = params.lastName;
+      if (params.mobilePhone) requestBody.mobilePhone = params.mobilePhone;
+    }
 
     const response = await fetch(`${TELNYX_API_URL}/10dlc/brand`, {
       method: 'POST',

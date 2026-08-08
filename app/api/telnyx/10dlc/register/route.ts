@@ -118,14 +118,56 @@ export async function POST(req: NextRequest) {
     //
     // Enforced here as well as removed from the two pickers, because a picker is
     // not a boundary and existing drafts may already hold this value.
-    if (body.entityType === 'SOLE_PROPRIETOR') {
-      return NextResponse.json({
-        ok: false,
-        error:
-          'Sole proprietor registration is not available yet — carriers require an extra ' +
-          'phone verification step we do not support. Register as an LLC or corporation, ' +
-          'which is what an EIN covers.',
-      }, { status: 400 });
+    // ── Sole proprietor ──────────────────────────────────────────────────────
+    //
+    // This used to be refused outright (#119), because the OTP step Telnyx
+    // requires had no endpoint and a registration would reach them and silently
+    // stop — the user's number never arriving, with nothing explaining why.
+    // Refusing was right on what was known.
+    //
+    // Telnyx support answered it on 2026-08-07: the step is **manual**, not
+    // missing. The brand is created via the API, then the PIN is requested by
+    // emailing 10dlcquestions@telnyx.com, Telnyx texts it to the brand's mobile,
+    // and it must be answered within 24 hours. The 404s on /2faEmail, /otp,
+    // /verification and /revet were accurate — those endpoints do not exist —
+    // but the process does.
+    //
+    // A human-mediated step is a different thing from an absent one. What made
+    // the old behaviour unacceptable was silence, so the requirement here is
+    // that the user is told what happens next, not that we refuse (#194).
+    //
+    // Throughput is ~1,000 messages/day, comfortably above what a solo agent
+    // sends, so this is a real path rather than a consolation prize — and it is
+    // the one most users of this product will take.
+    const isSoleProp = body.entityType === 'SOLE_PROPRIETOR';
+    if (isSoleProp) {
+      const firstName = String(body.firstName || '').trim();
+      const lastName = String(body.lastName || '').trim();
+      if (!firstName || !lastName) {
+        return NextResponse.json({
+          ok: false,
+          error:
+            'Sole proprietors register under a person, not a company — enter your first and last ' +
+            'name exactly as they appear on your IRS EIN letter.',
+          field: !firstName ? 'firstName' : 'lastName',
+        }, { status: 400 });
+      }
+
+      // Required, and required to be a MOBILE. The OTP arrives by SMS; a
+      // landline here ends the registration in the same silence this path was
+      // withdrawn for. We cannot detect line type, so it is asked for separately
+      // from the business contact number rather than defaulted to it.
+      const mobile = normalizePhone(body.mobilePhone);
+      if (!mobile) {
+        return NextResponse.json({
+          ok: false,
+          error:
+            'Enter a mobile number that can receive texts. Carriers send a verification PIN to it — ' +
+            'a landline will stop the registration with no error.',
+          field: 'mobilePhone',
+        }, { status: 400 });
+      }
+      body.mobilePhone = mobile;
     }
 
     // ── The legal name has to MATCH the EIN letter, not merely resemble it ────
@@ -249,6 +291,12 @@ export async function POST(req: NextRequest) {
       country,
       ein_issued_on: body.einIssuedOn?.trim() || null,
       legal_name_attested_at: attested ? new Date().toISOString() : null,
+      // Persisted only where they mean something, mirroring what is sent to
+      // Telnyx — storing a name against a PRIVATE_PROFIT row would suggest the
+      // brand carries one when it provably does not (#193).
+      first_name: isSoleProp ? String(body.firstName).trim() : null,
+      last_name: isSoleProp ? String(body.lastName).trim() : null,
+      mobile_phone: isSoleProp ? body.mobilePhone : null,
       is_mock: mock,
       brand_status: 'pending',
       brand_failure_reason: null,
@@ -292,6 +340,9 @@ export async function POST(req: NextRequest) {
       displayName: body.displayName.trim(),
       companyName: body.legalBusinessName.trim(),
       ein: body.taxId?.trim(),
+      firstName: isSoleProp ? String(body.firstName).trim() : undefined,
+      lastName: isSoleProp ? String(body.lastName).trim() : undefined,
+      mobilePhone: isSoleProp ? body.mobilePhone : undefined,
       phone: normalizedPhone,
       street: body.street.trim(),
       city: body.city.trim(),
@@ -394,6 +445,29 @@ export async function POST(req: NextRequest) {
         campaign_status: 'not_started',
         updated_at: new Date().toISOString(),
       }).eq('id', registrationId);
+
+      // A sole proprietor's brand does not clear on its own, and saying it will
+      // is the exact failure #119 withdrew this path for: the user waits for
+      // something that is never coming. TCR needs an OTP PIN, and requesting it
+      // is a manual step only the account holder can start.
+      //
+      // So this response says so, in place of the ETA that would be a lie here.
+      if (isSoleProp) {
+        return NextResponse.json({
+          ok: true,
+          brandStatus,
+          campaignStatus: 'not_started',
+          campaignDeferred: true,
+          actionRequired: 'sole_prop_otp',
+          otpEmail: '10dlcquestions@telnyx.com',
+          mobilePhone: body.mobilePhone,
+          message:
+            'Your business is registered — but sole proprietor verification needs one step only you ' +
+            'can take. Email 10dlcquestions@telnyx.com asking for your 10DLC OTP PIN and quoting your ' +
+            'business name. They text a PIN to ' + body.mobilePhone + ', and you reply to their email ' +
+            'with it within 24 hours. Your campaign is created automatically once that clears.',
+        });
+      }
 
       return NextResponse.json({
         ok: true,

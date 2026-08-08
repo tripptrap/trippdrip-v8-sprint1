@@ -92,6 +92,9 @@ function OnboardingContent() {
   const [entityType, setEntityType] = useState('PRIVATE_PROFIT')
   const [legalBusinessName, setLegalBusinessName] = useState('')
   const [taxId, setTaxId] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [mobilePhone, setMobilePhone] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [website, setWebsite] = useState('')
@@ -309,6 +312,9 @@ function OnboardingContent() {
           legalBusinessName,
           displayName: businessName || legalBusinessName,
           taxId,
+          firstName,
+          lastName,
+          mobilePhone,
           contactPhone,
           contactEmail,
           website,
@@ -995,7 +1001,10 @@ function OnboardingContent() {
                   <option value="PRIVATE_PROFIT">LLC / Corporation (private)</option>
                   <option value="PUBLIC_PROFIT">Publicly traded company</option>
                   <option value="NON_PROFIT">Non-profit</option>
-                  {/* Sole proprietor removed (#119) — needs an OTP step we do not support. */}
+                  {/* Restored (#194). Removed under #119 when the OTP step Telnyx
+                    * requires had no endpoint; they have since confirmed it is manual
+                    * rather than missing, so the path works provided we say so. */}
+                  <option value="SOLE_PROPRIETOR">Sole proprietor / individual (no company)</option>
                 </select>
               </div>
 
@@ -1010,10 +1019,62 @@ function OnboardingContent() {
                 />
               </div>
 
-              {/* Always shown. SOLE_PROPRIETOR is not in this form's entity picker
-                * and the API refuses it (#119), so the old
-                * `entityType !== 'SOLE_PROPRIETOR' &&` guard could never be false —
-                * it just implied an EIN-free path that does not exist. */}
+              {/* Sole proprietors register as a person, so TCR needs a name and a
+                * mobile that can take the verification PIN. Shown only here: every
+                * other entity type accepts these fields, echoes them back, and then
+                * discards them (#193). */}
+              {entityType === 'SOLE_PROPRIETOR' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="As on your EIN letter"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="As on your EIN letter"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={mobilePhone}
+                      onChange={(e) => setMobilePhone(e.target.value)}
+                      placeholder="(407) 555-0142"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-gray-900"
+                    />
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      Carriers text a verification PIN here. It must be a mobile — a landline stops the
+                      registration with no error.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-xs text-amber-900">
+                      <strong>One manual step later.</strong> Once you add your EIN, you email{' '}
+                      <a href="mailto:10dlcquestions@telnyx.com" className="underline">10dlcquestions@telnyx.com</a>{' '}
+                      for a PIN, they text it to the number above, and you reply within 24 hours. This
+                      only affects local numbers — your toll-free number works straight away.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Always shown. Sole proprietors have an EIN too — the IRS issues one
+                * to an individual with no company, which is the whole basis of that
+                * path (#194). */}
               {(
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

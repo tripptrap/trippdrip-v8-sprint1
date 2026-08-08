@@ -35,10 +35,12 @@ const ENTITY_TYPES: { value: EntityType; label: string }[] = [
   { value: 'PUBLIC_PROFIT', label: 'Public for-profit company' },
   { value: 'NON_PROFIT', label: 'Non-profit' },
   { value: 'GOVERNMENT', label: 'Government entity' },
-  // Sole proprietor removed (#119): Telnyx requires an SMS OTP step for sole
-  // props that we do not implement, so choosing it submitted a registration that
-  // silently never completed. The API refuses it too — this list is convenience,
-  // not the boundary.
+  // Restored (#194). It was removed under #119 because the OTP step Telnyx
+  // requires had no endpoint, so choosing it submitted a registration that
+  // silently never completed. Telnyx have since confirmed the step is manual
+  // rather than missing — the user emails them for a PIN — so the path works as
+  // long as we say that out loud instead of leaving them waiting.
+  { value: 'SOLE_PROPRIETOR', label: 'Sole proprietor / individual (no company)' },
 ];
 
 function statusPill(status: string) {
@@ -71,6 +73,9 @@ export default function TenDLCRegistration() {
   const [displayName, setDisplayName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [einIssuedOn, setEinIssuedOn] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [mobilePhone, setMobilePhone] = useState('');
   const [legalNameAttested, setLegalNameAttested] = useState(false);
   const [einDoc, setEinDoc] = useState<{ name: string; url: string | null } | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -115,6 +120,10 @@ export default function TenDLCRegistration() {
           setDisplayName(data.registration.display_name || '');
           setVertical(data.registration.vertical || '');
           setEinIssuedOn(data.registration.ein_issued_on || '');
+          setEntityType((data.registration.entity_type as EntityType) || 'PRIVATE_PROFIT');
+          setFirstName(data.registration.first_name || '');
+          setLastName(data.registration.last_name || '');
+          setMobilePhone(data.registration.mobile_phone || '');
           // Deliberately NOT restored from `legal_name_attested_at`. The
           // attestation is about the name in the box right now, and the name is
           // editable — carrying a tick over from a previous save would let an
@@ -180,13 +189,19 @@ export default function TenDLCRegistration() {
           optInUrl,
           einIssuedOn: einIssuedOn || undefined,
           legalNameAttested,
+          firstName, lastName, mobilePhone,
           acknowledgeFreshEin: true,
           campaignOverrides: overrides,
         }),
       });
       const data = await res.json();
       if (data.ok) {
-        toast.success('Registration submitted');
+        if (data.actionRequired === 'sole_prop_otp') {
+          toast.success('Business registered', { duration: 6000 });
+          window.alert(data.message);
+        } else {
+          toast.success('Registration submitted');
+        }
         loadStatus();
       } else {
         toast.error(data.error || 'Registration failed');
@@ -274,12 +289,20 @@ export default function TenDLCRegistration() {
           optInUrl,
           einIssuedOn: einIssuedOn || undefined,
           legalNameAttested,
+          firstName, lastName, mobilePhone,
           campaignOverrides: overrides,
         }),
       });
       const data = await res.json();
       if (data.ok) {
-        toast.success('Registration submitted');
+        // The sole-proprietor path ends with a manual step, and a 4-second toast
+        // is not where you put a 24-hour deadline (#194).
+        if (data.actionRequired === 'sole_prop_otp') {
+          toast.success('Business registered', { duration: 6000 });
+          window.alert(data.message);
+        } else {
+          toast.success('Registration submitted');
+        }
         loadStatus();
       } else if (data.canOverride) {
         // The fresh-EIN block is a judgement call, not a carrier rule, so it is
@@ -470,6 +493,57 @@ export default function TenDLCRegistration() {
                 IRS records.
               </p>
             </div>
+
+            {/* Sole proprietors register as a PERSON.
+              *
+              * These are the only entity type that stores a name — PRIVATE_PROFIT
+              * accepts firstName/lastName and silently discards them (#193) — so they
+              * are shown only where they do something. */}
+            {entityType === 'SOLE_PROPRIETOR' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">First name</label>
+                  <input
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    placeholder="As on your EIN letter"
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Last name</label>
+                  <input
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    placeholder="As on your EIN letter"
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    Mobile number for verification
+                  </label>
+                  <input
+                    value={mobilePhone}
+                    onChange={e => setMobilePhone(e.target.value)}
+                    placeholder="(407) 555-0142"
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-100"
+                  />
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Carriers text a verification PIN here. It has to be a mobile — a landline stops the
+                    registration without an error.
+                  </p>
+                </div>
+                <div className="sm:col-span-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5">
+                  <p className="text-xs text-amber-900 dark:text-amber-200">
+                    <strong>One manual step.</strong> After you submit, email{' '}
+                    <a href="mailto:10dlcquestions@telnyx.com" className="underline">10dlcquestions@telnyx.com</a>{' '}
+                    to request your 10DLC OTP PIN. They text it to the number above, and you reply to
+                    their email with it within 24 hours. Your registration waits until that is done.
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* The date on the CP 575.
               *
