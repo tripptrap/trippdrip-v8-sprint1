@@ -45,7 +45,13 @@ export async function GET(request: NextRequest) {
     if (stateUserId && stateUserId !== user.id) {
       console.error('OAuth state mismatch - possible CSRF attempt');
       const errorRedirect = stateFrom === 'onboarding'
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=5&calendar_error=invalid_state`
+        // Step 6 is Connect Your Calendar. This said 5 — the step before it — so a
+        // user who connected their calendar was dropped on "Set Up Your AI" and
+        // reasonably concluded it had failed. It drifted when the number and
+        // business steps were reordered; a step index hardcoded in another file
+        // cannot survive that, so onboarding now resolves the step from
+        // calendar_connected and treats this number as a hint.
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=6&calendar_error=invalid_state`
         : `${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_error=invalid_state`;
       return NextResponse.redirect(errorRedirect);
     }
@@ -92,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     const successRedirect = stateFrom === 'onboarding'
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=5&calendar_connected=true`
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/onboarding?step=6&calendar_connected=true`
       : `${process.env.NEXT_PUBLIC_APP_URL}/email?calendar_connected=true`;
     return NextResponse.redirect(successRedirect);
   } catch (error: any) {

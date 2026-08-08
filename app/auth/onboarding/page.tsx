@@ -54,9 +54,26 @@ function OnboardingContent() {
   const isPostPayment = searchParams.get('success') === 'true'
   const isCalendarReturn = searchParams.get('calendar_connected') === 'true'
 
+  // Which step "Connect Your Calendar" is. Google's OAuth callback sends the
+  // user back here, and it used to name the step itself — which broke the moment
+  // the number and business steps were reordered, landing everyone on "Set Up
+  // Your AI" after a successful connection.
+  //
+  // Owned here now, next to the steps it indexes, so a reorder is a one-file
+  // change rather than a silent bug in a route nobody thinks to open.
+  const CALENDAR_STEP = 6
+
   // Determine initial step
   const getInitialStep = () => {
-    if (stepParam) return parseInt(stepParam)
+    // Returning from Google wins over ?step=. The callback still sends one, but
+    // it is a hint, not the source of truth.
+    if (isCalendarReturn) return CALENDAR_STEP
+    if (stepParam) {
+      const n = parseInt(stepParam)
+      // parseInt('abc') is NaN, and NaN fails every `currentStep === n` test, so
+      // a junk step param used to render a page with no content and no way out.
+      if (Number.isFinite(n) && n >= 1 && n <= 7) return n
+    }
     return 1
   }
 

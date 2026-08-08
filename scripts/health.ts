@@ -459,6 +459,57 @@ async function tollFreeVerification(): Promise<Result> {
   return { name, level: 'PASS', detail: `${records.length} request(s), all verified` };
 }
 
+async function poolMatchesTollFreeVerification(sb: any): Promise<Result> {
+  const name = 'pool flags match Telnyx TFV';
+  const key = process.env.TELNYX_API_KEY?.trim();
+  if (!key) return { name, level: 'SKIP', detail: 'TELNYX_API_KEY not set' };
+
+  const res = await fetch(
+    'https://api.telnyx.com/v2/messaging_tollfree/verification/requests?page=1&page_size=50',
+    { headers: { Authorization: `Bearer ${key}` } }
+  );
+  if (!res.ok) return { name, level: 'WARN', detail: `Telnyx returned HTTP ${res.status}` };
+
+  const body = await res.json();
+  const records: any[] = body?.records ?? body?.data ?? [];
+  const verified = new Set<string>();
+  for (const r of records) {
+    if (!/^verified$/i.test(String(r.verificationStatus ?? ''))) continue;
+    for (const n of r.phoneNumbers ?? []) if (n?.phoneNumber) verified.add(n.phoneNumber);
+  }
+
+  const { data: pool, error } = await sb
+    .from('number_pool')
+    .select('phone_number, is_verified')
+    .eq('number_type', 'tollfree');
+
+  if (error) return { name, level: 'WARN', detail: `could not read number_pool: ${error.message}` };
+
+  // Verified at Telnyx, still flagged unverified here — these are numbers we own,
+  // have paid for, and are refusing to hand out.
+  const withheld = (pool ?? []).filter((p: any) => verified.has(p.phone_number) && !p.is_verified);
+
+  // The dangerous direction: flagged verified here but NOT verified at Telnyx.
+  // Those get handed to a user whose messages will not deliver.
+  const overclaimed = (pool ?? []).filter((p: any) => p.is_verified && !verified.has(p.phone_number));
+
+  if (overclaimed.length > 0) {
+    return {
+      name, level: 'FAIL',
+      detail: `${overclaimed.length} pool number(s) marked verified that Telnyx does not: ${overclaimed.map((p: any) => p.phone_number).join(', ')}`,
+      because: 'A number handed out on a false verification cannot deliver, and the user has no way to tell.',
+    };
+  }
+  if (withheld.length > 0) {
+    return {
+      name, level: 'WARN',
+      detail: `${withheld.length} verified number(s) still flagged unverified: ${withheld.map((p: any) => p.phone_number).join(', ')}`,
+      because: 'Nothing syncs this flag from Telnyx. Ten sat withheld while onboarding had one number left to give.',
+    };
+  }
+  return { name, level: 'PASS', detail: `${verified.size} verified at Telnyx, pool agrees` };
+}
+
 // ── run ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -483,6 +534,7 @@ async function main() {
   await check('paid tiers are billed', () => paidTiersAreBilled(db));
   await check('messaging profiles', messagingProfiles);
   await check('toll-free verification', tollFreeVerification);
+  await check('pool flags match Telnyx TFV', () => poolMatchesTollFreeVerification(db));
 
   const failed = results.filter(r => r.level === 'FAIL');
   const warned = results.filter(r => r.level === 'WARN');
