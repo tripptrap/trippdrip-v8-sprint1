@@ -13,6 +13,71 @@ import nodemailer from 'nodemailer';
 const FROM_EMAIL = () => (process.env.SERVICE_EMAIL_FROM || 'noreply@hyvewyre.com').trim();
 const FROM_NAME = () => (process.env.SERVICE_EMAIL_FROM_NAME || 'HyveWyre').trim();
 
+
+/**
+ * Keep a copy of what we sent, in the mailbox it was sent from.
+ *
+ * ── Why this is not automatic ──────────────────────────────────────────────
+ *
+ * SMTP submission hands the message to the server and stops. Filling the Sent
+ * folder is a separate IMAP APPEND that a mail *client* performs, so a
+ * server-to-server send leaves no trace in the mailbox — support@hyvewyre.com
+ * showed an empty Sent folder while mail was demonstrably being delivered, which
+ * is exactly what it looks like when nothing is sending at all. Half an hour went
+ * into telling those two states apart.
+ *
+ * It matters beyond diagnosis. This app emails carriers on customers' behalf with
+ * their IRS documents attached. A queue id in a log that rotates is not a record
+ * of compliance correspondence; the message itself is.
+ *
+ * ── Failure is deliberately silent to the caller ───────────────────────────
+ *
+ * The mail has already been accepted by the time this runs. Reporting an IMAP
+ * problem as a send failure would make callers retry a message that went out —
+ * for the OTP relay that means a second PIN request, and for verification a
+ * duplicate at the carrier. So this logs and returns; it never throws upward.
+ */
+async function appendToSentFolder(raw: Buffer | string): Promise<void> {
+  const user = (process.env.SMTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASSWORD || '').trim();
+  if (!user || !pass) return;
+
+  // Same host as SMTP unless told otherwise — for privateemail.com and most
+  // hosts they are the same machine on a different port.
+  const host = (process.env.IMAP_HOST || process.env.SMTP_HOST || '').trim();
+  if (!host) return;
+  const port = parseInt((process.env.IMAP_PORT || '993').trim(), 10);
+
+  let client: any;
+  try {
+    const { ImapFlow } = await import('imapflow');
+    client = new ImapFlow({
+      host, port, secure: true,
+      auth: { user, pass },
+      // Its own logging is extremely chatty and this runs on every send.
+      logger: false,
+    });
+    await client.connect();
+
+    // Servers disagree about what Sent is called. Ask, rather than guessing and
+    // silently creating a stray "Sent" alongside the real one.
+    let mailbox = 'Sent';
+    try {
+      const list = await client.list();
+      const found = list.find((m: any) =>
+        m.specialUse === '\\Sent' || /^(sent|sent items|sent mail)$/i.test(m.path)
+      );
+      if (found?.path) mailbox = found.path;
+    } catch { /* fall back to 'Sent' */ }
+
+    await client.append(mailbox, raw, ['\\Seen']);
+  } catch (err: any) {
+    console.error('sendEmail: message sent but could not be copied to Sent:', err?.message || err);
+  } finally {
+    try { await client?.logout(); } catch { /* connection already gone */ }
+  }
+}
+
 /**
  * Build a transport for whichever provider is configured.
  *
@@ -109,7 +174,7 @@ export async function sendEmail(opts: {
 
   try {
     const transporter = createTransporter();
-    const info = await transporter.sendMail({
+    const mail = {
       from: `${FROM_NAME()} <${FROM_EMAIL()}>`,
       to: recipients.join(', '),
       subject: opts.subject,
@@ -121,7 +186,9 @@ export async function sendEmail(opts: {
       // match up by hand.
       ...(opts.inReplyTo ? { inReplyTo: opts.inReplyTo, references: [opts.inReplyTo] } : {}),
       ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
-    });
+    };
+
+    const info = await transporter.sendMail(mail);
     // `sendMail` resolving is not the same as the server taking the message.
     // Nodemailer resolves when at least one recipient is accepted, so a partly
     // or wholly rejected send could return ok:true and nobody would know — and
@@ -140,6 +207,17 @@ export async function sendEmail(opts: {
         rejected,
         response: info?.response,
       };
+    }
+
+    // Copy to Sent, after the send and never in place of it. Compiled through a
+    // throwaway stream transport because SMTP delivery does not hand back the
+    // raw message, and re-composing it is the only way to get identical bytes.
+    try {
+      const composer = nodemailer.createTransport({ streamTransport: true, buffer: true });
+      const built = await composer.sendMail(mail as any);
+      if (built?.message) await appendToSentFolder(built.message as Buffer);
+    } catch (err: any) {
+      console.error('sendEmail: could not build a copy for Sent:', err?.message || err);
     }
 
     // Returned so callers that log deliveries keep their provider reference —
