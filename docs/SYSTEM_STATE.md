@@ -5370,3 +5370,48 @@ nothing here can observe, and Telnyx allow 24 hours to reply once the PIN is sen
 Self-reported rather than automated on purpose: the PIN arrives on the user's
 phone and only they can send it back, so hiding the step would hide the deadline
 too.
+
+## The users-grant trap now fails the build (#195 follow-up, 2026-08-08)
+
+`authenticated` holds column-level UPDATE on `public.users` for exactly four
+columns — `business_hours`, `business_name`, `timezone`, `updated_at`. Anything
+else written through the caller's client is rejected with `permission denied for
+table users`.
+
+That had shipped **seven** times. It hides well: supabase-js returns `{ error }`
+rather than throwing, most callers log and continue, and optimistic UI shows the
+change anyway — so it looks like it worked until the page reloads.
+
+```bash
+npm run check:user-writes    # also runs as part of npm run health
+```
+
+`scripts/check-user-writes.ts` resolves each `.from('users').update()` back to
+how its client was created and requires every column in the payload to be granted
+unless the client is service-role. The granted set comes from
+`health_catalog_checks()` (extended for this) rather than a constant — a
+hardcoded list would be a second source of truth drifting from the grants it
+exists to enforce, which is the same failure in a new place.
+
+Verified by reintroducing #195 and watching it fail, then restoring.
+
+### Seven more instances it found on its first run
+
+| route | column(s) discarded | user-visible effect |
+|---|---|---|
+| `calendar/disconnect` | `google_calendar_*` | **Disconnect never worked** — returned "Failed to disconnect calendar" |
+| `calendar/get-slots`, `create-event`, `check-availability`, `appointments` | refreshed `google_calendar_*` tokens | Integration broke ~1h after every re-auth, because the refreshed token was never stored |
+| `user/profile` | `full_name`, `phone_number` | Name and phone changes silently lost |
+| `user/settings` | `default_message_signature`, `auto_reply_enabled`, `auto_reply_message` | Those settings silently never saved |
+
+All fixed and confirmed at runtime — `disconnect` now returns `{"success":true}`,
+and a phone number written through the profile route reaches the database.
+
+**When adding a column to `public.users`, assume it is not writable by the user's
+client.** Either grant it explicitly or use `createServiceRoleClient()` scoped
+with `.eq('id', user.id)` — the elevated client bypasses RLS, so that filter is
+the only thing keeping the write on the caller's own row.
+
+What the checker cannot see — a client passed into a helper, a column name built
+at runtime — is reported as UNKNOWN rather than passed. Zero of those today; if
+one appears, it needs a person, not a suppression.
