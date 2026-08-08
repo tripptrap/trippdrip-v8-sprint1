@@ -5300,3 +5300,36 @@ known then and is wrong now — see #194.
 path is a real option for most users rather than a consolation prize. An EIN alone
 **is** enough — the earlier reading of "you need a registered entity" was wrong,
 and no part of this ever required an LLC.
+
+### The sole-proprietor path is on again (#194, 2026-08-07)
+
+`SOLE_PROPRIETOR` is selectable in both pickers and accepted by
+`/api/telnyx/10dlc/register`. What changed is knowledge, not the API: the OTP step
+is manual (see above), and #119 had reasonably read "no endpoint" as "not
+possible".
+
+Three things the code now enforces, each with a reason that has already cost
+something:
+
+- **`firstName`, `lastName` and `mobilePhone` are sent only for this entity
+  type.** `lib/telnyx10dlc.ts` gates them on `entityType === 'SOLE_PROPRIETOR'`
+  rather than on "was a value supplied". Sending them for a `PRIVATE_PROFIT`
+  brand is not harmlessly ignored from our side — it makes a request look like it
+  carried a name TCR could match on, when the field is discarded invisibly.
+- **The mobile is a separate field, not the business contact number.** The PIN
+  arrives by SMS. A landline ends the registration in exactly the silence this
+  path was withdrawn for, and line type cannot be detected.
+- **The success response says what happens next.** For a sole proprietor the
+  route returns `actionRequired: 'sole_prop_otp'` with the email address and the
+  24-hour deadline, in place of the "usually a few minutes, sometimes a few days"
+  message every other registration gets. That ETA is false here: the brand does
+  not clear until the user acts.
+
+Verified end to end in mock: `createBrand` returns a brand whose `firstName`,
+`lastName` and `mobilePhone` survive a **re-read**. That is the check that
+matters — the create response echoes fields it has not stored.
+
+Not yet built: nothing records that the user has actually emailed Telnyx.
+`otp_requested_at` exists on the table for it, and until something writes it, a
+brand waiting on a PIN is indistinguishable from one waiting on TCR — which is
+the same overloaded-`pending` problem as #190.
