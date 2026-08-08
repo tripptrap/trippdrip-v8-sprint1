@@ -5415,3 +5415,33 @@ the only thing keeping the write on the caller's own row.
 What the checker cannot see — a client passed into a helper, a column name built
 at runtime — is reported as UNKNOWN rather than passed. Zero of those today; if
 one appears, it needs a person, not a suppression.
+
+### Campaigns are qualification-checked before they are paid for (#192, 2026-08-08)
+
+`GET /10dlc/campaignBuilder/brand/{id}/usecase/{uc}` is **free** and returns a
+per-carrier `qualify` flag plus the fee schedule. `checkCampaignQualification()`
+in `lib/telnyx10dlc.ts` wraps it, and both submission paths call it —
+`lib/tenDlcSync` (the deferred campaign, once a brand verifies) and the register
+route's direct path.
+
+The signal is decisive, not advisory. Measured against both real brands:
+
+| brand | identityStatus | carriers qualifying |
+|---|---|---|
+| HyveWyre LLC | VERIFIED | all seven |
+| Tripp Browning | UNVERIFIED | **none** |
+
+That second row is the $15 this saves. It was caught by hand on 2026-08-07,
+after the $4.50 brand fee had already gone.
+
+**Declining is not an error state.** `campaign_status` stays `not_started`, the
+brand and reviewed `campaign_content` are kept, and the next sync retries for
+free — carriers changing their mind is the expected outcome, not a failure. The
+route still returns `ok: true`, because from the user's side nothing failed.
+
+**It fails OPEN.** If the check cannot complete — outage, unknown brand id, a
+changed response shape — the result carries `error`, `qualifies` stays true, and
+submission proceeds. An outage at Telnyx must not block a registration that would
+have succeeded, and refusing on silence would turn a response-shape change into an
+outage of our own. An empty `mnoMetadata` is treated as "cannot tell" for the same
+reason, never as "nobody qualifies".
