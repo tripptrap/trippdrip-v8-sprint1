@@ -4,13 +4,34 @@ import { useState, useEffect } from 'react';
 import { BarChart3, Users, CheckCircle, XCircle, Calendar, TrendingUp, ArrowLeft, Loader2, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
+/**
+ * A required question is an OBJECT, not a string.
+ *
+ * It became `{ question, fieldName }` when flows gained per-step tags and field
+ * mapping. This page still declared `string[]` and rendered the value directly,
+ * so React threw "Objects are not valid as a React child" and the whole page hit
+ * its error boundary — for every account with a flow, which is every account that
+ * has finished onboarding.
+ *
+ * The string form is still accepted below because a flow saved before that change
+ * can still hold one, and crashing on old data is how this happened in the first
+ * place.
+ */
+type RequiredQuestion = string | { question?: string; fieldName?: string };
+
 interface Flow {
   id: string;
   name: string;
   description: string;
   steps: any[];
-  requiredQuestions: string[];
+  requiredQuestions: RequiredQuestion[];
   created_at: string;
+}
+
+/** Never returns an object, whatever shape the flow was saved in. */
+function questionLabel(q: RequiredQuestion): string {
+  if (typeof q === 'string') return q;
+  return q?.question || q?.fieldName || 'Untitled question';
 }
 
 interface FlowStat {
@@ -262,7 +283,7 @@ export default function FlowAnalyticsPage() {
                         <div className="flex flex-wrap gap-2">
                           {flow.requiredQuestions.map((q, i) => (
                             <span key={i} className="px-2 py-1 text-xs bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-slate-600 dark:text-slate-300">
-                              {q}
+                              {questionLabel(q)}
                             </span>
                           ))}
                         </div>
