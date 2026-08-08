@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 
 // GET - Fetch all appointments for the user
 export async function GET(req: NextRequest) {
@@ -188,7 +188,7 @@ export async function DELETE(req: NextRequest) {
           const tokenData = await tokenRes.json();
           if (tokenData.access_token) {
             accessToken = tokenData.access_token;
-            await supabase.from('users').update({
+            await createServiceRoleClient().from('users').update({
               google_calendar_access_token: tokenData.access_token,
               google_calendar_token_expiry: tokenData.expires_in
                 ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()

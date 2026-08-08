@@ -1,6 +1,6 @@
 // API Route: Get and update current user's profile info
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -78,7 +78,10 @@ export async function PATCH(req: NextRequest) {
     if (business_name !== undefined) userUpdates.business_name = business_name;
 
     if (Object.keys(userUpdates).length > 0) {
-      const { error: dbUpdateError } = await supabase
+    // Service role: full_name and phone_number are not among the four columns
+    // `authenticated` may update on public.users, so this sync failed silently —
+    // the error was logged and swallowed, and a user's name change never landed.
+      const { error: dbUpdateError } = await createServiceRoleClient()
         .from('users')
         .update(userUpdates)
         .eq('id', user.id);

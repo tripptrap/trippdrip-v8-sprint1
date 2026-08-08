@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from 'googleapis';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { DateTime } from "luxon";
 
 const SLOT_DURATION_MIN = 30; // 30-minute slots
@@ -34,7 +34,7 @@ async function getAuthClient(userId: string) {
 
   oauth2Client.on('tokens', async (tokens) => {
     if (tokens.refresh_token) {
-      await supabase
+      await createServiceRoleClient()
         .from('users')
         .update({
           google_calendar_access_token: tokens.access_token,
@@ -43,7 +43,7 @@ async function getAuthClient(userId: string) {
         })
         .eq('id', userId);
     } else if (tokens.access_token) {
-      await supabase
+      await createServiceRoleClient()
         .from('users')
         .update({
           google_calendar_access_token: tokens.access_token,

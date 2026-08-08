@@ -85,7 +85,11 @@ export async function PUT(req: NextRequest) {
       }
 
       if (Object.keys(userUpdates).length > 0) {
-        const { data, error: updateError } = await supabase
+      // Service role: only business_hours here is a column `authenticated` may
+      // update. default_message_signature, auto_reply_enabled and
+      // auto_reply_message are not, so the whole statement was rejected and every
+      // one of these settings silently failed to save.
+        const { data, error: updateError } = await createServiceRoleClient()
           .from('users')
           .update(userUpdates)
           .eq('id', user.id)

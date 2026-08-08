@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear Google Calendar tokens
-    const { error: updateError } = await supabase
+    const { error: updateError } = await createServiceRoleClient()
       .from('users')
       .update({
         google_calendar_access_token: null,
