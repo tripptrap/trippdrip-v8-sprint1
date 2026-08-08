@@ -76,17 +76,33 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - **Auto-buy option:** user can enable auto-purchase and pick which point pack to auto-buy when they hit zero.
 
 ## Onboarding Flow
-1. User creates account (no free option — paid plans only)
-2. Asked demographic questions (industry, business type, etc.)
-3. Given a free **shared toll-free** number from the pool. **Not local** — a local
-   number requires the agent's own 10DLC brand and campaign to be submitted and
-   approved first, so it cannot be a day-one thing (#1, #18, #120). This said
-   "local" for a long time while the product gave toll-free; onboarding inventory
-   is therefore a hard cap on signups, and `lib/numberPoolInventory.ts` alerts
-   before the pool runs dry.
-4. Guided to set up their AI Flows and Receptionist based on their industry
-5. Shown industry-specific preset pipeline stages (user can customize)
-6. Optionally connect Google Calendar
+Seven steps, in `app/auth/onboarding/page.tsx` (`totalSteps = 7`). **This list had
+drifted from the code in three places; it is what actually runs as of 2026-08-08.**
+
+1. **Choose a plan → Stripe Checkout.** Payment is first, not last — the user
+   leaves for Stripe before seeing anything else. No free tier, no trial.
+2. **Free number.** A **shared toll-free** number from the pool. **Not local** — a
+   local number needs the agent's own 10DLC brand and campaign approved first, so
+   it cannot be day one (#1, #18, #120). Pool inventory is therefore a hard cap on
+   signups; `lib/numberPoolInventory.ts` alerts before it runs dry, and
+   `npm run health` asserts the pool's verification flags match Telnyx.
+3. **Business setup**, including the 10DLC/EIN block. **Deliberately after the
+   number** — asking for an EIN first gated every signup behind a rule that does
+   not apply to toll-free. The EIN is optional here: details save, carrier
+   submission waits.
+4. Pipeline stages (industry presets, customisable)
+5. AI Flows and Receptionist
+6. Google Calendar (optional). The OAuth callback must send the user back to
+   **step 6**; it said 5 for a while, so connecting looked like it had failed.
+   `CALENDAR_STEP` lives in the page, not the API route, so a reorder cannot break
+   it again.
+7. Done
+
+**Sole proprietors are supported** (#194). `SOLE_PROPRIETOR` was withdrawn under
+#119 when the OTP step appeared to have no endpoint; Telnyx confirmed it is
+manual — the user emails `10dlcquestions@telnyx.com`, gets a PIN by SMS, and
+replies within 24h. An EIN alone is enough for 10DLC. **Nothing here requires an
+LLC**, and toll-free needs no EIN, brand or entity at all.
 
 ## Leads vs Clients — Two Distinct Concepts
 - **Leads** = prospects being worked. Use **Flows** (AI conversation templates) to qualify them.
@@ -113,7 +129,7 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 ## Tech Stack
 - **Framework:** Next.js 14 (App Router), TypeScript, Tailwind CSS
 - **Database:** Supabase (PostgreSQL + Row Level Security + Auth)
-- **SMS Provider:** Telnyx (primary) — Twilio code exists but is legacy, do not remove
+- **SMS Provider:** Telnyx — the only provider. No other SMS provider code remains.
 - **AI:** OpenAI GPT-4o-mini
 - **Payments:** Stripe (subscriptions + one-time point packs)
 - **Calendar:** Google Calendar API (OAuth)
@@ -126,7 +142,7 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - `/texts` — conversation inbox with tabs for Lead conversations and Client conversations (a thin wrapper around `components/texts/TextsLayout.tsx`; a superseded 1177-line `/messages` page was deleted in #89 — this is the live one)
 - `/campaigns` — categorize what kind of lead a person is (health, life, auto, home, solar, etc.)
 - `/flows` — AI conversation templates (industry presets + custom builder) for qualifying leads and booking appointments
-- `/phone-numbers` — search/purchase local numbers via Telnyx (porting planned pre-launch)
+- `/phone-numbers` — claim a pool toll-free number, or search/purchase local numbers via Telnyx (local requires an approved 10DLC campaign; porting planned pre-launch)
 - `/points` — credit balance, transaction history, buy point packs
 - `/settings` — profile info, plan management (upgrade/downgrade), spam protection, DNC list, auto-buy config
 - `/receptionist` — AI auto-reply config for clients and inbound leads (not outbound prospecting)
@@ -214,10 +230,29 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - Native iOS/Android app planned for post-launch
 
 ## Phone Numbers
-- New numbers purchased via Telnyx during onboarding (one free with plan)
-- Additional numbers available for purchase
-- Number porting (bring your own number) planned for pre-launch
+Two regimes, and conflating them causes most of the confusion here.
+
+- **Toll-free** — authorised by Toll-Free Verification, **not** 10DLC. The shared
+  pool is verified under HyveWyre's own ISV/reseller TFV, so a user with no EIN,
+  no brand and no registered entity claims one and sends immediately.
+  `lib/numberEligibility.ts` returns `allowed: true` for toll-free before any
+  registration check runs. This is the day-one path.
+- **Local** — needs the user's own 10DLC brand **and** campaign approved. This is
+  the only thing 10DLC gates.
+- Additional numbers available for purchase; porting planned pre-launch
 - Geo-routing: system picks the closest local number to each lead's zip code
+
+### 10DLC states worth knowing
+`brand_status` is `not_started | pending | unverified | verified | failed`.
+**`unverified` is not `pending`** — it means TCR looked and could not match the
+business, so waiting alone may never resolve it (#190). What clears it depends on
+entity type: a sole proprietor completes the manual OTP; anyone else needs IRS
+propagation, paid external vetting, or a **new** brand, because `companyName` and
+`ein` are immutable once TCR holds them.
+
+Before any campaign is submitted, `checkCampaignQualification()` asks Telnyx —
+free — whether any carrier will take it (#192). It fails open: if the check
+cannot run, submission proceeds.
 
 ## Data Model (Core Entities)
 - **Users** — auth via Supabase, subscription tier (Growth/Scale), credits balance, industry, demographic info
@@ -238,8 +273,7 @@ HyveWyre is a multi-tenant SaaS SMS marketing and lead management platform for a
 - **AI Drips** — AI-generated follow-ups with quiet hours (9pm–9am EST)
 
 ## Important Notes
-- **Twilio has been completely removed** — all SMS goes through Telnyx only
-- `PROVIDER_NOTE.md` documents the Telnyx migration
+- `PROVIDER_NOTE.md` documents the migration to Telnyx
 - `scripts/` contains useful one-time utilities — keep
 - `browser-extension/` is a separate feature — keep
 - Test pages (`/test-ai`, `/test-points`) are useful for dev — keep

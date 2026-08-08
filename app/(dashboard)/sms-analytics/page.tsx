@@ -6,15 +6,13 @@ import { MessageSquare, TrendingUp, DollarSign, CheckCircle, XCircle, Clock, Fil
 interface SMSMessage {
   id: string;
   to_phone: string;
-  message_body: string;
-  twilio_status: string | null;
-  cost_points: number;
-  sent_at: string;
-  delivered_at: string | null;
-  failed_at: string | null;
+  body: string;
+  status: string | null;
+  points_cost: number;
+  created_at: string;
   lead_id: string | null;
   campaign_id: string | null;
-  twilio_error_message: string | null;
+  error_message: string | null;
   lead?: {
     first_name: string;
     last_name: string;
@@ -104,8 +102,11 @@ export default function SMSAnalyticsPage() {
     return phone;
   };
 
-  const getStatusBadge = (status: string | null, failedAt: string | null, deliveredAt: string | null) => {
-    if (failedAt || status === 'failed') {
+  // Status is the one source of truth. The old table carried delivered_at and
+  // failed_at alongside it; `messages` does not, so there is nothing to
+  // reconcile and nothing that can disagree with itself.
+  const getStatusBadge = (status: string | null) => {
+    if (status === 'failed' || status === 'undelivered') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
           <XCircle className="w-3 h-3" />
@@ -113,7 +114,7 @@ export default function SMSAnalyticsPage() {
         </span>
       );
     }
-    if (deliveredAt || status === 'delivered') {
+    if (status === 'delivered') {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
           <CheckCircle className="w-3 h-3" />
@@ -140,13 +141,13 @@ export default function SMSAnalyticsPage() {
   const exportToCSV = () => {
     const headers = ['Date', 'Recipient', 'Lead', 'Campaign', 'Status', 'Message', 'Cost'];
     const rows = messages.map(msg => [
-      formatDate(msg.sent_at),
+      formatDate(msg.created_at),
       formatPhone(msg.to_phone),
       msg.lead ? `${msg.lead.first_name} ${msg.lead.last_name}` : '-',
       msg.campaign?.name || '-',
-      msg.twilio_status || 'pending',
-      msg.message_body.replace(/"/g, '""'),
-      msg.cost_points.toString(),
+      msg.status || 'pending',
+      msg.body.replace(/"/g, '""'),
+      msg.points_cost.toString(),
     ]);
 
     const csvContent = [
@@ -340,7 +341,7 @@ export default function SMSAnalyticsPage() {
                 messages.map((message) => (
                   <tr key={message.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                      {formatDate(message.sent_at)}
+                      {formatDate(message.created_at)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
                       {formatPhone(message.to_phone)}
@@ -360,18 +361,18 @@ export default function SMSAnalyticsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-xs truncate">
-                      {message.message_body}
-                      {message.twilio_error_message && (
+                      {message.body}
+                      {message.error_message && (
                         <div className="text-xs text-red-600 mt-1">
-                          Error: {message.twilio_error_message}
+                          Error: {message.error_message}
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {getStatusBadge(message.twilio_status, message.failed_at, message.delivered_at)}
+                      {getStatusBadge(message.status)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                      {message.cost_points} pt{message.cost_points !== 1 ? 's' : ''}
+                      {message.points_cost} pt{message.points_cost !== 1 ? 's' : ''}
                     </td>
                   </tr>
                 ))
