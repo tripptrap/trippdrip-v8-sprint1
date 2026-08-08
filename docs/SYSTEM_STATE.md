@@ -5638,7 +5638,23 @@ Before this existed, "did that email send?" was unanswerable: `sendEmail` return
 and `response`. Nodemailer resolves when **at least one** recipient is accepted,
 so a partly rejected send was indistinguishable from a good one.
 
-**Still missing: a record of what was sent.** The product now emails carriers on
-customers' behalf with their tax documents attached, and keeps no copy — only a
-queue id in a log. For compliance correspondence that is a gap worth closing with
-an IMAP `APPEND` to Sent after each successful send.
+**Now recorded.** `sendEmail` performs an IMAP `APPEND` to Sent after each
+successful send, so every message the app sends appears in the mailbox it was sent
+from — the record that matters when the app is emailing carriers on customers'
+behalf with their IRS documents attached.
+
+Three things about how it is built:
+
+- The copy is composed through a throwaway `streamTransport`, because SMTP
+  delivery does not hand back the raw message and re-composing is the only way to
+  get identical bytes.
+- The Sent mailbox is **discovered** from the server's `\\Sent` special-use flag
+  rather than assumed, so it lands in the real folder instead of creating a stray
+  "Sent" beside it.
+- **Failure is silent to the caller, deliberately.** By the time it runs the mail
+  has been accepted; reporting an IMAP problem as a send failure would make
+  callers retry a message that already went — a second OTP PIN request, or a
+  duplicate filing at the carrier. It logs and returns.
+
+`IMAP_HOST` defaults to `SMTP_HOST` and `IMAP_PORT` to 993, which is right for
+privateemail.com and most hosts.
