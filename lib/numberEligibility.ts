@@ -86,15 +86,12 @@ export async function checkNumberEligibility(
   }
 
   // Sole proprietor used to be exempt from the EIN check, on the grounds that
-  // Telnyx registers them with an SSN instead. That exemption is now a hole: the
-  // entity type was withdrawn (#119) because Telnyx also requires an SMS OTP
-  // step we do not implement, so a sole-prop registration can never complete —
-  // and leaving the exemption in place would let such a row pass this gate and
-  // be handed a local number that cannot send.
-  //
-  // No live rows are affected (the only registration on the system is
-  // PRIVATE_PROFIT), but the exemption outliving the feature it existed for is
-  // exactly how a latent hole is created.
+  // Telnyx registers them with an SSN instead. The exemption is gone and stays
+  // gone: sole props are supported again (#194) and they do supply an EIN — the
+  // IRS issues one to an individual with no company, which is the whole basis of
+  // that path. So the requirement below applies to every entity type, and no
+  // registration can pass this gate without the field that starts the carrier
+  // clock.
   if (!reg.tax_id?.trim()) {
     return { allowed: false, code: 'missing_ein', reason: GATE_MESSAGES.missing_ein };
   }
