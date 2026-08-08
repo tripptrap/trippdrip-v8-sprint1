@@ -18,6 +18,7 @@ type Registration = {
   brand_id: string | null;
   brand_status: 'not_started' | 'pending' | 'unverified' | 'verified' | 'failed';
   otp_requested_at: string | null;
+  otp_pin_sent_at: string | null;
   brand_failure_reason: string | null;
   campaign_id: string | null;
   campaign_status: 'not_started' | 'pending' | 'active' | 'failed';
@@ -83,6 +84,10 @@ export default function TenDLCRegistration() {
   const [legalNameAttested, setLegalNameAttested] = useState(false);
   const [einDoc, setEinDoc] = useState<{ name: string; url: string | null } | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [otpConsent, setOtpConsent] = useState(false);
+  const [otpPin, setOtpPin] = useState('');
+  const [requestingPin, setRequestingPin] = useState(false);
+  const [submittingPin, setSubmittingPin] = useState(false);
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -221,20 +226,56 @@ export default function TenDLCRegistration() {
     }
   }
 
-  // Self-reported, because the request is an email we cannot observe. See the
-  // route for why automating it would be the wrong trade.
-  async function handleOtpRequested() {
+  // We send the request ourselves now, with the CP 575 attached, rather than
+  // telling the user to email Telnyx. Consent is passed explicitly — uploading a
+  // tax document is not agreement to forward it.
+  async function handleRequestPin() {
+    if (!otpConsent) {
+      toast.error('Tick the box first — we need your permission to send your EIN letter to the carrier.');
+      return;
+    }
+    setRequestingPin(true);
     try {
-      const res = await fetch('/api/telnyx/10dlc/otp-requested', { method: 'POST' });
+      const res = await fetch('/api/telnyx/10dlc/otp-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent: true }),
+      });
       const data = await res.json();
       if (!data.ok) {
-        toast.error(data.error || 'Could not record that');
+        toast.error(data.error || 'Could not request your PIN');
         return;
       }
-      toast.success('Noted — reply to their email with the PIN within 24 hours');
+      toast.success(data.message, { duration: 9000 });
       loadStatus();
     } catch {
-      toast.error('Could not record that');
+      toast.error('Could not request your PIN');
+    } finally {
+      setRequestingPin(false);
+    }
+  }
+
+  async function handleSubmitPin() {
+    if (!otpPin.trim()) return;
+    setSubmittingPin(true);
+    try {
+      const res = await fetch('/api/telnyx/10dlc/otp-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: otpPin.trim() }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        toast.error(data.error || 'Could not send your PIN');
+        return;
+      }
+      toast.success(data.message, { duration: 9000 });
+      setOtpPin('');
+      loadStatus();
+    } catch {
+      toast.error('Could not send your PIN');
+    } finally {
+      setSubmittingPin(false);
     }
   }
 
@@ -467,26 +508,63 @@ export default function TenDLCRegistration() {
             isSoleProp ? (
               <div className="rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-3 py-3 space-y-2">
                 <p className="text-xs text-orange-900 dark:text-orange-200">
-                  <strong>One step left, and only you can do it.</strong> Email{' '}
-                  <a href="mailto:10dlcquestions@telnyx.com?subject=10DLC%20OTP%20PIN%20request" className="underline">
-                    10dlcquestions@telnyx.com
-                  </a>{' '}
-                  asking for your 10DLC OTP PIN, quoting your business name. They text the PIN to{' '}
-                  {mobilePhone || 'your mobile'}, and you reply to their email with it{' '}
-                  <strong>within 24 hours</strong>.
+                  <strong>One step left.</strong> We&apos;ll ask the carrier to verify you and send
+                  your EIN letter across. They text a PIN to {mobilePhone || 'your mobile'}; type it in
+                  here and we handle the rest.
                 </p>
-                {registration.otp_requested_at ? (
+                {!registration.otp_requested_at ? (
+                  <>
+                    {/* Consent, unticked. Uploading the letter to your own account
+                      * and having it forwarded to a carrier are different acts, and
+                      * only the second one needs asking about. */}
+                    <label className="flex items-start gap-2 text-xs text-orange-900 dark:text-orange-200">
+                      <input
+                        type="checkbox"
+                        checked={otpConsent}
+                        onChange={e => setOtpConsent(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        Send my IRS EIN letter to Telnyx to verify my registration. It goes to the
+                        carrier&apos;s 10DLC team and nowhere else.
+                      </span>
+                    </label>
+                    <button
+                      onClick={handleRequestPin}
+                      disabled={requestingPin || !otpConsent}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+                    >
+                      {requestingPin ? 'Requesting…' : 'Request my PIN'}
+                    </button>
+                  </>
+                ) : registration.otp_pin_sent_at ? (
                   <p className="text-xs text-orange-800 dark:text-orange-300">
-                    Requested {new Date(registration.otp_requested_at).toLocaleString()}. If no PIN has
-                    arrived, reply to your own email to chase it — the request is theirs to action.
+                    PIN sent {new Date(registration.otp_pin_sent_at).toLocaleString()}. Verification
+                    usually completes within a business day — this updates on its own.
                   </p>
                 ) : (
-                  <button
-                    onClick={handleOtpRequested}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                    I&apos;ve emailed them — start the 24-hour clock
-                  </button>
+                  <>
+                    <p className="text-xs text-orange-800 dark:text-orange-300">
+                      Requested {new Date(registration.otp_requested_at).toLocaleString()}. Telnyx will
+                      text a PIN to {mobilePhone || 'your mobile'} — enter it here. It expires 24 hours
+                      after they send it.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        value={otpPin}
+                        onChange={e => setOtpPin(e.target.value)}
+                        placeholder="PIN from the text"
+                        className="flex-1 border border-orange-300 dark:border-orange-700 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800 dark:text-slate-100"
+                      />
+                      <button
+                        onClick={handleSubmitPin}
+                        disabled={submittingPin || !otpPin.trim()}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+                      >
+                        {submittingPin ? 'Sending…' : 'Send PIN'}
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             ) : (

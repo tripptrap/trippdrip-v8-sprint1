@@ -5562,3 +5562,48 @@ with `failureReasons: null`, while T-Mobile and non-T-Mobile both read ADDED. #1
 records that AT&T delivery appeared to work regardless, so the field may be
 reporting rather than blocking. That is still unproven either way, and the only
 thing that settles it is sending to a real AT&T handset and reading the DLR.
+
+## The sole-proprietor OTP is now relayed for the user (2026-08-08)
+
+Telnyx verify a `SOLE_PROPRIETOR` brand by texting a PIN to the person's mobile
+and taking it back **by email**, inside 24 hours. No endpoint exists for any of
+it. Support confirmed the process and that "an ISV/CSP can assist"; six follow-up
+questions are still queued with their 10DLC team.
+
+`lib/soleProprietorOtp.ts` does both halves:
+
+1. `requestOtpPin()` — emails `10dlcquestions@telnyx.com` with `brandId`,
+   `tcrBrandId`, legal name and mobile, and the CP 575 attached.
+2. `relayOtpPin()` — sends the PIN the customer read off their phone.
+
+**No inbound mail handling.** The PIN arrives by SMS on the customer's own
+handset, never in our mailbox, so this is send-only — which is what makes it
+cheap.
+
+**Threading does not depend on Telnyx's answer.** We send the request, so we know
+its `Message-ID` and set `In-Reply-To` (and `References`) on the PIN. It threads
+whichever convention they use, and the body quotes the brand ids for the case
+where a human replies from a different address. The open question of "reply vs
+new message" was never actually blocking.
+
+### `TENDLC_OTP_AUTOSEND` is off by default
+
+Until Telnyx confirm a platform may relay the PIN rather than the sole proprietor
+mailing them directly, every message is addressed to the first `ADMIN_EMAILS`
+inbox instead, subject-prefixed `[REVIEW — not sent to Telnyx]` with the
+destination in the body. The flow is complete either way; the switch decides the
+recipient, not whether it works. `otp_request_message_id` is stored **only** when
+the message really went to Telnyx — threading a PIN onto something that never
+reached them is worse than not threading.
+
+### Consent is separate from upload
+
+Uploading a tax document to your own account and having it forwarded to a carrier
+are different acts. `otp_consent_at` records the second, the tick defaults to off,
+and `requestOtpPin()` refuses without it — checked in the library rather than only
+the route, because the library is what actually transmits the file.
+
+Verified with autosend off: a `PRIVATE_PROFIT` account is refused, a sole
+proprietor without consent is refused, and a malformed PIN is rejected. PIN format
+validation is deliberately loose — Telnyx have not documented it, and rejecting a
+valid PIN while a 24-hour clock runs is the worse error.

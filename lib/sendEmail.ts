@@ -96,6 +96,13 @@ export async function sendEmail(opts: {
   subject: string;
   text: string;
   html: string;
+  /** Where a human should reply. FROM_EMAIL is a noreply, so anything that
+   *  expects an answer must set this or the answer is lost. */
+  replyTo?: string;
+  /** Message-ID of the message this answers, so it threads rather than starting
+   *  a new conversation in the recipient's inbox. */
+  inReplyTo?: string;
+  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>;
 }): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
   if (recipients.length === 0) return { ok: false, error: 'No recipients' };
@@ -108,6 +115,12 @@ export async function sendEmail(opts: {
       subject: opts.subject,
       text: opts.text,
       html: opts.html,
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      // References as well as In-Reply-To: some clients thread on one, some the
+      // other, and a PIN that lands in a fresh thread is a PIN a human has to
+      // match up by hand.
+      ...(opts.inReplyTo ? { inReplyTo: opts.inReplyTo, references: [opts.inReplyTo] } : {}),
+      ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
     });
     // Returned so callers that log deliveries keep their provider reference —
     // service_emails.message_id would otherwise go null.
