@@ -128,6 +128,41 @@ export async function createBrand(params: CreateBrandParams): Promise<BrandResul
   }
 }
 
+/**
+ * Force a simulated identity outcome on MOCK brands only (#191).
+ *
+ * Telnyx auto-verifies mock `PRIVATE_PROFIT` brands. That is convenient and it
+ * is also the problem: identity matching is the single most likely thing to fail
+ * for a real customer, and it is stubbed to always pass on the one entity type
+ * customers actually register as. Every mock run reported success; the first real
+ * non-LLC registration came back UNVERIFIED with no carrier qualifying it (#193).
+ * So mock could not exercise the dead-end path at all — the branch that decides
+ * what a stuck user is told had no way to be reached in testing.
+ *
+ * Set TELNYX_10DLC_MOCK_IDENTITY to UNVERIFIED / FAILED / VERIFIED to simulate
+ * that outcome. Mock SOLE_PROPRIETOR brands already return UNVERIFIED honestly,
+ * so this exists for the types that do not.
+ *
+ * Two independent guards, because getting this wrong in production would mean
+ * telling a paying customer their verified brand had failed:
+ *   1. TELNYX_10DLC_MOCK must be 'true' — environment only, never a request body;
+ *   2. the brand itself must report `mock: true` from Telnyx.
+ * Neither alone is enough. A stale env var cannot touch a real brand, and a mock
+ * brand is untouched unless mock mode is deliberately on.
+ */
+function simulatedIdentityStatus(brandIsMock: boolean): string | null {
+  if (process.env.TELNYX_10DLC_MOCK?.trim() !== 'true') return null;
+  if (!brandIsMock) return null;
+
+  const forced = process.env.TELNYX_10DLC_MOCK_IDENTITY?.trim().toUpperCase();
+  if (!forced) return null;
+  if (!['VERIFIED', 'UNVERIFIED', 'FAILED'].includes(forced)) {
+    console.warn(`TELNYX_10DLC_MOCK_IDENTITY="${forced}" is not VERIFIED, UNVERIFIED or FAILED — ignoring`);
+    return null;
+  }
+  return forced;
+}
+
 export async function getBrandStatus(brandId: string): Promise<BrandResult> {
   const key = apiKey();
   if (!key) return { success: false, error: 'Telnyx API key not configured' };
@@ -143,11 +178,13 @@ export async function getBrandStatus(brandId: string): Promise<BrandResult> {
       return { success: false, error: errorFromResponse(data, 'Failed to fetch brand status') };
     }
 
-    return {
-      success: true,
-      brandId,
-      status: data.data?.identityStatus ?? data.identityStatus ?? data.data?.status ?? data.status,
-    };
+    const real = data.data?.identityStatus ?? data.identityStatus ?? data.data?.status ?? data.status;
+    const simulated = simulatedIdentityStatus((data.data?.mock ?? data.mock) === true);
+    if (simulated) {
+      console.warn(`⚠️ 10DLC MOCK: reporting brand ${brandId} as ${simulated} (Telnyx says ${real})`);
+    }
+
+    return { success: true, brandId, status: simulated ?? real };
   } catch (error: any) {
     console.error('Telnyx getBrandStatus error:', error);
     return { success: false, error: error.message || 'Network error' };
@@ -349,6 +386,31 @@ export async function checkCampaignQualification(
   if (!key) return { qualifies: true, carriers: {}, declined: [], error: 'Telnyx API key not configured' };
 
   try {
+    // A simulated-unverified brand must also stop qualifying, or the simulation
+    // contradicts itself: the sync would see `unverified` and skip, while this
+    // reported every carrier happy. Telnyx answers for the brand it actually
+    // holds, so the override has to be mirrored here (#191).
+    //
+    // Guarded the same way as the status override — mock mode on AND the brand
+    // itself mock — so this cannot decline a real brand.
+    const forced = process.env.TELNYX_10DLC_MOCK?.trim() === 'true'
+      ? process.env.TELNYX_10DLC_MOCK_IDENTITY?.trim().toUpperCase()
+      : undefined;
+    if (forced === 'UNVERIFIED' || forced === 'FAILED') {
+      const brandRes = await fetch(`${TELNYX_API_URL}/10dlc/brand/${encodeURIComponent(brandId)}`, {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      const brand = await brandRes.json().catch(() => ({}));
+      if ((brand?.data?.mock ?? brand?.mock) === true) {
+        const carriers = {
+          'AT&T': false, 'T-Mobile': false, 'Verizon Wireless': false,
+          'US Cellular': false, 'Interop': false, 'ClearSky': false, 'Liberty': false,
+        };
+        console.warn(`⚠️ 10DLC MOCK: reporting no carrier qualification for mock brand ${brandId}`);
+        return { qualifies: false, carriers, declined: Object.keys(carriers) };
+      }
+    }
+
     const res = await fetch(
       `${TELNYX_API_URL}/10dlc/campaignBuilder/brand/${encodeURIComponent(brandId)}/usecase/${encodeURIComponent(usecase)}`,
       { headers: { Authorization: `Bearer ${key}` } }

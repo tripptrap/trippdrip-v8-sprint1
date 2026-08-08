@@ -5489,3 +5489,39 @@ than assumed.
 migration whose purpose is removing Twilio. The `sms_messages` table itself still
 exists and is filed as #196 — dropping it is irreversible and `delete-account`
 still lists it, so the reference must go first.
+
+## Mock mode can now fail the way reality does (#191, 2026-08-08)
+
+`TELNYX_10DLC_MOCK=true` exercises registration without carriers or fees, and it
+does catch real faults — it found the 343-character `optinMessage` that would
+have failed every campaign submission. But Telnyx **auto-verifies mock
+`PRIVATE_PROFIT` brands**, and identity matching is the single most likely thing
+to fail for a real customer. So the one outcome worth rehearsing was stubbed to
+always pass, on the only entity type customers actually register as.
+
+That is not hypothetical: every mock run reported success, and the first real
+non-LLC registration came back UNVERIFIED with no carrier qualifying it (#193).
+The branch deciding what a stuck user is told could not be reached in testing.
+
+```bash
+TELNYX_10DLC_MOCK=true TELNYX_10DLC_MOCK_IDENTITY=UNVERIFIED   # or FAILED, or VERIFIED
+```
+
+`simulatedIdentityStatus()` in `lib/telnyx10dlc.ts` substitutes the outcome at the
+read boundary, so everything downstream — `mapBrandStatus`, the campaign gate in
+`tenDlcSync`, the Settings UI — sees the simulated state naturally rather than
+each needing its own test hook. `checkCampaignQualification` mirrors it, because a
+simulated-unverified brand that still reported every carrier happy would
+contradict itself.
+
+**Two independent guards, and both are required.** Getting this wrong in
+production means telling a paying customer their verified brand failed:
+
+1. `TELNYX_10DLC_MOCK` must be `'true'` — environment only, never a request body;
+2. the brand itself must report `mock: true` **from Telnyx**.
+
+A stale env var therefore cannot touch a real brand. Verified across five cases —
+no override, forced UNVERIFIED, forced FAILED, override with mock mode off, and
+**override set against a real brand** (untouched, still VERIFIED). Mock
+`SOLE_PROPRIETOR` brands already return UNVERIFIED honestly, so this exists for
+the entity types that do not.

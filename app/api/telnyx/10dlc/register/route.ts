@@ -254,6 +254,11 @@ export async function POST(req: NextRequest) {
     // Scope is 10DLC only. Number ORDERS are still real and still cost money, so
     // a mock environment can prove registration works but must not be used to
     // test number purchase.
+    //
+    // Mock is not a full simulation: Telnyx auto-verifies mock PRIVATE_PROFIT
+    // brands, which is exactly the outcome most likely to fail in reality (#193).
+    // Set TELNYX_10DLC_MOCK_IDENTITY=UNVERIFIED to exercise that path — see
+    // simulatedIdentityStatus in lib/telnyx10dlc (#191).
     const mock = process.env.TELNYX_10DLC_MOCK?.trim() === 'true';
     if (mock) {
       console.warn('⚠️ 10DLC registration running in MOCK mode — no carrier submission, no fees.');
