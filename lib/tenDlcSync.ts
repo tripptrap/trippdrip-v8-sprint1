@@ -11,7 +11,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  getBrandStatus, getCampaignStatus, mapBrandStatus, mapCampaignStatus,
+  getBrandStatus, getCampaignStatus, mapBrandStatus, mapCampaignStatus, checkCampaignQualification,
   listCampaignsForBrand, pickUsableCampaign, createCampaign, type CampaignUseCase,
 } from '@/lib/telnyx10dlc';
 import { assignAllUserNumbersToCampaign } from '@/lib/autoAssignCampaignNumber';
@@ -112,6 +112,38 @@ export async function syncTenDlcRegistration(
     const stored = registration.pending_campaign_usecase;
     const usecase: CampaignUseCase = stored === 'MIXED' ? 'MIXED' : 'LOW_VOLUME';
 
+    // Ask before paying (#192).
+    //
+    // The qualification endpoint is free and answers the only question that
+    // matters here: will any carrier actually take this campaign. Submitting
+    // without asking is how $15 goes on something no carrier can provision, and
+    // the fee recurs on every resubmission.
+    //
+    // Defence in depth rather than the only guard — this branch already requires
+    // brand_status === 'verified' — but it is the guard that reports *why* in
+    // carrier terms, which is what a user can act on.
+    const qualification = await checkCampaignQualification(registration.brand_id!, usecase);
+
+    if (qualification.error) {
+      // Could not check. Submitting anyway, deliberately: an outage at Telnyx
+      // must not block a registration that would otherwise have gone through.
+      console.warn(`10DLC: qualification check unavailable (${qualification.error}) — submitting anyway`);
+    }
+
+    if (!qualification.qualifies) {
+      // Recorded and skipped, not thrown. The row keeps its brand and its stored
+      // campaign content, so the next run retries for free once the carriers
+      // change their mind — which is the normal outcome, not an error state.
+      updates.campaign_status = 'not_started';
+      updates.campaign_failure_reason =
+        `No carrier will accept a ${usecase} campaign for this brand yet ` +
+        `(declined by ${qualification.declined.join(', ')}). This usually clears once the ` +
+        `brand's identity verification does. Nothing was submitted and nothing was charged.`;
+      console.warn(
+        `10DLC: skipped campaign submission for user ${registration.user_id} — no carrier qualifies`,
+        qualification.carriers
+      );
+    } else {
     const campaignResult = await createCampaign({
       brandId: registration.brand_id!,
       usecase,
@@ -152,6 +184,7 @@ export async function syncTenDlcRegistration(
       updates.campaign_status = 'failed';
       updates.campaign_failure_reason = campaignResult.error || 'Campaign submission failed';
       console.error(`10DLC: campaign submission failed for user ${registration.user_id}:`, campaignResult.error);
+    }
     }
   }
 

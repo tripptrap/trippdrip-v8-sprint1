@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
   isValidVertical, isValidEntityType, SELF_SERVE_VERTICALS, TELNYX_ENTITY_TYPES,
 } from '@/lib/telnyx10dlcEnums';
-import { createBrand, createCampaign, EntityType, mapBrandStatus, mapCampaignStatus } from '@/lib/telnyx10dlc';
+import { createBrand, createCampaign, checkCampaignQualification, EntityType, mapBrandStatus, mapCampaignStatus } from '@/lib/telnyx10dlc';
 import { generateCampaignDefaults, CampaignDefaults } from '@/lib/telnyx10dlcDefaults';
 import { validateBusinessEmail, explainBrandError } from '@/lib/validateBusinessEmail';
 import { alertAdminsThrottled } from '@/lib/alerting';
@@ -110,14 +110,6 @@ export async function POST(req: NextRequest) {
     // the EIN actually buys is a number, and `checkNumberEligibility` is what
     // holds that line.
     //
-    // Sole proprietor is not offered (#119). Telnyx requires an SMS OTP step for
-    // sole props that nothing here implements, so a registration submitted as one
-    // reaches Telnyx and then stops — the user's number never arrives and no
-    // error explains why. Refusing up front is honest; the silent dead end was
-    // not.
-    //
-    // Enforced here as well as removed from the two pickers, because a picker is
-    // not a boundary and existing drafts may already hold this value.
     // ── Sole proprietor ──────────────────────────────────────────────────────
     //
     // This used to be refused outright (#119), because the OTP step Telnyx
@@ -489,6 +481,39 @@ export async function POST(req: NextRequest) {
         message:
           'Your business has been submitted for carrier verification. ' +
           'The messaging campaign is created automatically once that clears — usually within a few minutes, sometimes a few days.',
+      });
+    }
+
+    // Ask before paying (#192). Free, and it is the difference between a $15
+    // charge and a sentence explaining which carriers said no. Reached only when
+    // the brand verified instantly, which is rare — the deferred path in
+    // lib/tenDlcSync carries the same check.
+    const qualification = await checkCampaignQualification(brandResult.brandId!, usecase);
+    if (!qualification.qualifies) {
+      await supabaseAdmin.from('user_10dlc_registrations').update({
+        what_they_offer: body.whatTheyOffer?.trim() || null,
+        campaign_content: content,
+        pending_campaign_usecase: usecase,
+        campaign_status: 'not_started',
+        campaign_failure_reason:
+          `No carrier will accept a ${usecase} campaign for this brand yet ` +
+          `(declined by ${qualification.declined.join(', ')}).`,
+        updated_at: new Date().toISOString(),
+      }).eq('id', registrationId);
+
+      // ok:true — from the user's side nothing failed. Their business registered,
+      // the content is stored, and the campaign goes in by itself the moment the
+      // carriers accept it. Content is kept rather than regenerated so what
+      // eventually files is what they reviewed.
+      return NextResponse.json({
+        ok: true,
+        brandStatus,
+        campaignStatus: 'not_started',
+        campaignDeferred: true,
+        message:
+          'Your business is registered. Carriers are not accepting the messaging campaign yet — ' +
+          'that normally clears within a few days of the business itself being verified, and it is ' +
+          'submitted automatically when it does. Nothing further is needed from you.',
       });
     }
 

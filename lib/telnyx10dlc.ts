@@ -309,6 +309,85 @@ export function validateCampaignFields(params: CreateCampaignParams): string | n
   return null;
 }
 
+export interface CampaignQualification {
+  /** False only when Telnyx answered and no carrier will take the campaign. */
+  qualifies: boolean;
+  /** Carrier name → whether it will accept this brand on this use case. */
+  carriers: Record<string, boolean>;
+  /** Carriers that said no. Empty when everything qualifies. */
+  declined: string[];
+  quarterlyFee?: number;
+  annualFee?: number;
+  monthlyFee?: number;
+  /** Set when the check itself could not be completed. */
+  error?: string;
+}
+
+/**
+ * Ask Telnyx whether a brand can actually run this use case, before paying to
+ * find out.
+ *
+ * `GET /10dlc/campaignBuilder/brand/{id}/usecase/{uc}` is **free** and returns a
+ * per-carrier `qualify` flag alongside the fee schedule. Nothing called it, so
+ * the only way to learn a campaign was unrunnable was to submit one and be
+ * charged — and the campaign review fee recurs on every resubmission, with
+ * docs/10DLC_REJECTION_HISTORY.md recording eight submissions before one passed.
+ *
+ * It is decisive in practice. Checked on 2026-08-07:
+ *   verified brand   → qualify true at all seven carriers
+ *   UNVERIFIED brand → qualify FALSE at all seven
+ *
+ * A failed *check* is not a failed qualification. If Telnyx cannot be reached the
+ * result carries `error` and `qualifies: true`, so an outage never blocks a
+ * registration that would have succeeded — the caller decides what that is worth.
+ */
+export async function checkCampaignQualification(
+  brandId: string,
+  usecase: string
+): Promise<CampaignQualification> {
+  const key = apiKey();
+  if (!key) return { qualifies: true, carriers: {}, declined: [], error: 'Telnyx API key not configured' };
+
+  try {
+    const res = await fetch(
+      `${TELNYX_API_URL}/10dlc/campaignBuilder/brand/${encodeURIComponent(brandId)}/usecase/${encodeURIComponent(usecase)}`,
+      { headers: { Authorization: `Bearer ${key}` } }
+    );
+    const data = await res.json();
+
+    if (!res.ok) {
+      return {
+        qualifies: true, carriers: {}, declined: [],
+        error: errorFromResponse(data, `qualification check returned HTTP ${res.status}`),
+      };
+    }
+
+    const carriers: Record<string, boolean> = {};
+    for (const entry of Object.values(data?.mnoMetadata ?? {}) as any[]) {
+      if (entry?.mno) carriers[entry.mno] = entry.qualify === true;
+    }
+
+    // An empty carrier map means Telnyx told us nothing useful. Treated as
+    // "cannot tell" rather than "nobody qualifies" — refusing on silence would
+    // block registrations over a response-shape change.
+    if (Object.keys(carriers).length === 0) {
+      return { qualifies: true, carriers: {}, declined: [], error: 'no carrier data in response' };
+    }
+
+    const declined = Object.entries(carriers).filter(([, ok]) => !ok).map(([mno]) => mno);
+    return {
+      qualifies: declined.length < Object.keys(carriers).length,
+      carriers,
+      declined,
+      quarterlyFee: data?.quarterlyFee,
+      annualFee: data?.annualFee,
+      monthlyFee: data?.monthlyFee,
+    };
+  } catch (err: any) {
+    return { qualifies: true, carriers: {}, declined: [], error: err?.message || 'qualification check failed' };
+  }
+}
+
 export async function createCampaign(params: CreateCampaignParams): Promise<CampaignResult> {
   const key = apiKey();
   if (!key) return { success: false, error: 'Telnyx API key not configured' };
